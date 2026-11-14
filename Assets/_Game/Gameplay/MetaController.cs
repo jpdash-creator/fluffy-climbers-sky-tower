@@ -1796,14 +1796,17 @@ namespace FluffyClimbers.Gameplay
 
         /// <summary>
         /// The milestone gem badge in the top right corner of a level tile: the gem icon, its amount to the left of it (outlined, one line, inside the tile) and, once the gems were claimed,
-        /// the icon dimmed with a small green tick (shape and colour both say "done"). The top row is medal (left), amount, gem (right); the level number sits lower in the middle.
+        /// the icon dimmed with a small green tick (shape and colour both say "done"). The medal sits top left, the gem top right with its amount right under it and the claimed tick under that; the level number stays in the middle.
         /// </summary>
         void AddGemBadge(RectTransform node, int gems, bool claimed)
         {
+            // phone check + layout test 2026-11-14: the badge floats ABOVE the tile's top right corner (the gap above a tile is empty), so neither the amount nor the icon can touch the level number
+            // (which grows at 130 percent text) and the amount cannot read as part of it ("5 1" looked like 51).
+            const float rowY = 34f;
             Image gem = UiKit.AddImage(node, GemBadgeName, art.GemIcon, claimed ? new Color(1f, 1f, 1f, 0.6f) : Color.white);
             gem.rectTransform.anchorMin = gem.rectTransform.anchorMax = new Vector2(1f, 1f);
             gem.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            gem.rectTransform.anchoredPosition = new Vector2(-14f, -14f);
+            gem.rectTransform.anchoredPosition = new Vector2(-18f, rowY);
             gem.rectTransform.sizeDelta = new Vector2(64f, 64f);
             gem.gameObject.AddComponent<A11yLabel>().Text = gems + (gems == 1 ? " gem" : " gems") + " for the first clear" + (claimed ? ", claimed" : "");
             Text amount = UiKit.AddText(node, GemAmountName, gems.ToString(), 44, UiKit.ButtonInk, TextAnchor.MiddleCenter, true);
@@ -1812,14 +1815,14 @@ namespace FluffyClimbers.Gameplay
             amount.verticalOverflow = VerticalWrapMode.Overflow;
             amount.rectTransform.anchorMin = amount.rectTransform.anchorMax = new Vector2(1f, 1f);
             amount.rectTransform.pivot = new Vector2(1f, 0.5f);
-            amount.rectTransform.anchoredPosition = new Vector2(-50f, -14f);
+            amount.rectTransform.anchoredPosition = new Vector2(-54f, rowY);
             amount.rectTransform.sizeDelta = new Vector2(46f, 56f);
             if (claimed)
             {
                 Image tick = UiKit.AddImage(node, GemClaimedName, Glyphs.Check, new Color(0.18f, 0.7f, 0.3f, 1f));
                 tick.rectTransform.anchorMin = tick.rectTransform.anchorMax = new Vector2(1f, 1f);
                 tick.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                tick.rectTransform.anchoredPosition = new Vector2(-6f, -36f);
+                tick.rectTransform.anchoredPosition = new Vector2(-116f, rowY);
                 tick.rectTransform.sizeDelta = new Vector2(32f, 32f);
             }
         }
