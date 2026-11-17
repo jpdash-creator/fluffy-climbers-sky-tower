@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using FluffyClimbers.Economy;
@@ -47,7 +47,7 @@ namespace FluffyClimbers.Gameplay
         // Bug List 5 item 1 (2026-11-17): a taller row (140) with a smaller medal and avatar so nothing touches the painted border of any plate (the gold / silver / bronze caps are round: the medal corner sat on the border at 108 tall).
         public const float MedalH = 92f, AvatarSize = 80f, RowVPad = 24f, RowBase = MedalH + 2f * RowVPad;
         /// <summary>The height of every row (top 100 and the pinned own card): the content plus its padding, never below the 48 dp touch minimum, and tall enough for the own row's name line and tag line at the current text size.</summary>
-        public static float RowH { get { return Mathf.Max(Mathf.Max(RowBase, UiKit.MinTouchRef), RewardsScreen.LineH(NameFont) + YouTagH + 16f); } }
+        public static float RowH { get { return Mathf.Max(Mathf.Max(RowBase, UiKit.MinTouchRef), RewardsScreen.LineH(NameFont) + 16f); } }
         const float RowGap = 12f, PadTop = 8f, PadSide = 12f, TabGap = 8f;
         /// <summary>How far the own row's glow rings grow past the plate (inside the list's side padding and row gap, so no ring is clipped or touches the next row).</summary>
         const float GlowWideGrow = 8f, GlowThinGrow = 4f;
@@ -63,9 +63,6 @@ namespace FluffyClimbers.Gameplay
         static float CrownIconH { get { return Mathf.Round(CrownFontPx * 0.9f); } }
         static float CrownIconW { get { return Mathf.Round(CrownIconH * 1.2f); } }
         const float TagBottom = 6f;
-        /// <summary>The "YOU" tag sits under the name of the own row (no (i) button since Bug List 5: the whole row opens the calculation); it grows with the text size.</summary>
-        static float YouTagW { get { return 130f + (UiKit.TextScale - 1f) * 90f; } }
-        static float YouTagH { get { return Mathf.Max(48f, Mathf.Round(Mathf.Max(42f, UiKit.MinBodyTextPx) * UiKit.TextScale) + 6f); } }
         /// <summary>Two name lines fit the row at this text size (the own row never uses two: its YOU tag sits under the name).</summary>
         static bool TwoLineNames { get { return RowH - 8f >= 2f * RewardsScreen.LineH(NameFont); } }
         static readonly Color[] AvatarColors =
@@ -74,7 +71,7 @@ namespace FluffyClimbers.Gameplay
             new Color(0.98f, 0.90f, 0.58f, 1f), new Color(0.66f, 0.88f, 0.90f, 1f), new Color(0.84f, 0.76f, 0.94f, 1f), new Color(0.96f, 0.74f, 0.74f, 1f)
         };
         /// <summary>Bottom of the name box of the own row (above the tag).</summary>
-        static float OwnNameBottom { get { return TagBottom + YouTagH + 2f; } }
+        static float OwnNameBottom { get { return 4f; } }
 
         static readonly Color Ink = UiKit.PanelInk;
         static readonly Color GlowColor = new Color(1f, 0.93f, 0.35f, 1f), GlowSoft = new Color(1f, 0.93f, 0.35f, 0.55f);
@@ -85,10 +82,10 @@ namespace FluffyClimbers.Gameplay
         sealed class Row
         {
             public GameObject Go;
-            public RectTransform Rt, NameRt, TagRt, HitRt;
+            public RectTransform Rt, NameRt, HitRt;
             public Image Back, Medal, Photo, Glow, GlowWide, AvatarBg;
-            public Text Rank, Name, Crowns, Letter, Tag;
-            public GameObject TagGo, HitGo;
+            public Text Rank, Name, Crowns, Letter;
+            public GameObject HitGo;
             public bool Pinned, IsMe;
             public int PlateIdx = -1;
             public string Url = "";
@@ -515,7 +512,7 @@ namespace FluffyClimbers.Gameplay
                 BoardRow r = data.Entries[i];
                 rankText[i] = RankString(r.Rank);
                 initialText[i] = InitialOf(r.Name);
-                nameText[i] = FitName(r.Name, false, i != ownIdx && TwoLineNames);
+                nameText[i] = FitName(r.Name, false, TwoLineNames);
             }
         }
 
@@ -566,7 +563,7 @@ namespace FluffyClimbers.Gameplay
         }
 
         /// <summary>
-        /// A name that fits the name slot at the current text size, measured with the real font, so it never runs into the crown icon. A long name of a row WITHOUT the YOU tag may use two lines (broken at a space when it can);
+        /// A name that fits the name slot at the current text size, measured with the real font, so it never runs into the crown icon. A long name (every row, the own row too since the YOU tag is gone) may use two lines (broken at a space when it can);
         /// only what still does not fit is cut with three dots (Bug List 5: names are not truncated while there is room for them).
         /// </summary>
         string FitName(string name, bool pinned, bool allowTwoLines)
@@ -667,7 +664,7 @@ namespace FluffyClimbers.Gameplay
             LbProfile p = LeaderboardHub.Profile;
             string name = string.IsNullOrEmpty(p.DisplayName) ? "You" : p.DisplayName;
             long crowns = ownIdx >= 0 ? data.Entries[ownIdx].Crowns : (rank != null ? rank.Crowns : 0L);
-            Bind(ownRow, 0, pinnedRankText, FitName(name, true, false), CrownString(crowns), p.AvatarUrl, InitialOf(name), true);
+            Bind(ownRow, 0, pinnedRankText, FitName(name, true, TwoLineNames), CrownString(crowns), p.AvatarUrl, InitialOf(name), true);
             ownRow.Go.SetActive(false);
         }
 
@@ -735,19 +732,6 @@ namespace FluffyClimbers.Gameplay
             UiKit.Stretch(r.Photo.rectTransform);
             r.Photo.rectTransform.offsetMin = new Vector2(3f, 3f); r.Photo.rectTransform.offsetMax = new Vector2(-3f, -3f);   // the picture stays inside the round edge
             r.Photo.gameObject.SetActive(false);
-
-            // the own row: a tag "YOU" UNDER the name; the whole row (the Hit area below) opens the calculation popup, there is no separate (i) button (Bug List 5)
-            RectTransform tag = UiKit.Rect(r.Rt, "YouTag");
-            Anchor(tag, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(NameX(pinned) - 4f, TagBottom), new Vector2(YouTagW, YouTagH));
-            Image tbg = UiKit.AddImage(tag, "Plate", ToyKit.Get("lb_pill_score"), Color.white);
-            CapsFollowHeight(tbg, YouTagH);
-            UiKit.Stretch(tbg.rectTransform);
-            r.Tag = Label(tag, "TagText", "YOU", 42, Ink, TextAnchor.MiddleCenter, true, true);
-            UiKit.Stretch(r.Tag.rectTransform);
-            r.Tag.rectTransform.offsetMin = new Vector2(10f, 2f); r.Tag.rectTransform.offsetMax = new Vector2(-10f, -2f);
-            r.Tag.horizontalOverflow = HorizontalWrapMode.Overflow;
-            r.TagRt = tag; r.TagGo = tag.gameObject;
-            r.TagGo.SetActive(pinned);
 
             // the whole own row is the touch target of the calculation popup (only active on the own row)
             r.HitGo = UiKit.Rect(r.Rt, "Hit").gameObject;
@@ -850,7 +834,6 @@ namespace FluffyClimbers.Gameplay
                 r.IsMe = me;
                 r.Glow.gameObject.SetActive(me);
                 r.GlowWide.gameObject.SetActive(me);
-                r.TagGo.SetActive(me);
                 r.HitGo.SetActive(me);
                 r.NameRt.offsetMin = new Vector2(NameX(false), me ? OwnNameBottom : 4f);
             }

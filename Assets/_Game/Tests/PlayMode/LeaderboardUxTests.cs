@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Text;
@@ -568,9 +568,8 @@ namespace FluffyClimbers.Tests
                 Assert.IsFalse(s.PinnedShown, "inside the top 100 there is no pinned card");
                 Assert.AreEqual(0f, s.ScrollOffset, 0.5f, "ranks 1 to 10 open at the top");
                 Transform own = LbRowOfRank(s, 5);
-                Assert.IsTrue(own.Find("Backdrop").gameObject.activeSelf && own.Find("YouTag").gameObject.activeSelf, "glow outline and YOU tag on the own row");
+                Assert.IsTrue(own.Find("Backdrop").gameObject.activeSelf, "glow outline on the own row");
                 Assert.AreEqual("lb_row_green", own.Find("Plate").GetComponent<Image>().sprite.name, "the own row keeps its rank colour");
-                Assert.AreEqual("YOU", own.Find("YouTag").Find("TagText").GetComponent<Text>().text);
 
                 // rank 8 is the last rank shown in place (light green), rank 9 and lower is pinned while the real row is off screen
                 LbState(LbServer("rows", false, "p8", 8), true, true, true);
@@ -783,7 +782,6 @@ namespace FluffyClimbers.Tests
                 GameObject own = LbHitOf(LbRowOfRank(s, 5));
                 Assert.IsNotNull(own, "the own row is a button");
                 Assert.AreEqual("Your crowns, tap for the calculation", own.GetComponent<A11yLabel>().Text);
-                Assert.IsNull(LbRowOfRank(s, 5).Find("YouTag").Find("HintIcon"), "no (i) button: tapping the row itself opens the calculation");
                 Assert.AreEqual(0, net.CountOf("slots=1"), "nothing is read before the tap");
                 Assert.IsFalse(s.BreakdownOpen);
                 LbTap(own);
@@ -843,7 +841,6 @@ namespace FluffyClimbers.Tests
                 Assert.IsTrue(s.PinnedShown);
                 GameObject hit = LbHitOf(LbFind(s.Root, "OwnCard"));
                 Assert.IsNotNull(hit, "the pinned card is a button");
-                Assert.IsNull(LbFind(s.Root, "OwnCard").Find("YouTag").Find("HintIcon"), "no (i) button on the pinned card either");
                 LbTap(hit);
                 yield return null;
                 Assert.AreEqual(LeaderboardScreen.BreakdownState.Ready, s.BreakdownPhase);

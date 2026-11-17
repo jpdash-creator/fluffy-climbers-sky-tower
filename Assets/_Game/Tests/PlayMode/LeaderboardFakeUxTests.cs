@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using FluffyClimbers.Economy;
 using FluffyClimbers.Gameplay;
@@ -91,7 +91,6 @@ namespace FluffyClimbers.Tests
                 Text crowns = row.Find("CrownsText").GetComponent<Text>();
                 Assert.AreNotSame(UiKit.DisplayFont, crowns.font, who + ": the amount uses the regular body face, not the heavy display face");
                 Assert.LessOrEqual(crowns.fontSize, Mathf.RoundToInt(UiKit.MinBodyTextPx * UiKit.TextScale) + 1, who + ": the amount is as small as the 16 sp floor allows");
-                Assert.IsNull(row.Find("YouTag") != null ? row.Find("YouTag").Find("HintIcon") : null, who + ": no (i) button");
                 Text name = row.Find("NameText").GetComponent<Text>();
                 Assert.LessOrEqual(name.text.Split('\n').Length, 2, who + ": at most two name lines");
                 if (name.text.Contains("\n")) Assert.GreaterOrEqual(((RectTransform)name.transform).rect.height, 2f * RewardsScreen.LineH(42) - 1f, who + ": two lines only when the box holds them");
@@ -125,8 +124,7 @@ namespace FluffyClimbers.Tests
                 yield return null;
                 Transform row = LbRowOfRank(s, rank);
                 Assert.IsNotNull(row, "the own row is bound once it is scrolled into view");
-                Assert.IsNotNull(row.Find("YouTag"), "the own row keeps the YOU tag");
-                Assert.IsNull(row.Find("YouTag").Find("HintIcon"), "and has no (i) button");
+                Assert.IsNull(row.Find("YouTag"), "the own row has no tag under the name (owner 2026-11-17)");
                 GameObject hit = LbHitOf(row);
                 Assert.IsNotNull(hit, "the whole own row is the button");
                 LbTap(hit);
