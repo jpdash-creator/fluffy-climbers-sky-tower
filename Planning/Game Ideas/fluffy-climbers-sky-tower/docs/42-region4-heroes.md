@@ -10,11 +10,11 @@ Hero physics (Jump, Speed, Control, Wall Bounce) and the rarity rules: see docs/
 
 | Hero | Identity | Identity power (first of the pool) | Run bonus |
 |---|---|---|---|
-| Bonbon (existing) | jump, wall bounce | Double Jump (Double Jump, Slow Time, Magnet, Rocket) | 70 coins, 4 gems |
-| Gummi | defence, wall bounce | Shield (Shield, Wall Stick, Slow Time, Magnet) | 80 coins, 3 gems |
+| Bonbon (existing) | jump, wall bounce | Double Jump (Double Jump, Slow Time, Wide Platforms, Rocket) | 70 coins, 4 gems |
+| Gummi | defence, wall bounce | Shield (Shield, Wall Stick, Slow Time, Wide Platforms) | 80 coins, 3 gems |
 | Choco | jump | Double Jump (Double Jump, Rocket, Shield, Slow Time) | 100 coins, 1 gem |
-| Marsh | calm control | Slow Time (Slow Time, Shield, Double Jump, Magnet) | 90 coins, 4 gems |
-| Cookie | coin finder | Magnet (Magnet, Double Jump, Rocket, Shield), coin find +35 per level | 80 coins, 4 gems |
+| Marsh | calm control | Slow Time (Slow Time, Shield, Double Jump, Glide Cape) | 90 coins, 4 gems |
+| Cookie | coin finder | Wide Platforms (Wide Platforms, Double Jump, Rocket, Shield), coin find +35 per level | 80 coins, 4 gems |
 
 Tier physics follow doc 44 sections 4 and 8 (no percent chain). Run add-ons drawn by `Tools/tier_rows.py` (seed BaseSeed + line index + 1000 x tier; line index continues after Coco: Gummi 17, Choco 18, Marsh 19, Cookie 20; Bonbon is line 3). Cookie takes the better of two draws for run coins and gems. Bonbon's Uncommon is the existing constant.
 

@@ -1,0 +1,89 @@
+using System;
+using System.Collections.Generic;
+
+namespace FluffyClimbers.Economy
+{
+    /// <summary>
+    /// The crown calculation of the week on the phone, kept in step with the cloud copy (owner 2026-11-17). The phone's own version is the weekly crown store (written after every run, with a UTC stamp per slot);
+    /// the leaderboard hub uploads it and merges the cloud version back in (newer version per slot wins, see <see cref="BreakdownMerge"/>), so the latest version is on both sides, also after a reinstall or on a new device.
+    /// The cloud copy is display-only: nothing here changes a crown that is sent for ranking (those are replayed by the service).
+    /// </summary>
+    public sealed partial class ProgressService
+    {
+        /// <summary>Counts every change of the weekly crown store made by a run (not by a merge from the cloud). Not saved: a new app start counts from 0 and the hub syncs once at sign-in anyway.</summary>
+        public int BreakdownRevision { get; private set; }
+
+        long BreakdownNowUnix() { return WeekKeys.ToUnix(WeekClock != null ? WeekClock() : DateTime.UtcNow); }
+
+        /// <summary>The stamp of a newly recorded slot version: the phone's clock, but never earlier than (or equal to) any stamp already in the week's store, so a clock set back cannot make a newer run look older.</summary>
+        long NextBreakdownStamp(WeekCrownData w)
+        {
+            long max = 0;
+            MaxStamp(w.Levels, ref max);
+            MaxStamp(w.Endless, ref max);
+            MaxStamp(w.TimeAttack, ref max);
+            long now = BreakdownNowUnix();
+            return now > max ? now : max + 1;
+        }
+
+        static void MaxStamp(Dictionary<string, CrownRun[]> map, ref long max)
+        {
+            if (map == null) return;
+            foreach (var kv in map)
+            {
+                if (kv.Value == null) continue;
+                foreach (CrownRun r in kv.Value) if (r != null && r.At > max) max = r.At;
+            }
+        }
+
+        /// <summary>The phone's own calculation of this week: one slot per level / Endless region / Time Attack region and setting with a crown, with floors, base score, chains and the version time. Same as <see cref="WeekSlots"/>.</summary>
+        public List<WeekSlotInfo> LocalBreakdown() { return WeekSlots(); }
+
+        /// <summary>
+        /// Merges the cloud version of the week's calculation into the local weekly store: per slot the NEWER version wins (the higher crown when a time is unknown), so after this call the phone holds the latest of both.
+        /// Returns true when the local store changed (and was saved). Ignored while the week key differs from the current one or a Reset progress is still waiting to be deleted in the cloud (the cloud copy is old then).
+        /// Slots without a readable id or score are skipped; the crown is recomputed from the score, never taken from the cloud.
+        /// </summary>
+        public bool MergeCloudBreakdown(string weekKey, IEnumerable<WeekSlotInfo> cloud)
+        {
+            if (cloud == null || weekKey != CurrentWeekKey || Data.LeaderboardWipePending) return false;
+            long now = BreakdownNowUnix();
+            List<WeekSlotInfo> clean = BreakdownMerge.Sanitize(cloud, long.MaxValue, WeekKeys.StartOfWeekUnix(now), false);
+            bool changed = false;
+            foreach (WeekSlotInfo c in clean)
+            {
+                char kind; string target; int mode;
+                if (!BreakdownMerge.TryParseId(c.SlotId, out kind, out target, out mode)) continue;
+                WeekKind wk = kind == 'e' ? WeekKind.Endless : kind == 't' ? WeekKind.TimeAttack : WeekKind.Level;
+                CrownRun have = WeekRun(wk, target, mode);
+                WeekSlotInfo mine = have == null ? null : new WeekSlotInfo { SlotId = c.SlotId, Crown = CrownScore.FromScore(have.BaseScore, mode), Score = have.BaseScore, At = have.At, Chains = have.Chains };
+                if (!ReferenceEquals(BreakdownMerge.Newer(mine, c), c)) continue;
+                if (mine != null && mine.Crown == c.Crown && mine.At == c.At && have.BaseScore == c.Score) continue;   // the same version: nothing to write
+                PutWeekRun(wk, target, mode, new CrownRun { Floors = c.Floors, BestCombo = c.Combo, BaseScore = c.Score, Chains = CrownRun.CopyChains(c.Chains), At = c.At });
+                changed = true;
+            }
+            if (changed) Commit();
+            return changed;
+        }
+
+        void PutWeekRun(WeekKind kind, string id, int mode, CrownRun run)
+        {
+            string key = CurrentWeekKey;
+            WeekCrownData w = Data.WeekCrowns;
+            if (w == null || w.WeekKey != key) { w = new WeekCrownData { WeekKey = key }; Data.WeekCrowns = w; }
+            if (w.Levels == null) w.Levels = new Dictionary<string, CrownRun[]>();
+            if (w.Endless == null) w.Endless = new Dictionary<string, CrownRun[]>();
+            if (w.TimeAttack == null) w.TimeAttack = new Dictionary<string, CrownRun[]>();
+            var map = kind == WeekKind.Endless ? w.Endless : kind == WeekKind.TimeAttack ? w.TimeAttack : w.Levels;
+            CrownRun[] arr;
+            if (!map.TryGetValue(id, out arr) || arr == null || arr.Length != TimeRecords.ModeCount)
+            {
+                var fresh = new CrownRun[TimeRecords.ModeCount];
+                if (arr != null) Array.Copy(arr, fresh, Math.Min(arr.Length, fresh.Length));
+                arr = fresh;
+                map[id] = arr;
+            }
+            arr[mode] = run;
+        }
+    }
+}

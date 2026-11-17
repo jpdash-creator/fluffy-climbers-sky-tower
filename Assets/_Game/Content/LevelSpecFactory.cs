@@ -47,7 +47,7 @@ namespace FluffyClimbers.Content
             goal.TimeSec = level.Goal.TimeSec ?? 0;
             spec.Goal = goal;
 
-            if (attemptSeed != 0) { spec.AttemptSeed = attemptSeed; spec.Seed = LevelSpec.MixAttemptSeed(level.Seed, attemptSeed); }
+            if (attemptSeed != 0) { spec.AttemptSeed = attemptSeed; spec.BaseSeed = level.Seed; spec.Seed = LevelSpec.MixAttemptSeed(level.Seed, attemptSeed); }
 
             if (level.Overrides != null)
             {

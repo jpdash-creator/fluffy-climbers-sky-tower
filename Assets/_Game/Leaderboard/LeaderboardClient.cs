@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FluffyClimbers.Economy;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -104,12 +105,26 @@ namespace FluffyClimbers.Leaderboard
             Call("GET", cfg.Url("/my-week" + (withPrizes ? "?prizes=1" : "")), null, r => done(r.Ok ? LbJson.ParseMyWeek(r.Body) : null));
         }
 
+        /// <summary>GET /my-week?slots=1: the same standing plus the slot list (the best crown of the week per level x setting, Endless and Time Attack region x setting) for the own-row calculation popup. null on failure.</summary>
+        public void MySlots(Action<MyWeekData> done)
+        {
+            Call("GET", cfg.Url("/my-week?slots=1"), null, r => done(r.Ok ? LbJson.ParseMyWeek(r.Body) : null));
+        }
+
         /// <summary>POST /claim-prize. With <paramref name="ack"/> the app confirms it saved the prize (the claim then becomes "granted"). The reply carries the status for the caller.</summary>
         public void ClaimPrize(string weekKey, string board, bool ack, Action<HttpReply, ClaimData> done)
         {
             var body = new JObject { ["weekKey"] = weekKey, ["board"] = board };
             if (ack) body["ack"] = true;
             Call("POST", cfg.Url("/claim-prize"), body.ToString(Newtonsoft.Json.Formatting.None), r => done(r, r.Ok ? LbJson.ParseClaim(r.Body) : null));
+        }
+
+        /// <summary>
+        /// POST /sync-breakdown (owner 2026-11-17): uploads the phone's crown calculation of the week (display only) and returns the cloud's merged copy. null when the call failed or the answer is not a breakdown.
+        /// </summary>
+        public void SyncBreakdown(string weekKey, List<WeekSlotInfo> slots, Action<BreakdownReply> done)
+        {
+            Call("POST", cfg.Url("/sync-breakdown"), LbBreakdownJson.BuildBody(weekKey, slots), r => done(r.Ok ? LbBreakdownJson.ParseReply(r.Body) : null));
         }
 
         /// <summary>The top 100 of a board straight from Firestore (REST, one document read). A missing document (404) is an empty board; null on a real failure.</summary>
@@ -121,6 +136,12 @@ namespace FluffyClimbers.Leaderboard
                 else if (!r.NetworkError && !r.NoToken && r.Status == 404) done(new BoardData { WeekKey = weekKey, Board = board });
                 else done(null);
             });
+        }
+
+        /// <summary>POST /delete-my-entries (Settings > Reset progress): the service deletes every score of this player. done(true) only on a 2xx answer; any other result (offline, no token, error) is false and the caller keeps the request queued.</summary>
+        public void DeleteMyEntries(Action<bool> done)
+        {
+            Call("POST", cfg.Url("/delete-my-entries"), "{}", r => { if (done != null) done(r.Ok); });
         }
 
         /// <summary>Writes players/{uid} (display name and picture URL; the rules allow exactly these fields). done(true) when stored.</summary>

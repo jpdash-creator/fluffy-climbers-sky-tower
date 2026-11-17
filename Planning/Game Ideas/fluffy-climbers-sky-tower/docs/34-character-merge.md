@@ -39,14 +39,14 @@ Hero powers per tier: Uncommon 1, Rare 2, Elite 3, Legendary 4 (`CharacterDefs.P
 
 ### Hero power pools (region themed)
 
-Powers use only the power-ups that exist in the simulation (Flight, Rocket, Double Jump, Wall Stick, Shield, Magnet, Slow Time). Each pool is ordered: Uncommon gets power 1, Rare powers 1 to 2, Elite 1 to 3, Legendary 1 to 4 (a higher tier keeps the earlier powers and adds the next). Code: `TierRules.Pools`. A power is free to use, ready at the start of a run, then on the cooldown of the table above. Section 2c describes how they work in a run.
+Powers use only the power-ups that exist in the simulation (Flight, Rocket, Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms, Slow Time). Each pool is ordered: Uncommon gets power 1, Rare powers 1 to 2, Elite 1 to 3, Legendary 1 to 4 (a higher tier keeps the earlier powers and adds the next). Code: `TierRules.Pools`. A power is free to use, ready at the start of a run, then on the cooldown of the table above. Section 2c describes how they work in a run.
 
 | Hero (line) | Region | 1 Uncommon | 2 Rare | 3 Elite | 4 Legendary | Theme |
 |---|---|---|---|---|---|---|
-| Momo (`momo`) | Meadow Springs, R1 | Double Jump | Magnet | Shield | Rocket | bouncy hops, easy pickups |
-| Capi (`forestgirl`) | Mushroom Grove, R2 | Wall Stick | Shield | Magnet | Slow Time | trunks and walls, safe footing |
-| Otto (`beachotter`) | Sunny Beach, R3 | Magnet | Double Jump | Flight | Shield | sea breeze, floating |
-| Bonbon (`candygirl`) | Candy Canyon, R4 | Double Jump | Slow Time | Magnet | Rocket | springy sweets, sticky slow-down |
+| Momo (`momo`) | Meadow Springs, R1 | Double Jump | Safety Net | Shield | Rocket | bouncy hops, easy pickups |
+| Capi (`forestgirl`) | Mushroom Grove, R2 | Wall Stick | Shield | Glide Cape | Slow Time | trunks and walls, safe footing |
+| Otto (`beachotter`) | Sunny Beach, R3 | Glide Cape | Double Jump | Flight | Shield | sea breeze, floating |
+| Bonbon (`candygirl`) | Candy Canyon, R4 | Double Jump | Slow Time | Wide Platforms | Rocket | springy sweets, sticky slow-down |
 | Bao (`monk`) | Bamboo Temple, R5 | Wall Stick | Slow Time | Shield | Flight | wall mastery, calm focus |
 
 ## 2c. Hero powers in a run (owner 2026-11-02, built)
@@ -57,14 +57,18 @@ Powers use only the power-ups that exist in the simulation (Flight, Rocket, Doub
 
 **Durations** (`SimConfig.HeroPowerDurationPercent` = 60, `HeroPowerDurationFactor` = 0.6; ticks rounded half up by `SimConfig.HeroTicks`):
 
-| Power | Bought | Hero power (60 percent) |
+Bug List 4 (2026-11-16): a hero power uses the matching bought power-up and its timing exactly (no separate duration); it is free ONCE per run (a revive does not reset it, Retry does), then the button works from owned stock only and shows the owned count. The table below is the OLD 60 percent rule, kept for history.
+
+| Power | Bought | Hero power (old 60 percent rule) |
 |---|---|---|
 | Flight | 10 s | 6 s |
 | Rocket | 20 floors in 4 s | 12 floors in 2.4 s (same climb speed) |
-| Double Jump | 30 s | 18 s |
-| Wall Stick | 30 s | 18 s |
-| Shield | 60 s | 36 s |
-| Magnet | 30 s | 18 s |
+| Double Jump | 20 s | same as bought |
+| Wall Stick | 20 s | same as bought |
+| Shield | 20 s | same as bought |
+| Safety Net | not timed, once per run | same as bought |
+| Glide Cape | 20 s | same as bought |
+| Wide Platforms | 20 s | same as bought |
 | Slow Time | 30 s | 18 s |
 
 **Buttons.** Round, 150 px (about 57 dp), 28 px gaps, drawn at 50 percent alpha (`ControlPad.ButtonAlpha`), the same icon as the bought power-up of the type, up to 4 in one column starting at the same height as the bought block (`PowerUpBar.BottomOffset`, above the pad) and growing upward. The column is on the move-pad side (`HeroPowerBar.OnJumpSide` = false; a column beside the bought block would reach 530 px from the edge and hit the centred combo and speed-up banners); the left-handed option mirrors it. States use text and shape, not only colour: ready = icon, "FREE" pill and a full gold ring; cooling down = dimmed icon, seconds left in the pill and a blue ring that refills clockwise; effect running = gold pill with the seconds left at the top. The hero sheet and the merge screen already list the powers and the cooldown ("ready again after N s").

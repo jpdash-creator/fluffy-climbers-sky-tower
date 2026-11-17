@@ -16,7 +16,7 @@ Columns: `d` = effective difficulty; `rows` = platform rows; `nodes` = search no
 | lvl_001_02 | simple | 0.200 | reachFloor 75 | 75 | yes | 71 | 3571 | 5 | 0 | n/a | yes (solved without a revive) |
 | lvl_001_03 | simple | 0.231 | reachFloor 75 | 75 | yes | 75 | 3799 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_001_04 | medium | 0.290 | reachFloor 75 | 75 | yes | 78 | 3924 | 0 | 0 | n/a | yes (solved without a revive) |
-| lvl_001_05 | medium | 0.540 | comboChain 3x3 | 75 | yes | 67 | 3113 | 10 | 0 | n/a | yes (solved without a revive) |
+| lvl_001_05 | medium | 0.540 | reachFloor 75 | 75 | yes | 93 | 4750 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_001_06 | medium | 0.395 | reachFloor 90 | 90 | yes | 98 | 4944 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_001_07 | medium | 0.423 | reachFloor 90 | 90 | yes | 90 | 4540 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_001_08 | medium | 0.442 | reachFloor 90 | 90 | yes | 108 | 5525 | 0 | 0 | n/a | yes (solved without a revive) |
@@ -41,7 +41,7 @@ Columns: `d` = effective difficulty; `rows` = platform rows; `nodes` = search no
 | lvl_002_02 | simple | 0.226 | reachFloor 75 | 75 | yes | 75 | 3685 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_002_03 | simple | 0.250 | reachFloor 75 | 75 | yes | 89 | 4605 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_002_04 | medium | 0.319 | reachFloor 75 | 75 | yes | 86 | 4165 | 0 | 0 | n/a | yes (solved without a revive) |
-| lvl_002_05 | medium | 0.533 | comboChain 3x3 | 75 | yes | 75 | 3667 | 10 | 0 | n/a | yes (solved without a revive) |
+| lvl_002_05 | medium | 0.533 | reachFloor 75 | 75 | yes | 79 | 3804 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_002_06 | medium | 0.369 | reachFloor 90 | 90 | yes | 94 | 4812 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_002_07 | medium | 0.441 | reachFloor 90 | 90 | yes | 95 | 4652 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_002_08 | medium | 0.496 | reachFloor 90 | 90 | yes | 104 | 5379 | 0 | 0 | n/a | yes (solved without a revive) |
@@ -66,7 +66,7 @@ Columns: `d` = effective difficulty; `rows` = platform rows; `nodes` = search no
 | lvl_003_02 | simple | 0.222 | reachFloor 75 | 75 | yes | 75 | 3617 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_003_03 | simple | 0.228 | reachFloor 75 | 75 | yes | 80 | 3901 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_003_04 | medium | 0.316 | reachFloor 75 | 75 | yes | 86 | 4242 | 0 | 0 | n/a | yes (solved without a revive) |
-| lvl_003_05 | medium | 0.552 | comboChain 3x3 | 75 | yes | 72 | 3411 | 15 | 0 | n/a | yes (solved without a revive) |
+| lvl_003_05 | medium | 0.552 | reachFloor 75 | 75 | yes | 85 | 4000 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_003_06 | medium | 0.381 | reachFloor 90 | 90 | yes | 108 | 5430 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_003_07 | medium | 0.440 | reachFloor 90 | 90 | yes | 99 | 4793 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_003_08 | medium | 0.499 | reachFloor 90 | 90 | yes | 106 | 5313 | 0 | 0 | n/a | yes (solved without a revive) |
@@ -91,7 +91,7 @@ Columns: `d` = effective difficulty; `rows` = platform rows; `nodes` = search no
 | lvl_004_02 | simple | 0.220 | reachFloor 75 | 75 | yes | 76 | 3541 | 5 | 0 | n/a | yes (solved without a revive) |
 | lvl_004_03 | simple | 0.253 | reachFloor 75 | 75 | yes | 87 | 4308 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_004_04 | medium | 0.340 | reachFloor 75 | 75 | yes | 85 | 4026 | 0 | 0 | n/a | yes (solved without a revive) |
-| lvl_004_05 | medium | 0.605 | comboChain 3x3 | 75 | yes | 72 | 3291 | 10 | 0 | n/a | yes (solved without a revive) |
+| lvl_004_05 | medium | 0.605 | reachFloor 75 | 75 | yes | 90 | 4260 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_004_06 | medium | 0.412 | reachFloor 90 | 90 | yes | 104 | 5072 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_004_07 | medium | 0.483 | reachFloor 90 | 90 | yes | 103 | 4870 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_004_08 | medium | 0.486 | reachFloor 90 | 90 | yes | 107 | 5271 | 0 | 0 | n/a | yes (solved without a revive) |
@@ -116,7 +116,7 @@ Columns: `d` = effective difficulty; `rows` = platform rows; `nodes` = search no
 | lvl_005_02 | simple | 0.228 | reachFloor 75 | 75 | yes | 94 | 4729 | 0 | 0 | n/a | yes (solved without a revive) |
 | lvl_005_03 | simple | 0.231 | reachFloor 75 | 75 | yes | 86 | 4189 | 0 | 2 | n/a | yes (solved without a revive) |
 | lvl_005_04 | medium | 0.286 | reachFloor 75 | 75 | yes | 87 | 4095 | 0 | 5 | n/a | yes (solved without a revive) |
-| lvl_005_05 | medium | 0.521 | comboChain 3x3 | 75 | yes | 82 | 3918 | 10 | 3 | n/a | yes (solved without a revive) |
+| lvl_005_05 | medium | 0.521 | reachFloor 75 | 75 | yes | 94 | 4432 | 0 | 7 | n/a | yes (solved without a revive) |
 | lvl_005_06 | medium | 0.338 | reachFloor 90 | 90 | yes | 104 | 5069 | 0 | 2 | n/a | yes (solved without a revive) |
 | lvl_005_07 | medium | 0.409 | reachFloor 90 | 90 | yes | 104 | 5041 | 0 | 3 | n/a | yes (solved without a revive) |
 | lvl_005_08 | medium | 0.428 | reachFloor 90 | 90 | yes | 108 | 5124 | 0 | 4 | n/a | yes (solved without a revive) |

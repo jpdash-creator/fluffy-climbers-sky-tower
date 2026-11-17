@@ -120,6 +120,60 @@ namespace FluffyClimbers.Tests
             StringAssert.Contains("Gold chest on days 1, 11 and 21", SubscriptionCatalog.Describe(mp), "the accessibility label lists the contents");
         }
 
+        [Test]
+        public void CardChipsShowTotalsOverThePeriod()
+        {
+            SubscriptionCatalog c = SubscriptionCatalog.BuiltIn();
+            Assert.AreEqual("170, 3,500, x1, 7 days", SubscriptionChips.Join(c.Get("weekly")));
+            Assert.AreEqual("390, 7,000, x3, Iron x1, 7 days", SubscriptionChips.Join(c.Get("weekly_plus")));
+            Assert.AreEqual("500, 18,000, x6, 30 days", SubscriptionChips.Join(c.Get("monthly")));
+            Assert.AreEqual("900, 30,000, x6, Gold x3, 30 days", SubscriptionChips.Join(c.Get("monthly_premium")));
+            var chips = SubscriptionChips.For(c.Get("monthly_premium"));
+            Assert.AreEqual(SubscriptionChipKind.Gems, chips[0].Kind);
+            Assert.AreEqual(900, chips[0].Amount);
+            Assert.AreEqual(SubscriptionChipKind.Chest, chips[3].Kind);
+            Assert.AreEqual(ChestKind.Golden, chips[3].Chest);
+            Assert.AreEqual(SubscriptionChipKind.Days, chips[4].Kind);
+            for (int i = 0; i < c.All.Count; i++) Assert.LessOrEqual(SubscriptionChips.For(c.All[i]).Count, 5, "at most 5 chips per card");
+        }
+
+        [Test]
+        public void InfoPopupPillsCoverEveryPlanFromTheCatalog()
+        {
+            SubscriptionCatalog c = SubscriptionCatalog.BuiltIn();
+            Assert.AreEqual(4, c.All.Count);
+            Assert.AreEqual("Now: 100, 10 / day, 500 / day, Day 4, 7 days", SubscriptionChips.JoinInfo(c.Get("weekly")));
+            Assert.AreEqual("Now: 250, 20 / day, 1,000 / day, Every 2nd day, Iron: day 1, 7 days", SubscriptionChips.JoinInfo(c.Get("weekly_plus")));
+            Assert.AreEqual("Now: 200, 10 / day, 600 / day, Every 5th day, 30 days", SubscriptionChips.JoinInfo(c.Get("monthly")));
+            Assert.AreEqual("Now: 300, 20 / day, 1,000 / day, Every 5th day, Gold: days 1, 11 and 21, 30 days", SubscriptionChips.JoinInfo(c.Get("monthly_premium")));
+            for (int i = 0; i < c.All.Count; i++)
+            {
+                SubscriptionDef d = c.All[i];
+                var totals = SubscriptionChips.TotalPills(d);
+                Assert.Greater(totals.Count, 1, d.Id);
+                foreach (SubscriptionChip t in totals) Assert.AreNotEqual(SubscriptionChipKind.Days, t.Kind, d.Id);
+                Assert.AreEqual(d.InstantGems + d.TotalDailyGems(), totals[0].Amount, d.Id);
+            }
+        }
+
+        [Test]
+        public void CardShortLinesAndInfoPopupKeepEveryBenefit()
+        {
+            SubscriptionCatalog c = SubscriptionCatalog.BuiltIn();
+            SubscriptionDef mp = c.Get("monthly_premium"), w = c.Get("weekly");
+            Assert.AreEqual("Pay once, rewards every day for 30 days", SubscriptionCatalog.IntroLine(mp));
+            Assert.AreEqual("Pay once, rewards every day for 7 days", SubscriptionCatalog.IntroLine(w));
+            Assert.AreEqual("Worth x4.0", SubscriptionCatalog.WorthBadge(mp));
+            string info = FluffyClimbers.Gameplay.SubscriptionScreen.InfoText(mp);
+            StringAssert.Contains("Now: 300 gems", info);
+            StringAssert.Contains("20 gems every day for 30 days", info);
+            StringAssert.Contains("1,000 coins every day for 30 days", info);
+            StringAssert.Contains("Power-up every 5th day (6 in all)", info);
+            StringAssert.Contains("Gold chest on days 1, 11 and 21", info);
+            StringAssert.Contains("In all: 900 gems + 30,000 coins", info);
+            StringAssert.Contains("30 days", SubscriptionCatalog.Describe(mp), "the accessibility label names the days");
+        }
+
         static string SubscriptionScreenLabel(SubscriptionDef def) { return FluffyClimbers.Gameplay.SubscriptionScreen.PayLabel(SubscriptionCatalog.AmountText(def)); }
 
         [Test]
@@ -447,10 +501,10 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void ThePowerUpIsOneOfTheSevenTypes()
+        public void ThePowerUpIsOneOfTheNineTypes()
         {
             ProgressService p = NewService();
-            p.SubscriptionPick = n => { Assert.AreEqual(7, n); return n - 1; };
+            p.SubscriptionPick = n => { Assert.AreEqual(9, n); return n - 1; };
             p.GrantTestSubscriptionPurchase("monthly", true);
             for (int i = 0; i < 5; i++) { p.ClaimDaily(); now = now.AddDays(1); }
             Assert.AreEqual(1, PowerUpTotal(p));

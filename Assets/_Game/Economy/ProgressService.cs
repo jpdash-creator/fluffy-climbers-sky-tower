@@ -49,6 +49,7 @@ namespace FluffyClimbers.Economy
             EnsurePowerUpFields();
             EnsureChestFields();
             EnsureTimedFields();   // ProgressService.Records.cs
+            MigrateCrownFormula();   // ProgressService.WeekCrowns.cs
         }
 
         /// <summary>Saves written before endless mode (or with null fields) get safe defaults.</summary>
@@ -137,6 +138,7 @@ namespace FluffyClimbers.Economy
             if (Data.Gems < price) return ShopResult.NotEnoughGems;
             Data.Gems -= price;
             Data.Coins = SaturatingAdd(Data.Coins, pack.Coins);
+            LedgerAddCoins(pack.Coins);   // a shop purchase: Reset progress keeps it
             Commit();
             return ShopResult.Ok;
         }
@@ -156,11 +158,27 @@ namespace FluffyClimbers.Economy
         /// Saves written before power-ups get an empty inventory. There is no stock cap and no loadout any more (2026-10-31): the old
         /// Data.Loadout list stays in the save for compatibility and is ignored; stored counts above the former cap of 99 are kept.
         /// </summary>
+        /// <summary>Id of the removed Magnet power-up; only the save migration names it.</summary>
+        public const string LegacyMagnetId = "pw_magnet";
+
         void EnsurePowerUpFields()
         {
             if (Data.Inventory == null) Data.Inventory = new InventoryData();
             if (Data.Inventory.Powerups == null) Data.Inventory.Powerups = new System.Collections.Generic.Dictionary<string, int>();
             if (Data.Loadout == null) Data.Loadout = new System.Collections.Generic.List<string>();
+            // Bug List 4 (2026-11-16): the Magnet was removed; owned units convert 1:1 to Safety Nets (additive migration, the ids list stays stable). The old loadout list is obsolete and drops it.
+            int magnets;
+            if (Data.Inventory.Powerups.TryGetValue(LegacyMagnetId, out magnets))
+            {
+                Data.Inventory.Powerups.Remove(LegacyMagnetId);
+                if (magnets > 0)
+                {
+                    int have;
+                    Data.Inventory.Powerups.TryGetValue("pw_safety_net", out have);
+                    Data.Inventory.Powerups["pw_safety_net"] = (int)Math.Min((long)Math.Max(0, have) + magnets, int.MaxValue);
+                }
+            }
+            Data.Loadout.RemoveAll(x => x == LegacyMagnetId);
             // counts are never negative or zero; unknown ids are dropped
             var bad = new System.Collections.Generic.List<string>();
             foreach (var kv in Data.Inventory.Powerups)
@@ -241,6 +259,7 @@ namespace FluffyClimbers.Economy
                 Data.Gems -= price;
             }
             Data.Inventory.Powerups[id] = (int)Math.Min((long)have + quantity, int.MaxValue);   // saturating: no stock cap
+            LedgerAddPowerUp(id, quantity);   // a shop purchase: Reset progress keeps it
             Commit();
             return PowerUpBuyResult.Ok;
         }
@@ -394,7 +413,8 @@ namespace FluffyClimbers.Economy
             p.StarMask |= run.StarMask & 7;
             p.Stars = new RunOutcome { StarMask = p.StarMask }.Stars;
             if (run.Score > p.BestScore) p.BestScore = run.Score;
-            RecordCrown(p, run.Score, run.Mode, run.Floors, run.BestCombo);
+            RecordCrown(p, run.Score, run.Mode, run.Floors, run.BestCombo, run.Chains);
+            RecordWeekCrown(WeekKind.Level, levelId, run.Score, run.Mode, run.Floors, run.BestCombo, run.Chains);   // this week's crown (ProgressService.WeekCrowns.cs)
             Data.Levels[levelId] = p;
 
             Data.Coins = SaturatingAdd(Data.Coins, reward.TotalCoins);
@@ -416,7 +436,7 @@ namespace FluffyClimbers.Economy
 
         // ---- crown (owner 2026-11-12) ----
 
-        static void RecordCrown(LevelProgress p, int baseScore, int mode, int floors = 0, int bestCombo = 0)
+        static void RecordCrown(LevelProgress p, int baseScore, int mode, int floors = 0, int bestCombo = 0, int[] chains = null)
         {
             mode = TimeRecords.ClampMode(mode);
             int crown = CrownScore.FromScore(baseScore, mode);
@@ -436,47 +456,53 @@ namespace FluffyClimbers.Economy
                     if (p.CrownRuns != null) Array.Copy(p.CrownRuns, r, p.CrownRuns.Length);
                     p.CrownRuns = r;
                 }
-                p.CrownRuns[mode] = new CrownRun { Floors = floors < 0 ? 0 : floors, BestCombo = bestCombo < 0 ? 0 : bestCombo, BaseScore = baseScore };
+                p.CrownRuns[mode] = new CrownRun { Floors = floors < 0 ? 0 : floors, BestCombo = bestCombo < 0 ? 0 : bestCombo, BaseScore = baseScore, Chains = CrownRun.CopyChains(chains) };
             }
         }
 
-        /// <summary>
-        /// The run behind the best crown of a level in a Gameplay mode, for the calculation pop-up. Floors and BestCombo are 0 when they were not stored (an old save);
-        /// the base score is always known when a crown exists (stored, the legacy best score, or recovered exactly from the crown). Null when the level has no crown in the mode.
-        /// </summary>
+        // Crowns on the level screen are THIS WEEK's best (owner 2026-11-14): the weekly store lives in ProgressService.WeekCrowns.cs, the all-time data stays in the save untouched.
+
+        /// <summary>The run behind THIS WEEK's best crown of a level in a Gameplay mode, for the calculation pop-up. Null when the level has no crown this week in that mode (also right after the weekly reset).</summary>
         public CrownRun BestCrownRun(string levelId, int mode)
         {
-            int crown = BestCrown(levelId, mode);
-            if (crown <= 0) return null;
-            mode = TimeRecords.ClampMode(mode);
-            LevelProgress p = GetProgress(levelId);
-            CrownRun r = p != null && p.CrownRuns != null && mode < p.CrownRuns.Length ? p.CrownRuns[mode] : null;
-            if (r != null && r.BaseScore > 0 && CrownScore.FromScore(r.BaseScore, mode) == crown) return r;
-            return new CrownRun { BaseScore = CrownScore.BaseFromCrown(crown, mode) };
+            return WeekRun(WeekKind.Level, levelId, mode);
         }
 
-        /// <summary>Best crown of the region's endless tower in a Gameplay mode (0 = none yet). Endless runs only; Time Attack has no crown.</summary>
+        /// <summary>THIS WEEK's best crown of the region's endless tower in a Gameplay mode (0 = none yet this week). Endless runs only; Time Attack has no crown.</summary>
         public int EndlessBestCrown(string regionId, int mode)
         {
             CrownRun r = EndlessCrownRun(regionId, mode);
             return r == null ? 0 : CrownScore.FromScore(r.BaseScore, mode);
         }
 
-        /// <summary>The run behind the best endless crown of a region and mode, or null. Do not modify.</summary>
+        /// <summary>The run behind THIS WEEK's best endless crown of a region and mode, or null. Do not modify.</summary>
         public CrownRun EndlessCrownRun(string regionId, int mode)
         {
-            CrownRun[] arr;
-            if (regionId == null || Data.EndlessCrowns == null || !TimeRecords.ValidMode(mode) || !Data.EndlessCrowns.TryGetValue(regionId, out arr) || arr == null || mode >= arr.Length) return null;
-            CrownRun r = arr[mode];
-            return r != null && r.BaseScore > 0 ? r : null;
+            return WeekRun(WeekKind.Endless, regionId, mode);
         }
 
-        /// <summary>Stores the run as the best endless crown of its region and mode when it beats the stored one. Returns true when the save changed (the caller commits).</summary>
+        /// <summary>All-time best endless crown of a region and mode (never reset; not shown on the level screen any more).</summary>
+        public int AllTimeEndlessBestCrown(string regionId, int mode)
+        {
+            CrownRun[] arr;
+            if (regionId == null || Data.EndlessCrowns == null || !TimeRecords.ValidMode(mode) || !Data.EndlessCrowns.TryGetValue(regionId, out arr) || arr == null || mode >= arr.Length) return 0;
+            CrownRun r = arr[mode];
+            return r != null && r.BaseScore > 0 ? CrownScore.FromScore(r.BaseScore, mode) : 0;
+        }
+
+        /// <summary>Stores the run as the best endless crown of its region and mode (all-time and this week) when it beats the stored one. Returns true when the save changed (the caller commits).</summary>
         bool RecordEndlessCrown(RunRecord run)
         {
-            if (run == null || run.Kind != RunKind.Endless || run.RegionId == null || run.Score <= 0) return false;
+            if (run == null || run.RegionId == null || run.Score <= 0) return false;
+            if (run.Kind == RunKind.TimeAttack)
+            {
+                // Time Attack (server slot t.<region>.<mode>): only this week's store, same crown function (owner 2026-11-16)
+                return RecordWeekCrown(WeekKind.TimeAttack, run.RegionId, run.Score, TimeRecords.ClampMode(run.Mode), run.Floors, run.BestCombo, run.Chains);
+            }
+            if (run.Kind != RunKind.Endless) return false;
             EnsureEndlessFields();
             int mode = TimeRecords.ClampMode(run.Mode);
+            bool changed = false;
             CrownRun[] arr;
             if (!Data.EndlessCrowns.TryGetValue(run.RegionId, out arr) || arr == null || arr.Length != TimeRecords.ModeCount)
             {
@@ -486,16 +512,40 @@ namespace FluffyClimbers.Economy
                 Data.EndlessCrowns[run.RegionId] = arr;
             }
             int before = arr[mode] != null && arr[mode].BaseScore > 0 ? CrownScore.FromScore(arr[mode].BaseScore, mode) : 0;
-            if (CrownScore.FromScore(run.Score, mode) <= before) return false;
-            arr[mode] = new CrownRun { Floors = run.Floors < 0 ? 0 : run.Floors, BestCombo = run.BestCombo < 0 ? 0 : run.BestCombo, BaseScore = run.Score };
-            return true;
+            if (CrownScore.FromScore(run.Score, mode) > before)
+            {
+                arr[mode] = new CrownRun { Floors = run.Floors < 0 ? 0 : run.Floors, BestCombo = run.BestCombo < 0 ? 0 : run.BestCombo, BaseScore = run.Score, Chains = CrownRun.CopyChains(run.Chains) };
+                changed = true;
+            }
+            if (RecordWeekCrown(WeekKind.Endless, run.RegionId, run.Score, mode, run.Floors, run.BestCombo, run.Chains)) changed = true;
+            return changed;
+        }
+
+        /// <summary>THIS WEEK's best Time Attack crown of a region in a Gameplay mode (0 = none yet this week); the same formula as every other crown.</summary>
+        public int TimeAttackBestCrown(string regionId, int mode)
+        {
+            CrownRun r = TimeAttackCrownRun(regionId, mode);
+            return r == null ? 0 : CrownScore.FromScore(r.BaseScore, mode);
+        }
+
+        /// <summary>The run behind THIS WEEK's best Time Attack crown of a region and mode, or null. Do not modify.</summary>
+        public CrownRun TimeAttackCrownRun(string regionId, int mode)
+        {
+            return WeekRun(WeekKind.TimeAttack, regionId, mode);
         }
 
         /// <summary>
-        /// Best crown of a level in ONE Gameplay mode (0 = none, also when that setting was never played). Stored per level and per setting; there is no fallback to the
-        /// mode-less <see cref="LevelProgress.BestScore"/> (owner 2026-11-13: a run in one setting must never show up as a crown in another one).
+        /// THIS WEEK's best crown of a level in ONE Gameplay mode (0 = none this week, also when that setting was not played this week). Stored per level and per setting; resets to 0
+        /// when the weekly board resets (Monday 00:00 UTC). Medals, pace and time records are separate and never reset. No fallback to the mode-less BestScore.
         /// </summary>
         public int BestCrown(string levelId, int mode)
+        {
+            CrownRun r = WeekRun(WeekKind.Level, levelId, mode);
+            return r == null ? 0 : CrownScore.FromScore(r.BaseScore, mode);
+        }
+
+        /// <summary>All-time best crown of a level in one Gameplay mode (never reset; kept in the save, not shown on the level screen).</summary>
+        public int AllTimeBestCrown(string levelId, int mode)
         {
             LevelProgress p = GetProgress(levelId);
             if (p == null) return 0;
@@ -577,20 +627,9 @@ namespace FluffyClimbers.Economy
             return result;
         }
 
-        /// <summary>Erases all progress, coins and gems (Settings > Reset progress).</summary>
-        public void ResetAll()
-        {
-            SaveData old = Data;
-            Data = new SaveData();
-            SaveSync.CarryAccount(old, Data);   // resetting progress keeps the login choice and the linked account (docs/35)
-            Data.Purchases = old.Purchases ?? new System.Collections.Generic.List<PurchaseRecord>();   // paid purchases are never lost by a reset (docs/38); Restore Purchases re-grants the entitlements
-            EnsurePowerUpFields();
-            EnsureChestFields();
-            Commit();
-        }
-
         void Commit()
         {
+            ClampLedger();   // ProgressService.Ledger.cs: the ledger never holds more than the player still owns
             Data.LastPlayedUtc = SaveSync.NowText();   // docs/35: when this save last changed
             store.Save(Data);
             Changed?.Invoke();

@@ -25,8 +25,8 @@ namespace FluffyClimbers.Economy
     public static class HeroCards
     {
         /// <summary>
-        /// The main Heroes list: one card per owned copy, grouped by hero in the given order (2 Common Momo = 2 cards, same artwork). A visible hero always has at least
-        /// one card (Momo stays selectable even with no copy left). Capped at <see cref="MergeRules.MaxCopies"/> cards per hero.
+        /// The main Heroes list: one card per owned copy, grouped by hero in the given order (2 Common Momo = 2 cards, same artwork). A hero with no copy has no card
+        /// (Momo included, owner 2026-11-16); a null <paramref name="copies"/> counts 1 per listed hero. Capped at <see cref="MergeRules.MaxCopies"/> cards per hero.
         /// </summary>
         public static List<HeroCard> Owned(IEnumerable<CharacterSpec> owned, Func<string, int> copies)
         {
@@ -35,7 +35,7 @@ namespace FluffyClimbers.Economy
             foreach (CharacterSpec s in owned)
             {
                 if (s == null) continue;
-                int n = Math.Min(MergeRules.MaxCopies, Math.Max(1, copies != null ? copies(s.Id) : 1));
+                int n = Math.Min(MergeRules.MaxCopies, Math.Max(0, copies != null ? copies(s.Id) : 1));
                 for (int i = 0; i < n; i++) list.Add(new HeroCard { Spec = s, Copy = i });
             }
             return list;
@@ -74,6 +74,17 @@ namespace FluffyClimbers.Economy
             if (picked == null || picked.Count < 2) return false;
             for (int i = 1; i < picked.Count; i++) if (picked[i].Id != picked[0].Id) return true;
             return false;
+        }
+
+        /// <summary>
+        /// True when this card carries the chosen tick: it is a card of the chosen hero AND its copy is the chosen copy. The chosen copy index is clamped to the copies the player holds
+        /// (a stale or missing index, e.g. after a merge consumed copies, falls back to the last card; an old save without the index means copy 0). Only ONE card is ever chosen.
+        /// </summary>
+        public static bool IsChosen(HeroCard card, string chosenId, int chosenCopy, int copiesHeld)
+        {
+            if (card == null || card.Spec == null || card.Spec.Id != chosenId) return false;
+            int held = Math.Min(MergeRules.MaxCopies, Math.Max(1, copiesHeld));
+            return card.Copy == Math.Min(Math.Max(0, chosenCopy), held - 1);
         }
 
         /// <summary>Index of the card in the list (same hero and copy), or -1.</summary>

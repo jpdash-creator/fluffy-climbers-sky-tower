@@ -9,7 +9,7 @@ namespace FluffyClimbers.Economy
     /// POOL of physics variants. Pool entry 0 is the hero's row in <see cref="HeroTable"/>; entries 1.. are the generated <see cref="HeroVariants"/>. Every entry passed the same measured
     /// Forgiveness Index gate (Tests/Simulation/HeroVariantGeneratorTests.cs, checked again by HeroVariantTests), so any entry is a legal hero of its rarity: two players holding the same hero see
     /// slightly different numbers, never a stronger or weaker hero. The Common hero of a line (and Momo Common, the 19.0 reference) is NOT rolled: it has one fixed row.
-    /// The variant is dealt ONCE, when the hero is first obtained, by <see cref="Pick"/>: a pure integer function of (account seed, hero id, roll counter), so a server recomputes it from the
+    /// The variant is dealt for EVERY COPY (owner 2026-11-17: one roll per copy), when that copy is obtained, by <see cref="Pick"/>: a pure integer function of (account seed, hero id, roll counter), so a server recomputes it from the
     /// per-account seed. Pure C#, no engine types, no clock, no floats: the .NET test project and a future server compile this file as it is.
     /// </summary>
     public static class HeroRolls

@@ -60,8 +60,8 @@ namespace FluffyClimbers.Gameplay
         {
             SimConfig run = Cfg.Clone();
             CharacterSpec info = CharacterCatalog.Selected.Info;
-            // docs/44 section 11: the player's own rolled copy of a tier hero (Common heroes and the default are fixed)
-            CharacterStats stats = info == null ? null : (Progress != null ? Progress.StatsOf(info) : info.Stats);
+            // docs/44 section 11 (one roll per copy, owner 2026-11-17): the stats of the CHOSEN copy of a tier hero (Common heroes and the default are fixed)
+            CharacterStats stats = info == null ? null : (Progress != null ? Progress.StatsOf(info, CharacterCatalog.SelectedCopy) : info.Stats);
             (stats ?? CharacterStats.Default).ApplyTo(run);
             return run;
         }

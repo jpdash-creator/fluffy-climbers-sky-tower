@@ -1711,5 +1711,54 @@ namespace FluffyClimbers.Tests
             }
             finally { UiKit.TextScale = oldScale; }
         }
+
+        // ---- Main Bug List 3 item 3: ready first, then in progress, then claimed ----
+
+        [Test]
+        public void RewardOrderPutsReadyFirstThenInProgressThenClaimedAndKeepsTableOrder()
+        {
+            string[] ids = { "a", "b", "c", "d", "e", "f" };
+            var ready = new System.Collections.Generic.HashSet<string> { "c", "e" };
+            var claimed = new System.Collections.Generic.HashSet<string> { "a", "f" };
+            var sorted = RewardOrder.Sort(ids, s => ready.Contains(s), s => claimed.Contains(s));
+            CollectionAssert.AreEqual(new[] { "c", "e", "b", "d", "a", "f" }, sorted);
+            Assert.AreEqual(6, ids.Length);
+            Assert.AreEqual("a", ids[0], "the input is not changed");
+            // a claim: "c" leaves the ready group and drops under the in-progress ones, in the claimed group (table order: a, c, f)
+            ready.Remove("c");
+            claimed.Add("c");
+            CollectionAssert.AreEqual(new[] { "e", "b", "d", "a", "c", "f" }, RewardOrder.Sort(ids, s => ready.Contains(s), s => claimed.Contains(s)));
+            // claimed wins over ready; empty and null input are fine
+            ready.Add("a");
+            Assert.AreEqual(2, RewardOrder.GroupOf("a", s => ready.Contains(s), s => claimed.Contains(s)));
+            Assert.AreEqual(0, RewardOrder.Sort(new string[0], s => true, s => false).Count);
+            Assert.AreEqual(0, RewardOrder.Sort<string>(null, s => true, s => false).Count);
+        }
+
+        [Test]
+        public void MainListShowsReadyGoalsFirstAndAClaimMovesTheGoalToCompleted()
+        {
+            ProgressService svc = NewService();
+            ClearLevels(svc, 1, 5);
+            GameObject root;
+            RewardsScreen s = BuildScreen(svc, RewardTab.Main, out root);
+            try
+            {
+                s.SelectRegion(1);
+                var readyIds = new System.Collections.Generic.List<string>();
+                foreach (RegionGoal g in svc.RegionGoals(1)) if (svc.IsRegionGoalReady(g)) readyIds.Add(g.Id);
+                Assert.Greater(readyIds.Count, 0, "clearing levels made at least one goal ready");
+                var rows = new System.Collections.Generic.List<string>();
+                foreach (Transform t in s.ListContent) if (t.name.StartsWith("Row_", StringComparison.Ordinal)) rows.Add(t.name.Substring(4));
+                for (int k = 0; k < readyIds.Count; k++) Assert.AreEqual(readyIds[k], rows[k], "ready goals come first, in table order");
+                s.Claim(RewardTab.Main, readyIds[0]);
+                Assert.IsNull(s.ListContent.Find("Row_" + readyIds[0]), "the claimed goal left the top group at once");
+                Assert.IsNotNull(s.ListContent.Find("CompletedHeader"), "...and waits in the Completed section at the bottom");
+                string firstRow = null;
+                foreach (Transform t in s.ListContent) if (t.name.StartsWith("Row_", StringComparison.Ordinal)) { firstRow = t.name.Substring(4); break; }
+                if (readyIds.Count > 1) Assert.AreEqual(readyIds[1], firstRow, "the next ready goal is now on top");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
     }
 }

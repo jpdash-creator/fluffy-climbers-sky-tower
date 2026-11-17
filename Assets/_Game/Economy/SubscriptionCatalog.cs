@@ -179,6 +179,18 @@ namespace FluffyClimbers.Economy
             return TotalGemValue(def) * UsdPerGem / def.PriceUsd;
         }
 
+        /// <summary>The short badge of a card, like the chest cards: "Worth x3.9".</summary>
+        public static string WorthBadge(SubscriptionDef def)
+        {
+            return "Worth x" + WorthMultiple(def).ToString("0.0", CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>The one line under a card title: "Pay once, rewards every day for 30 days".</summary>
+        public static string IntroLine(SubscriptionDef def)
+        {
+            return "Pay once, rewards every day for " + def.Days.ToString(CultureInfo.InvariantCulture) + " days";
+        }
+
         /// <summary>"Worth about 3.0x" (one decimal, invariant culture).</summary>
         public static string WorthText(SubscriptionDef def)
         {
@@ -286,6 +298,101 @@ namespace FluffyClimbers.Economy
             if (t2 != null) sb.Append(t2).Append(". ");
             sb.Append(WorthText(def)).Append(".");
             return sb.ToString();
+        }
+    }
+    /// <summary>What a chip of a subscription card shows.</summary>
+    public enum SubscriptionChipKind { Gems, Coins, PowerUps, Chest, Days }
+
+    /// <summary>One icon chip of a subscription card: an icon kind and a short text ("900", "30,000", "x6", "Gold x3", "30 days"). Totals over the whole period.</summary>
+    public struct SubscriptionChip
+    {
+        public SubscriptionChipKind Kind;
+        public string Text;
+        /// <summary>Only for Kind Chest: which chest.</summary>
+        public ChestKind Chest;
+        /// <summary>The number the chip counts (gems, coins, power-ups, chests or days).</summary>
+        public int Amount;
+    }
+
+    /// <summary>Pure chip data of the subscription cards (owner Main Bug List 3 item 4): gems total, coins total, power-ups, one chip per chest kind, days. At most 5 chips.</summary>
+    public static class SubscriptionChips
+    {
+        public static List<SubscriptionChip> For(SubscriptionDef def)
+        {
+            var list = new List<SubscriptionChip>(5);
+            if (def == null) return list;
+            int gems = def.InstantGems + def.TotalDailyGems(), coins = def.TotalDailyCoins(), pu = def.TotalPowerUps();
+            if (gems > 0) list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.Gems, Amount = gems, Text = gems.ToString("N0", CultureInfo.InvariantCulture) });
+            if (coins > 0) list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.Coins, Amount = coins, Text = coins.ToString("N0", CultureInfo.InvariantCulture) });
+            if (pu > 0) list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.PowerUps, Amount = pu, Text = "x" + pu.ToString(CultureInfo.InvariantCulture) });
+            ChestKind[] kinds = { ChestKind.Iron, ChestKind.Golden };
+            for (int k = 0; k < kinds.Length; k++)
+            {
+                int n = def.TotalChests(kinds[k]);
+                if (n > 0) list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.Chest, Chest = kinds[k], Amount = n, Text = (kinds[k] == ChestKind.Golden ? "Gold" : "Iron") + " x" + n.ToString(CultureInfo.InvariantCulture) });
+            }
+            if (def.Days > 0) list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.Days, Amount = def.Days, Text = def.Days.ToString(CultureInfo.InvariantCulture) + " days" });
+            return list;
+        }
+
+        /// <summary>
+        /// The pills of the "i" popup (what you get and when, per plan, from the plan data only): "Now: 100" (instant gems), "10 / day", "500 / day", the power-up schedule
+        /// ("Day 4", "Every 5th day", "2 x Day 4"), one pill per chest grant ("Gold: day 1, 11 and 21") and the duration ("7 days"). Zero amounts are left out.
+        /// </summary>
+        public static List<SubscriptionChip> InfoPills(SubscriptionDef def)
+        {
+            var list = new List<SubscriptionChip>(8);
+            if (def == null) return list;
+            var inv = CultureInfo.InvariantCulture;
+            if (def.InstantGems > 0) list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.Gems, Amount = def.InstantGems, Text = "Now: " + def.InstantGems.ToString("N0", inv) });
+            if (def.DailyGems > 0) list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.Gems, Amount = def.DailyGems, Text = def.DailyGems.ToString("N0", inv) + " / day" });
+            if (def.DailyCoins > 0) list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.Coins, Amount = def.DailyCoins, Text = def.DailyCoins.ToString("N0", inv) + " / day" });
+            if (def.TotalPowerUps() > 0)
+            {
+                string when;
+                if (def.PowerUpEveryClaims > 0 && (def.PowerUpOnClaims == null || def.PowerUpOnClaims.Length == 0)) when = "Every " + Ordinal(def.PowerUpEveryClaims) + " day";
+                else if (def.PowerUpEveryClaims <= 0 && def.PowerUpOnClaims != null && def.PowerUpOnClaims.Length == 1) when = "Day " + def.PowerUpOnClaims[0].ToString(inv);
+                else when = "x" + def.TotalPowerUps().ToString(inv);
+                if (def.PowerUpCount > 1) when = def.PowerUpCount.ToString(inv) + " x " + when;
+                list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.PowerUps, Amount = def.TotalPowerUps(), Text = when });
+            }
+            for (int i = 0; i < def.Chests.Count; i++)
+            {
+                SubscriptionChestGrant g = def.Chests[i];
+                if (g.Claims.Length == 0) continue;
+                list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.Chest, Chest = g.ChestKind, Amount = g.Claims.Length, Text = g.KindName + ": " + (g.Claims.Length == 1 ? "day " : "days ") + DayList(g.Claims) });
+            }
+            if (def.Days > 0) list.Add(new SubscriptionChip { Kind = SubscriptionChipKind.Days, Amount = def.Days, Text = def.Days.ToString(inv) + " days" });
+            return list;
+        }
+
+        static string Ordinal(int n) { return SubscriptionCatalog.Ordinal(n); }
+        static string DayList(int[] d) { return SubscriptionCatalog.DayList(d); }
+
+        /// <summary>The totals chips of the popup: the card chips without the duration (gems, coins, power-ups, chests over the whole period).</summary>
+        public static List<SubscriptionChip> TotalPills(SubscriptionDef def)
+        {
+            List<SubscriptionChip> all = For(def);
+            all.RemoveAll(c => c.Kind == SubscriptionChipKind.Days);
+            return all;
+        }
+
+        /// <summary>The info pills as plain text for tests: "Now: 100, 10 / day, 500 / day, Day 4, 7 days".</summary>
+        public static string JoinInfo(SubscriptionDef def)
+        {
+            List<SubscriptionChip> c = InfoPills(def);
+            var parts = new string[c.Count];
+            for (int i = 0; i < parts.Length; i++) parts[i] = c[i].Text;
+            return string.Join(", ", parts);
+        }
+
+        /// <summary>The chips as plain text for tests and logs: "900, 30,000, x6, Gold x3, 30 days".</summary>
+        public static string Join(SubscriptionDef def)
+        {
+            List<SubscriptionChip> c = For(def);
+            var parts = new string[c.Count];
+            for (int i = 0; i < parts.Length; i++) parts[i] = c[i].Text;
+            return string.Join(", ", parts);
         }
     }
 }

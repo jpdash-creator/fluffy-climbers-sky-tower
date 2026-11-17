@@ -21,6 +21,7 @@ namespace FluffyClimbers.LeaderboardService
         DocumentReference Totals(string wk, string uid) { return db.Collection("weeks").Document(wk).Collection("totals").Document(uid); }
         CollectionReference TotalsCol(string wk) { return db.Collection("weeks").Document(wk).Collection("totals"); }
         DocumentReference Board(string wk, string board) { return db.Collection("weeks").Document(wk).Collection("boards").Document(board); }
+        DocumentReference Breakdown(string wk, string uid) { return db.Collection("weeks").Document(wk).Collection("breakdowns").Document(uid); }
         DocumentReference Claim(string id) { return db.Collection("prizeClaims").Document(id); }
 
         public async Task<Limits> GetLimitsAsync()
@@ -156,6 +157,48 @@ namespace FluffyClimbers.LeaderboardService
                 if (s.Exists) return false;
                 tx.Create(r, new Dictionary<string, object> { { "uid", uid }, { "at", DateTime.UtcNow }, { "expireAt", expireAt } });
                 return true;
+            });
+        }
+
+        public async Task<DeletedEntries> DeletePlayerEntriesAsync(string uid)
+        {
+            var res = new DeletedEntries();
+            // weeks/{weekKey} documents do not exist themselves (only their subcollections), ListDocuments also returns such "missing" parents; retention (TTL) keeps the number of weeks small
+            await foreach (DocumentReference week in db.Collection("weeks").ListDocumentsAsync())
+            {
+                bool touched = false;
+                DocumentReference tot = week.Collection("totals").Document(uid);
+                DocumentSnapshot ts = await tot.GetSnapshotAsync();
+                if (ts.Exists) { await tot.DeleteAsync(); res.Totals++; touched = true; }
+                DocumentReference bd = week.Collection("breakdowns").Document(uid);   // the uploaded crown calculation (display only) goes with the scores
+                DocumentSnapshot bs = await bd.GetSnapshotAsync();
+                if (bs.Exists) { await bd.DeleteAsync(); res.Breakdowns++; touched = true; }
+                QuerySnapshot q = await week.Collection("slots").WhereEqualTo("uid", uid).GetSnapshotAsync();   // single field equality: no extra index
+                foreach (DocumentSnapshot d in q.Documents) { await d.Reference.DeleteAsync(); res.Slots++; touched = true; }
+                if (touched) res.WeekKeys.Add(week.Id);
+            }
+            return res;
+        }
+
+        public async Task<BreakdownDoc> GetBreakdownAsync(string weekKey, string uid)
+        {
+            DocumentSnapshot s = await Breakdown(weekKey, uid).GetSnapshotAsync();
+            return s.Exists ? s.ConvertTo<BreakdownDoc>() : null;
+        }
+
+        public Task<BreakdownDoc> MergeBreakdownAsync(string weekKey, string uid, List<FluffyClimbers.Economy.WeekSlotInfo> upload, DateTime now, DateTime expireAt)
+        {
+            // one document read and at most one write of weeks/{wk}/breakdowns/{uid}; no ranking document is read or written here
+            return db.RunTransactionAsync(async tx =>
+            {
+                DocumentReference r = Breakdown(weekKey, uid);
+                DocumentSnapshot snap = await tx.GetSnapshotAsync(r);
+                BreakdownDoc cur = snap.Exists ? snap.ConvertTo<BreakdownDoc>() : null;
+                BreakdownMergeResult m = BreakdownStep.Merge(cur, upload);
+                if (!m.Changed) return cur ?? BreakdownStep.Build(weekKey, uid, m.Slots, now, expireAt);
+                BreakdownDoc doc = BreakdownStep.Build(weekKey, uid, m.Slots, now, expireAt);
+                tx.Set(r, doc);
+                return doc;
             });
         }
 

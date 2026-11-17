@@ -19,7 +19,7 @@
         "required": ["id", "count"],
         "additionalProperties": false,
         "properties": {
-          "id": {"type": "string", "enum": ["pw_flight", "pw_rocket", "pw_doublejump", "pw_wallstick", "pw_shield", "pw_magnet", "pw_slowtime"]},
+          "id": {"type": "string", "enum": ["pw_flight", "pw_rocket", "pw_doublejump", "pw_wallstick", "pw_shield", "pw_safety_net", "pw_glide", "pw_wide_platforms", "pw_slowtime"]},
           "count": {"type": "integer", "minimum": 1, "maximum": 10}
         }
       }

@@ -70,7 +70,7 @@ namespace FluffyClimbers.Tests
                 List<string> lines = HeroPurchase.InfoLines(r);
                 Assert.AreEqual(3, lines.Count);
                 StringAssert.Contains(rule.PowerCount.ToString(), lines[0]);
-                StringAssert.Contains(rule.CooldownSeconds + " s", lines[0]);
+                StringAssert.Contains("once per run", lines[0]);   // Bug List 4: one free use per run, no separate cooldown
                 StringAssert.Contains(TierRules.JumpBandText(r), lines[1]);
                 StringAssert.Contains("Milestone bonus +" + FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusCoins((int)r) + " coins", lines[2]);   // owner 2026-11-13: the hero bonus by rarity replaced the run bonus range
                 StringAssert.Contains(FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusGemsByRarity[(int)r] + " gems", lines[2]);

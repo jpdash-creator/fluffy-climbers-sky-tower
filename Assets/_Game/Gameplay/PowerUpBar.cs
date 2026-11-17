@@ -64,8 +64,14 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Position of button k of a group (0 = lowest) as an offset from the bottom corner of its side, before the left-handed mirror.</summary>
         public static Vector2 PositionFor(int index, bool leftGroup)
         {
-            return new Vector2(leftGroup ? SideOffset : -SideOffset, BottomOffset + index * (ButtonSize + Gap));
+            // four buttons per column; a fifth wraps into a second column next to the first (inward, towards the middle)
+            int col = index / ColumnHeight, row = index % ColumnHeight;
+            float dx = col * (ButtonSize + Gap);
+            return new Vector2(leftGroup ? SideOffset + dx : -SideOffset - dx, BottomOffset + row * (ButtonSize + Gap));
         }
+
+        /// <summary>Buttons in one column of a group: five fit on every supported aspect (top at BottomOffset + 5 x 178 - 28 = 1226 px; the field between the top strip and the screen bottom is at least about 1280 px at 3:4), so a group never wraps into a second column (it would collide with the centred banners).</summary>
+        public const int ColumnHeight = 5;
 
         /// <summary>Horizontal anchor of a group: 0 = left edge, 1 = right edge, before the left-handed mirror.</summary>
         public static float AnchorX(bool leftGroup)
@@ -76,6 +82,9 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Distance of a group's inner edge from its side edge of the safe area (reference px), for the layout tests.</summary>
         public static float ReachFromEdge { get { return SideOffset + ButtonSize; } }
 
+        /// <summary>Distance of the inner edge of the widest column of a group with <paramref name="count"/> buttons from its side edge (a second column adds ButtonSize + Gap).</summary>
+        public static float ReachFromEdgeFor(int count) { return SideOffset + ButtonSize + (count > ColumnHeight ? ButtonSize + Gap : 0f); }
+
         /// <summary>
         /// Builds one button for every power type the player owned when the run started or that the hero has for free. <paramref name="place"/> positions a button the
         /// same way the HUD places everything else (it applies the left-handed mirror).
@@ -83,11 +92,13 @@ namespace FluffyClimbers.Gameplay
         public void Build(RectTransform root, RunSession run, Action<RectTransform, Vector2, Vector2, Vector2> place)
         {
             session = run;
+            buildRoot = root;
+            buildPlace = place;
             bool[] shown = new bool[PowerUps.MaxType + 1];
-            for (int i = (int)PowerUp.Flight; i <= (int)PowerUp.SlowTime; i++)
+            for (int k = 0; k < PowerUps.Implemented.Length; k++)
             {
-                PowerUp t = (PowerUp)i;
-                shown[i] = run.OwnedAtStart(t) || (run.Hero != null && run.Hero.IndexOf(t) >= 0);
+                PowerUp t = PowerUps.Implemented[k];
+                shown[(int)t] = run.OwnedAtStart(t) || (run.Hero != null && run.Hero.IndexOf(t) >= 0);
             }
             PowerUp[] buf = new PowerUp[MaxButtons];
             int built = 0;
@@ -103,6 +114,38 @@ namespace FluffyClimbers.Gameplay
                 if (leftGroup) LeftCount = n; else RightCount = n;
             }
             ButtonCount = built;
+        }
+
+        RectTransform buildRoot;
+        Action<RectTransform, Vector2, Vector2, Vector2> buildPlace;
+
+        /// <summary>
+        /// A power-up bought during the run (RunSession.SyncStock) makes its button appear, or a hero-only button show its count: rebuilds the bar once when the owned set differs from the
+        /// built one (a rare event, so the allocation is fine; nothing happens otherwise and the check allocates nothing). Keeps the visibility. Returns true when it rebuilt.
+        /// </summary>
+        public bool SyncOwned()
+        {
+            if (session == null || buildRoot == null) return false;
+            bool differs = false;
+            for (int k = 0; k < PowerUps.Implemented.Length && !differs; k++)
+            {
+                PowerUp t = PowerUps.Implemented[k];
+                bool want = session.OwnedAtStart(t) || (session.Hero != null && session.Hero.IndexOf(t) >= 0);
+                Slot have = null;
+                for (int i = 0; i < slots.Length; i++) if (slots[i] != null && slots[i].Type == t) { have = slots[i]; break; }
+                if (want != (have != null) || (have != null && have.Bought != session.OwnedAtStart(t))) differs = true;
+            }
+            if (!differs) return false;
+            bool wasVisible = Visible;
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (slots[i] != null && slots[i].Button != null) UnityEngine.Object.Destroy(slots[i].Button.gameObject);
+                slots[i] = null;
+            }
+            LeftCount = RightCount = ButtonCount = 0;
+            Build(buildRoot, session, buildPlace);
+            SetVisible(wasVisible);
+            return true;
         }
 
         Slot BuildSlot(RectTransform root, RunSession run, PowerUp t, bool leftGroup, int indexInGroup, Action<RectTransform, Vector2, Vector2, Vector2> place)
@@ -129,10 +172,10 @@ namespace FluffyClimbers.Gameplay
             countPill.pixelsPerUnitMultiplier = Mathf.Max(0.2f, 44f / 24f);
             UiKit.Place(countPill.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 6f), new Vector2(ButtonSize * 0.84f, 48f));
             s.Count = UiKit.AddText(countPill.transform, "Count", "", 36, Color.white, TextAnchor.MiddleCenter, true);
-            s.Count.horizontalOverflow = HorizontalWrapMode.Overflow;
+            FitInPill(s.Count);
             Outline o2 = s.Count.GetComponent<Outline>(); if (o2 != null) o2.enabled = false;
             UiKit.Stretch((RectTransform)s.Count.transform);
-            countPill.gameObject.SetActive(s.Bought);
+            countPill.gameObject.SetActive(s.Bought || s.HeroIdx >= 0);   // a hero-only button shows its count once the free use is spent (x0 when none is owned)
 
             // top pill: remaining seconds while the effect runs (gold), else the FREE hero power ("FREE" green when ready, cooldown seconds slate while cooling down)
             Image secsPill = UiKit.AddImage(rt, "SecsBacking", Theme.RoundSprite, new Color(0.98f, 0.8f, 0.2f, 0.96f));
@@ -142,7 +185,7 @@ namespace FluffyClimbers.Gameplay
             s.SecsPill = secsPill.rectTransform;
             s.SecsPillImage = secsPill;
             s.Secs = UiKit.AddText(secsPill.transform, "Secs", "", 36, Theme.Ink, TextAnchor.MiddleCenter, true);
-            s.Secs.horizontalOverflow = HorizontalWrapMode.Overflow;
+            FitInPill(s.Secs);
             Outline o3 = s.Secs.GetComponent<Outline>(); if (o3 != null) o3.enabled = false;
             UiKit.Stretch((RectTransform)s.Secs.transform);
             secsPill.gameObject.SetActive(false);
@@ -171,6 +214,32 @@ namespace FluffyClimbers.Gameplay
             return s;
         }
 
+        /// <summary>Pill labels ("ARMED", "FREE", "x1.2K", "120s") shrink to fit their pill (best fit 24 to 30 px, one line) so a long word never spills over the circle button (Bug List 5).</summary>
+        static void FitInPill(Text t)
+        {
+            t.resizeTextForBestFit = true;
+            t.resizeTextMinSize = 24;
+            t.resizeTextMaxSize = 30;
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
+            t.alignment = TextAnchor.MiddleCenter;
+        }
+
+        /// <summary>
+        /// The ARMED tag of the Safety Net (owner Bug List 6): a narrow pill (62 percent of the button) lowered by 20 px and a smaller best-fit range (18 to 22 px, one line), so the whole tag sits
+        /// INSIDE the round button at every aspect and at 130 percent text scale (the circle is only 106 px wide 22 px below its top edge; the normal 126 px pill poked out at its corners).
+        /// It is a state tag next to the gold ring, the tinted button and the spoken label "armed", so it never carries the state alone. Every other tag keeps the normal pill.
+        /// </summary>
+        static void SetArmedStyle(Slot s, bool armed)
+        {
+            UiKit.Place(s.SecsPill, new Vector2(0.5f, 1f), new Vector2(0f, armed ? -22f : -4f), new Vector2(ButtonSize * (armed ? 0.62f : 0.84f), 48f));
+            s.Secs.resizeTextMinSize = armed ? ArmedMinFont : 24;
+            s.Secs.resizeTextMaxSize = armed ? ArmedMaxFont : 30;
+        }
+
+        /// <summary>Best-fit range (px) of the ARMED tag (see SetArmedStyle); the other pill tags use 24 to 30.</summary>
+        public const int ArmedMinFont = 18, ArmedMaxFont = 22;
+
         static void RingStretch(RectTransform rt)
         {
             rt.anchorMin = Vector2.zero;
@@ -195,21 +264,21 @@ namespace FluffyClimbers.Gameplay
             {
                 Slot s = slots[i];
                 if (s == null) continue;
-                int units = s.Bought && session != null ? session.PowerStock(s.Type) : 0;
+                bool net = s.Type == PowerUp.SafetyNet;
+                int units = (s.Bought || s.HeroIdx >= 0) && session != null ? session.PowerStock(s.Type) : 0;
                 int ticks = PowerUps.ActiveTicks(in st, s.Type);
                 int total = PowerUps.TotalTicks(cfg, s.Type);
                 int free = FreeNone, cool = 0;
-                if (s.HeroIdx >= 0 && hero != null)
-                {
-                    if (hero.IsReady(s.HeroIdx)) free = FreeReady;
-                    else { free = FreeCool; cool = hero.RemainingSeconds(s.HeroIdx); }
-                }
+                // FREE ONCE PER RUN (owner 2026-11-16): the hero's own power is free until it was used once; then the button is the normal bought button (count, 0 shows 0)
+                if (s.HeroIdx >= 0 && hero != null && hero.FreeAvailable(s.HeroIdx)) free = FreeReady;
                 int state = ticks > 0 ? Active : (units > 0 || free == FreeReady ? Ready : Spent);
                 int secs = ticks > 0 ? (int)Math.Min(((long)ticks + SimConfig.TicksPerSecond - 1) / SimConfig.TicksPerSecond, 999999L) : 0;
                 if (ticks > s.PeakTicks) s.PeakTicks = Math.Max(ticks, total);   // a stacking tap raises the ring's full mark
                 if (ticks <= 0) s.PeakTicks = 0;
-                // a bought unit works any time (an active button stays tappable while units are left: a tap stacks more time); the free hero power only when it is ready and not already running
-                int inter = (units > 0 || (free == FreeReady && PowerUps.CanActivateHero(in st, s.Type))) ? 1 : 0;
+                // a bought unit works any time (an active timed button stays tappable while units are left: a tap stacks more time); the free hero power only when it is not running.
+                // The Safety Net can be armed once and is not stackable: its button is tappable only while it is unarmed (after a rescue the next owned one can be armed).
+                int inter = net ? ((units > 0 || free == FreeReady) && PowerUps.CanActivate(in st, PowerUp.SafetyNet) ? 1 : 0)
+                                : ((units > 0 || (free == FreeReady && PowerUps.CanActivateHero(in st, s.Type))) ? 1 : 0);
 
                 if (state != s.LastState || units != s.LastUnits || secs != s.LastSecs || free != s.LastFree || cool != s.LastCool)
                 {
@@ -218,28 +287,25 @@ namespace FluffyClimbers.Gameplay
                     s.LastSecs = secs;
                     s.LastFree = free;
                     s.LastCool = cool;
-                    if (s.Bought) UiKit.SetText(s.Count, units > 0 ? FormatCount(units) : "X");   // used up: a cross, not just a grey button
-                    // top pill: running effect (gold seconds), else the free hero power (green FREE word, or slate cooldown seconds)
+                    if (s.Bought || s.HeroIdx >= 0) UiKit.SetText(s.Count, FormatCount(units));   // "x0" when none is left: the count is always shown, 0 included
+                    // top pill: running effect (gold seconds; the Safety Net shows ARMED), else the free hero power (green FREE word)
                     if (state == Active)
                     {
-                        UiKit.SetText(s.Secs, secs + "s");
+                        UiKit.SetText(s.Secs, net ? "ARMED" : secs + "s");   // the pill text is best-fit (FitInPill), so ARMED stays inside the pill
+                        SetArmedStyle(s, net);
                         s.SecsPillImage.color = new Color(0.98f, 0.8f, 0.2f, 0.96f);
                     }
                     else if (free == FreeReady)
                     {
                         UiKit.SetText(s.Secs, "FREE");
+                        SetArmedStyle(s, false);
                         s.SecsPillImage.color = new Color(0.55f, 0.92f, 0.6f, 0.98f);
-                    }
-                    else if (free == FreeCool)
-                    {
-                        UiKit.SetText(s.Secs, cool + "s");
-                        s.SecsPillImage.color = new Color(0.72f, 0.77f, 0.92f, 0.96f);
                     }
                     s.SecsPill.gameObject.SetActive(state == Active || free != FreeNone);
                     s.Background.color = state == Spent ? new Color(0.75f, 0.77f, 0.84f, 0.7f) : (state == Active ? new Color(1f, 0.93f, 0.6f, 1f) : new Color(1f, 1f, 1f, 0.95f));
                     string spoken = Spoken(s.Type, s.Bought, units, free, cool);
-                    if (state == Active) spoken += ", active, " + secs + " seconds left" + (units > 0 ? ", tap to add more time" : "");
-                    else if (state == Spent && s.Bought && free == FreeNone) spoken += ", used up";
+                    if (state == Active) spoken += net ? ", armed, catches your first fall" : ", active, " + secs + " seconds left" + (units > 0 ? ", tap to add more time" : "");
+                    else if (state == Spent && (s.Bought || s.HeroIdx >= 0) && free == FreeNone) spoken += ", none left";
                     if (s.Label != null) s.Label.Text = spoken;
                 }
                 if (inter != s.LastInter) { s.LastInter = inter; s.Button.interactable = inter == 1; }
@@ -248,7 +314,6 @@ namespace FluffyClimbers.Gameplay
                 int mode;
                 float frac;
                 if (state == Active) { mode = 0; frac = s.PeakTicks > 0 ? Mathf.Clamp01(ticks / (float)s.PeakTicks) : 1f; }
-                else if (free == FreeCool && units <= 0) { mode = 1; frac = 1f - hero.Fraction(s.HeroIdx); }
                 else if (state == Ready) { mode = 2; frac = 1f; }
                 else { mode = 3; frac = 0f; }
                 int fill64 = Mathf.RoundToInt(frac * 64f);

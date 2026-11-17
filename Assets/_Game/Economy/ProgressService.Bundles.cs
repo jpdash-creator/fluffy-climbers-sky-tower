@@ -230,14 +230,16 @@ namespace FluffyClimbers.Economy
 
             Data.Gems -= price;   // bundles give no gems back
             Data.Coins = SaturatingAdd(Data.Coins, def.Coins);
+            LedgerAddCoins(def.Coins);   // a shop purchase: Reset progress keeps the whole bundle
             foreach (BundlePowerUp p in def.PowerUps)
             {
                 int have = PowerUpCount(p.Id);
                 Data.Inventory.Powerups[p.Id] = (int)Math.Min((long)have + p.Count, int.MaxValue);   // saturating: no stock cap
+                LedgerAddPowerUp(p.Id, p.Count);
             }
             if (def.HiddenCard) card = DrawBundleCard(BundleState);
             if (clearTimerOffer) ClearTimerOffer(BundleState);
-            if (card != null) AddCopies(card.Id, 1);   // the existing API; it saves, and that one save also holds everything above
+            if (card != null) AddBoughtCopy(card.Id);   // like AddCopies (it saves); it saves, and that one save also holds everything above
             else Commit();
             return BundleResult.Ok;
         }

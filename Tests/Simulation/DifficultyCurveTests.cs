@@ -308,7 +308,8 @@ namespace FluffyClimbers.Simulation.Tests
                     bool special = idx % 5 == 0 && idx <= 20;
                     GoalType g = ls[i].Spec.Goal.Type;
                     if (idx == 25) Assert.Equal(GoalType.ReachFloor, g);
-                    else if (special) Assert.True(g == GoalType.ComboChain || g == GoalType.NoWallBounce || g == GoalType.FindHiddenGem || g == GoalType.Speedrun, ls[i].Id + " special goal");
+                    else if (idx == 5) Assert.Equal(GoalType.ReachFloor, g);   // Bug List 4 item 10: plain reach floor
+                    else if (special) Assert.True(g == GoalType.NoWallBounce || g == GoalType.FindHiddenGem || g == GoalType.Speedrun, ls[i].Id + " special goal");
                     else Assert.Equal(GoalType.ReachFloor, g);
                     if (special && idx > 5) Assert.NotEqual(ls[i - 5].Spec.Goal.Type, g);   // no two special neighbours repeat
                 }

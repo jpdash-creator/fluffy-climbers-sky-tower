@@ -587,7 +587,7 @@ namespace FluffyClimbers.Simulation.Tests
                     else
                     {
                         Assert.True(s.EffectiveDifficulty(cfg) >= s.Difficulty);
-                        if (i > 0 && s.LevelIndex > 3 && ls[i - 1].Spec.Goal.Type != GoalType.ComboChain)
+                        if (i > 0 && s.LevelIndex > 3 && ls[i - 1].Spec.Goal.Type != GoalType.ComboChain && ls[i - 1].Spec.LevelIndex != 5)   // level 5 was the combo level (its content d is calibrated on the old goal): level 6 is exempt, as before Bug List 4 item 10
                         {
                             // Bug List 8 item 3: the special-goal levels (5, 10, 15, 20) are calibrated on their SCORE (their goal changes what the probe measures), so next to one of them
                             // the content difficulty may dip by up to 0.03 (the score curve of doc 45 stays the rule); all other neighbours must rise strictly.

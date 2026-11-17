@@ -211,6 +211,10 @@ namespace FluffyClimbers.Simulation
         /// MixAttemptSeed(base seed, AttemptSeed) when this is set, so the run can be reproduced from (level, AttemptSeed).
         /// </summary>
         public int AttemptSeed;
+        /// <summary>The level's own seed when <see cref="AttemptSeed"/> is set (Seed is the mixed layout seed then); unused otherwise.</summary>
+        public int BaseSeed;
+        /// <summary>The level's own seed whatever the attempt: the collectible gem roll (GemLevels.GemsInLevel) uses it, so every attempt layout holds the same gems.</summary>
+        public int LevelSeed { get { return AttemptSeed != 0 ? BaseSeed : Seed; } }
 
         /// <summary>
         /// Layout seed of one attempt: attempt 0 keeps the level's own seed (the base layout), any other value gives a different, fully
@@ -234,7 +238,8 @@ namespace FluffyClimbers.Simulation
         public LevelSpec WithAttemptSeed(int attemptSeed)
         {
             LevelSpec c = (LevelSpec)MemberwiseClone();
-            c.Seed = MixAttemptSeed(Seed, attemptSeed);
+            c.BaseSeed = LevelSeed;
+            c.Seed = MixAttemptSeed(LevelSeed, attemptSeed);
             c.AttemptSeed = attemptSeed;
             return c;
         }

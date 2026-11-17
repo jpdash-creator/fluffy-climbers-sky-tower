@@ -111,9 +111,9 @@ namespace FluffyClimbers.LeaderboardService.Tests
             RunSubmission a = BotRun("lvl_001_01", 2, 1);
             await rig.Send("carol", a);
             string week1 = rig.Week;
-            rig.Now = new DateTime(2026, 11, 15, 18, 29, 59, DateTimeKind.Utc);   // Sunday 23:59:59 IST
+            rig.Now = new DateTime(2026, 11, 15, 23, 59, 59, DateTimeKind.Utc);   // Sunday 23:59:59 UTC
             Assert.Equal(week1, rig.Week);
-            rig.Now = new DateTime(2026, 11, 15, 18, 30, 0, DateTimeKind.Utc);    // Monday 00:00:00 IST
+            rig.Now = new DateTime(2026, 11, 16, 0, 0, 0, DateTimeKind.Utc);      // Monday 00:00:00 UTC (week change since 2026-11-16: was Sunday 18:30 UTC)
             Assert.NotEqual(week1, rig.Week);
             Assert.Equal("2026-11-16", rig.Week);
             ApiResult r = await rig.Send("carol", a);
@@ -122,15 +122,16 @@ namespace FluffyClimbers.LeaderboardService.Tests
         }
 
         [Fact]
-        public void WeekKeysFollowIndiaTime()
+        public void WeekKeysFollowUtc()
         {
-            Assert.Equal("2026-11-09", WeekMath.WeekKey(new DateTime(2026, 11, 9, 0, 0, 0, DateTimeKind.Utc)));      // Monday 05:30 IST
-            Assert.Equal("2026-11-02", WeekMath.WeekKey(new DateTime(2026, 11, 8, 18, 29, 59, DateTimeKind.Utc)));   // Sunday 23:59:59 IST
-            Assert.Equal("2026-11-09", WeekMath.WeekKey(new DateTime(2026, 11, 8, 18, 30, 0, DateTimeKind.Utc)));    // Monday 00:00:00 IST
-            Assert.Equal(new DateTime(2026, 11, 8, 18, 30, 0, DateTimeKind.Utc), WeekMath.WeekStartUtc(new DateTime(2026, 11, 12, 1, 0, 0, DateTimeKind.Utc)));
+            Assert.Equal("2026-11-09", WeekMath.WeekKey(new DateTime(2026, 11, 9, 0, 0, 0, DateTimeKind.Utc)));      // Monday 00:00:00 UTC
+            Assert.Equal("2026-11-02", WeekMath.WeekKey(new DateTime(2026, 11, 8, 23, 59, 59, DateTimeKind.Utc)));   // Sunday 23:59:59 UTC
+            Assert.Equal("2026-11-02", WeekMath.WeekKey(new DateTime(2026, 11, 8, 18, 30, 0, DateTimeKind.Utc)));    // the old India rollover instant is now mid Sunday
+            Assert.Equal(new DateTime(2026, 11, 9, 0, 0, 0, DateTimeKind.Utc), WeekMath.WeekStartUtc(new DateTime(2026, 11, 12, 1, 0, 0, DateTimeKind.Utc)));
+            Assert.Equal(new DateTime(2026, 11, 16, 0, 0, 0, DateTimeKind.Utc), WeekMath.WeekEndUtc(new DateTime(2026, 11, 12, 1, 0, 0, DateTimeKind.Utc)));
             DateTime s;
             Assert.True(WeekMath.TryStartOf("2026-11-09", out s));
-            Assert.Equal(new DateTime(2026, 11, 8, 18, 30, 0, DateTimeKind.Utc), s);
+            Assert.Equal(new DateTime(2026, 11, 9, 0, 0, 0, DateTimeKind.Utc), s);
             Assert.False(WeekMath.TryStartOf("2026-11-10", out s));   // not a Monday
             Assert.False(WeekMath.TryStartOf("garbage", out s));
         }
@@ -175,7 +176,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
         }
 
         [Fact]
-        public async Task TheDurableRateLimitStopsFloodsAndTheHeroVariantStaysLocked()
+        public async Task TheDurableRateLimitStopsFloodsAndEveryCopyMayUseItsOwnVariant()
         {
             var rig = new Rig();
             rig.Store.LimitsValue.MinSubmitIntervalMs = 5000;
@@ -186,7 +187,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
             rig.Now = rig.Now.AddSeconds(6);
             Assert.Equal(200, (await rig.Send("dave", a)).Status);
 
-            // a rolled hero keeps the variant of its first leaderboard run (needs generated variants: HeroVariants.Rows is empty until the hero generator ran)
+            // every copy of a rolled hero has its own roll (2026-11-17): the same account may submit two different pool variants of one hero (needs generated variants: HeroVariants.Rows is empty until the hero generator ran)
             rig.Store.LimitsValue.MinSubmitIntervalMs = 0;
             string id = Harness.HeroWithPool(3);
             if (id == null) return;
@@ -195,8 +196,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.Equal(200, (await rig.Send("erin", Harness.Upload(s1, Kinds.Level, 8, 1))).Status);
             RunSession s2 = Harness.NewLevelSession("lvl_001_03", 2, 8, id, 2);
             Harness.Play(s2, Harness.BotTrace(s2, s2.State));
-            ApiResult locked = await rig.Send("erin", Harness.Upload(s2, Kinds.Level, 8, 2));
-            Assert.Equal("variant_locked", (string)Body(locked).error);
+            Assert.Equal(200, (await rig.Send("erin", Harness.Upload(s2, Kinds.Level, 8, 2))).Status);
         }
 
         [Fact]
@@ -268,13 +268,39 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.True(Prizes.For(Boards.Overall, 11).IsEmpty);
             Assert.True(Prizes.For(Boards.Overall, 0).IsEmpty);
 
-            var lim = new Limits();   // 200000 / 150000 / 50000, top three need 1.5x
-            Assert.True(Prizes.Resolve(lim, Boards.Overall, 5, 199999).IsEmpty);                       // below the entry limit
-            Assert.Equal(2, Prizes.Resolve(lim, Boards.Overall, 5, 200000).PowerUps);                   // limit met, ranks 4-10 need no more
-            Assert.Equal(2, Prizes.Resolve(lim, Boards.Overall, 1, 299999).PowerUps);                   // rank 1 without 1.5x falls back to the 4th-10th prize (owner question Q2)
-            Assert.Equal(1, Prizes.Resolve(lim, Boards.Overall, 1, 300000).Bundles);                    // 1.5 x 200000
-            Assert.Equal(1, Prizes.Resolve(lim, Boards.Endless, 3, 75000).IronChests);                  // 1.5 x 50000
-            Assert.True(Prizes.Resolve(lim, Boards.Levels, 2, 149999).IsEmpty);
+            var lim = new Limits();   // overall 250000 / levels (Regions) 100000 / endless 150000 (owner 2026-11-16), top three need 1.5x
+            Assert.Equal((250000L, 100000L, 150000L), (lim.OverallEntryLimit, lim.LevelsEntryLimit, lim.EndlessEntryLimit));
+            Assert.Equal(150, lim.TopThreeFactorPercent);
+            Assert.True(Prizes.Resolve(lim, Boards.Overall, 5, 249999).IsEmpty);                       // below the entry limit
+            Assert.Equal(2, Prizes.Resolve(lim, Boards.Overall, 5, 250000).PowerUps);                   // limit met, ranks 4-10 need no more
+            Assert.Equal(2, Prizes.Resolve(lim, Boards.Overall, 1, 374999).PowerUps);                   // rank 1 without 1.5x falls back to the 4th-10th prize (owner question Q2)
+            Assert.Equal(1, Prizes.Resolve(lim, Boards.Overall, 1, 375000).Bundles);                    // 1.5 x 250000
+            Assert.Equal(1, Prizes.Resolve(lim, Boards.Endless, 3, 225000).IronChests);                 // 1.5 x 150000
+            Assert.True(Prizes.Resolve(lim, Boards.Endless, 3, 224999).PowerUps == 1 && Prizes.Resolve(lim, Boards.Endless, 3, 224999).Coins == 3000);   // 3rd needs 1.5x, else the 4th-10th prize
+            Assert.True(Prizes.Resolve(lim, Boards.Levels, 2, 99999).IsEmpty);
+            Assert.Equal(1, Prizes.Resolve(lim, Boards.Levels, 2, 150000).GoldChests);                  // 1.5 x 100000
+        }
+
+        [Fact]
+        public void ConfigDefaultJsonCarriesTheSameEntryLimitsAsTheCodeDefaults()
+        {
+            string dir = AppContext.BaseDirectory, file = null;
+            for (int i = 0; i < 10 && dir != null && file == null; i++, dir = System.IO.Path.GetDirectoryName(dir))
+            {
+                string f = System.IO.Path.Combine(dir, "Tools", "leaderboard_service", "config.default.json");
+                if (System.IO.File.Exists(f)) file = f;
+            }
+            Assert.NotNull(file);
+            using (var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(file)))
+            {
+                var lim = new Limits();
+                Assert.Equal(lim.OverallEntryLimit, doc.RootElement.GetProperty("overallEntryLimit").GetInt64());
+                Assert.Equal(lim.LevelsEntryLimit, doc.RootElement.GetProperty("levelsEntryLimit").GetInt64());
+                Assert.Equal(lim.EndlessEntryLimit, doc.RootElement.GetProperty("endlessEntryLimit").GetInt64());
+                Assert.Equal(250000L, lim.OverallEntryLimit);
+                Assert.Equal(100000L, lim.LevelsEntryLimit);
+                Assert.Equal(150000L, lim.EndlessEntryLimit);
+            }
         }
 
         // ------------------------------------------------------------------ owner decisions 2026-11-12: Q1 completed-only slots, Q3 run tickets

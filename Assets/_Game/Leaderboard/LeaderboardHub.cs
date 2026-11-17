@@ -23,7 +23,7 @@ namespace FluffyClimbers.Leaderboard
     /// the prize claims. Everything is asynchronous and silent on failure: a missing network, a signed-out player, a switched-off feature or a refused call only means "not on the boards", never an
     /// error for play. All state is plain fields; the only periodic work is <see cref="Tick"/> (every 2 s, driven by <see cref="LeaderboardRunner"/>). Tests inject the parts with <see cref="Setup"/>.
     /// </summary>
-    public static class LeaderboardHub
+    public static partial class LeaderboardHub
     {
         /// <summary>A ticket is not used when it expires within this many seconds.</summary>
         public const int TicketMarginSeconds = 60;
@@ -89,6 +89,7 @@ namespace FluffyClimbers.Leaderboard
         public static void ResetForTests()
         {
             progress = null; cfg = LeaderboardConfig.Off; auth = null; net = null; client = null;
+            fakeOn = false; fakeWeek = null; fakeBoards.Clear();
             Clock = () => DateTime.UtcNow;
             ClearCaches();
         }
@@ -98,6 +99,39 @@ namespace FluffyClimbers.Leaderboard
             tickets.Clear(); ticketsInFlight.Clear(); boards.Clear(); boardsAt.Clear(); boardsInFlight.Clear();
             myWeek = null; myWeekAt = 0; myWeekInFlight = sending = claiming = signingIn = false;
             profileKey = ""; signInTries = 0; nextSignInTry = 0;
+            ResetBreakdownState();
+        }
+
+        // ---------------- local test boards (Admin "Test 1000 users", development builds) ----------------
+
+        static bool fakeOn;
+        static MyWeekData fakeWeek;
+        static readonly Dictionary<string, BoardData> fakeBoards = new Dictionary<string, BoardData>();
+
+        /// <summary>Local fake boards are on screen instead of the service boards (nothing is read from or written to Firebase for them; the feature switch is not needed).</summary>
+        public static bool FakeActive { get { return fakeOn; } }
+
+        /// <summary>
+        /// Turns the local fake boards on: <paramref name="count"/> players on each of the three boards, the player's own local crowns placed at their real rank. Open screens are told to redraw.
+        /// </summary>
+        public static void InstallFakeBoards(int count = 1000)
+        {
+            long[] own = new long[3];
+            MyWeekData local = LocalSlotsData();
+            for (int b = 0; b < 3; b++) own[b] = LeaderboardBreakdown.Build(local.Slots, LbBoards.All[b], null).Total;
+            FakeBoardSet set = LeaderboardFake.Build(CurrentWeekKey, own, count);
+            fakeBoards.Clear();
+            for (int b = 0; b < 3; b++) fakeBoards[LbBoards.All[b]] = set.Boards[b];
+            fakeWeek = set.Week;
+            fakeOn = true;
+            Raise();
+        }
+
+        /// <summary>Removes the local fake boards (the real state shows again).</summary>
+        public static void ClearFakeBoards()
+        {
+            fakeOn = false; fakeWeek = null; fakeBoards.Clear();
+            Raise();
         }
 
         static long Now { get { return LeaderboardTime.ToUnix(Clock()); } }
@@ -119,11 +153,11 @@ namespace FluffyClimbers.Leaderboard
         public static bool CanUpload { get { return IsSignedIn && HasConsent && client != null; } }
         public static LbProfile Profile { get { return auth != null ? auth.Profile : new LbProfile(); } }
         public static string Uid { get { return auth != null ? auth.Uid : ""; } }
-        public static MyWeekData MyWeek { get { return myWeek; } }
+        public static MyWeekData MyWeek { get { return fakeOn ? fakeWeek : myWeek; } }
         public static bool QueueBusy { get { return sending; } }
         public static int QueuedRuns { get { return progress != null ? progress.LeaderboardQueue.Count : 0; } }
 
-        /// <summary>Time left in the current week (Monday 00:00 India time).</summary>
+        /// <summary>Time left in the current week (Monday 00:00 UTC).</summary>
         public static TimeSpan WeekRemaining { get { return LeaderboardTime.Remaining(Clock()); } }
 
         /// <summary>The current week key from the device clock (the service decides with its own clock when a run is received).</summary>
@@ -152,10 +186,12 @@ namespace FluffyClimbers.Leaderboard
 
         static void AfterSignIn()
         {
+            RunPendingWipe();   // a Reset progress made offline or signed out: the player's scores are deleted before anything new is sent
             if (!CanUpload) return;
             SyncProfile();
             Pump();
             RefreshMyWeek(true, null);
+            SyncBreakdown();   // the phone's crown calculation goes up and the cloud's comes down (a new device or a reinstall gets it here)
         }
 
         /// <summary>Called when the menu starts: a returning player who accepted the consent is signed in to Firebase silently (retried a few times while Play Games is still signing in).</summary>
@@ -193,6 +229,35 @@ namespace FluffyClimbers.Leaderboard
 
         /// <summary>The consent popup should be shown now (consent missing and not declined today).</summary>
         public static bool ShouldAskConsent { get { return progress != null && progress.ShouldAskLeaderboardConsent(LeaderboardTime.DayKey(Clock())); } }
+
+        static bool wiping;
+
+        /// <summary>
+        /// Settings > Reset progress: drops every cached standing, board and ticket and asks the service to delete the player's scores (POST /delete-my-entries). When offline or signed out the request stays in the save
+        /// (<c>leaderboardWipePending</c>) and is sent at the next sign-in or slow tick; until it is confirmed no run is uploaded.
+        /// </summary>
+        public static void OnProgressReset()
+        {
+            tickets.Clear(); ticketsInFlight.Clear(); boards.Clear(); boardsAt.Clear(); myWeek = null; myWeekAt = 0;
+            Raise();
+            RunPendingWipe();
+        }
+
+        /// <summary>Sends the queued "delete my entries" request when a wipe is pending and the player is signed in to the service. One request at a time; a failure leaves it pending.</summary>
+        public static void RunPendingWipe()
+        {
+            if (progress == null || !progress.LeaderboardWipePending || wiping || client == null || !IsSignedIn) return;
+            wiping = true;
+            client.DeleteMyEntries(ok =>
+            {
+                wiping = false;
+                if (!ok) return;
+                if (progress != null) progress.ClearLeaderboardWipePending();
+                MarkStale();
+                Raise();
+                Pump();   // runs played while the wipe was pending go up now
+            });
+        }
 
         /// <summary>"Leave leaderboards" (Settings): consent and queue are cleared, the cached standing and tickets are dropped. Play Games itself stays signed in.</summary>
         public static void LeaveLeaderboards()
@@ -308,6 +373,7 @@ namespace FluffyClimbers.Leaderboard
         /// <summary>Sends the first due run of the queue (one at a time). Called after a new run, after sign-in and every 2 s while runs wait.</summary>
         public static void Pump()
         {
+            if (progress != null && progress.LeaderboardWipePending) { RunPendingWipe(); return; }   // nothing new goes up before the old scores are gone
             if (sending || !CanUpload) return;
             QueuedRun run = progress.NextDueLeaderboardRun(Now);
             if (run == null) return;
@@ -327,9 +393,11 @@ namespace FluffyClimbers.Leaderboard
         {
             if (!Enabled) return;
             if (HasConsent && !auth.IsReady) TrySilentSignIn();
+            RunPendingWipe();   // retried until the service confirms
             if (!CanUpload) return;
             if (profileKey.Length == 0) SyncProfile();   // a failed profile write is retried
             if (QueuedRuns > 0) Pump();
+            TickBreakdown();
             if (myWeek != null && myWeek.WeekKey != CurrentWeekKey && Now - myWeekAt > 5) RefreshMyWeek(true, null);
         }
 
@@ -340,6 +408,7 @@ namespace FluffyClimbers.Leaderboard
         /// <summary>Reads GET /my-week (cached for <see cref="CacheSeconds"/> unless <paramref name="force"/>). done(null) when it could not be read; the previous standing stays in <see cref="MyWeek"/>.</summary>
         public static void RefreshMyWeek(bool withPrizes, Action<MyWeekData> done, bool force = false)
         {
+            if (fakeOn) { if (done != null) done(fakeWeek); return; }
             if (!CanUpload) { if (done != null) done(myWeek); return; }
             if (!force && myWeek != null && Now - myWeekAt < CacheSeconds && (!withPrizes || myWeek.PrizesKnown)) { if (done != null) done(myWeek); return; }
             if (myWeekInFlight) { if (done != null) done(myWeek); return; }
@@ -357,16 +426,93 @@ namespace FluffyClimbers.Leaderboard
             });
         }
 
+        /// <summary>
+        /// Reads GET /my-week?slots=1 for the own-row calculation popup (never cached here: the screen keeps the answer for its own life). done(null) when the player cannot be on the boards or the call failed.
+        /// It does not replace <see cref="MyWeek"/>, so the prizes and ranks of the screens stay as they are.
+        /// </summary>
+        public static void LoadSlots(Action<MyWeekData> done)
+        {
+            if (fakeOn) { MyWeekData k = LocalSlotsData(); k.SlotsKnown = true; if (done != null) done(k); return; }
+            if (!CanUpload) { if (done != null) done(null); return; }
+            client.MySlots(d =>
+            {
+                if (d != null && d.SlotsKnown) { StoreSlotsCache(d); ResolveSlots(d); }
+                if (done != null) done(d);
+            });
+        }
+
+        /// <summary>Keeps the service's slot list in the save so the calculation popup also works offline (owner Bug List 5, 2026-11-17).</summary>
+        static void StoreSlotsCache(MyWeekData d)
+        {
+            if (progress == null || d == null) return;
+            var list = new List<WeekSlotInfo>(d.Slots.Count);
+            foreach (LbSlot s in d.Slots) list.Add(new WeekSlotInfo { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId, Score = s.Score, At = s.At, Verified = true });
+            progress.StoreLeaderboardSlots(string.IsNullOrEmpty(d.WeekKey) ? CurrentWeekKey : d.WeekKey, list, d.Totals, d.TotalsKnown);
+        }
+
+        /// <summary>The slots of this week built from the phone alone (the local weekly crown store, written after every run). Never null; <c>SlotsKnown</c> is true when at least one slot exists.</summary>
+        public static MyWeekData LocalSlotsData()
+        {
+            var d = new MyWeekData { WeekKey = CurrentWeekKey };
+            if (progress == null) return d;
+            foreach (WeekSlotInfo s in progress.WeekSlots()) d.Slots.Add(ToLbSlot(s));
+            d.SlotsKnown = d.Slots.Count > 0;
+            return d;
+        }
+
+        static LbSlot ToLbSlot(WeekSlotInfo s)
+        {
+            return new LbSlot { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId ?? "", Score = s.Score, At = s.At, Verified = s.Verified };
+        }
+
+        /// <summary>
+        /// The service answered GET /my-week?slots=1: its copy of the player's calculation (the uploaded display list with the replay results laid over it) is merged into the phone (the newer version per slot wins), then the
+        /// slot list of the answer becomes what the phone now holds with the service's replay numbers on top (the service wins for every slot it replayed; a slot it has not replayed yet is still shown).
+        /// </summary>
+        static void ResolveSlots(MyWeekData d)
+        {
+            if (progress == null || d == null || !d.SlotsKnown) return;
+            string wk = string.IsNullOrEmpty(d.WeekKey) ? CurrentWeekKey : d.WeekKey;
+            if (d.Display != null && wk == CurrentWeekKey) progress.MergeCloudBreakdown(wk, d.Display);
+            var verified = new List<WeekSlotInfo>(d.Slots.Count);
+            foreach (LbSlot s in d.Slots) verified.Add(new WeekSlotInfo { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId, Score = s.Score, At = s.At, Verified = true });
+            List<WeekSlotInfo> shown = BreakdownMerge.ApplyVerified(wk == CurrentWeekKey ? progress.LocalBreakdown() : null, verified);
+            d.Slots.Clear();
+            foreach (WeekSlotInfo s in shown) d.Slots.Add(ToLbSlot(s));
+        }
+
+        /// <summary>
+        /// The best calculation the phone has without asking the service: the slot list the service last answered for this week (with its totals) when no run waits for upload, otherwise the local weekly store.
+        /// <c>SlotsKnown</c> is false when there is nothing at all (nothing played this week, nothing cached).
+        /// </summary>
+        public static MyWeekData KnownSlots()
+        {
+            LeaderboardSlotsCache c = progress != null ? progress.LeaderboardSlots : null;
+            if (c != null && c.WeekKey == CurrentWeekKey && c.Slots != null && c.Slots.Count > 0 && QueuedRuns == 0)
+            {
+                // the service's replay numbers win; a slot only the phone knows (replay not available yet) stays, whichever version is newest
+                var d = new MyWeekData { WeekKey = c.WeekKey, SlotsKnown = true, TotalsKnown = c.TotalsKnown };
+                var verified = new List<WeekSlotInfo>(c.Slots.Count);
+                foreach (WeekSlotInfo s in c.Slots) { WeekSlotInfo v = s.Copy(); v.Verified = true; verified.Add(v); }
+                foreach (WeekSlotInfo s in BreakdownMerge.ApplyVerified(progress.LocalBreakdown(), verified)) d.Slots.Add(ToLbSlot(s));
+                if (c.Totals != null) for (int i = 0; i < 3 && i < c.Totals.Length; i++) d.Totals[i] = c.Totals[i];
+                return d;
+            }
+            return LocalSlotsData();
+        }
+
         /// <summary>The cached board (or null) of the current week.</summary>
         public static BoardData CachedBoard(string board)
         {
             BoardData b;
+            if (fakeOn) return fakeBoards.TryGetValue(board, out b) ? b : null;
             return boards.TryGetValue(CurrentWeekKey + "|" + board, out b) ? b : null;
         }
 
         /// <summary>Reads the top 100 of a board (Firestore REST, one document; cached for <see cref="CacheSeconds"/>). done(null) on failure.</summary>
         public static void LoadBoard(string board, Action<BoardData> done, bool force = false)
         {
+            if (fakeOn) { if (done != null) done(CachedBoard(board)); return; }
             if (!IsSignedIn || client == null) { if (done != null) done(null); return; }
             string wk = CurrentWeekKey;
             string key = wk + "|" + board;

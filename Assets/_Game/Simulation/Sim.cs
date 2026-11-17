@@ -8,15 +8,19 @@ namespace FluffyClimbers.Simulation
         public const int Jump = 4;
         /// <summary>
         /// Power-up activation edges (docs/15 FR-REGION-3, reworked 2026-10-31): one bit per power-up TYPE, set only on the tick of the tap.
-        /// Bit = PowerFirst shifted left by (type id - 1): Flight 8, Rocket 16, Double Jump 32, Wall Stick 64, Shield 128, Magnet 256, Slow Time 512
+        /// Bit = PowerFirst shifted left by (type id - 1): Flight 8, Rocket 16, Double Jump 32, Wall Stick 64, Shield 128, (Magnet 256 retired), Slow Time 512
         /// (use PowerUps.InputBit). There are no loadout slots any more: every owned type can be used. Bits above 4 were unused before,
         /// so old replays and the bot (which never set them) are unaffected.
         /// </summary>
         public const int PowerFirst = 8;
-        public const int PowerMask = 8 | 16 | 32 | 64 | 128 | 256 | 512;
+        public const int PowerMask = 8 | 16 | 32 | 64 | 128 | 512 | GlideBit | WideBit | SafetyNetBit;   // bit 256 was the Magnet (retired 2026-11-16)
+        /// <summary>Activation bits of the three power-ups added 2026-11-16 (Glide Cape, Wide Platforms, Safety Net). They sit above the hero bits (use PowerUps.InputBit).</summary>
+        public const int GlideBit = 1 << 17, WideBit = 1 << 18, SafetyNetBit = 1 << 19;
+        /// <summary>Level input (not an edge): the jump button is held down. NOT read by the simulation any more (the Glide became an automatic slow-mo, 2026-11-17); RunSession drops it so recordings stay short; the server mask still allows it for old recordings.</summary>
+        public const int JumpHeld = 1 << 20;
         /// <summary>
         /// HERO power activation edges (owner 2026-11-02): the same seven types, one bit each, 1024 shifted left by (type id - 1) (use PowerUps.HeroInputBit).
-        /// A hero power is a normal activation of the type that costs no inventory unit and lasts SimConfig.HeroPowerDurationPercent (60) percent of the bought one.
+        /// A hero power is a normal activation of the type that costs no inventory unit and lasts SimConfig.HeroPowerDurationPercent (100 since 2026-11-16) percent of the bought one.
         /// Runs without a hero power never set these bits, so bot proofs, replays and golden files are unaffected.
         /// </summary>
         public const int HeroFirst = 1024;
@@ -36,7 +40,14 @@ namespace FluffyClimbers.Simulation
         public int JumpStartRow;
         /// <summary>Highest platform row landed on.</summary>
         public int Row;
-        public int Combo, BestCombo, Score, WallBounces;
+        /// <summary>
+        /// Combo chain being built (landings with at least ComboMinFloors floors gained from NORMAL jumps; a power-up jump adds exactly +1 and closes it). BestCombo = longest chain.
+        /// ComboSquares = sum of chain_length^2 over every CLOSED chain. Score = BaseScore = floors x FloorPoints + ComboSquares + Combo^2 (the open chain counts
+        /// as if it ended now), so it is correct at any tick, also when the run ends mid-chain. Crown = BaseScore x 5 x (1 + bonus), computed in Economy.
+        /// </summary>
+        public int Combo, BestCombo, Score, WallBounces, ComboSquares;
+        /// <summary>The current air phase used a power-up (Flight, Rocket, Double Jump air jump, Wall Stick hold, Glide Cape): its landing is a power-up jump (+1 combo, closes the chain).</summary>
+        public bool PowerAir;
         public Fx KillY, MaxY;
         /// <summary>Tick of the first jump of the run, or -1 before it. The screen starts scrolling then (owner, 2026-10-19).</summary>
         public int StartTick;
@@ -106,7 +117,7 @@ namespace FluffyClimbers.Simulation
         // ---- Power-ups. Plain ints for the stacked timers (no maximum, additions saturate at int.MaxValue); the OWNED STOCK lives outside the
         // state (RunSession counts it and only passes an activation bit while units are left), so the bot, which copies SimState on every
         // recursion level, stays small. Read and write the fields through the int properties. ----
-        private int pwUsed, flightTicks, rocketTicks, magnetTicks, slowTicks, shieldTicks, wallStickTicks, doubleJumpTicks, rocketTargetRow;
+        private int pwUsed, flightTicks, rocketTicks, capeTicks, wideTicks, slowTicks, shieldTicks, wallStickTicks, doubleJumpTicks, rocketTargetRow;
         private Fx rocketTargetY;
         private ushort pwUsedMask, slowFall, wallHold, wallCool;
         private byte shieldSaves;
@@ -115,11 +126,29 @@ namespace FluffyClimbers.Simulation
         /// <summary>Units used this run and a bit mask of the types used (bit = PowerUp id).</summary>
         public int PwUsed { readonly get { return pwUsed; } set { pwUsed = value; } }
         public int PwUsedMask { readonly get { return pwUsedMask; } set { pwUsedMask = (ushort)value; } }
-        /// <summary>Remaining ticks: Flight, Rocket, slow fall after them, Magnet, Slow Time, Shield, Wall Stick, Double Jump. A tap adds its base time onto the remaining time.</summary>
+        /// <summary>Remaining ticks: Flight, Rocket, slow fall after them, Glide Cape, Wide Platforms, Slow Time, Shield, Wall Stick, Double Jump. A tap adds its base time onto the remaining time.</summary>
         public int FlightTicks { readonly get { return flightTicks; } set { flightTicks = value; } }
         public int RocketTicks { readonly get { return rocketTicks; } set { rocketTicks = value; } }
         public int SlowFall { readonly get { return slowFall; } set { slowFall = (ushort)value; } }
-        public int MagnetTicks { readonly get { return magnetTicks; } set { magnetTicks = value; } }
+        /// <summary>Glide ticks left (20 s per tap): while it runs, the whole game is at half speed whenever the player is in the air (see SimState.WarpLost).</summary>
+        public int CapeTicks { readonly get { return capeTicks; } set { capeTicks = value; } }
+        /// <summary>Wide Platforms ticks left (20 s per tap): every platform lands 20 percent wider.</summary>
+        public int WideTicks { readonly get { return wideTicks; } set { wideTicks = value; } }
+        /// <summary>Safety Net: armed (waits for the next fall) and the number of rescues so far (diagnostic only; no per-run limit, the next owned net can be armed after a rescue).</summary>
+        public bool SafetyNetArmed;
+        public int SafetyNetCatches;
+        /// <summary>Safety Net rescue jump in progress: ticks left (0 = none), the platform it lands on and the start point. The jump is a scripted fixed-point arc; no input is read while it runs.</summary>
+        public int NetTicks, NetTarget;
+        /// <summary>Start point of the rescue jump, its total length in ticks and the danger line at its start (the line rises smoothly with the jump, no camera snap).</summary>
+        public int NetN;
+        public Fx NetX0, NetY0, NetK0;
+        /// <summary>
+        /// Glide slow-mo: world ticks lost so far (every second tick of a slowed air phase does not advance the world clock). The clock of everything that moves by time (moving platforms,
+        /// hazards, crumble and wobble timers) is <see cref="WorldTick"/> = Tick - WarpLost; it equals Tick in every run without Glide (WarpLost stays 0).
+        /// </summary>
+        public int WarpLost;
+        /// <summary>The world clock (see WarpLost). Use this, not Tick, to place platforms and hazards in time.</summary>
+        public readonly int WorldTick { get { return Tick - WarpLost; } }
         public int SlowTicks { readonly get { return slowTicks; } set { slowTicks = value; } }
         public int ShieldTicks { readonly get { return shieldTicks; } set { shieldTicks = value; } }
         public int WallStickTicks { readonly get { return wallStickTicks; } set { wallStickTicks = value; } }
@@ -308,6 +337,7 @@ namespace FluffyClimbers.Simulation
             s.KillY = s.KillY - yShift;
             s.MaxY = s.MaxY - yShift;
             if (s.RocketTicks > 0) s.RocketTargetY = s.RocketTargetY - yShift;   // only a running burn reads it (it is set again at the next tap)
+            if (s.NetTicks > 0) { s.NetY0 = s.NetY0 - yShift; s.NetK0 = s.NetK0 - yShift; s.NetTarget -= dropPlatforms; }   // a running Safety Net jump follows the re-base
             s.GroundId -= dropPlatforms;
             s.BestGroundId -= dropPlatforms;
             if (dropPlatforms > 0 && s.CrumbleTick != null)
@@ -332,13 +362,13 @@ namespace FluffyClimbers.Simulation
             int rid = s.BestGroundId;
             int vanishCycle = Cfg.VanishVisibleTicks + Cfg.VanishHiddenTicks;
             while (rid > 0 && Platforms[rid].Kind == PlatformKind.Vanishing
-                   && (s.Tick + Platforms[rid].Phase) % vanishCycle >= Cfg.VanishVisibleTicks - Cfg.VanishWarnTicks)
+                   && (s.WorldTick + Platforms[rid].Phase) % vanishCycle >= Cfg.VanishVisibleTicks - Cfg.VanishWarnTicks)
                 rid--;
             s.BestGroundId = rid;
             PlatformKind rk = Platforms[rid].Kind;
             if ((rk == PlatformKind.Crumble || rk == PlatformKind.SnapDaisy || rk == PlatformKind.SporePop || rk == PlatformKind.JellyWobble) && s.CrumbleTick != null) s.CrumbleTick[rid] = -1;
             Platform p = Platforms[s.BestGroundId];
-            p.Y = PlatformY(s.BestGroundId, s.Tick, s.CrumbleTick);   // a Bee Hive Lift is somewhere on its bob, a Sprout Lift somewhere on its rise
+            p.Y = PlatformY(s.BestGroundId, s.WorldTick, s.CrumbleTick);   // a Bee Hive Lift is somewhere on its bob, a Sprout Lift somewhere on its rise
             s.TiltDir = 0;
             s.SteerLock = 0;
             s.FloatTicks = 0;
@@ -348,10 +378,10 @@ namespace FluffyClimbers.Simulation
             s.KoiAir = 0;
             s.Dead = false;
             s.GroundId = s.BestGroundId;
-            s.X = PlatformX(s.BestGroundId, s.Tick);
+            s.X = PlatformX(s.BestGroundId, s.WorldTick);
             if (p.Kind == PlatformKind.FairyRing) s.X = p.X + p.Amplitude + Fx.One;   // never revive into the hole
-            s.LandTick = s.Tick;
-            if (p.Kind == PlatformKind.SproutLift || p.Kind == PlatformKind.SinkingRaft || p.Kind == PlatformKind.LanternLift) OccupySprout(ref s, s.BestGroundId, s.Tick);
+            s.LandTick = s.WorldTick;
+            if (p.Kind == PlatformKind.SproutLift || p.Kind == PlatformKind.SinkingRaft || p.Kind == PlatformKind.LanternLift) OccupySprout(ref s, s.BestGroundId, s.WorldTick);
             s.Y = p.Kind == PlatformKind.SandcastleStep ? SandSurfaceY(in p, s.X) : p.Y;
             s.Vx = Fx.Zero;
             s.Vy = Fx.Zero;
@@ -365,8 +395,25 @@ namespace FluffyClimbers.Simulation
             s.Invuln = Cfg.ReviveInvulnTicks;
             s.WallHold = 0;
             s.Assisted = false;
-            s.Combo = 0;
+            s.PowerAir = false;
+            CloseChain(ref s);   // the open chain ends with the fall (its square is already in Score; it moves to ComboSquares)
             s.RevivesUsed++;
+        }
+
+        /// <summary>Ends the open combo chain: its length squared moves into ComboSquares (saturating) and the chain restarts at 0. Score does not change (the open chain was already counted).</summary>
+        private static void CloseChain(ref SimState s)
+        {
+            if (s.Combo <= 0) { s.Combo = 0; return; }
+            long add = (long)s.ComboSquares + (long)s.Combo * s.Combo;
+            s.ComboSquares = add > int.MaxValue ? int.MaxValue : (int)add;
+            s.Combo = 0;
+        }
+
+        /// <summary>Score = BaseScore = floors x FloorPoints + closed chain squares + open chain square (saturating). See SimState.ComboSquares.</summary>
+        private void RefreshScore(ref SimState s)
+        {
+            long v = (long)s.Row * Cfg.FloorPoints + s.ComboSquares + (long)s.Combo * s.Combo;
+            s.Score = v > int.MaxValue ? int.MaxValue : (int)v;
         }
 
         /// <summary>Position of a hazard at a tick (triangle wave on X, small pendulum rise at the extremes).</summary>
@@ -476,7 +523,7 @@ namespace FluffyClimbers.Simulation
         /// <summary>Centre X of a platform as the run in <paramref name="s"/> sees it at the state's tick (includes the Ladybug boost).</summary>
         public Fx PlatformXAt(in SimState s, int id)
         {
-            return PlatformX(id, s.Tick, s.CrumbleTick);
+            return PlatformX(id, s.WorldTick, s.CrumbleTick);
         }
 
         /// <summary>Surface height of a platform at a tick: the base Y, bobbing for a Bee Hive Lift (triangle wave of HivePeriodTicks, +-HiveBobAmplitude).</summary>
@@ -645,7 +692,7 @@ namespace FluffyClimbers.Simulation
         public Fx SquishSink(in SimState s, int id)
         {
             if (!s.Grounded || s.GroundId != id || Platforms[id].Kind != PlatformKind.SquishCap) return Fx.Zero;
-            int e = s.Tick - s.LandTick;
+            int e = s.WorldTick - s.LandTick;
             if (e < 0) e = 0;
             if (e > Cfg.SquishTicks) e = Cfg.SquishTicks;
             return Cfg.SquishDepth * e / Cfg.SquishTicks;
@@ -654,7 +701,7 @@ namespace FluffyClimbers.Simulation
         /// <summary>Jump speed factor of a jump from the Squish Cap in <paramref name="s"/>: 1 right after the landing, 1 + SquishJumpBonusPercent / 100 when fully squashed.</summary>
         private Fx SquishJumpMultiplier(in SimState s)
         {
-            int e = s.Tick - s.LandTick;
+            int e = s.WorldTick - s.LandTick;
             if (e < 0) e = 0;
             if (e > Cfg.SquishTicks) e = Cfg.SquishTicks;
             return Fx.FromRatio(100 * Cfg.SquishTicks + Cfg.SquishJumpBonusPercent * e, 100 * Cfg.SquishTicks);
@@ -821,10 +868,21 @@ namespace FluffyClimbers.Simulation
             return (int)((cur * 100 + bas / 2) / bas) - 100;
         }
 
+        /// <summary>True while the Glide slow-mo applies to the state: the Glide runs and the player is in the air (not flying, not holding a wall, not in the Safety Net jump). Everything then runs at 1 / SimConfig.GlideSlowDivisor speed.</summary>
+        public bool GlideSlowed(in SimState s)
+        {
+            return s.CapeTicks > 0 && !s.Grounded && s.NetTicks == 0 && s.FlightTicks == 0 && s.RocketTicks == 0 && s.WallHold == 0;
+        }
+
         public void Step(ref SimState s, int input)
         {
             if (s.Dead) return;
-            int tick = s.Tick + 1;
+            int rtick = s.Tick + 1;   // real tick (scroll ramp, run clock, timers); `tick` below is the WORLD tick of this step (platforms, hazards, landing clocks)
+            if (s.NetTicks > 0) { StepNetJump(ref s, rtick - s.WarpLost); return; }   // Safety Net rescue jump: a scripted arc, no input
+            // Glide slow-mo: while the player is in the air with the Glide running, every second tick does not advance the world clock (platforms and hazards move at half speed)
+            bool slowClock = GlideSlowed(in s);
+            int lost = s.WarpLost + (slowClock && (rtick & 1) == 0 ? 1 : 0);
+            int tick = rtick - lost;
             int dir = ((input & SimInput.Right) != 0 ? 1 : 0) - ((input & SimInput.Left) != 0 ? 1 : 0);
             if (s.SteerLock > 0) dir = 0;   // Dizzy Spores: steering is ignored (never inverted); momentum and friction still work
             PlatformKind groundKind = Platforms[s.GroundId].Kind;
@@ -860,6 +918,7 @@ namespace FluffyClimbers.Simulation
             if (!s.Grounded)
             {
                 accel = accel * Cfg.AirControl;
+                if (slowClock) accel = accel / SimConfig.GlideSlowDivisor;      // Glide slow-mo: the steering of a slowed tick is half as strong too
                 if (s.GlideTicks > 0) accel = accel * Cfg.GlideAirMultiplier;   // Floss Glide: the air steering after a jump from it is doubled
                 else if (s.KoiAir > 0) accel = Cfg.Accel;                       // Koi Stone: a charged jump keeps the full ground steering in the air
             }
@@ -914,24 +973,29 @@ namespace FluffyClimbers.Simulation
                 s.Coyote = 0;
                 s.JumpBuffer = 0;
                 s.JumpStartRow = Platforms[s.GroundId].Row;
-                if (s.StartTick < 0) s.StartTick = tick;
+                if (s.StartTick < 0) s.StartTick = rtick;
             }
             else if (s.JumpBuffer > 0 && s.DoubleJumpTicks > 0 && !s.AirJumpUsed && !flying && !holding && !s.Grounded && s.Coyote == 0 && s.Vy <= Fx.Zero && s.JumpLock == 0)
             {
                 // Double Jump (timed): while the window runs, every air phase has one extra standing-jump launch in mid-air (no sticky or bounce multiplier)
                 s.Vy = Cfg.JumpBase;
                 s.AirJumpUsed = true;
+                s.PowerAir = true;
                 s.JumpBuffer = 0;
             }
 
             // --- movement ---
+            // Glide slow-mo (owner 2026-11-17): in the air with the Glide running everything advances at half speed: the hero moves Vy / 2 and Vx / 2 per tick under gravity / 2
+            // (the same arc as at full speed, just slower), the danger line scrolls at half speed, and the world clock (platforms, hazards) skips every second tick. Vx and Vy stay
+            // in full-speed units, so the speed is continuous when the slow phase ends.
+            int d = s.CapeTicks > 0 && !s.Grounded && !flying && !holding ? SimConfig.GlideSlowDivisor : 1;
             Fx prevY = s.Y;
             Fx prevX = s.X;
             if (s.Grounded)
             {
                 if (Platforms[s.GroundId].Kind == PlatformKind.Moving)
                 {
-                    s.X = s.X + PlatformX(s.GroundId, tick) - PlatformX(s.GroundId, s.Tick);
+                    s.X = s.X + PlatformX(s.GroundId, tick) - PlatformX(s.GroundId, s.WorldTick);
                 }
                 else if (Platforms[s.GroundId].Kind >= PlatformKind.WindPetal) CarryOnNewPlatform(ref s, tick);
                 s.X = s.X + s.Vx;
@@ -960,20 +1024,20 @@ namespace FluffyClimbers.Simulation
                 }
                 else if (s.SlowFall > 0)
                 {
-                    s.Vy = s.Vy - Cfg.Gravity * Cfg.SlowFallGravityPercent / 100;
+                    s.Vy = s.Vy - Cfg.Gravity * Cfg.SlowFallGravityPercent / 100 / d;
                     if (s.Vy < -Cfg.SlowFallMaxSpeed) s.Vy = -Cfg.SlowFallMaxSpeed;
                 }
                 else if (s.FloatTicks > 0 && s.Vy < Fx.Zero)
                 {
-                    s.Vy = s.Vy - Cfg.Gravity * Cfg.PuffGravityPercent / 100;   // Puff Float: rising is normal, falling is slow
+                    s.Vy = s.Vy - Cfg.Gravity * Cfg.PuffGravityPercent / 100 / d;   // Puff Float: rising is normal, falling is slow
                     if (s.Vy < -Cfg.PuffMaxFall) s.Vy = -Cfg.PuffMaxFall;
                 }
                 else
                 {
-                    s.Vy = s.Vy - gravity;
+                    s.Vy = s.Vy - gravity / d;
                 }
-                s.Y = s.Y + s.Vy;
-                s.X = s.X + s.Vx + zonePush;
+                s.Y = s.Y + s.Vy / d;
+                s.X = s.X + (s.Vx + zonePush) / d;
                 if (flying && s.Y >= powerCapY)
                 {
                     // never skip the finish: stop under the top rows, then fall slowly
@@ -1018,7 +1082,7 @@ namespace FluffyClimbers.Simulation
                 {
                     KnockFromThorns(ref s, in g);   // stepping onto the thorny half hops the player away like a landing there
                 }
-                else if (!solid || Fx.Abs(s.X - PlatformX(s.GroundId, tick, s.CrumbleTick)) > WidthAt(s.GroundId, tick) / 2 + Cfg.LandingMargin || InHole(in g, s.X))
+                else if (!solid || Fx.Abs(s.X - PlatformX(s.GroundId, tick, s.CrumbleTick)) > WidthAt(s.GroundId, tick) / 2 + Cfg.LandingMargin + WideBonus(in s, WidthAt(s.GroundId, tick)) || InHole(in g, s.X))
                 {
                     s.Grounded = false;
                     s.Vy = Fx.Zero;
@@ -1065,7 +1129,7 @@ namespace FluffyClimbers.Simulation
                         if (p.Kind == PlatformKind.SandcastleStep)
                         {
                             // the surface under the player's x; a player already below the top of the raised half lands on the low surface (no falling through the block)
-                            if (Fx.Abs(s.X - p.X) > p.Width / 2 + Cfg.LandingMargin) continue;
+                            if (Fx.Abs(s.X - p.X) > p.Width / 2 + Cfg.LandingMargin + WideBonus(in s, p.Width)) continue;
                             Fx top = IsRaisedHalf(in p, s.X) ? p.Y + p.Amplitude : p.Y;
                             if (top <= prevY && top >= s.Y) surfaceY = top;
                             else if (p.Y <= prevY && p.Y >= s.Y) surfaceY = p.Y;
@@ -1076,11 +1140,12 @@ namespace FluffyClimbers.Simulation
                         {
                             // a bobbing, orbiting or rising surface is crossed when the feet were above it last tick and are at or below it now
                             surfaceY = PlatformY(i, tick, s.CrumbleTick);
-                            if (surfaceY < s.Y || PlatformY(i, s.Tick, s.CrumbleTick) > prevY) continue;
+                            if (surfaceY < s.Y || PlatformY(i, s.WorldTick, s.CrumbleTick) > prevY) continue;
                         }
                         else if (p.Y < s.Y || p.Y > prevY) continue;   // outside the fall of this tick (only possible with the widened window)
                         if (!IsSolid(i, tick, s.CrumbleTick)) continue;
-                        if (Fx.Abs(s.X - PlatformX(i, tick, s.CrumbleTick)) > (p.Kind == PlatformKind.TaffyStretch ? WidthAt(i, tick) : p.Width) / 2 + Cfg.LandingMargin) continue;
+                        Fx landW = p.Kind == PlatformKind.TaffyStretch ? WidthAt(i, tick) : p.Width;
+                        if (Fx.Abs(s.X - PlatformX(i, tick, s.CrumbleTick)) > landW / 2 + Cfg.LandingMargin + WideBonus(in s, landW)) continue;
                         if (InHole(in p, s.X)) continue;   // Fairy Ring: the hole is no landing spot
                         if (best < 0 || surfaceY > bestY) { best = i; bestY = surfaceY; }
                     }
@@ -1116,20 +1181,21 @@ namespace FluffyClimbers.Simulation
             }
 
             // --- pickups and hazards ---
-            if (Pickups.Length > 0) CollectPickups(ref s, prevX, prevY + Cfg.PlayerCenterY, s.MagnetTicks > 0 ? Cfg.MagnetExtraRadius : Fx.Zero);
+            if (Pickups.Length > 0) CollectPickups(ref s, prevX, prevY + Cfg.PlayerCenterY, Fx.Zero);
             if (Hazards.Length > 0 && !flying && s.SlowFall == 0 && s.ShieldTicks == 0) HitHazards(ref s, tick);   // Shield, Flight and Rocket: gongs cannot hurt
 
             // --- scroll pressure and death ---
             if (s.Y > s.MaxY) s.MaxY = s.Y;
             if (s.StartTick >= 0)
             {
-                Fx scroll = ScrollPerTickAt(in s, tick);   // one source of truth, also read by the HUD speed cue
+                Fx scroll = ScrollPerTickAt(in s, rtick);   // one source of truth, also read by the HUD speed cue
                 if (s.SlowTicks > 0) scroll = scroll * (100 - Cfg.SlowTimePercent) / 100;
+                scroll = scroll / d;   // Glide slow-mo: the danger line crawls too while the player is in the air
                 s.KillY = s.KillY + scroll;
             }
             Fx follow = s.MaxY - Cfg.KillDistance;
             if (follow > s.KillY) s.KillY = follow;
-            if (s.Y < s.KillY) s.Dead = true;
+            if (s.Y < s.KillY && !(s.SafetyNetArmed && SafetyNetCatch(ref s, tick))) s.Dead = true;
 
             if (s.JumpBuffer > 0) s.JumpBuffer--;
             if (s.Invuln > 0) s.Invuln--;
@@ -1140,7 +1206,8 @@ namespace FluffyClimbers.Simulation
             if (s.KoiAir > 0) s.KoiAir--;
             if (s.FloatTicks > 0 && s.Vy < Fx.Zero) s.FloatTicks--;   // Puff Float: the window runs while the player falls (the rise does not eat it)
             if (sproutId >= 0 && !(s.Grounded && s.GroundId == sproutId)) ReleaseSprout(ref s, sproutId, tick);   // the Sprout Lift starts to sink once it is empty
-            s.Tick = tick;
+            s.Tick = rtick;
+            s.WarpLost = lost;
         }
 
         // ------------------------------------------------------------------------------------------
@@ -1151,12 +1218,124 @@ namespace FluffyClimbers.Simulation
         {
             // One bit per type (SimInput.PowerFirst << (id - 1)); every tap uses one owned unit and ADDS the full base time onto the remaining time.
             // A hero bit (SimInput.HeroFirst << (id - 1)) activates the same effect for free with HeroPowerDurationPercent of the time (no stacking onto itself).
-            for (int i = (int)PowerUp.Flight; i <= (int)PowerUp.SlowTime; i++)
+            PowerUp[] all = PowerUps.Implemented;
+            for (int i = 0; i < all.Length; i++)
             {
-                PowerUp p = (PowerUp)i;
+                PowerUp p = all[i];
                 if ((input & PowerUps.InputBit(p)) != 0 && PowerUps.CanActivate(in s, p)) ApplyPowerUp(ref s, p, tick, false);
-                if ((input & PowerUps.HeroInputBit(p)) != 0 && PowerUps.CanActivateHero(in s, p)) ApplyPowerUp(ref s, p, tick, true);
+                int hb = PowerUps.HeroInputBit(p);
+                if (hb != 0 && (input & hb) != 0 && PowerUps.CanActivateHero(in s, p)) ApplyPowerUp(ref s, p, tick, true);
             }
+        }
+
+        /// <summary>Extra half width (landing zone) a platform of this width gets while Wide Platforms runs: the platform lands WidePlatformPercent (20) percent wider, so +10 percent of its width on each side. Collision only; the art is never stretched.</summary>
+        private Fx WideBonus(in SimState s, Fx width)
+        {
+            return s.WideTicks > 0 ? width * Cfg.WidePlatformPercent / 200 : Fx.Zero;
+        }
+
+        /// <summary>
+        /// Safety Net (owner 2026-11-17): the first fall of a run does not end it. The player is rescued onto the plain platform SafetyNetFloors (3) rows ABOVE the fall spot
+        /// (the row of the platform at the player's height when the danger line caught him), or the nearest plain platform above that (never above the finish limit of a campaign
+        /// level: the same cap as Flight and Rocket). The rescue is a visible JUMP: a ballistic fixed-point arc of at least SafetyNetJumpTicks ticks from the fall position to the target
+        /// (StepNetJump, no input, no hazards, the danger line rises smoothly with it), then an assisted landing (floors count, +1 combo step, chain closes like any power-up jump) with the revive grace time and
+        /// kill distance. Costs no revive; after a rescue the next net can be armed again (no per-run limit). Returns false when no platform fits (the run then ends as usual).
+        /// </summary>
+        private bool SafetyNetCatch(ref SimState s, int tick)
+        {
+            // row of the fall spot: the highest platform at or below the player's height
+            int lb = LowerBound(s.Y);
+            int below = lb > 0 ? lb - 1 : 0;
+            int fallRow = Platforms[below].Y <= s.Y ? Platforms[below].Row : 0;
+            int wantRow = fallRow + Cfg.SafetyNetFloors;
+            int found = -1;
+            for (int i = lb; i < Platforms.Length; i++)
+            {
+                Platform p = Platforms[i];
+                if (p.Y > powerCapY) break;
+                if (p.Row < wantRow || p.Kind != PlatformKind.Normal || p.Y <= s.Y) continue;
+                found = i;
+                break;
+            }
+            if (found < 0)
+            {
+                // nothing 3 floors up (top of the level or of the window): take the highest plain platform that is above the player
+                for (int i = Platforms.Length - 1; i >= 0; i--)
+                {
+                    Platform p = Platforms[i];
+                    if (p.Y > powerCapY || p.Kind != PlatformKind.Normal) continue;
+                    if (p.Y > s.Y) found = i;
+                    break;
+                }
+            }
+            if (found < 0) return false;
+            s.SafetyNetArmed = false;
+            s.SafetyNetCatches++;
+            s.NetTarget = found;
+            // flight length: at least SafetyNetJumpTicks, longer (steps of SafetyNetStepTicks) until the ballistic arc arrives falling: D / n < g (n - 1) / 2
+            Fx rise = Platforms[found].Y - s.Y;
+            int n = Cfg.SafetyNetJumpTicks;
+            while (n < 600 && rise * 2 >= Cfg.Gravity * (n * (n - 1))) n += Cfg.SafetyNetStepTicks;
+            s.NetN = n;
+            s.NetTicks = n;
+            s.NetX0 = s.X;
+            s.NetY0 = s.Y;
+            s.NetK0 = s.KillY;
+            s.Vx = Fx.Zero;
+            s.Vy = Fx.Zero;
+            s.Grounded = false;
+            s.Coyote = 0;
+            s.Assisted = true;
+            s.PowerAir = true;
+            s.JumpStartRow = fallRow;
+            s.WallHold = 0;
+            return true;
+        }
+
+        /// <summary>
+        /// One tick of the Safety Net rescue jump (owner Bug List 6: a natural, smooth jump). The hero flies a real ballistic arc under the normal gravity: y(k) = y0 + v k - g k (k + 1) / 2,
+        /// with v chosen so tick NetN lands exactly on the target (the same integration step as the game's own air phase, so the arc looks like any other jump, only higher) and the flight long
+        /// enough that the hero arrives FALLING (apex above the platform, like a normal landing). x eases (smoothstep) to the target, so there is no sideways jerk. The danger line (the camera)
+        /// rises along the same ease to where the revive grace puts it, so the camera glides instead of snapping at the landing. No input, no hazards; the last tick is the (assisted) landing.
+        /// All fixed point.
+        /// </summary>
+        private void StepNetJump(ref SimState s, int tick)
+        {
+            Platform t = Platforms[s.NetTarget];
+            int n = s.NetN;
+            int k = n - s.NetTicks + 1;   // 1 .. n
+            s.NetTicks--;
+            Fx killEnd = t.Y - Cfg.ReviveKillDistance;
+            if (killEnd < s.NetK0) killEnd = s.NetK0;
+            if (s.NetTicks <= 0)
+            {
+                s.NetTicks = 0;
+                s.X = t.X;
+                s.Y = t.Y;
+                s.Vx = Fx.Zero;
+                s.Vy = Fx.Zero;
+                s.Invuln = Cfg.ReviveInvulnTicks;
+                Land(ref s, s.NetTarget, tick, t.Y);   // an assisted landing: floors, +1 combo step, chain closed
+                if (s.Y > s.MaxY) s.MaxY = s.Y;
+                s.KillY = s.Y - Cfg.ReviveKillDistance;
+            }
+            else
+            {
+                Fx g = Cfg.Gravity;
+                Fx v = ((t.Y - s.NetY0) + g * (n * (n + 1) / 2)) / n;
+                Fx ny = s.NetY0 + v * k - g * (k * (k + 1) / 2);
+                Fx e = Ease(k, n);
+                Fx nx = s.NetX0 + (t.X - s.NetX0) * e;
+                s.Vx = nx - s.X;
+                s.Vy = ny - s.Y;
+                s.X = nx;
+                s.Y = ny;
+                s.KillY = s.NetK0 + (killEnd - s.NetK0) * e;
+                s.Grounded = false;
+                if (s.Y > s.MaxY) s.MaxY = s.Y;
+            }
+            if (s.PwUsed > 0) TickPowerUps(ref s);
+            s.Tick++;
         }
 
         private void ApplyPowerUp(ref SimState s, PowerUp p, int tick, bool hero)
@@ -1190,12 +1369,14 @@ namespace FluffyClimbers.Simulation
                     s.Assisted = true;
                     s.JumpStartRow = Platforms[s.GroundId].Row;
                     if (p == PowerUp.Rocket) s.Vx = Fx.Zero;
-                    if (s.StartTick < 0) s.StartTick = tick;
+                    if (s.StartTick < 0) s.StartTick = s.Tick + 1;
                     break;
                 case PowerUp.DoubleJump: s.DoubleJumpTicks = PowerUps.SatAdd(s.DoubleJumpTicks, hero ? Cfg.HeroTicks(Cfg.DoubleJumpWindowTicks) : Cfg.DoubleJumpWindowTicks); break;
                 case PowerUp.WallStick: s.WallStickTicks = PowerUps.SatAdd(s.WallStickTicks, hero ? Cfg.HeroTicks(Cfg.WallStickWindowTicks) : Cfg.WallStickWindowTicks); break;
                 case PowerUp.Shield: s.ShieldTicks = PowerUps.SatAdd(s.ShieldTicks, hero ? Cfg.HeroTicks(Cfg.ShieldTicks) : Cfg.ShieldTicks); break;
-                case PowerUp.Magnet: s.MagnetTicks = PowerUps.SatAdd(s.MagnetTicks, hero ? Cfg.HeroTicks(Cfg.MagnetTicks) : Cfg.MagnetTicks); break;
+                case PowerUp.Glide: s.CapeTicks = PowerUps.SatAdd(s.CapeTicks, Cfg.GlideCapeTicks); break;
+                case PowerUp.WidePlatforms: s.WideTicks = PowerUps.SatAdd(s.WideTicks, Cfg.WidePlatformTicks); break;
+                case PowerUp.SafetyNet: s.SafetyNetArmed = true; break;
                 case PowerUp.SlowTime: s.SlowTicks = PowerUps.SatAdd(s.SlowTicks, hero ? Cfg.HeroTicks(Cfg.SlowTimeTicks) : Cfg.SlowTimeTicks); break;
             }
         }
@@ -1223,6 +1404,7 @@ namespace FluffyClimbers.Simulation
         private void StartWallHold(ref SimState s)
         {
             s.WallHold = Cfg.WallHoldTicks;
+            s.PowerAir = true;
             s.Vx = Fx.Zero;
             s.Vy = Fx.Zero;
             s.WallBounces++;
@@ -1234,7 +1416,8 @@ namespace FluffyClimbers.Simulation
             if (s.SlowFall > 0) s.SlowFall--;
             if (s.FlightTicks > 0 && --s.FlightTicks == 0) { s.SlowFall = Cfg.FlightGraceTicks; s.Vy = Fx.Zero; }
             if (s.RocketTicks > 0 && --s.RocketTicks == 0) { s.SlowFall = Cfg.RocketSlowFallTicks; s.Vy = Fx.Zero; s.RocketTargetRow = 0; }
-            if (s.MagnetTicks > 0) s.MagnetTicks--;
+            if (s.CapeTicks > 0) s.CapeTicks--;
+            if (s.WideTicks > 0) s.WideTicks--;
             if (s.SlowTicks > 0) s.SlowTicks--;
             if (s.ShieldTicks > 0) s.ShieldTicks--;
             if (s.WallStickTicks > 0) s.WallStickTicks--;
@@ -1357,27 +1540,38 @@ namespace FluffyClimbers.Simulation
 
             int oldRow = s.Row;
             int gained = s.Assisted ? 0 : p.Row - s.JumpStartRow;   // Flight/Rocket landings never count as a multi-floor jump
+            bool powerJump = s.PowerAir || s.Assisted;               // owner 2026-11-16: a power-up jump adds exactly +1 to the combo and closes the chain
+            int climbed = p.Row - s.JumpStartRow;
             s.Assisted = false;
+            s.PowerAir = false;
             bool newRow = p.Row > oldRow;
             bool qualifies = gained >= Cfg.ComboMinFloors;
             bool continuesCombo = qualifies && s.Combo > 0;
 
             if (newRow)
             {
-                s.Score = PowerUps.SatAdd(s.Score, (p.Row - oldRow) * Cfg.FloorPoints);   // saturating: a very long endless chain (combo^2 points) must never wrap negative
                 s.Row = p.Row;
                 s.BestGroundId = id;
             }
-            if (qualifies)
+            if (powerJump)
+            {
+                if (climbed >= 1)
+                {
+                    s.Combo++;   // exactly one chain step, no extra points beyond the square of the closed chain
+                    if (s.Combo > s.BestCombo) s.BestCombo = s.Combo;
+                }
+                CloseChain(ref s);
+            }
+            else if (qualifies)
             {
                 s.Combo++;
                 if (s.Combo > s.BestCombo) s.BestCombo = s.Combo;
-                s.Score = PowerUps.SatAdd(s.Score, (int)System.Math.Min((long)s.Combo * s.Combo * Cfg.ComboPointsMultiplier, int.MaxValue));
             }
             else
             {
-                s.Combo = 0;
+                CloseChain(ref s);
             }
+            RefreshScore(ref s);   // floors + closed chains^2 + open chain^2
 
             // Doc 08 section 7 coin rules (campaign only; endless has its own rule, D3).
             if (newRow && !Endless)
@@ -1500,7 +1694,7 @@ namespace FluffyClimbers.Simulation
             {
                 case PlatformKind.Ladybug:
                     {
-                        Fx before = PlatformX(id, s.Tick, s.CrumbleTick);
+                        Fx before = PlatformX(id, s.WorldTick, s.CrumbleTick);
                         int extra = Cfg.LadybugBoostPercent - 100;
                         int add = tick * extra / 100 - (tick - 1) * extra / 100;   // 1.5x speed: the path clock gains one tick every second tick
                         if (add > 0) s.CrumbleTick[id] = (s.CrumbleTick[id] > 0 ? s.CrumbleTick[id] : 0) + add;
@@ -1525,12 +1719,12 @@ namespace FluffyClimbers.Simulation
                     break;
                 case PlatformKind.LanternLift:
                     // the lantern sways (x) and rises (y) under the player
-                    s.X = s.X + PlatformX(id, tick) - PlatformX(id, s.Tick);
+                    s.X = s.X + PlatformX(id, tick) - PlatformX(id, s.WorldTick);
                     s.Y = PlatformY(id, tick, s.CrumbleTick);
                     break;
                 case PlatformKind.SwingPlank:
                     // the pendulum carries the player along its arc
-                    s.X = s.X + PlatformX(id, tick) - PlatformX(id, s.Tick);
+                    s.X = s.X + PlatformX(id, tick) - PlatformX(id, s.WorldTick);
                     s.Y = PlatformY(id, tick);
                     break;
                 case PlatformKind.KoiStone:
@@ -1553,11 +1747,11 @@ namespace FluffyClimbers.Simulation
                         break;
                     }
                 case PlatformKind.TurtleShuttle:
-                    s.X = s.X + PlatformX(id, tick) - PlatformX(id, s.Tick);
+                    s.X = s.X + PlatformX(id, tick) - PlatformX(id, s.WorldTick);
                     break;
                 case PlatformKind.JellyWobble:
                     // the wobbling cube carries the player most of the way (JellyCarryPercent), so the footing slides a little under an edge-standing player
-                    s.X = s.X + (PlatformX(id, tick, s.CrumbleTick) - PlatformX(id, s.Tick, s.CrumbleTick)) * Cfg.JellyCarryPercent / 100;
+                    s.X = s.X + (PlatformX(id, tick, s.CrumbleTick) - PlatformX(id, s.WorldTick, s.CrumbleTick)) * Cfg.JellyCarryPercent / 100;
                     break;
                 case PlatformKind.CandyBowl:
                     {
@@ -1572,7 +1766,7 @@ namespace FluffyClimbers.Simulation
                     break;
                 case PlatformKind.OrbitCap:
                     {
-                        Fx before = PlatformX(id, s.Tick);
+                        Fx before = PlatformX(id, s.WorldTick);
                         s.X = s.X + PlatformX(id, tick) - before;
                         s.Y = PlatformY(id, tick);
                         break;

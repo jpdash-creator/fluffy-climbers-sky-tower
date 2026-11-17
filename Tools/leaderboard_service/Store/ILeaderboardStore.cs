@@ -10,6 +10,16 @@ namespace FluffyClimbers.LeaderboardService
         public List<SlotDoc> Slots = new List<SlotDoc>();
     }
 
+    /// <summary>What <see cref="ILeaderboardStore.DeletePlayerEntriesAsync"/> removed: counts and the weeks that had something of the player (their open boards are rebuilt afterwards).</summary>
+    public sealed class DeletedEntries
+    {
+        public int Slots;
+        public int Totals;
+        /// <summary>Uploaded crown calculations (weeks/*/breakdowns/{uid}) removed.</summary>
+        public int Breakdowns;
+        public List<string> WeekKeys = new List<string>();
+    }
+
     /// <summary>Persistence of the leaderboard. Two implementations: <see cref="FirestoreStore"/> (production, Mumbai) and <see cref="InMemoryStore"/> (local runs and tests). Every method that writes is atomic per call (a Firestore transaction).</summary>
     public interface ILeaderboardStore
     {
@@ -42,6 +52,18 @@ namespace FluffyClimbers.LeaderboardService
 
         /// <summary>Marks a run ticket as used (create-if-absent in one transaction). False when it was already used. The record expires with the ticket (TTL on tickets.expireAt).</summary>
         Task<bool> ConsumeTicketAsync(string ticketId, string uid, DateTime expireAt);
+
+        /// <summary>Deletes the player's slots (best crown per level or region and setting), weekly totals and uploaded crown calculation (breakdown) in EVERY week. Idempotent. The profile (display name), prize claims and frozen (final) boards are not touched.</summary>
+        Task<DeletedEntries> DeletePlayerEntriesAsync(string uid);
+
+        /// <summary>The player's uploaded (display-only) crown calculation of a week; null when none.</summary>
+        Task<BreakdownDoc> GetBreakdownAsync(string weekKey, string uid);
+
+        /// <summary>
+        /// Atomically merges an already sanitised upload into the stored display list of the week (<see cref="FluffyClimbers.Economy.BreakdownMerge.MergeUpload"/>: per slot the newer version wins) and returns the stored document.
+        /// Writes nothing when the merge changes nothing (idempotent). Touches NO ranking data: never slots, totals, boards or claims.
+        /// </summary>
+        Task<BreakdownDoc> MergeBreakdownAsync(string weekKey, string uid, List<FluffyClimbers.Economy.WeekSlotInfo> upload, DateTime now, DateTime expireAt);
     }
 
     public static class ClaimIds

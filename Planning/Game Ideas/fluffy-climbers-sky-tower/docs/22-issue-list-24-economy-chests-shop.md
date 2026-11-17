@@ -7,7 +7,7 @@ Source: the owner's pasted "Fluffy Climbers: full requirements for issue-list po
 ## Shared conventions
 - $1 = 95 rupees. 1 gem = 20 coins. A 1,000-coin power-up = 50 gems, a 1,500-coin one = 75 gems. Reference gem value = the 1000-pack rate, $0.01099 per gem.
 - Characters, the chest character slot and the shop Characters section are Coming Soon. Chests ship with coins and power-ups only (character code stays but is switched off).
-- (2026-11-12, owner: there is no neutral Ranked mode any more; the weekly boards count everything, see `Planning/LEADERBOARD-DESIGN.md`.) Power-ups roll with equal chance across the 7 types (Magnet, Shield, Wall Stick, Double Jump, Slow Time, Rocket, Flight). 10x open costs exactly 10x a single open.
+- (2026-11-12, owner: there is no neutral Ranked mode any more; the weekly boards count everything, see `Planning/LEADERBOARD-DESIGN.md`.) Power-ups roll with equal chance across the 9 types (Safety Net, Glide Cape, Wide Platforms, Shield, Wall Stick, Double Jump, Slow Time, Rocket, Flight). 10x open costs exactly 10x a single open.
 - Critical UX (docs/11, .claude/rules/ux-gameplay-critical.md): CUX-3 no overlap or clipping on 9:16, 9:19.5, 9:21, 3:4; CUX-4 targets >= 48 dp with >= 8 dp gaps; CUX-5 text >= 16 sp, contrast >= 4.5:1, survives 130% text scale; CUX-6 colour never the only cue, reduced motion honoured; pause on interruption. Progress saved immediately after every purchase/open/result.
 
 ## Owner answers that settle conflicts (2026-10-25)
@@ -66,7 +66,7 @@ Source: the owner's pasted "Fluffy Climbers: full requirements for issue-list po
 | 20,000 | 900 |
 | 50,000 | 2,200 |
 | 100,000 | 4,000 |
-### 4.3 Power-ups: Magnet, Shield, Wall Stick, Double Jump 1,000 coins / 50 gems; Slow Time, Rocket, Flight 1,500 coins / 75 gems.
+### 4.3 Power-ups: Safety Net, Glide Cape, Wide Platforms, Shield, Wall Stick, Double Jump 1,000 coins / 50 gems (Bug List 4 2026-11-16: the Magnet was replaced by the first three); Slow Time, Rocket, Flight 1,500 coins / 75 gems.
 ### 4.4 Chests: see point 3.
 ### 4.5 Shop layout and badges
 - Section order: Treasure Chests, Power-ups, Characters (a single Coming Soon card, no buy buttons), Coins, Gems.

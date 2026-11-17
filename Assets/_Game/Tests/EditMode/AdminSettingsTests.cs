@@ -210,11 +210,11 @@ namespace FluffyClimbers.Tests
             svc.AddGems(80);
             svc.AddCopies("forestgirl", 1);
             Assert.IsTrue(svc.RecordPurchase(ProductCatalog.SubMonthly, PurchaseRecord.KindSubscription, "tx-1", Now, 30));
-            svc.CreditSubscription("monthly", Now);
-            svc.ResetAll();
+            svc.CreditSubscription("monthly", Now);   // a direct credit (no purchase path): its gems are earned-like and are wiped
+            svc.ResetAll(Now);
             Assert.AreEqual(0, svc.Coins);
             Assert.AreEqual(0, svc.Gems);
-            Assert.IsFalse(svc.IsActive(Now), "the subscription state is wiped with the progress");
+            Assert.IsTrue(svc.IsActive(Now), "owner 2026-11-17: a subscription that was bought is kept and rebuilt from its purchase record");
             Assert.AreEqual(1, svc.Purchases.Count, "the purchase record survives");
             Assert.AreEqual(ProductCatalog.SubMonthly, svc.Purchases[0].ProductId);
         }
@@ -248,7 +248,7 @@ namespace FluffyClimbers.Tests
             var svc = NewService();
             svc.RecordPurchase(ProductCatalog.SubWeekly, PurchaseRecord.KindSubscription, "tx-1", Now, 7);
             svc.CreditSubscription("weekly", Now);
-            svc.ResetAll();
+            svc.ResetAll(Now.AddDays(30));   // long after the paid week: nothing is rebuilt by the reset itself
             Assert.IsFalse(svc.IsActive(Now.AddDays(1)));
             Assert.AreEqual(1, svc.RestoreFromRecords(Now.AddDays(1)));
             Assert.IsTrue(svc.IsActive(Now.AddDays(1)));
@@ -295,7 +295,7 @@ namespace FluffyClimbers.Tests
             pay.Purchase(ProductCatalog.SubMonthly, r => res = r);
             Assert.IsTrue(res.Success);
             svc.RecordPurchase(res.ProductId, PurchaseRecord.KindSubscription, res.TransactionId, Now, 30);
-            svc.ResetAll();
+            svc.ResetAll(Now.AddDays(60));   // the reset runs after the paid month: only Restore Purchases can bring it back
             Assert.AreEqual(1, svc.RestoreFromRecords(Now));
             Assert.AreEqual("monthly", svc.ActiveSubscription(Now));
         }

@@ -5,7 +5,7 @@ using NUnit.Framework;
 
 namespace FluffyClimbers.Tests
 {
-    /// <summary>The crown per level and Gameplay setting (owner 2026-11-12): stored per mode on a run, a setting that was never played has crown 0 (the mode-less legacy best score is never used).</summary>
+    /// <summary>The crown per level and Gameplay setting (owner 2026-11-12, formula 2026-11-16 x5): stored per mode on a run, a setting that was never played has crown 0 (the mode-less legacy best score is never used).</summary>
     public class CrownEditTests
     {
         ContentRepository repo;
@@ -21,13 +21,13 @@ namespace FluffyClimbers.Tests
         public void ARunStoresTheCrownOfItsSettingAndKeepsTheBestPerSetting()
         {
             var svc = NewService();
-            svc.ApplyRun("lvl_001_01", Run(1000, 4));   // Insane x1.50
-            Assert.AreEqual(1500, svc.BestCrown("lvl_001_01", 4));
+            svc.ApplyRun("lvl_001_01", Run(1000, 4));   // Insane: 1000 x 5 x 1.50
+            Assert.AreEqual(7500, svc.BestCrown("lvl_001_01", 4));
             Assert.AreEqual(0, svc.BestCrown("lvl_001_01", 3), "other settings have no crown yet");
             svc.ApplyRun("lvl_001_01", Run(800, 4));    // lower: unchanged
-            Assert.AreEqual(1500, svc.BestCrown("lvl_001_01", 4));
-            svc.ApplyRun("lvl_001_01", Run(1000, 1));   // Easy x1.20
-            Assert.AreEqual(1200, svc.BestCrown("lvl_001_01", 1));
+            Assert.AreEqual(7500, svc.BestCrown("lvl_001_01", 4));
+            svc.ApplyRun("lvl_001_01", Run(1000, 1));   // Easy: 1000 x 5 x 1.20
+            Assert.AreEqual(6000, svc.BestCrown("lvl_001_01", 1));
             Assert.AreEqual(1000, svc.GetProgress("lvl_001_01").BestScore, "the legacy base best score is still kept");
         }
 
@@ -47,12 +47,12 @@ namespace FluffyClimbers.Tests
         {
             var svc = NewService();
             svc.ApplyRun("lvl_001_01", Run(1945, 4));   // Insane only
-            Assert.AreEqual(2918, svc.BestCrown("lvl_001_01", 4));
+            Assert.AreEqual(14588, svc.BestCrown("lvl_001_01", 4));
             for (int mode = 0; mode < 4; mode++) Assert.AreEqual(0, svc.BestCrown("lvl_001_01", mode), "mode " + mode + " was not played");
             Assert.IsNull(svc.BestCrownRun("lvl_001_01", 0));
             svc.ApplyRun("lvl_001_01", Run(1020, 0));   // then Relaxed with a lower base
-            Assert.AreEqual(1122, svc.BestCrown("lvl_001_01", 0));
-            Assert.AreEqual(2918, svc.BestCrown("lvl_001_01", 4));
+            Assert.AreEqual(5610, svc.BestCrown("lvl_001_01", 0));
+            Assert.AreEqual(14588, svc.BestCrown("lvl_001_01", 4));
         }
 
         [Test]

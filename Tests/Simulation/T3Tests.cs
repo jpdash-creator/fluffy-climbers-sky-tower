@@ -116,7 +116,7 @@ namespace FluffyClimbers.Simulation.Tests
             b.FixedChunks = new string[] { "chunk_complex_a" };
             b.Class = 3;
             Assert.Equal(-1274289823304530343L, LevelBuilder.Build(cfg, a).ComputeHash());   // re-rolled 2026-11-13 (economy review: no gem pickups; was -3181476168520851783); re-rolled 2026-11-10: region 1 got the generics Crumble and Moving (was -7839884808577442138, re-rolled 2026-10-31 for doc 24)
-            Assert.Equal(5136200250945043513L, LevelBuilder.Build(cfg, b).ComputeHash());   // re-rolled 2026-11-13 (economy review: no gem pickups; was -9118401508389237609); re-rolled 2026-11-04: SwingingGongs (region 5) now draws from its 7 new kinds (Bug List 3 D5); was -5175047465905895765
+            Assert.Equal(4519676794810349580L, LevelBuilder.Build(cfg, b).ComputeHash());   // re-rolled 2026-11-17 (gem levels restored: 2 or 3 collectible gems; was -3729750187827399642); re-rolled 2026-11-16 (collectible gems on level 10: was 5136200250945043513); re-rolled 2026-11-13 (economy review: no gem pickups; was -9118401508389237609); re-rolled 2026-11-04: SwingingGongs (region 5) now draws from its 7 new kinds (Bug List 3 D5); was -5175047465905895765
         }
 
         [Fact]
@@ -464,8 +464,8 @@ namespace FluffyClimbers.Simulation.Tests
             // continues the combo: +5
             Assert.Equal(5, s.Coins);
             Assert.Equal(2, s.Combo);
-            // score formula unchanged: floors x 10 + combo^2 x 5 (no coins in it)
-            Assert.Equal(4 * 10 + 1 * 5 + 4 * 5, s.Score);
+            // Bug List 4 score: floors + chain_length^2 (open chain of 2 = 4), no coins in it
+            Assert.Equal(4 + 2 * 2, s.Score);
         }
 
         [Fact]

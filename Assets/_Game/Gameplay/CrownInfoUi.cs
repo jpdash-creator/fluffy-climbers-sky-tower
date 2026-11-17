@@ -196,38 +196,46 @@ namespace FluffyClimbers.Gameplay
             float y = 0f, h;
             Color ink = Theme.Ink, soft = Theme.InkSoft;
 
-            Txt(parent, "Formula", "Crown = (floors x " + CrownScore.FloorPoints + " + combo points) x (1 + bonus)", 42, ink, 0.5f, 0f, y, ContentW, false, false, out h);
+            Txt(parent, "Formula", "Crown = (floors + chain squares) x 5 x (1 + bonus)", 42, ink, 0.5f, 0f, y, ContentW, false, false, out h);
             y += h + 2f;
-            Txt(parent, "ComboRule", "Combo step n adds n x n x " + CrownScore.ComboPoints + " points.", 42, soft, 0.5f, 0f, y, ContentW, false, false, out h);
+            Txt(parent, "ComboRule", "A combo chain of n adds n x n.", 42, soft, 0.5f, 0f, y, ContentW, false, false, out h);
             y += h + 8f;
 
-            string bonus = "+" + b.BonusPercent + "%", bonusLabel = modeName + " bonus";
+            // rows (owner Bug List 5 item 3): Floors / Chain Squares / Total (x5) / Bonus (setting) / rule / Total Crowns, label left, value right, one line each
+            string bonus = "+" + b.BonusPercent + "%", bonusLabel = BonusLabel(modeName), totalLabel = TotalLabel();
             if (!b.HasRun)
             {
-                y += Row(parent, "RowFloors", "floors x " + CrownScore.FloorPoints, "0", y, false, null);   // never played in this setting: all zero, no other calculation (owner 2026-11-13)
-                y += Row(parent, "RowCombo", "Combo points", "0", y, false, null);
+                y += Row(parent, "RowFloors", "Floors", "0", y, false, null);   // never played in this setting: all zero, no other calculation (owner 2026-11-13)
+                y += Row(parent, "RowCombo", "Chain Squares", "0", y, false, null);
+                y += Row(parent, "RowFactor", totalLabel, "0", y, false, null);
                 y += Row(parent, "RowBonus", bonusLabel, bonus, y, false, null);
                 y += Rule(parent, y);
-                y += Row(parent, "RowCrown", "Crown", "0", y, true, null);
-                Txt(parent, "Hint", endless ? "Play Endless to set your crown." : "Play this level to set your crown.", 42, soft, 0.5f, 0f, y + 2f, ContentW, false, true, out h);
+                y += Row(parent, "RowCrown", "Total Crowns", "0", y, true, null);
+                Txt(parent, "Hint", endless ? "Play Endless to set this week's crown." : "Play this level to set this week's crown.", 42, soft, 0.5f, 0f, y + 2f, ContentW, false, true, out h);
                 y += h + 8f;
             }
             else if (b.PartsKnown)
             {
-                y += Row(parent, "RowFloors", b.Floors + " floors x " + CrownScore.FloorPoints, b.FloorPoints.ToString(), y, false, null);
-                y += Row(parent, "RowCombo", "Combo points" + (b.BestCombo > 0 ? " (chain " + b.BestCombo + ")" : ""), b.ComboPoints.ToString(), y, false, null);
+                y += Row(parent, "RowFloors", "Floors", b.FloorPoints.ToString(), y, false, null);
+                y += Row(parent, "RowCombo", "Chain Squares", b.ComboPoints.ToString(), y, false, null);
+                y += Row(parent, "RowFactor", totalLabel, b.BeforeBonus.ToString(), y, false, null);
                 y += Row(parent, "RowBonus", bonusLabel, bonus, y, false, null);
                 y += Rule(parent, y);
-                y += Row(parent, "RowCrown", "Crown", b.Crown.ToString(), y, true, null);
+                y += Row(parent, "RowCrown", "Total Crowns", b.Crown.ToString(), y, true, null);
+                if (b.Chains != null && b.Chains.Length > 0)
+                {
+                    Txt(parent, "Chains", "Chains: " + string.Join(", ", b.Chains), 42, soft, 0.5f, 0f, y + 4f, ContentW, false, false, out h);
+                    y += h + 4f;
+                }
                 y += 6f;
             }
             else
             {
-                y += Row(parent, "RowTotal", "Score (floors + combo)", b.BaseScore > 0 ? b.BaseScore.ToString() : "?", y, false, null);
+                y += Row(parent, "RowFactor", totalLabel, b.BaseScore > 0 ? b.BeforeBonus.ToString() : "?", y, false, null);
                 y += Row(parent, "RowBonus", bonusLabel, bonus, y, false, null);
                 y += Rule(parent, y);
-                y += Row(parent, "RowCrown", "Crown", b.Crown.ToString(), y, true, null);
-                Txt(parent, "Hint", "Floors and combo were not saved for this older best.", 42, soft, 0.5f, 0f, y + 2f, ContentW, false, true, out h);
+                y += Row(parent, "RowCrown", "Total Crowns", b.Crown.ToString(), y, true, null);
+                Txt(parent, "Hint", "The run parts were not saved for this best.", 42, soft, 0.5f, 0f, y + 2f, ContentW, false, true, out h);
                 y += h + 8f;
             }
 
@@ -251,6 +259,12 @@ namespace FluffyClimbers.Gameplay
             y += h + 4f;
             return y;
         }
+
+        /// <summary>"Total (x5)": the label of the (floors + chain squares) x 5 row.</summary>
+        public static string TotalLabel() { return "Total (x" + CrownBreakdown.Factor + ")"; }
+
+        /// <summary>"Bonus (Insane)": the label of the setting bonus row; the percent is its value.</summary>
+        public static string BonusLabel(string modeName) { return "Bonus (" + modeName + ")"; }
 
         /// <summary>A thin ink line across the content (a sum line); returns the height it takes.</summary>
         static float Rule(RectTransform parent, float y)
@@ -278,6 +292,13 @@ namespace FluffyClimbers.Gameplay
             Text v = Txt(parent, name + "Value", value, strong ? 60 : 50, Theme.Ink, 1f, 0f, y, vw, true, false, out hv, TextAnchor.MiddleRight, 0f);
             // the value is one line: shrink it toward the 16 sp floor instead of wrapping
             v.horizontalOverflow = HorizontalWrapMode.Overflow;
+            // the label is one line too: shrink toward the 16 sp floor instead of wrapping at large text sizes (130 percent)
+            int minFs = Mathf.RoundToInt(UiKit.MinBodyTextPx), guard = 0;
+            while (l.preferredHeight > TimedUi.LineHeight() * 1.5f && l.fontSize > minFs && ++guard < 40)
+            {
+                l.fontSize = Mathf.Max(minFs, l.fontSize - 2);
+                hl = Mathf.Max(TimedUi.LineHeight(), Mathf.Ceil(l.preferredHeight));
+            }
             float rowH = Mathf.Max(Mathf.Max(hl, hv), icon != null ? 64f : 0f);
             l.rectTransform.sizeDelta = new Vector2(lw, rowH);
             v.rectTransform.sizeDelta = new Vector2(vw, rowH);

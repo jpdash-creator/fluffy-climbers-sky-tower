@@ -52,6 +52,7 @@ namespace FluffyClimbers.Economy
             int gems = GemsFromPack(pack);
             if (IsFirstPurchaseAvailable(pack)) FirstPurchaseList.Add(pack.Id);
             Data.Gems = SaturatingAdd(Data.Gems, gems);
+            if (recordingPurchase) LedgerAddGems(gems);   // a real-money purchase (GrantWithRecord): Reset progress keeps it; admin and test grants do not set the flag
             Commit();
             return ShopResult.Ok;
         }

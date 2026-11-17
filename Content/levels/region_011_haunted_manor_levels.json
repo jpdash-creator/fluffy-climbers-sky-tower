@@ -83,16 +83,14 @@
     "class": "complex",
     "difficulty": 0.4,
     "goal": {
-      "type": "comboChain",
-      "value": 3,
-      "count": 3
+      "type": "reachFloor",
+      "value": 90
     },
     "rewards": {
       "gems": {
-        "chance": 1.0,
-        "min": 1,
-        "max": 1,
-        "firstClearGuaranteed": 1
+        "chance": 0.0,
+        "min": 0,
+        "max": 0
       }
     }
   },
@@ -186,10 +184,9 @@
     },
     "rewards": {
       "gems": {
-        "chance": 1.0,
-        "min": 1,
-        "max": 1,
-        "firstClearGuaranteed": 1
+        "chance": 0.0,
+        "min": 0,
+        "max": 0
       }
     }
   },
@@ -282,10 +279,9 @@
     },
     "rewards": {
       "gems": {
-        "chance": 1.0,
-        "min": 2,
-        "max": 2,
-        "firstClearGuaranteed": 2
+        "chance": 0.0,
+        "min": 0,
+        "max": 0
       }
     }
   }

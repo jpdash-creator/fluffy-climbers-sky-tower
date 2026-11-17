@@ -121,7 +121,7 @@ Seven power-ups are implemented and sold (doc 22 point 4.3, doc 27 section 7). S
 | Double Jump | One extra air jump per air phase | 30 s | 1,000 | 50 |
 | Wall Stick | Stick to side walls up to 1.5 s | 30 s | 1,000 | 50 |
 | Shield | Gongs cannot hurt | 60 s | 1,000 | 50 |
-| Magnet | Gems and stars come from farther away | 30 s | 1,000 | 50 |
+| Safety Net / Glide Cape / Wide Platforms (replaced the Magnet, Bug List 4) | Bounces you up on the first fall / auto slow-mo after every jump (half speed until you land) / 20 percent wider platforms | not timed / 20 s / 20 s | 1,000 | 50 |
 | Slow Time | Rising danger zone 50 percent slower | 30 s | 1,500 | 75 |
 | Revive | Continue after a fall | 1 use | - | 5 gems (first), 10 (second), max 2 per run; the first can be free by rewarded ad |
 

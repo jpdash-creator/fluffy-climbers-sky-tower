@@ -13,7 +13,7 @@ import content  # noqa: E402
 import gen_bundles  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-GEM_VALUE = {"pw_flight": 75, "pw_rocket": 75, "pw_doublejump": 50, "pw_wallstick": 50, "pw_shield": 50, "pw_magnet": 50, "pw_slowtime": 75}
+GEM_VALUE = {"pw_flight": 75, "pw_rocket": 75, "pw_doublejump": 50, "pw_wallstick": 50, "pw_shield": 50, "pw_safety_net": 50, "pw_glide": 50, "pw_wide_platforms": 50, "pw_slowtime": 75}
 
 
 def load_bundles():

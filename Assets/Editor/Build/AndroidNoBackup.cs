@@ -1,12 +1,13 @@
 using System.IO;
 using System.Text.RegularExpressions;
+using UnityEditor;
 using UnityEditor.Android;
 using UnityEngine;
 
 namespace FluffyClimbers.Editor.Build
 {
     /// <summary>
-    /// Turns Android backup off for the game. By default Android Auto Backup (Google backup) copies the app's private files
+    /// Turns Android backup off for DEVELOPMENT builds only (owner 2026-11-16; release builds keep backup). By default Android Auto Backup (Google backup) copies the app's private files
     /// (persistentDataPath/save.json, PlayerPrefs) to the player's Google account and restores them when the same package is
     /// installed again, even after a manual uninstall. That is why an old save came back after a reinstall. With
     /// android:allowBackup="false" (plus empty extraction rules for Android 12+ cloud backup and device transfer) a clean install
@@ -23,6 +24,11 @@ namespace FluffyClimbers.Editor.Build
 
         public void OnPostGenerateGradleAndroidProject(string path)
         {
+            if (!ShouldDisableBackup(EditorUserBuildSettings.development))
+            {
+                Debug.Log("[Backup] release build: Android backup left at the default (on).");
+                return;
+            }
             DirectoryInfo parent = Directory.GetParent(path);
             string root = parent != null ? parent.FullName : path;
             string main = Path.Combine(root, "launcher", "src", "main");
@@ -42,15 +48,33 @@ namespace FluffyClimbers.Editor.Build
                 "    <device-transfer><exclude domain=\"root\" path=\".\" /><exclude domain=\"file\" path=\".\" /><exclude domain=\"database\" path=\".\" /><exclude domain=\"sharedpref\" path=\".\" /><exclude domain=\"external\" path=\".\" /></device-transfer>\n" +
                 "</data-extraction-rules>\n");
 
-            string text = File.ReadAllText(manifest);
-            if (!text.Contains("xmlns:tools="))
-                text = Regex.Replace(text, "<manifest\\b", "<manifest xmlns:tools=\"http://schemas.android.com/tools\"", RegexOptions.None);
-            Match app = Regex.Match(text, "<application\\b[^>]*>");
-            if (!app.Success)
+            string original = File.ReadAllText(manifest);
+            string text = PatchManifest(original, true);
+            if (text == null)
             {
                 Debug.LogWarning("[Backup] <application> tag not found in " + manifest + "; backup flags not changed.");
                 return;
             }
+            File.WriteAllText(manifest, text);
+            Debug.Log("[Backup] allowBackup=false set in " + manifest);
+        }
+
+        /// <summary>
+        /// Owner 2026-11-16: only DEVELOPMENT builds turn Android backup off (a fresh debug install must be clean); release builds keep the Android default (backup on).
+        /// </summary>
+        public static bool ShouldDisableBackup(bool development) { return development; }
+
+        /// <summary>
+        /// Pure manifest edit. Returns the launcher manifest text with backup switched off when <paramref name="development"/> is true; the text unchanged for a release build;
+        /// null when the application tag is missing (the caller only warns).
+        /// </summary>
+        public static string PatchManifest(string text, bool development)
+        {
+            if (!ShouldDisableBackup(development)) return text;
+            if (!text.Contains("xmlns:tools="))
+                text = Regex.Replace(text, "<manifest\\b", "<manifest xmlns:tools=\"http://schemas.android.com/tools\"", RegexOptions.None);
+            Match app = Regex.Match(text, "<application\\b[^>]*>");
+            if (!app.Success) return null;
             string tag = app.Value;
             tag = Regex.Replace(tag, "\\s+android:(allowBackup|fullBackupContent|dataExtractionRules)=\"[^\"]*\"", "");
             tag = Regex.Replace(tag, "\\s+tools:replace=\"[^\"]*\"", "");
@@ -60,9 +84,7 @@ namespace FluffyClimbers.Editor.Build
             tag = tag.Substring(0, tag.Length - ending.Length).TrimEnd()
                 + " android:allowBackup=\"false\" android:fullBackupContent=\"false\" android:dataExtractionRules=\"@xml/" + RulesName + "\""
                 + " tools:replace=\"android:allowBackup,android:fullBackupContent,android:dataExtractionRules\"" + (selfClosing ? " />" : ">");
-            text = text.Substring(0, app.Index) + tag + text.Substring(app.Index + app.Length);
-            File.WriteAllText(manifest, text);
-            Debug.Log("[Backup] allowBackup=false set in " + manifest);
+            return text.Substring(0, app.Index) + tag + text.Substring(app.Index + app.Length);
         }
     }
 }

@@ -354,6 +354,7 @@ namespace FluffyClimbers.Gameplay
                 RunLayout.StripsRef(asp, worldWidth, out tr, out br);
                 topStripRt.sizeDelta = new Vector2(0f, tr);
             }
+            if (Powers != null) Powers.SyncOwned();   // a power-up bought during the run gets its button now (RunSession.SyncStock)
             if (Powers != null && Powers.ButtonCount > 0)
             {
                 if (introTimer <= 0f && !Powers.Visible) Powers.SetVisible(true);
@@ -607,17 +608,33 @@ namespace FluffyClimbers.Gameplay
         /// <summary>A thin progress bar (dark track, green fill) at <paramref name="y"/> below the top of the panel; <paramref name="fraction"/> 0..1.</summary>
         void ProgressBar(Transform panel, float y, float fraction)
         {
-            Image track = Theme.GlassPanel(panel, "Progress", 20f);
+            // Bug List 6: flat rounded track and fill (the old bevelled pill sprites ended in a point on the right and the bar had no number); the percent sits centred on the bar.
+            const float barH = 50f, trackR = 25f, fillR = 19f;   // 50 high like before: the bar must end where the reserved "Ad not ready" line starts
+            Image track = UiKit.AddImage(panel, "Progress", Theme.RoundSprite, new Color(0.09f, 0.11f, 0.24f, 0.92f));
+            track.type = Image.Type.Sliced;
+            track.pixelsPerUnitMultiplier = 44f / trackR;
             track.rectTransform.anchorMin = new Vector2(0f, 1f);
             track.rectTransform.anchorMax = new Vector2(1f, 1f);
             track.rectTransform.pivot = new Vector2(0.5f, 1f);
             track.rectTransform.anchoredPosition = new Vector2(0f, -y);
-            track.rectTransform.sizeDelta = new Vector2(-140f, 50f);
-            Image fill = ToyKit.Sliced(track.transform, "Fill", ToyKit.Button(1), 18f);
+            track.rectTransform.sizeDelta = new Vector2(-140f, barH);
+            // The fill sits inside a clip rectangle (RectMask2D) inset 5 px from the track, so nothing of it can ever stick out of the black track (owner 2026-11-16, "You fell!" bar).
+            // Its corner radius is kept under half the bar height so a short fill never squeezes its 9-slice corners past each other.
+            var clipGo = new GameObject("FillClip", typeof(RectTransform), typeof(RectMask2D));
+            RectTransform clip = (RectTransform)clipGo.transform;
+            clip.SetParent(track.transform, false);
+            clip.anchorMin = Vector2.zero;
+            clip.anchorMax = Vector2.one;
+            clip.offsetMin = new Vector2(5f, 5f);
+            clip.offsetMax = new Vector2(-5f, -5f);
+            Image fill = UiKit.AddImage(clip, "Fill", Theme.RoundSprite, new Color(0.22f, 0.78f, 0.32f, 1f));
+            fill.type = Image.Type.Sliced;
+            fill.pixelsPerUnitMultiplier = 44f / fillR;
             fill.rectTransform.anchorMin = new Vector2(0f, 0f);
             fill.rectTransform.anchorMax = new Vector2(Mathf.Max(0.07f, Mathf.Clamp01(fraction)), 1f);
-            fill.rectTransform.offsetMin = new Vector2(5f, 5f);
-            fill.rectTransform.offsetMax = new Vector2(-5f, -5f);
+            fill.rectTransform.offsetMin = Vector2.zero;
+            fill.rectTransform.offsetMax = Vector2.zero;
+            // (no number on the bar: the two pills above it already show the floor and the goal, and a label here collided with the reserved "Ad not ready" line)
         }
 
         /// <summary>

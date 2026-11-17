@@ -189,8 +189,22 @@ namespace FluffyClimbers.Gameplay
             return Momo;
         }
 
-        /// <summary>True when the player has the character AND it is visible: a region hero stays hidden until its region is unlocked and its "New hero joins you!" reveal was confirmed. Momo always.</summary>
-        public static bool Owns(ProgressService p, CharacterDef c) { return c == Momo || (p != null && p.IsCharacterVisible(c.Id)); }
+        /// <summary>True when the player has the character AND it is visible: a region hero stays hidden until its region is unlocked and its "New hero joins you!" reveal was confirmed. Momo follows the same rule as every hero (owner 2026-11-16): at 0 copies he is not owned (a fresh save still starts with 1 copy).</summary>
+        public static bool Owns(ProgressService p, CharacterDef c) { return c != null && p != null && p.IsCharacterVisible(c.Id); }
+
+        /// <summary>The best hero the player owns (highest tier, then list order = hero line, region order), or Momo as a crash-free default when nothing is owned or there is no save (CUX-10).</summary>
+        public static CharacterDef BestOwned(ProgressService p)
+        {
+            CharacterDef best = null;
+            CharacterRarity bestRarity = CharacterRarity.Common;
+            foreach (CharacterDef c in Available(p))
+            {
+                CharacterSpec s = c.Info;
+                CharacterRarity r = s != null ? s.Rarity : CharacterRarity.Common;
+                if (best == null || r > bestRarity) { best = c; bestRarity = r; }
+            }
+            return best ?? Momo;
+        }
 
         /// <summary>The characters the player has and may see (bought, received, or the revealed heroes of unlocked regions).</summary>
         public static CharacterDef[] Available(ProgressService p)
@@ -216,7 +230,7 @@ namespace FluffyClimbers.Gameplay
         /// </summary>
         public static List<HeroCard> OwnedCards(ProgressService p)
         {
-            return HeroCards.Owned(AvailableSpecs(p), id => p != null ? p.Copies(id) : 1);
+            return HeroCards.Owned(AvailableSpecs(p), id => p != null ? p.Copies(id) : 0);
         }
 
         /// <summary>The Merge screen list: every copy of every hero type that has a next tier and at least 3 copies (types with fewer copies are not listed).</summary>
@@ -225,19 +239,51 @@ namespace FluffyClimbers.Gameplay
             return p == null ? new List<HeroCard>() : HeroCards.Mergeable(AvailableSpecs(p), id => p.Copies(id));
         }
 
-        /// <summary>The chosen character (Momo until another is picked, and when the chosen one is not owned).</summary>
+        /// <summary>The chosen character (Momo until another is picked; when the chosen one is not owned, the best owned hero).</summary>
         public static CharacterDef Selected
         {
             get
             {
                 CharacterDef c = Get(PlayerPrefs.GetString(SelectedKey, Momo.Id));
-                return Owns(GameSession.Progress, c) ? c : Momo;
+                return Owns(GameSession.Progress, c) ? c : BestOwned(GameSession.Progress);
             }
             set
             {
-                PlayerPrefs.SetString(SelectedKey, value != null ? value.Id : Momo.Id);
+                string id = value != null ? value.Id : Momo.Id;
+                if (PlayerPrefs.GetString(SelectedKey, Momo.Id) != id) PlayerPrefs.SetInt(SelectedCopyKey, 0);   // another hero: its first card; the same hero keeps its chosen copy
+                PlayerPrefs.SetString(SelectedKey, id);
                 PlayerPrefs.Save();
             }
+        }
+
+        const string SelectedCopyKey = "settings.character.copy";
+
+        /// <summary>
+        /// The chosen COPY (0-based card of the chosen hero; Bug List 5 item 4). Two copies of one hero are two cards on the Heroes screen and either can be chosen; the hero (and with it
+        /// the roll, <see cref="ProgressService.HeroVariant"/>) is the same. Additive: a missing key (old installs) means copy 0. Clamped to the copies held.
+        /// </summary>
+        public static int SelectedCopy
+        {
+            get
+            {
+                int held = Mathf.Max(1, Copies(GameSession.Progress, Selected));
+                return Mathf.Clamp(PlayerPrefs.GetInt(SelectedCopyKey, 0), 0, Mathf.Min(MergeRules.MaxCopies, held) - 1);
+            }
+        }
+
+        /// <summary>Chooses one card: hero <paramref name="who"/>, copy <paramref name="copy"/> (0-based).</summary>
+        public static void Select(CharacterDef who, int copy)
+        {
+            Selected = who;
+            PlayerPrefs.SetInt(SelectedCopyKey, Mathf.Max(0, copy));
+            PlayerPrefs.Save();
+        }
+
+        /// <summary>True when the card carries the chosen tick (see <see cref="HeroCards.IsChosen"/>).</summary>
+        public static bool IsChosen(ProgressService p, HeroCard card)
+        {
+            CharacterDef sel = Selected;
+            return card != null && HeroCards.IsChosen(card, sel.Id, SelectedCopy, Copies(p, sel));
         }
     }
 

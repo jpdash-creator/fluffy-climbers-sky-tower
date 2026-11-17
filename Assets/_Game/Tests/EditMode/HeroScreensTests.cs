@@ -437,13 +437,13 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void PowersListsAllSevenPowerUpsWithTheOwnedNumberAtTheBottomRightAndNothingToBuy()
+        public void PowersListsAllNinePowerUpsWithTheOwnedNumberAtTheBottomRightAndNothingToBuy()
         {
             P.GrantPowerUp("pw_flight", 3);
             P.GrantPowerUp("pw_slowtime", 40);
             PowersScreen s = NewPowers();
-            Assert.AreEqual(7, s.Cards.Count);
-            string[] ids = { "pw_flight", "pw_rocket", "pw_doublejump", "pw_magnet", "pw_shield", "pw_slowtime", "pw_wallstick" };
+            Assert.AreEqual(9, s.Cards.Count);
+            string[] ids = { "pw_flight", "pw_rocket", "pw_doublejump", "pw_safety_net", "pw_shield", "pw_slowtime", "pw_wallstick", "pw_glide", "pw_wide_platforms" };
             for (int i = 0; i < ids.Length; i++)
             {
                 Assert.AreEqual(ids[i], s.Cards[i].Id, "owner order");

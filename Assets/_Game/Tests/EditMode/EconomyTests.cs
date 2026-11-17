@@ -355,23 +355,31 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void OnlyTheMilestoneLevelsPayFixedGemsOnTheFirstClear()
+        public void OnlyTheGemsARunCollectedPayAndOnlyOnTheGemLevels()
         {
+            // Main Bug List 7 item 2: fixed first-clear gems 1/2/2/3/4 on levels 5/10/15/20/25; those levels also hold 2 or 3 collectible gems (seeded 50 percent); only collected gems pay on top.
             var svc = NewService();
-            int[] want = new int[26];
-            want[5] = 1; want[10] = 1; want[15] = 2; want[20] = 2; want[25] = 3;
             int total = 0;
             for (int i = 1; i <= 25; i++)
             {
-                RewardResult first = svc.ApplyRun("lvl_001_" + i.ToString("D2"), Won(gems: 4));   // reported pickups are ignored
-                Assert.AreEqual(want[i], first.RewardGems, "level " + i + " first clear");
-                Assert.AreEqual(0, first.PickupGems);
+                string id = "lvl_001_" + i.ToString("D2");
+                int held = FluffyClimbers.Simulation.GemLevels.GemsInLevel(i, repo.GetLevel(id).Seed);
+                Assert.AreEqual(held, RewardCalculator.GemsInLevel(repo.GetLevel(id)), id);
+                Assert.IsTrue(held == 0 || held == 2 || held == 3, id);
+                RewardResult first = svc.ApplyRun(id, Won(gems: 4));   // 4 reported: only the gems the level holds pay (clamped)
+                Assert.AreEqual(held, first.PickupGems, "level " + i + " first clear");
+                int fixedGems = i == 5 ? 1 : i == 10 ? 2 : i == 15 ? 2 : i == 20 ? 3 : i == 25 ? 4 : 0;
+                Assert.AreEqual(fixedGems, first.RewardGems, "fixed first-clear gems of level " + i);
+                Assert.AreEqual(fixedGems, RewardCalculator.MilestoneGemsOf(repo.GetLevel(id)), "tile badge shows the fixed gems on every milestone level");
                 Assert.AreEqual(0, first.HiddenGemReward);
-                total += first.RewardGems;
+                total += first.PickupGems;
             }
-            Assert.AreEqual(9, total, "9 milestone gems per region");
-            RewardResult again = svc.ApplyRun("lvl_001_25", Won());
-            Assert.AreEqual(0, again.RewardGems, "milestone gems pay on the first clear only");
+            var none = NewService();
+            Assert.AreEqual(0, none.ApplyRun("lvl_001_01", Won(gems: 0)).PickupGems);
+            RewardResult uncollected = none.ApplyRun("lvl_001_02", Won());
+            Assert.AreEqual(0, uncollected.PickupGems, "nothing at the end for uncollected gems");
+            RewardResult again = svc.ApplyRun("lvl_001_25", Won(starMask: 7, gems: 4));
+            Assert.AreEqual(0, again.RewardGems, "fixed gems on the first clear only");
             Assert.AreEqual(0, again.HeroBonusGems);
             Assert.AreEqual(0, again.HeroBonusCoins);
         }
@@ -385,7 +393,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(50, c5.HeroBonusCoins);
             Assert.AreEqual(0, c5.HeroBonusGems);
             Assert.AreEqual(c5.PayoutCoins + 50, c5.TotalCoins);
-            Assert.AreEqual(c5.RewardGems, c5.TotalGems);
+            Assert.AreEqual(1 + c5.PickupGems, c5.TotalGems);   // level 5: 1 fixed gem
             Assert.AreEqual(0, momo.ApplyRun("lvl_001_05", Won()).HeroBonusCoins, "first clear only");
 
             string[] ids = { "momo", null, null, null, null };
@@ -402,7 +410,7 @@ namespace FluffyClimbers.Tests
                 Assert.AreEqual(FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusCoinsByRarity[rarity], r.HeroBonusCoins, "rarity " + rarity);
                 int sure = FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusGemsByRarity[rarity];
                 Assert.That(r.HeroBonusGems, Is.EqualTo(sure).Or.EqualTo(sure + 1), "rarity " + rarity);
-                Assert.AreEqual(r.RewardGems + r.HeroBonusGems, r.TotalGems);
+                Assert.AreEqual(r.RewardGems + r.PickupGems + r.HeroBonusGems, r.TotalGems);
                 Assert.AreEqual(c5.PayoutCoins + FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusCoinsByRarity[rarity], r.TotalCoins, "fixed coins: no region factor, no cut");
             }
         }
@@ -449,7 +457,7 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void TheHiddenGemOfLevel15IsOnlyTheGoalObjectItsTwoGemsAreTheMilestoneReward()
+        public void TheHiddenGemOfLevel15IsOnlyTheGoalObjectAndPaysNothing()
         {
             var svc = NewService();
             for (int i = 1; i <= 14; i++) svc.ApplyRun("lvl_001_" + i.ToString("D2"), Won());
@@ -457,8 +465,8 @@ namespace FluffyClimbers.Tests
             run.HiddenGems = 2;
             RewardResult first = svc.ApplyRun("lvl_001_15", run);
             Assert.AreEqual(0, first.HiddenGemReward, "no separate gem for the hidden gem pickup");
-            Assert.AreEqual(2, first.RewardGems, "level 15 pays its 2 gems on the first clear");
-            Assert.AreEqual(0, svc.ApplyRun("lvl_001_15", run).TotalGems, "first clear only");
+            Assert.AreEqual(2, first.RewardGems, "level 15 pays 2 fixed gems on the first clear (the hidden gem itself pays none)");
+            Assert.AreEqual(0, svc.ApplyRun("lvl_001_15", run).TotalGems, "nothing on a repeat either");
         }
 
         [Test]

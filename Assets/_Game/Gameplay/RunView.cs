@@ -446,6 +446,11 @@ namespace FluffyClimbers.Gameplay
             return best;
         }
 
+        static int WidthKindOf(Platform p)
+        {
+            return p.Kind == PlatformKind.Crumble ? 1 : p.Kind == PlatformKind.Moving ? 2 : (p.Kind == PlatformKind.Bounce || p.Kind == PlatformKind.BounceCap) ? 3 : 0;
+        }
+
         /// <summary>Index into region.KindPieces of the painted piece of a region 1 special platform (kind, thorny side Platform.Dir, nearest baked width), or -1 (no art yet: tinted normal platform, no drawn cues).</summary>
         int KindPieceIndexFor(Platform p, float width)
         {
@@ -574,6 +579,23 @@ namespace FluffyClimbers.Gameplay
             System.Array.Resize(ref platformOffY, n);
         }
 
+        bool wideView;   // Wide Platforms running: every platform view is built x1.2 wide (the Sim lands them x1.2 wide)
+
+        /// <summary>Width factor of the Sim: 1, or 1 + WidePlatformPercent / 100 (1.2) while Wide Platforms runs. The VIEW does not scale by it (owner Bug List 7: only the width grows): SetupPlatform swaps in the next wider painted piece at the unchanged uniform scale; only code-drawn slabs and bars use the factor.</summary>
+        float WideScale { get { return wideView ? 1f + session.Sim.Cfg.WidePlatformPercent / 100f : 1f; } }
+
+        /// <summary>Rebuilds every live platform view at the new width when Wide Platforms starts or ends (a rare event; reuses the renderers, no allocation).</summary>
+        void RefreshWideViews(bool wide)
+        {
+            if (wide == wideView) return;
+            wideView = wide;
+            Platform[] plats = session.Data.Platforms;
+            for (int i = actLo; i < actHi && i < plats.Length; i++)
+            {
+                if (platformSr[i] != null) SetupPlatform(i, plats[i], platformSr[i]);
+            }
+        }
+
         /// <summary>Creates (or, with a pooled renderer, re-configures) the view of platform i.</summary>
         void SetupPlatform(int i, Platform p, SpriteRenderer reuse)
         {
@@ -586,19 +608,31 @@ namespace FluffyClimbers.Gameplay
                 sr.drawMode = SpriteDrawMode.Simple;
                 sr.sprite = sprite != null ? sprite : white;
             }
-            float width = p.Width.F();
+            float baseWidth = p.Width.F();
+            float width = baseWidth * WideScale;   // Wide Platforms: the Sim lands the platform x1.2 wide; only the code-drawn slab and bar are drawn exactly that wide
             platformOffX[i] = 0f;
-            int piece = PieceIndex(p, width);
-            int wp = WidthPieceIndex(p, width);
-            int kp = KindPieceIndexFor(p, width);
+            // Wide Platforms (owner Bug List 7): only the WIDTH grows. The scale s is always the one of the NORMAL width piece (so thickness, caps and features keep their size) and the sprite
+            // is swapped for the NEXT WIDER painted piece (nearest painted width at or above width x 1.2). Nothing is stretched (CUX-9): same uniform scale, a real wider piece.
+            int piece = PieceIndex(p, baseWidth);
+            int wp = WidthPieceIndex(p, baseWidth);
+            int kp = KindPieceIndexFor(p, baseWidth);
+            int kpDraw = kp, wpDraw = wp;
+            if (wideView)
+            {
+                float target = baseWidth * WideScale;
+                if (kp >= 0 && !PosedKind(p.Kind)) kpDraw = region.KindPieceIndexAtOrAbove(p.Kind, p.Dir < 0 ? -1 : 1, target, baseWidth);
+                if (kpDraw < 0) kpDraw = kp;
+                if (wp >= 0) { wpDraw = region.WidthPieceIndexAtOrAbove(WidthKindOf(p), target); if (wpDraw < 0) wpDraw = wp; }
+            }
             if (kp >= 0)
             {
                 // Painted special platform (doc 24) for this kind and width (Thorn Bush: the baked piece of its thorny side, Platform.Dir): ONE uniform scale, never stretched.
-                KindPiece kpc = region.KindPieces[kp];
+                KindPiece kpn = region.KindPieces[kp];
+                KindPiece kpc = region.KindPieces[kpDraw];
                 Sprite sp = kpc.Sprite;
                 PlatformMetric m = kpc.Metric;
                 float ppu = sp.pixelsPerUnit;
-                float s = width / ((m.BodyRight - m.BodyLeft) / ppu);
+                float s = baseWidth / ((kpn.Metric.BodyRight - kpn.Metric.BodyLeft) / kpn.Sprite.pixelsPerUnit);
                 sr.sprite = sp;
                 sr.drawMode = SpriteDrawMode.Simple;
                 sr.transform.localScale = new Vector3(s, s, 1f);
@@ -608,10 +642,11 @@ namespace FluffyClimbers.Gameplay
             else if (wp >= 0)
             {
                 // A real painted piece for exactly this width: ONE uniform scale, never stretched (owner rule, CUX-9 addendum).
-                Sprite sp = region.WidthPieces[wp];
-                PlatformMetric m = region.WidthMetrics[wp];
+                Sprite sp = region.WidthPieces[wpDraw];
+                PlatformMetric m = region.WidthMetrics[wpDraw];
+                PlatformMetric mn = region.WidthMetrics[wp];
                 float ppu = sp.pixelsPerUnit;
-                float s = width / ((m.BodyRight - m.BodyLeft) / ppu);
+                float s = baseWidth / ((mn.BodyRight - mn.BodyLeft) / region.WidthPieces[wp].pixelsPerUnit);
                 sr.sprite = sp;
                 sr.drawMode = SpriteDrawMode.Simple;
                 sr.transform.localScale = new Vector3(s, s, 1f);
@@ -626,10 +661,10 @@ namespace FluffyClimbers.Gameplay
                 PlatformMetric m = region.PieceMetrics[piece];
                 float ppu = sp.pixelsPerUnit;
                 float bodyW = (m.BodyRight - m.BodyLeft) / ppu;
-                float s = Mathf.Min(1f, width / bodyW);
+                float s = Mathf.Min(1f, baseWidth / bodyW);   // uniform; Wide Platforms only lengthens the 9-slice middle (this older piece set has no wider painted piece), thickness unchanged
                 sr.sprite = sp;
                 sr.drawMode = SpriteDrawMode.Sliced;
-                sr.size = new Vector2((width / s) * (m.W / (m.BodyRight - m.BodyLeft)), m.H / ppu);
+                sr.size = new Vector2((baseWidth * WideScale / s) * (m.W / (m.BodyRight - m.BodyLeft)), m.H / ppu);
                 sr.transform.localScale = new Vector3(s, s, 1f);
                 platformBaseScaleX[i] = s;
                 platformOffY[i] = -(m.H * 0.5f - m.SurfaceY) / ppu * s;   // the sprite centre sits (H/2 - surface) below the walking line
@@ -673,12 +708,12 @@ namespace FluffyClimbers.Gameplay
         {
             platformPose[i] = pose;
             if (region == null) return;
-            float width = PoseWidth(p, pose);
-            int kp = region.KindPieceIndex(p.Kind, pose, width);
+            float poseWidth = PoseWidth(p, pose);
+            int kp = region.KindPieceIndex(p.Kind, pose, poseWidth);   // posed pieces are animation frames, not widths: Wide Platforms keeps their normal painted frame (no stretch, no scale)
             if (kp < 0) return;
             KindPiece kpc = region.KindPieces[kp];
             float ppu = kpc.Sprite.pixelsPerUnit;
-            float sc = width / ((kpc.Metric.BodyRight - kpc.Metric.BodyLeft) / ppu);
+            float sc = poseWidth / ((kpc.Metric.BodyRight - kpc.Metric.BodyLeft) / ppu);
             sr.sprite = kpc.Sprite;
             sr.transform.localScale = new Vector3(sc, sc, 1f);
             platformBaseScaleX[i] = sc;
@@ -972,7 +1007,7 @@ namespace FluffyClimbers.Gameplay
 
 
         // ---------------- power-up effects (docs/15 FR-PWR-7) ----------------
-        // Rings around Momo for the Shield (cyan), Magnet (gold, as wide as its pull) and Flight/Rocket (white / orange), a burst when one starts
+        // Rings around Momo for the Shield (cyan), Glide Cape (sky blue; fxMagnet is its renderer) and Flight/Rocket (white / orange), a burst when one starts
         // and trail sparkles while flying. Everything reads the simulation state; nothing here feeds back. Reduced motion: static rings only,
         // no trail and no pops. Allocation free: three pooled renderers and the existing pop pool.
 
@@ -1037,7 +1072,8 @@ namespace FluffyClimbers.Gameplay
             if (st.DoubleJumpTicks > 0) m |= 1 << (int)PowerUp.DoubleJump;
             if (st.WallStickTicks > 0) m |= 1 << (int)PowerUp.WallStick;
             if (st.ShieldTicks > 0) m |= 1 << (int)PowerUp.Shield;
-            if (st.MagnetTicks > 0) m |= 1 << (int)PowerUp.Magnet;
+            if (st.CapeTicks > 0) m |= 1 << (int)PowerUp.Glide;
+            if (st.WideTicks > 0) m |= 1 << (int)PowerUp.WidePlatforms;
             if (st.SlowTicks > 0) m |= 1 << (int)PowerUp.SlowTime;
             return m;
         }
@@ -1069,7 +1105,9 @@ namespace FluffyClimbers.Gameplay
         {
             if (fxShield == null) return;
             SimState st = session.State;
-            bool shield = st.ShieldTicks > 0, magnet = st.MagnetTicks > 0, boost = false;   // the old ring is gone: Flight shows wings and Rocket a rocket pack
+            bool shield = st.ShieldTicks > 0, magnet = false, boost = false;   // fxMagnet is unused (Magnet removed 2026-11-16); the Glide draws NO cape and no ring on the hero (owner), only a small air swirl trail below while the slow-mo runs
+            if (!reduced && session.Sim.GlideSlowed(in st) && st.Tick % 9 == 0)
+                Spawn(cx - (st.Vx.Raw >= 0 ? 0.35f : -0.35f), cy + 0.15f, 0.5f, new Color(0.85f, 0.95f, 1f, 0.35f), 0.4f, 0.2f, ArtCatalog.Pick(art != null ? art.Sparkles : null, 2));   // subtle, small, low contrast, pooled; off with reduced motion   // the old ring is gone: Flight shows wings and Rocket a rocket pack
             if (fxShield.enabled != shield) fxShield.enabled = shield;
             if (fxMagnet.enabled != magnet) fxMagnet.enabled = magnet;
             if (fxBoost.enabled != boost) fxBoost.enabled = boost;
@@ -1082,10 +1120,10 @@ namespace FluffyClimbers.Gameplay
             }
             if (magnet)
             {
-                float d = (session.Cfg.StarRadius + session.Cfg.MagnetExtraRadius).F() * 2f;   // as wide as the pull
+                float d = 2.6f;   // a soft sky-blue ring round the hero while the cape runs
                 fxMagnet.transform.position = new Vector3(cx, cy, 0f);
                 fxMagnet.transform.localScale = new Vector3(d * 0.5f, d * 0.5f, 1f);
-                fxMagnet.color = new Color(1f, 0.85f, 0.3f, 0.45f);
+                fxMagnet.color = new Color(0.55f, 0.8f, 1f, 0.45f);
             }
             if (boost)
             {
@@ -1231,6 +1269,7 @@ namespace FluffyClimbers.Gameplay
             else p.Tf.localScale = new Vector3(size * 0.4f, size * 0.4f, 1f);
         }
 
+        float stretchSmooth = 1f;   // eased squash/stretch of the player
         const float camSmoothing = 11f;
         float frameDt = 1f / 60f;
 
@@ -1240,14 +1279,18 @@ namespace FluffyClimbers.Gameplay
             SyncRebase();
             frameDt = deltaTime;
             SimState s = session.State;
-            int tick = s.Tick;
+            int tick = s.WorldTick;   // the world clock (Glide slow-mo slows it); platforms and hazards are placed from it
 
             // Player (interpolated, squash and stretch from vertical speed and landing).
             float px = Mathf.Lerp(prevX, curX, alpha);
             float py = Mathf.Lerp(prevY, curY, alpha);
             float vy = s.Vy.F();
             squash = Mathf.Max(0f, squash - deltaTime * 6f);
-            float stretch = reduced ? 1f : 1f + Mathf.Clamp(Mathf.Abs(vy) * 1.6f, 0f, 0.25f) - squash * 0.22f;
+            // squash and stretch follow the speed ON SCREEN (the Glide slow-mo halves it) and ease toward their target with a time-based factor, so a landing or a Safety Net jump never pops the shape
+            float vShown = session.Sim.GlideSlowed(in s) ? vy / SimConfig.GlideSlowDivisor : vy;
+            float stretchTarget = reduced ? 1f : 1f + Mathf.Clamp(Mathf.Abs(vShown) * 1.6f, 0f, 0.25f) - squash * 0.22f;
+            stretchSmooth += (stretchTarget - stretchSmooth) * (1f - Mathf.Exp(-deltaTime * 22f));
+            float stretch = reduced ? 1f : stretchSmooth;
             float h = playerHeight * stretch;
             float widthFactor = 1f / Mathf.Max(0.7f, stretch);
             if (partSr.Length > 0)
@@ -1265,6 +1308,7 @@ namespace FluffyClimbers.Gameplay
             UpdateGearFx(px, py + h * 0.5f, h);
 
             // Platforms (moving ones follow the sim, vanishing ones blink, crumbling ones fade).
+            RefreshWideViews(s.WideTicks > 0);
             if (endless) UpdateEndlessWindow();
             Platform[] plats = session.Data.Platforms;
             for (int i = actLo; i < actHi; i++)

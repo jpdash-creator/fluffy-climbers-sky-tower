@@ -13,8 +13,8 @@ Hero physics (Jump, Speed, Control, Wall Bounce) and the rarity rules: see docs/
 | Bao (existing) | calm focus, wall mastery | Wall Stick (Wall Stick, Slow Time, Shield, Flight) | 60 coins, 5 gems |
 | Sprout | defence, wall bounce | Shield (Shield, Wall Stick, Slow Time, Double Jump) | 70 coins, 5 gems |
 | Tora | jump | Double Jump (Double Jump, Wall Stick, Rocket, Shield) | 60 coins, 4 gems |
-| Rusu | coin finder | Magnet (Magnet, Double Jump, Slow Time, Rocket), coin find +40 per level | 80 coins, 5 gems |
-| Ryu | speed | Rocket (Rocket, Shield, Magnet, Double Jump) | 90 coins, 5 gems |
+| Rusu | coin finder | Safety Net (Safety Net, Double Jump, Slow Time, Rocket), coin find +40 per level | 80 coins, 5 gems |
+| Ryu | speed | Rocket (Rocket, Shield, Safety Net, Double Jump) | 90 coins, 5 gems |
 
 Tier physics follow doc 44 sections 4 and 8 (no percent chain). Run add-ons drawn by `Tools/tier_rows.py` (line index continues after Cookie: Sprout 21, Tora 22, Rusu 23, Ryu 24; Bao is line 4). Rusu takes the better of two draws for run coins and gems. Bao's Uncommon is the existing constant.
 

@@ -152,7 +152,7 @@ Momo's five tiers are not drawn: they are the reference.
 
 | Part | Today | Plan |
 |---|---|---|
-| **Hero powers** (Double Jump, Wall Stick, Magnet, Shield, Rocket, Slow Time, Flight; doc 34 section 2c) | Not measured. FI headroom is reserved for them: the gap from the approved Ladder Final FI to the 1.10 ceiling is 0.060 for Rare (1.040) and 0.052 for Legendary (1.048) (an earlier note said about 0.10 and 0.04; that was wrong). Measured with the fast probe, Legendary on level 15 of Region 1 reads 1.100 and the 75-level mean is 1.096, so the real headroom there is close to zero and must be settled before powers are measured. | The next phase measures each power on the same probe and sets how much of the headroom it may use. |
+| **Hero powers** (Double Jump, Wall Stick, Safety Net, Glide Cape, Wide Platforms, Shield, Rocket, Slow Time, Flight; doc 34 section 2c) | Not measured. FI headroom is reserved for them: the gap from the approved Ladder Final FI to the 1.10 ceiling is 0.060 for Rare (1.040) and 0.052 for Legendary (1.048) (an earlier note said about 0.10 and 0.04; that was wrong). Measured with the fast probe, Legendary on level 15 of Region 1 reads 1.100 and the 75-level mean is 1.096, so the real headroom there is close to zero and must be settled before powers are measured. | The next phase measures each power on the same probe and sets how much of the headroom it may use. |
 | **Run bonuses and finds** (run bonus coins and gems, flat coin and gem finds) | Neutral: paid after the run, never seen by the simulation. | Stay outside the index. |
 
 ## 7b. Run bonus and finds (moved here from doc 29)
@@ -337,7 +337,9 @@ The level 15 target is Momo's own value of the tier measured with the same fast 
 
 - 2026-11-12 (owner): per-player hero rolls added (section 11); the gate is measured over all 125 shipped levels (was 75); "Ranked runs stay neutral" is gone, everything counts on the boards.
 
-## 11. Per-player hero rolls (owner 2026-11-12)
+## 11. Per-player hero rolls (owner 2026-11-12; one roll per COPY since 2026-11-17)
+
+**One roll per copy (owner 2026-11-17).** Every COPY of an upper-tier hero rolls its OWN pool entry when that copy is obtained (chest, bundle, shop, reward, merge result, debug grant); the save keeps one roll per copy (`heroCopyRolls`: hero id to the list of variants, entry i = card i on the Heroes screen; `heroCopyRollNos` = the roll counter of each; `heroRolls` stays as a mirror of copy 0 for older apps). The run, the hero sheet and the leaderboard upload use the roll of the CHOSEN copy. Old saves: every copy already held gets the old per-hero roll. Merging three copies into the next tier takes the rolls of the three merged cards with them (the Merge screen passes the picked cards; without a pick the LAST three copies go so the first cards keep their place); the new tier copy is rolled fresh. The purchase ledger keeps one roll per bought copy and Reset gives each copy its roll back. The leaderboard service has no per-hero variant lock any more (the replay still requires a real pool entry; Common stays fixed). The text below describes the original one-roll-per-hero wording.
 
 **Rule.** Every upper-tier hero (Uncommon, Rare, Elite, Legendary; Momo's four upper tiers included) has a POOL of physics variants. Pool entry 0 is the hero's row in `HeroTable.cs`; entries 1.. are `HeroVariants.cs`. When a player first obtains the hero (merge, chest, bundle, reward), `HeroRolls.Pick(accountSeed, heroId, counter)` deals ONE entry (pure integer function, splitmix64 over the seed, the FNV hash of the hero id and the roll counter, so a server can recompute it). The stats are shown on the hero stats sheet and used in every run of that player. Common heroes (and Momo Common, the 19.0 reference) are NOT rolled: one fixed row.
 

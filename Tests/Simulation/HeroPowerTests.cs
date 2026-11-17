@@ -32,7 +32,7 @@ namespace FluffyClimbers.Simulation.Tests
             long h = 1469598103934665603L;
             h = Mix(h, s.Tick); h = Mix(h, s.X.Raw); h = Mix(h, s.Y.Raw); h = Mix(h, s.Vx.Raw); h = Mix(h, s.Vy.Raw);
             h = Mix(h, s.Row); h = Mix(h, s.Score); h = Mix(h, s.Dead ? 1 : 0); h = Mix(h, s.PwUsed); h = Mix(h, s.PwUsedMask);
-            h = Mix(h, s.FlightTicks); h = Mix(h, s.RocketTicks); h = Mix(h, s.MagnetTicks); h = Mix(h, s.SlowTicks);
+            h = Mix(h, s.FlightTicks); h = Mix(h, s.RocketTicks); h = Mix(h, s.CapeTicks); h = Mix(h, s.WideTicks); h = Mix(h, s.SlowTicks);
             h = Mix(h, s.ShieldTicks); h = Mix(h, s.WallStickTicks); h = Mix(h, s.DoubleJumpTicks); h = Mix(h, s.RocketTargetRow);
             return h;
         }
@@ -40,16 +40,15 @@ namespace FluffyClimbers.Simulation.Tests
         // ---------- constants and bits ----------
 
         [Fact]
-        public void DurationFactorIsSixtyPercent()
+        public void HeroDurationIsTheFullNormalTiming()
         {
-            Assert.Equal(60, Cfg.HeroPowerDurationPercent);
-            Assert.Equal(0.6f, SimConfig.HeroPowerDurationFactor);
-            Assert.Equal(SimConfig.HeroPowerDurationFactor, Cfg.HeroPowerDurationPercent / 100f);
-            Assert.Equal(1080, Cfg.HeroTicks(1800));   // Magnet 30 s -> 18 s
-            Assert.Equal(2160, Cfg.HeroTicks(3600));   // Shield 60 s -> 36 s
-            Assert.Equal(360, Cfg.HeroTicks(600));     // Flight 10 s -> 6 s
-            Assert.Equal(144, Cfg.HeroTicks(240));     // Rocket 4 s -> 2.4 s
-            Assert.Equal(12, Cfg.HeroRocketFloors);    // Rocket 20 floors -> 12
+            // owner 2026-11-16: a hero power is the matching normal power-up with its normal timing (no separate 60 percent)
+            Assert.Equal(100, Cfg.HeroPowerDurationPercent);
+            Assert.Equal(1.0f, SimConfig.HeroPowerDurationFactor);
+            Assert.Equal(1200, Cfg.HeroTicks(1200));   // 20 s stays 20 s
+            Assert.Equal(600, Cfg.HeroTicks(600));     // Flight 10 s
+            Assert.Equal(240, Cfg.HeroTicks(240));     // Rocket 4 s
+            Assert.Equal(20, Cfg.HeroRocketFloors);    // Rocket 20 floors
             Assert.Equal(1, Cfg.HeroTicks(0));
         }
 
@@ -57,18 +56,21 @@ namespace FluffyClimbers.Simulation.Tests
         public void HeroBitsAreOwnAndDoNotOverlapAnythingElse()
         {
             int all = 0;
-            for (int i = 1; i <= PowerUps.TypeCount; i++)
+            PowerUp[] six = { PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Shield, PowerUp.SlowTime };
+            for (int i = 0; i < six.Length; i++)
             {
-                int bit = Hero((PowerUp)i);
+                int bit = Hero(six[i]);
                 Assert.NotEqual(0, bit);
                 Assert.Equal(0, all & bit);
                 all |= bit;
             }
-            Assert.Equal(SimInput.HeroMask, all);
+            Assert.Equal(SimInput.HeroMask & ~(SimInput.HeroFirst << 5), all);   // the retired Magnet bit (id 6) is unused
             Assert.Equal(1024, Hero(PowerUp.Flight));
             Assert.Equal(65536, Hero(PowerUp.SlowTime));
             Assert.Equal(0, SimInput.HeroMask & (SimInput.Left | SimInput.Right | SimInput.Jump | SimInput.PowerMask));
             Assert.Equal(0, Hero(PowerUp.SpringBoots));
+            Assert.Equal(0, Hero(PowerUp.Magnet));
+            Assert.Equal(0, Hero(PowerUp.Glide));
             Assert.Equal(0, Hero(PowerUp.None));
         }
 
@@ -79,10 +81,9 @@ namespace FluffyClimbers.Simulation.Tests
         [InlineData(PowerUp.DoubleJump)]
         [InlineData(PowerUp.WallStick)]
         [InlineData(PowerUp.Shield)]
-        [InlineData(PowerUp.Magnet)]
         [InlineData(PowerUp.SlowTime)]
         [InlineData(PowerUp.Rocket)]
-        public void HeroActivationLastsSixtyPercentOfTheBoughtOne(PowerUp p)
+        public void HeroActivationLastsAsLongAsTheBoughtOne(PowerUp p)
         {
             Sim sim = Tower(40);
             SimState bought = sim.NewState();
@@ -96,11 +97,11 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.True(PowerUps.IsActive(in hero, p));
             Assert.Equal(1, hero.PwUsed);
             Assert.Equal(1 << (int)p, hero.PwUsedMask);
-            Assert.InRange(part / (double)full, 0.599, 0.601);
+            Assert.Equal(full, part);
         }
 
         [Fact]
-        public void HeroRocketClimbsSixtyPercentOfTheFloorsInSixtyPercentOfTheTime()
+        public void HeroRocketClimbsTheSameAsTheBoughtOne()
         {
             Sim sim = Tower(60);
             SimState b = sim.NewState();
@@ -108,14 +109,12 @@ namespace FluffyClimbers.Simulation.Tests
             sim.Step(ref b, Bought(PowerUp.Rocket));
             sim.Step(ref h, Hero(PowerUp.Rocket));
             Assert.Equal(20, b.RocketTargetRow);
-            Assert.Equal(12, h.RocketTargetRow);
+            Assert.Equal(20, h.RocketTargetRow);
             int guardB = 0, guardH = 0;
             while (b.RocketTicks > 0 && guardB++ < 1000) sim.Step(ref b, 0);
             while (h.RocketTicks > 0 && guardH++ < 1000) sim.Step(ref h, 0);
-            Assert.Equal(239, guardB);
-            Assert.Equal(143, guardH);
-            Assert.True(h.Y > Fx.FromInt(30), "the hero rocket climbed (about 12 rows of 3 u)");
-            Assert.True(h.Y < b.Y, "shorter climb");
+            Assert.Equal(guardB, guardH);
+            Assert.Equal(b.Y, h.Y);
         }
 
         [Fact]
@@ -123,13 +122,13 @@ namespace FluffyClimbers.Simulation.Tests
         {
             Sim sim = Tower(20);
             SimState s = sim.NewState();
-            sim.Step(ref s, Hero(PowerUp.Magnet));
-            int after = s.MagnetTicks;
-            sim.Step(ref s, Hero(PowerUp.Magnet));   // refused: already running
-            Assert.Equal(after - 1, s.MagnetTicks);
+            sim.Step(ref s, Hero(PowerUp.Shield));
+            int after = s.ShieldTicks;
+            sim.Step(ref s, Hero(PowerUp.Shield));   // refused: already running
+            Assert.Equal(after - 1, s.ShieldTicks);
             Assert.Equal(1, s.PwUsed);
-            sim.Step(ref s, Bought(PowerUp.Magnet));  // a bought tap adds the full base time
-            Assert.Equal(after - 2 + Cfg.MagnetTicks, s.MagnetTicks);
+            sim.Step(ref s, Bought(PowerUp.Shield));  // a bought tap adds the full base time
+            Assert.Equal(after - 2 + Cfg.ShieldTicks, s.ShieldTicks);
             Assert.Equal(2, s.PwUsed);
         }
 
@@ -170,7 +169,7 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void ReplayWithHeroActivationsIsDeterministic()
         {
-            PowerUp[] types = { PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Shield, PowerUp.Magnet, PowerUp.SlowTime };
+            PowerUp[] types = { PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Shield, PowerUp.Glide, PowerUp.SlowTime };
             for (int seed = 1; seed <= 4; seed++)
             {
                 Sim sim = Tower(60);
@@ -207,7 +206,7 @@ namespace FluffyClimbers.Simulation.Tests
                 long before = data.ComputeHash();
                 Sim sim = new Sim(Cfg, data, ll.Spec);
                 SimState s = sim.NewState();
-                for (int t = 0; t < 300; t++) sim.Step(ref s, SimInput.Right | (t == 5 ? Hero(PowerUp.Shield) | Hero(PowerUp.Magnet) : 0));
+                for (int t = 0; t < 300; t++) sim.Step(ref s, SimInput.Right | (t == 5 ? Hero(PowerUp.Shield) | Hero(PowerUp.SlowTime) : 0));
                 Assert.Equal(before, data.ComputeHash());
                 Assert.Equal(before, LevelBuilder.Build(Cfg, ll.Spec).ComputeHash());
 
@@ -230,7 +229,7 @@ namespace FluffyClimbers.Simulation.Tests
             SimState b = sim.NewState();
             for (int t = 0; t < 400; t++)
             {
-                int input = SimInput.Right | (t % 40 == 0 ? SimInput.Jump : 0) | (t == 10 ? Bought(PowerUp.Magnet) : 0);
+                int input = SimInput.Right | (t % 40 == 0 ? SimInput.Jump : 0) | (t == 10 ? Bought(PowerUp.Glide) : 0);
                 sim.Step(ref a, input);
                 sim.Step(ref b, input & ~SimInput.HeroMask);
             }
@@ -242,7 +241,7 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void CooldownStartsReadyAndEachPowerHasItsOwnClock()
         {
-            var cd = new HeroPowerCooldown(new[] { PowerUp.Magnet, PowerUp.Shield, PowerUp.Rocket }, 22);
+            var cd = new HeroPowerCooldown(new[] { PowerUp.Glide, PowerUp.Shield, PowerUp.Rocket }, 22);
             Assert.Equal(3, cd.Count);
             Assert.Equal(22 * 60, cd.CooldownTicks);
             for (int i = 0; i < 3; i++) { Assert.True(cd.IsReady(i)); Assert.Equal(0, cd.RemainingSeconds(i)); Assert.Equal(0f, cd.Fraction(i)); }
@@ -265,9 +264,9 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void CooldownKeepsOnlyImplementedUniquePowersUpToFour()
         {
-            var cd = new HeroPowerCooldown(new[] { PowerUp.Magnet, PowerUp.Magnet, PowerUp.SpringBoots, PowerUp.None, PowerUp.Shield, PowerUp.Flight, PowerUp.Rocket, PowerUp.SlowTime }, 10);
+            var cd = new HeroPowerCooldown(new[] { PowerUp.Magnet, PowerUp.Glide, PowerUp.Glide, PowerUp.SpringBoots, PowerUp.None, PowerUp.Shield, PowerUp.Flight, PowerUp.Rocket, PowerUp.SlowTime }, 10);
             Assert.Equal(4, cd.Count);
-            Assert.Equal(PowerUp.Magnet, cd.Type(0));
+            Assert.Equal(PowerUp.Glide, cd.Type(0));
             Assert.Equal(PowerUp.Shield, cd.Type(1));
             Assert.Equal(PowerUp.Flight, cd.Type(2));
             Assert.Equal(PowerUp.Rocket, cd.Type(3));

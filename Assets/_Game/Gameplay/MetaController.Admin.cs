@@ -26,15 +26,25 @@ namespace FluffyClimbers.Gameplay
         /// </summary>
         void AddSettingsFooter(RectTransform panel, RectTransform c, float x, float y, float cellW, float h, bool showAdmin)
         {
-            Button v = UiKit.AddHitArea(c, "VersionTap", "Version " + Application.version, new Vector2(0f, 1f), new Vector2(x, -y), new Vector2(cellW, h), OnVersionTapped);
-            Text vt = UiKit.AddText(v.transform, "Label", "v" + Application.version, 34, Theme.InkSoft, TextAnchor.MiddleRight);
+            // Bug List 6: the version is a thin plain caption at the foot (it must not need a 48 dp button there); the hidden 7-tap gesture sits on the title strip instead (always 48 dp, between the lock and the close X).
+            RectTransform cap = UiKit.Rect(c, "VersionLabel");
+            UiKit.Place(cap, new Vector2(0f, 1f), new Vector2(x, -y), new Vector2(cellW, h));
+            Text vt = UiKit.AddText(cap, "Label", "v" + Application.version, 30, Theme.InkSoft, TextAnchor.MiddleRight);
             DropOutline(vt);
             vt.horizontalOverflow = HorizontalWrapMode.Overflow;
             UiKit.Stretch((RectTransform)vt.transform);
+            vt.raycastTarget = true;   // hidden developer gesture (7 quick taps, development builds only): a plain click handler on the caption, not a control, so it needs no 48 dp target
+            vt.gameObject.AddComponent<VersionTapTarget>().OnTap = OnVersionTapped;
             if (!showAdmin) return;
             float s = Mathf.Max(132f, UiKit.MinTouchRef);
             Button a = ToyKit.IconButton(panel, "Admin", "Admin", 2, ToyKit.Get("icon_lock"), new Vector2(s, s), () => ShowAdmin(), 0.6f);
             UiKit.Place((RectTransform)a.transform, new Vector2(0f, 1f), new Vector2(20f, -20f), new Vector2(s, s));
+        }
+
+        sealed class VersionTapTarget : MonoBehaviour, UnityEngine.EventSystems.IPointerClickHandler
+        {
+            public Action OnTap;
+            public void OnPointerClick(UnityEngine.EventSystems.PointerEventData e) { if (OnTap != null) OnTap(); }
         }
 
         void OnVersionTapped()
@@ -85,11 +95,19 @@ namespace FluffyClimbers.Gameplay
 
         bool CloudSignedIn { get { return progress != null && progress.Data != null && progress.Data.AccountMode == SaveSync.ModeGoogle; } }
 
-        /// <summary>Reset Progress: the confirm popup. Reset wipes this device's save (levels, heroes, gems, coins); purchases stay recorded.</summary>
+        /// <summary>The confirm text of Reset progress (public for tests): says exactly what is kept and what is wiped. Items from before the purchase ledger (v0.62) cannot be told apart from earned ones, so they are wiped.</summary>
+        public static string ResetMessage(bool cloud)
+        {
+            return "Kept: shop purchases (before v0.62 they are wiped too).\n\n"
+                 + "Wiped: progress, ALL rewards, earned items, leaderboard scores"
+                 + (cloud ? ", cloud too" : "") + ".\nCannot be undone.";
+        }
+
+        /// <summary>Reset Progress: the confirm popup. Reset wipes this device's save (and the cloud copy and leaderboard scores) except what was bought in the shops (purchase ledger).</summary>
         public void ConfirmReset()
         {
             bool cloud = CloudSignedIn;
-            OpenPopup("Reset progress?", "This deletes levels, heroes, gems and coins on this device." + (cloud ? "\nYour cloud save is reset too." : "") + "\nPurchases are kept.", 1280f);
+            OpenPopup("Reset progress?", ResetMessage(cloud), 1280f, 36, 640f);   // 36 px = the 16 sp body minimum (CUX-5); the box is taller than the usual 520 for the longer text
             PopupButton("Reset", ToyKit.Button(3), Color.white, 230f, DoReset);
             PopupButton("Cancel", Btn(0), Color.white, 60f, ClosePopup);
         }
@@ -98,6 +116,7 @@ namespace FluffyClimbers.Gameplay
         {
             progress.ResetAll();
             CharacterCatalog.Selected = CharacterCatalog.Momo;
+            FluffyClimbers.Leaderboard.LeaderboardHub.OnProgressReset();   // caches dropped, the player's scores on the service deleted (queued in the save while offline)
             PushCloudSave();
             ClosePopup();
             ShowMenu();
@@ -379,6 +398,21 @@ namespace FluffyClimbers.Gameplay
                 LeaderboardHub.Init(progress, repo != null ? repo.RemoteConfig : null, v);
                 AdminSay(v ? "Leaderboard forced ON (test)" : "Leaderboard back to the shipped setting");
             }, on);
+            // local fake boards of 1000 players on each tab, to test the leaderboard screen end to end (nothing is sent to Firebase; shows even while the feature is OFF)
+            if (on)
+                AdminButtons(c, ref y, true,
+                    new AdminBtn("Test 1000 users", LeaderboardHub.FakeActive ? 1 : 0, () =>
+                    {
+                        LeaderboardHub.InstallFakeBoards(1000);
+                        AdminSay("1000 fake players on each board (local only)");
+                        AdminRebuild();
+                    }, "Test 1000 users: fill all three leaderboards with 1000 local fake players. Nothing is sent online."),
+                    new AdminBtn("Remove test users", 0, () =>
+                    {
+                        LeaderboardHub.ClearFakeBoards();
+                        AdminSay("Fake leaderboard players removed");
+                        AdminRebuild();
+                    }, "Remove the fake test players from the leaderboards"));
 
             // CLOUD TEST: only while System Test is on
             if (on) BuildAdminCloud(c, ref y);

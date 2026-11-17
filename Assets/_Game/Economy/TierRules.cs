@@ -51,61 +51,61 @@ namespace FluffyClimbers.Economy
         /// </summary>
         public static readonly Dictionary<string, PowerUp[]> Pools = new Dictionary<string, PowerUp[]>
         {
-            // Meadow Springs (R1): bouncy hops and easy pickups
-            { "momo", new[] { PowerUp.DoubleJump, PowerUp.Magnet, PowerUp.Shield, PowerUp.Rocket } },
+            // Meadow Springs (R1): bouncy hops and forgiving falls
+            { "momo", new[] { PowerUp.DoubleJump, PowerUp.SafetyNet, PowerUp.Shield, PowerUp.Rocket } },
             // Mushroom Grove (R2): clinging to trunks and walls, safe footing
-            { "forestgirl", new[] { PowerUp.WallStick, PowerUp.Shield, PowerUp.Magnet, PowerUp.SlowTime } },
+            { "forestgirl", new[] { PowerUp.WallStick, PowerUp.Shield, PowerUp.Glide, PowerUp.SlowTime } },
             // Sunny Beach (R3): sea breeze lift and floating
-            { "beachotter", new[] { PowerUp.Magnet, PowerUp.DoubleJump, PowerUp.Flight, PowerUp.Shield } },
+            { "beachotter", new[] { PowerUp.Glide, PowerUp.DoubleJump, PowerUp.Flight, PowerUp.Shield } },
             // Candy Canyon (R4): sticky sweets, springy jumps, sugar rush
-            { "candygirl", new[] { PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Magnet, PowerUp.Rocket } },
+            { "candygirl", new[] { PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.WidePlatforms, PowerUp.Rocket } },
             // Bamboo Temple (R5): calm focus, wall mastery, guardian
             { "monk", new[] { PowerUp.WallStick, PowerUp.SlowTime, PowerUp.Shield, PowerUp.Flight } },
             // Meadow Springs extra heroes (F4.1): the first power is the hero's identity, the rest follow the theme
-            // Bumble the bee (mage): speed + Flight, then sweet pickups and a spell shield
-            { "bumble", new[] { PowerUp.Flight, PowerUp.Magnet, PowerUp.SlowTime, PowerUp.Shield } },
+            // Bumble the bee (mage): speed + Flight, then a Glide Cape flutter and a spell shield
+            { "bumble", new[] { PowerUp.Flight, PowerUp.Glide, PowerUp.SlowTime, PowerUp.Shield } },
             // Ribbi the frog: jump + Double Jump, then clinging and leaping
-            { "ribbi", new[] { PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Magnet, PowerUp.Rocket } },
+            { "ribbi", new[] { PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.SafetyNet, PowerUp.Rocket } },
             // Dandy the dandelion puff: slow fall + Slow Time, then soft landings
-            { "dandy", new[] { PowerUp.SlowTime, PowerUp.Shield, PowerUp.Magnet, PowerUp.DoubleJump } },
+            { "dandy", new[] { PowerUp.SlowTime, PowerUp.Shield, PowerUp.Glide, PowerUp.DoubleJump } },
             // Pip the ladybug: wall bounce + Shield, then wall mastery
-            { "pip", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.Magnet } },
+            { "pip", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.SafetyNet } },
             // Mushroom Grove extra heroes (F4.2): the first power is the hero's identity
-            // Nib the squirrel: Magnet (plus a flat coin find stat), then leaps and a rocket for far coins
-            { "nib", new[] { PowerUp.Magnet, PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Rocket } },
-            // Spike the hedgehog: Shield, then pickups and calm
-            { "spike", new[] { PowerUp.Shield, PowerUp.Magnet, PowerUp.SlowTime, PowerUp.Rocket } },
+            // Nib the squirrel: Glide Cape (a gliding squirrel, plus a flat coin find stat), then leaps and a rocket
+            { "nib", new[] { PowerUp.Glide, PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Rocket } },
+            // Spike the hedgehog: Shield, then a Safety Net and calm
+            { "spike", new[] { PowerUp.Shield, PowerUp.SafetyNet, PowerUp.SlowTime, PowerUp.Rocket } },
             // Moss the snail kid: Wall Stick, then a shield shell
             { "moss", new[] { PowerUp.WallStick, PowerUp.Shield, PowerUp.SlowTime, PowerUp.DoubleJump } },
-            // Fenn the fox kit: the run bonus is the identity; quick power-ups to pick coins up
-            { "fenn", new[] { PowerUp.Rocket, PowerUp.Magnet, PowerUp.DoubleJump, PowerUp.Shield } },
+            // Fenn the fox kit: the run bonus is the identity; quick power-ups and wide landings
+            { "fenn", new[] { PowerUp.Rocket, PowerUp.WidePlatforms, PowerUp.DoubleJump, PowerUp.Shield } },
             // Sunny Beach extra heroes (F4.3): the first power is the hero's identity (Otto keeps his pool above)
             // Pinch the crab: Shield (claws up), then a clinging claw grip and calm tides
-            { "pinch", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.Magnet } },
-            // Shelly the sea turtle: Slow Time (a calm swimmer), then a shell shield and pickups
-            { "shelly", new[] { PowerUp.SlowTime, PowerUp.Shield, PowerUp.Magnet, PowerUp.DoubleJump } },
+            { "pinch", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.WidePlatforms } },
+            // Shelly the sea turtle: Slow Time (a calm swimmer), then a shell shield and a gentle glide
+            { "shelly", new[] { PowerUp.SlowTime, PowerUp.Shield, PowerUp.Glide, PowerUp.DoubleJump } },
             // Bloop the pufferfish kid: Double Jump (bounces off the water), then a rocket pop
             { "bloop", new[] { PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Rocket, PowerUp.Shield } },
-            // Coco the monkey: Magnet and a coin find stat, then leaps and a rocket
-            { "coco", new[] { PowerUp.Magnet, PowerUp.DoubleJump, PowerUp.Rocket, PowerUp.SlowTime } },
+            // Coco the monkey: Safety Net (a vine catches him) and a coin find stat, then leaps and a rocket
+            { "coco", new[] { PowerUp.SafetyNet, PowerUp.DoubleJump, PowerUp.Rocket, PowerUp.SlowTime } },
             // Candy Canyon extra heroes (F4.4): the first power is the hero's identity (Bonbon keeps her pool above)
-            // Gummi the gummy bear: Shield (a bouncy gummy hide), then sticky wall grip, calm and pickups
-            { "gummi", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.Magnet } },
+            // Gummi the gummy bear: Shield (a bouncy gummy hide), then sticky wall grip, calm and wide sticky platforms
+            { "gummi", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.WidePlatforms } },
             // Choco the chocolate bunny: Double Jump (hops), then a rocket pop
             { "choco", new[] { PowerUp.DoubleJump, PowerUp.Rocket, PowerUp.Shield, PowerUp.SlowTime } },
             // Marsh the marshmallow kid: Slow Time (soft and floaty), then a toasty shield
-            { "marsh", new[] { PowerUp.SlowTime, PowerUp.Shield, PowerUp.DoubleJump, PowerUp.Magnet } },
-            // Cookie the cookie kid: Magnet and a coin find stat, then leaps and a rocket
-            { "cookie", new[] { PowerUp.Magnet, PowerUp.DoubleJump, PowerUp.Rocket, PowerUp.Shield } },
+            { "marsh", new[] { PowerUp.SlowTime, PowerUp.Shield, PowerUp.DoubleJump, PowerUp.Glide } },
+            // Cookie the cookie kid: Wide Platforms (big cookie landings) and a coin find stat, then leaps and a rocket
+            { "cookie", new[] { PowerUp.WidePlatforms, PowerUp.DoubleJump, PowerUp.Rocket, PowerUp.Shield } },
             // Bamboo Temple extra heroes (F4.5): the first power is the hero's identity (Bao keeps his pool above)
             // Sprout the bamboo sprout: Shield (a leafy guard), then wall grip and calm
             { "sprout", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.DoubleJump } },
             // Tora the tiger cub: Double Jump (pounce), then a wall claw grip and a rocket
             { "tora", new[] { PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Rocket, PowerUp.Shield } },
-            // Rusu the red panda: Magnet and a coin find stat, then leaps and calm
-            { "rusu", new[] { PowerUp.Magnet, PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Rocket } },
+            // Rusu the red panda: Safety Net and a coin find stat, then leaps and calm
+            { "rusu", new[] { PowerUp.SafetyNet, PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Rocket } },
             // Ryu the wingless dragon pup: Rocket (a fiery dash, no wings), then a scale shield
-            { "ryu", new[] { PowerUp.Rocket, PowerUp.Shield, PowerUp.Magnet, PowerUp.DoubleJump } },
+            { "ryu", new[] { PowerUp.Rocket, PowerUp.Shield, PowerUp.SafetyNet, PowerUp.DoubleJump } },
         };
 
         /// <summary>The rule of a tier, or null for Common.</summary>

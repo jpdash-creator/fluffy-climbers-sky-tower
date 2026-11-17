@@ -30,9 +30,10 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void AVisibleHeroAlwaysHasACardAndTheStackIsCapped()
+        public void AHeroWithNoCopyHasNoCardAndTheStackIsCapped()
         {
-            Assert.Single(HeroCards.Owned(new[] { S("momo") }, Copies("momo", 0)));
+            Assert.Empty(HeroCards.Owned(new[] { S("momo") }, Copies("momo", 0)));   // owner 2026-11-16: Momo has no special case
+            Assert.Single(HeroCards.Owned(new[] { S("momo") }, Copies("momo", 1)));
             Assert.Equal(MergeRules.MaxCopies, HeroCards.Owned(new[] { S("momo") }, Copies("momo", 500)).Count);
         }
 

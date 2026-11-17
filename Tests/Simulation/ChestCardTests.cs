@@ -33,7 +33,7 @@ namespace FluffyClimbers.Simulation.Tests
             Hero("l1", CharacterRarity.Legendary, 0, "base1"), Hero("l2", CharacterRarity.Legendary, 0, "base2"), Hero("l3", CharacterRarity.Legendary, 0, "base3"),
         };
 
-        const double AvgPowerUpGems = 425.0 / 7.0;   // 3 x 75 + 4 x 50 over the seven implemented types
+        const double AvgPowerUpGems = 525.0 / 9.0;   // 3 x 75 + 6 x 50 over the nine implemented types (Bug List 4: Magnet replaced by Safety Net, Glide Cape, Wide Platforms)
 
         [Fact]
         public void TheOddsAreTheOwnersNumbers()
@@ -177,11 +177,11 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void WorthTagsAre3Point6And5Point3()
+        public void WorthTagsAre3Point5And5Point3()
         {
-            Assert.Equal("Worth x3.6", ChestRolls.WorthText(ChestKind.Iron, AvgPowerUpGems));   // (50 + 60.7 + 245) / 100 = 3.557
-            Assert.Equal("Worth x5.3", ChestRolls.WorthText(ChestKind.Golden, AvgPowerUpGems)); // (180 + 182.1 + 1,240) / 300 = 5.34
-            Assert.InRange(ChestRolls.WorthMultiplier(ChestKind.Iron, AvgPowerUpGems), 3.50, 3.62);
+            Assert.Equal("Worth x3.5", ChestRolls.WorthText(ChestKind.Iron, AvgPowerUpGems));   // (50 + 58.3 + 245) / 100 = 3.533
+            Assert.Equal("Worth x5.3", ChestRolls.WorthText(ChestKind.Golden, AvgPowerUpGems)); // (180 + 175 + 1,240) / 300 = 5.32
+            Assert.InRange(ChestRolls.WorthMultiplier(ChestKind.Iron, AvgPowerUpGems), 3.46, 3.58);
             Assert.InRange(ChestRolls.WorthMultiplier(ChestKind.Golden, AvgPowerUpGems), 5.30, 5.38);
         }
 

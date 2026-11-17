@@ -75,6 +75,34 @@ namespace FluffyClimbers.LeaderboardService
         public DateTime At(string board) { return board == Boards.Overall ? OverallAt : board == Boards.Levels ? LevelsAt : EndlessAt; }
     }
 
+    /// <summary>
+    /// weeks/{weekKey}/breakdowns/{uid}: the player's crown calculation of the week as the PHONE uploaded it (owner 2026-11-17). DISPLAY ONLY: nothing in ranking, totals, entry limits or prizes ever reads it; those come from the
+    /// replay-verified slots. The slot list is one JSON string (<see cref="SlotsJson"/>, a list of <c>WeekSlotInfo</c>, at most BreakdownMerge.MaxSlots entries). Deleted with the other entries by POST /delete-my-entries; expires with the week's other rows.
+    /// </summary>
+    [FirestoreData]
+    public sealed class BreakdownDoc
+    {
+        [FirestoreProperty("uid")] public string Uid { get; set; }
+        [FirestoreProperty("weekKey")] public string WeekKey { get; set; }
+        [FirestoreProperty("slotsJson")] public string SlotsJson { get; set; }
+        /// <summary>When the service last stored a change (its own clock).</summary>
+        [FirestoreProperty("receivedAt")] public DateTime ReceivedAt { get; set; } = Epoch.Utc;
+        [FirestoreProperty("expireAt")] public DateTime ExpireAt { get; set; } = Epoch.Utc;
+    }
+
+    /// <summary>JSON of <see cref="BreakdownDoc.SlotsJson"/>: the list of <c>WeekSlotInfo</c> (Newtonsoft names: id, crown, floors, score, combo, ch, at, ra).</summary>
+    public static class BreakdownCodec
+    {
+        public static List<FluffyClimbers.Economy.WeekSlotInfo> Read(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return new List<FluffyClimbers.Economy.WeekSlotInfo>();
+            try { return Newtonsoft.Json.JsonConvert.DeserializeObject<List<FluffyClimbers.Economy.WeekSlotInfo>>(json) ?? new List<FluffyClimbers.Economy.WeekSlotInfo>(); }
+            catch (Newtonsoft.Json.JsonException) { return new List<FluffyClimbers.Economy.WeekSlotInfo>(); }
+        }
+
+        public static string Write(List<FluffyClimbers.Economy.WeekSlotInfo> slots) { return Newtonsoft.Json.JsonConvert.SerializeObject(slots ?? new List<FluffyClimbers.Economy.WeekSlotInfo>()); }
+    }
+
     [FirestoreData]
     public sealed class BoardEntry
     {

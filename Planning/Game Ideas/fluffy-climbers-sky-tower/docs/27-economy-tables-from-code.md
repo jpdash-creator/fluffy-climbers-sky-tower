@@ -30,7 +30,7 @@ Assumptions used everywhere (change them here and the tables follow):
 |---|---|---|---|
 | A-1 | Human time per level (bot time x 2, from `ECONOMY_TABLES.md`) | about 3.4 min; a region about 41-56 min; the 5 regions about 4.3 h | [ASSUMPTION] |
 | A-2 | Share of placed gem value the player picks up ("c") | 60 percent (30 to 100 shown) | [ASSUMPTION] |
-| A-3 | Value of one random power-up unit | **60.7 gems** = average of 4 x 50 and 3 x 75 over the 7 types (chests, rewards and subscription pick equally) | [CODE] |
+| A-3 | Value of one random power-up unit | **58.3 gems** (since 2026-11-16; was 60.7) = average of 6 x 50 and 3 x 75 over the 9 types (chests, rewards and subscription pick equally) | [CODE] |
 | A-4 | Rewarded ad revenue to the developer per view | $0.01 (range $0.004 to $0.025) | [ASSUMPTION] (verify with LevelPlay) |
 | A-5 | Payers / DAU:MAU, average spend of a payer | 2 percent / 20 percent / $18.40 | [ASSUMPTION] |
 | A-6 | Store fee | 15 percent | (verify) |
@@ -43,7 +43,7 @@ Assumptions used everywhere (change them here and the tables follow):
 2. **The daily random power-up alone is worth 60.7 gems ($0.67) a day**, 1,821 gems a month. It is the biggest single free item (doc 22 open item 2).
 3. **The subscription is the cheapest gem source by far.** Monthly $4.99 pays 500 gems + 18,000 coins (1,400 GE; 1,764 with the 6 power-ups) = **281 to 354 GE per dollar**, against 63 to 125 gems per dollar in the packs. Weekly $1.49 pays 345 GE = 232 GE per dollar.
 4. **Power-ups are expensive in gems and cheap in coins.** 50 or 75 gems is a whole region of gem pickups (51 to 54 gems), but 1,000 or 1,500 coins is only 4 to 6 levels of coin income (250 coins a level). Free players buy power-ups with coins; gems go to revives, chests, bundles and skips.
-5. **Price per second is uneven.** Rocket costs 18.75 gems per second of effect and Flight 7.5, against 0.83 for Shield and 1.67 for Double Jump, Wall Stick and Magnet.
+5. **Price per second is uneven.** Rocket costs 18.75 gems per second of effect and Flight 7.5, against 0.83 for Shield and 2.50 for Double Jump, Wall Stick, Shield, Glide Cape and Wide Platforms.
 6. **Chests are a gem sink with a deliberate loss:** Iron returns 85.7 percent of its price in value, Gold 80.7 percent. Bundles are the opposite: 1.41 to 1.79 times their price (average 1.60). Direct power-up purchase is 1.0 times.
 7. **Gems are the hub currency.** Every shop item except the two subscriptions and the gem packs is bought with gems or coins. The only money products are the 9 gem packs and 2 subscriptions.
 8. **Ads are only the revive ad today** (first revive of a run, free). One ad saves 5 gems ($0.055 at ref) and earns the developer about $0.01. Everything else on the ad plan (double result, free chest, daily power-up) is not built.
@@ -67,7 +67,7 @@ Assumptions used everywhere (change them here and the tables follow):
 | Revive | 2 gems then 5 | **5 gems then 10**, max 2 per run, plus **1 free revive by rewarded ad** with the first revive | `RunSession.cs` |
 | Region skip | 100 + (n-2) x 300/18 | **100 / 116 / 133 / 150 gems** for regions 2 to 5 | `regions/*.json` |
 | Chests | Coin / Gear / Power-up kinds in 4 tiers, earned chests | **Iron and Gold only**, gems only, 100 and 300 (x10 = 1,000 and 3,000); **no earned chests** | `Chests.cs` |
-| Power-ups | 11 types, loadout of 3, carry caps, stock cap 99 | **7 implemented** (Flight, Rocket, Double Jump, Wall Stick, Shield, Magnet, Slow Time); Spring Boots, Coin Doubler, Star Seeker, Safety Net exist as hidden rows; **no stock cap, no carry cap; a tap while active adds the full duration** | `PowerUpCatalog.cs` |
+| Power-ups | 11 types, loadout of 3, carry caps, stock cap 99 | **9 implemented** (Flight, Rocket, Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms, Slow Time; the Magnet was replaced by the three new ones on 2026-11-16, owned Magnets became Safety Nets 1:1); Spring Boots, Coin Doubler, Star Seeker exist as hidden rows; **no stock cap, no carry cap; a tap while active adds the full duration** | `PowerUpCatalog.cs` |
 | Power-up prices | 800 to 2,400 coins, 8 to 30 gems | **1,000 coins and 1,500 coins** (Shop sells power-ups and hero cards in COINS ONLY since 2026-11-10; gem column kept as data: 50 / 75 gems = 1 gem per 20 coins; hero cards since 2026-11-13: Common 2,000 / Uncommon 5,000 / Rare 12,000 / Elite 32,000 / Legendary 80,000 coins, was 3,000 / 6,000 / 14,000 / 30,000 and Common not sold) | `powerups.json`, `HeroPurchase.Prices` |
 | VIP | 6 tiers with jump, gem, coin percent | **Subscription**: Weekly $1.49 and Monthly $4.99, no tiers, no stat bonuses; VIP left the shop | `subscriptions.json` |
 | Bundles | starter pack, daily deal, limited offers | **1,000 generated bundles priced in gems (200 to 500)**, a Refresh and a 30-percent-off timer bundle; starter pack and money bundles not built | `bundles.json` |
@@ -129,7 +129,7 @@ Dollar columns = the gem price of the pack at the three gem rates. The coin pack
 
 | Sink | Gems | Coins | GE | $ best | $ ref | $ small | Levels of 3-star income (250 coins) |
 |---|---|---|---|---|---|---|---|
-| Double Jump, Wall Stick, Magnet, Shield | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 4.0 |
+| Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 4.0 |
 | Flight, Rocket, Slow Time | 75 | 1,500 | 75 | 0.60 | 0.82 | 1.19 | 6.0 |
 | Bundle Refresh | 5 | 100 | 5 | 0.04 | 0.05 | 0.08 | 0.4 |
 | Characters (when they launch) | 150-1,500 gems | - | - | - | - | - | not built |
@@ -146,6 +146,8 @@ Dollar columns = the gem price of the pack at the three gem rates. The coin pack
 | Gem value per pickup | 1 / 2 / 5 / 10 at 70 / 22 / 7 / 1 percent (average 1.59) |
 | Gem spots | 2.7 / 2.7 / 2.9 / 3.0 / 3.2 percent of rows by difficulty (Relaxed to Insane) |
 | Milestone gems (first clear) | L5, L10: a roll of 1 to 3 gems (L10 guarantees 1); L15: 5 guaranteed + 2 bonus (double gem); hidden gem up to 2 on L8 AND on the FindHiddenGem level (L15), both can hold the double gem (owner 2026-11-10, `GemLevels`); main-goal coin rewards use the same region coin factor as the level payout (100 / 103 / 106 / 109 / 112 percent) |
+| **Gem levels restored (2026-11-17, Main Bug List 7 item 2, supersedes the 2026-11-16 row below)** | Levels 5/10/15/20/25 of every region pay FIXED first-clear gems 1/2/2/3/4 (`GemLevels.FixedFirstClearGems`, `RewardResult.RewardGems`, no pickup needed, first clear only; 12 per region). On top, each of those levels holds 2 or 3 collectible gems of value 1 with a seeded 50 percent chance (`GemLevels.GemsInLevel`, level 25 too); only picked gems pay (clamped to what the level holds), none on a replay of a 3-star level. The level tile badge and level pop-up show the fixed gems on every milestone level. Hero milestone bonus unchanged. |
+| **Collectible gems (2026-11-16, Bug List 4 item 9, replaces the milestone gems and the hidden extra gem)** | Levels 5, 10, 15, 20: a seeded 50 percent chance (per level seed) that the level holds 2 gems of 1 gem each; level 25: always 4 (`GemLevels.GemsInLevel`). Only gems the run picks up pay, nothing for uncollected ones, none on a replay of a 3-star level. The hero milestone bonus is unchanged. The old fixed 1, 1, 2, 2, 3 first-clear gems and the lines above are history. Level 5 is a plain "reach floor 75" (no combo chain, no ladder). |
 | Failed run | gems lost; kept on revive |
 | Replay of a 3-star level | no gems |
 | Endless | no gems yet (thresholds 250/500/1,000 floors are specified but not built) |
@@ -224,12 +226,14 @@ See section 8 for what they pay. Prices: Weekly **$1.49 (Rs 149)** for 7 days, M
 |---|---|---|---|---|---|---|---|---|---|
 | Flight | rise and steer, gongs harmless | 10 s | 75 | 1,500 | 75 | 0.60 | 0.82 | 1.19 | 7.50 |
 | Rocket | auto-climb 20 floors | about 4 s | 75 | 1,500 | 75 | 0.60 | 0.82 | 1.19 | 18.75 |
-| Double Jump | one extra air jump per air phase | 30 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 1.67 |
-| Wall Stick | hold on walls up to 1.5 s | 30 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 1.67 |
-| Shield | gongs harmless | 60 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 0.83 |
-| Magnet | gems and stars from farther | 30 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 1.67 |
+| Double Jump | one extra air jump per air phase | 20 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 2.50 |
+| Wall Stick | hold on walls up to 1.5 s | 20 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 2.50 |
+| Shield | gongs harmless | 20 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 2.50 |
+| Safety Net | first fall jumps you up 3 floors, once per run | not timed | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | n/a |
+| Glide Cape | after every jump the whole game runs at half speed until you land | 20 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 2.50 |
+| Wide Platforms | platforms 20 percent wider | 20 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 2.50 |
 | Slow Time | danger zone 50 percent slower | 30 s | 75 | 1,500 | 75 | 0.60 | 0.82 | 1.19 | 2.50 |
-| Average of the 7 | | | 60.7 | 1,214 | 60.7 | 0.49 | 0.67 | 0.96 | |
+| Average of the 9 | | | 58.3 | 1,167 | 58.3 | 0.47 | 0.64 | 0.92 | |
 
 Bundle prices (gems / coins): 5 units of a 50-gem type 225 / 4,500; of a 75-gem type 338 / 6,750; 10 units 400 / 8,000 and 600 / 12,000.
 
@@ -561,7 +565,7 @@ Payer mix guess (per 100 monthly payers, $1,840 gross): gem packs about 50 perce
 | RC 2 | **Review the Daily reward size** | 45 gems + 1,500 coins + 1 power-up a day = 180.7 GE ($1.99 at ref), 5,421 GE a month; the gems alone are 1,350 a month. Options: cut the 100-point power-up, halve gem milestones, or make them 30 and 60 points | `rewards.json` |
 | RC 3 | **Review the random power-up in Daily and Weekly** | 1 a day + 1 a week = 60.7 gems each; 1,821 gems a month for a daily player (doc 22 item 2) | `rewards.json` |
 | RC 4 | **Main rewards pay 2.2 times the campaign gem pickups** | 580 gems vs 260; region rewards (50 gems + 2,000 coins each) and star milestones (330 gems) dwarf pickups. Keep if the design wants rewards to lead; otherwise scale the milestone gems | `rewards.json` |
-| RC 5 | **Reprice power-ups by effect time** | Gems per second: Rocket 18.75, Flight 7.5, Slow Time 2.5, Double Jump/Wall Stick/Magnet 1.67, Shield 0.83. Rocket (4 s, 75 gems) and Flight (10 s, 75 gems) look dear next to Shield (60 s, 50 gems); doc 24 already says longer durations may call for repricing Shield, Slow Time, Magnet | `powerups.json` |
+| RC 5 | **Reprice power-ups by effect time** | Gems per second: Rocket 18.75, Flight 7.5, Slow Time 2.5, Double Jump/Wall Stick/Shield/Glide Cape/Wide Platforms 2.50 (all 20 s since 2026-11-16). Rocket (4 s, 75 gems) and Flight (10 s, 75 gems) look dear next to Shield (60 s, 50 gems); doc 24 already says longer durations may call for repricing Shield, Slow Time, Magnet | `powerups.json` |
 | RC 6 | **Decide whether the subscription should undercut packs** | Monthly $4.99 = 354 GE per $ against 63 to 125 in packs; the monthly claim loop alone is 0.7 of a 1,000 pack value per week. It is a retention product, but nearly all payers will choose it. Options: keep, raise monthly to $6.99 to $7.99, or cut the daily coins | `subscriptions.json` |
 | RC 7 | **Keep the chest return below 1 and bundles at 1.6** | Iron 85.7 percent, Gold 80.7 percent, bundles 1.60 times: bundles beat every direct purchase. If you want chests used, raise their contents; if you want bundles to be a reward for spending, keep it | `Chests.cs`, `gen_bundles.py` |
 | RC 8 | **Do not switch characters on in chests before changing odds** | A character per chest returns 286 percent (Iron) and 276 percent (Gold) of the price (doc 22 item 1) | `ChestRolls.CharactersEnabled` |

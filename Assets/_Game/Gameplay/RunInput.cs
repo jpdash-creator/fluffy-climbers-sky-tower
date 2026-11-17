@@ -90,8 +90,8 @@ namespace FluffyClimbers.Gameplay
     {
         readonly TouchControlLogic touch = new TouchControlLogic();
         readonly List<TouchSample> samples = new List<TouchSample>(8);
-        bool jumpLatched;
-        int powerLatched;   // SimInput power bits (PowerUps.InputBit), latched like the jump until the next tick
+        bool jumpLatched, jumpHeld;
+        int powerLatched;  // SimInput power bits (PowerUps.InputBit), latched like the jump until the next tick
         int keyboardMove;
 
         /// <summary>Optional override for tests: when set, Update() uses it instead of the devices.</summary>
@@ -115,8 +115,10 @@ namespace FluffyClimbers.Gameplay
 
             // On-screen pad (touch and mouse both arrive through the UI event system).
             keyboardMove = 0;
+            jumpHeld = false;
             if (Pad != null)
             {
+                if (Pad.Jump != null && Pad.Jump.Held) jumpHeld = true;   // Glide Cape: the jump button held down in the air
                 if (Pad.Left != null && Pad.Left.Held) keyboardMove |= SimInput.Left;
                 if (Pad.Right != null && Pad.Right.Held) keyboardMove |= SimInput.Right;
                 if (Pad.Jump != null && Pad.Jump.PressedEdge) { jumpLatched = true; Pad.Jump.PressedEdge = false; }
@@ -128,14 +130,17 @@ namespace FluffyClimbers.Gameplay
                 if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) keyboardMove |= SimInput.Left;
                 if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) keyboardMove |= SimInput.Right;
                 if (kb.spaceKey.wasPressedThisFrame || kb.upArrowKey.wasPressedThisFrame || kb.wKey.wasPressedThisFrame) jumpLatched = true;
-                // editor keys 1..7: Flight, Rocket, Double Jump, Wall Stick, Shield, Magnet, Slow Time
+                if (kb.spaceKey.isPressed || kb.upArrowKey.isPressed || kb.wKey.isPressed) jumpHeld = true;
+                // editor keys 1..9: Flight, Rocket, Double Jump, Wall Stick, Shield, Glide Cape, Slow Time, Wide Platforms, Safety Net
                 if (kb.digit1Key.wasPressedThisFrame) LatchPower(PowerUp.Flight);
                 if (kb.digit2Key.wasPressedThisFrame) LatchPower(PowerUp.Rocket);
                 if (kb.digit3Key.wasPressedThisFrame) LatchPower(PowerUp.DoubleJump);
                 if (kb.digit4Key.wasPressedThisFrame) LatchPower(PowerUp.WallStick);
                 if (kb.digit5Key.wasPressedThisFrame) LatchPower(PowerUp.Shield);
-                if (kb.digit6Key.wasPressedThisFrame) LatchPower(PowerUp.Magnet);
+                if (kb.digit6Key.wasPressedThisFrame) LatchPower(PowerUp.Glide);
                 if (kb.digit7Key.wasPressedThisFrame) LatchPower(PowerUp.SlowTime);
+                if (kb.digit8Key.wasPressedThisFrame) LatchPower(PowerUp.WidePlatforms);
+                if (kb.digit9Key.wasPressedThisFrame) LatchPower(PowerUp.SafetyNet);
             }
         }
 
@@ -152,6 +157,7 @@ namespace FluffyClimbers.Gameplay
                 jumpLatched = false;
             }
             bits |= powerLatched;
+            if (jumpHeld) bits |= SimInput.JumpHeld;
             powerLatched = 0;
             return bits;
         }
@@ -172,6 +178,7 @@ namespace FluffyClimbers.Gameplay
         {
             touch.Clear();
             jumpLatched = false;
+            jumpHeld = false;
             powerLatched = 0;
             keyboardMove = 0;
         }

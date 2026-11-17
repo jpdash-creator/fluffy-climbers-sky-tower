@@ -82,15 +82,16 @@ namespace FluffyClimbers.Economy
         {
             new object[] { PowerUp.Flight, "Flight", "Fly upward for 10 seconds and steer left and right. Gongs cannot hurt you. Tap again to add 10 more seconds.", "button", 10, 1, 1500, 75, true },
             new object[] { PowerUp.Rocket, "Rocket", "Auto-climb 20 floors in about 4 seconds. Gongs cannot hurt you. Tap again to add 20 more floors. Stops before the last floors of a level.", "button", 4, 1, 1500, 75, true },
-            new object[] { PowerUp.DoubleJump, "Double Jump", "For 30 seconds you can jump once more in mid-air. Tap again to add 30 seconds.", "button", 30, 1, 1000, 50, true },
-            new object[] { PowerUp.WallStick, "Wall Stick", "For 30 seconds you stick to the side walls for up to 1.5 seconds. Jump to leap off. Tap again to add 30 seconds.", "button", 30, 1, 1000, 50, true },
-            new object[] { PowerUp.Shield, "Shield", "Gongs cannot hurt you for 60 seconds. Tap again to add 60 seconds.", "button", 60, 1, 1000, 50, true },
-            new object[] { PowerUp.Magnet, "Magnet", "Gems and stars come to you from farther away for 30 seconds. Tap again to add 30 seconds.", "button", 30, 1, 1000, 50, true },
+            new object[] { PowerUp.DoubleJump, "Double Jump", "For 20 seconds you can jump once more in mid-air. Tap again to add 20 seconds.", "button", 20, 1, 1000, 50, true },
+            new object[] { PowerUp.WallStick, "Wall Stick", "For 20 seconds you stick to the side walls for up to 1.5 seconds. Jump to leap off. Tap again to add 20 seconds.", "button", 20, 1, 1000, 50, true },
+            new object[] { PowerUp.Shield, "Shield", "Gongs cannot hurt you for 20 seconds. Tap again to add 20 seconds.", "button", 20, 1, 1000, 50, true },
+            new object[] { PowerUp.SafetyNet, "Safety Net", "Arm it any time before a fall. The next time you fall, it jumps you up 3 floors. Arm the next one after a rescue. Not timed.", "button", 0, 1, 1000, 50, true },
+            new object[] { PowerUp.Glide, "Glide Cape", "For 20 seconds the whole game slows to half speed after every jump until you land, so you can steer to the next platform. Tap again to add 20 seconds.", "button", 20, 1, 1000, 50, true },
+            new object[] { PowerUp.WidePlatforms, "Wide Platforms", "For 20 seconds every platform is 20 percent wider to land on. Tap again to add 20 seconds.", "button", 20, 1, 1000, 50, true },
             new object[] { PowerUp.SlowTime, "Slow Time", "The rising danger zone moves 50 percent slower for 30 seconds. Tap again to add 30 seconds.", "button", 30, 1, 1500, 75, true },
             new object[] { PowerUp.SpringBoots, "Spring Boots", "The next 3 jumps are 20 percent higher.", "button", 0, 3, 1000, 0, false },
             new object[] { PowerUp.CoinDoubler, "Coin Doubler", "Doubles the coins paid at the end of this level.", "button", 0, 1, 120, 0, false },
             new object[] { PowerUp.StarSeeker, "Star Seeker", "Arrows at the screen edge point to stars you have not collected yet.", "button", 12, 1, 800, 0, false },
-            new object[] { PowerUp.SafetyNet, "Safety Net", "Catches you the first time you would fall off the bottom.", "auto", 0, 1, 1500, 0, false },
         };
 
         public static PowerUpCatalog BuiltIn()

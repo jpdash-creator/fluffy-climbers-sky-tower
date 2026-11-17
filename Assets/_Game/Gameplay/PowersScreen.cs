@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace FluffyClimbers.Gameplay
 {
     /// <summary>
-    /// The Powers tab of the Heroes screen (Bug List 6 item 3a): ALL 7 power-ups as cards in the look of the All Heroes grid (3 to a row, scrolling, the Merge screen's background and header),
+    /// The Powers tab of the Heroes screen (Bug List 6 item 3a): ALL 9 power-ups as cards in the look of the All Heroes grid (3 to a row, scrolling, the Merge screen's background and header),
     /// each with the NUMBER THE PLAYER OWNS at the bottom right of the card (<see cref="ProgressService.PowerUpCount"/>, the same counter the shop used to show). Nothing is sold here: there is no
     /// buy button; a tap on a card only opens a small popup with the power-up's name and description (the catalog text). Built once per change; no Update, no per-frame work.
     /// </summary>
@@ -22,10 +22,10 @@ namespace FluffyClimbers.Gameplay
         const float Margin = 16f, Gap = 12f, IconS = 150f, Pad = 10f;
         static readonly Color PillInk = new Color(0.07f, 0.06f, 0.20f, 0.94f);
 
-        /// <summary>The seven power-ups in screen order (the owner's list).</summary>
+        /// <summary>The nine power-ups in screen order (the owner's list).</summary>
         public static readonly PowerUp[] Order =
         {
-            PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.Magnet, PowerUp.Shield, PowerUp.SlowTime, PowerUp.WallStick,
+            PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.SafetyNet, PowerUp.Shield, PowerUp.SlowTime, PowerUp.WallStick, PowerUp.Glide, PowerUp.WidePlatforms,
         };
 
         /// <summary>What the screen needs from the menu.</summary>

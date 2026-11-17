@@ -128,8 +128,10 @@ namespace FluffyClimbers.Simulation
         public int PlayerSpeedSharePercent = 50;
 
         // Scoring (doc 09 D5)
-        public int FloorPoints = 10;
-        public int ComboPointsMultiplier = 5;
+        // Owner 2026-11-16: Sim base score = floors x FloorPoints + sum of chain_length^2 over every chain (SimState.Score). The x5 and the setting bonus are in the crown (Economy/CrownScore).
+        public int FloorPoints = 1;
+        /// <summary>Unused since 2026-11-16 (the per-step combo points are gone; each chain pays its length squared once). Kept at 1 for old callers.</summary>
+        public int ComboPointsMultiplier = 1;
         public int ComboMinFloors = 2;
 
         // ---------------------------------------------------------------------------------------
@@ -530,26 +532,34 @@ namespace FluffyClimbers.Simulation
         public int SlowFallGravityPercent = 35;
         public Fx SlowFallMaxSpeed = Fx.FromRatio(6, 60);
         /// <summary>Double Jump (timed): 30 s per tap in which every air phase has one extra standing-jump-strength air jump.</summary>
-        public int DoubleJumpWindowTicks = 1800;
+        public int DoubleJumpWindowTicks = 1200;   // owner 2026-11-16: Double Jump, Wall Stick, Shield, Glide Cape and Wide Platforms last exactly 20 s per tap
         /// <summary>Wall Stick: one tap enables sticking for 30 s; each stick holds up to 1.5 s; a wall jump launches away from the wall.</summary>
-        public int WallStickWindowTicks = 1800;
+        public int WallStickWindowTicks = 1200;
         public int WallHoldTicks = 90;
         public Fx WallJumpVx = Fx.FromRatio(6, 60);
         /// <summary>Ticks after leaving a wall before it can hold again.</summary>
         public int WallStickCooldownTicks = 15;
         /// <summary>Shield: 60 s per tap during which gongs cannot hurt at all (no knockback, no hit).</summary>
-        public int ShieldTicks = 3600;
-        /// <summary>Magnet: 30 s per tap; every pickup counts as this much larger (a star then collects from about 3 u).</summary>
-        public int MagnetTicks = 1800;
-        public Fx MagnetExtraRadius = Fx.FromInt(2);
+        public int ShieldTicks = 1200;
+        /// <summary>Glide (owner 2026-11-17, auto slow-mo): 20 s per tap; after EVERY jump (any time the player is in the air) the whole game runs at half its speed (GlideSlowDivisor 2) (hero rise and fall, steering, the scroll of the danger line, moving platforms and hazards) until the landing. Back to normal speed on the ground and when the 20 s are up.</summary>
+        public int GlideCapeTicks = 1200;
+        public const int GlideSlowDivisor = 2;
+        /// <summary>Wide Platforms: 20 s per tap; every platform (all kinds) lands AND is drawn WidePlatformPercent percent wider (x1.2 since owner Bug List 6; the view scales the painted piece uniformly, never a stretched sprite).</summary>
+        public int WidePlatformTicks = 1200;
+        public int WidePlatformPercent = 20;
+        /// <summary>Safety Net (owner 2026-11-17): rows above the fall spot of the platform the scripted rescue jump lands on (bug list 5).</summary>
+        public int SafetyNetFloors = 3;
+        /// <summary>Safety Net rescue jump: minimum duration in ticks of the ballistic arc (normal gravity, the flight is lengthened in steps of SafetyNetStepTicks until it arrives falling); the jump runs on its own, no input.</summary>
+        public int SafetyNetJumpTicks = 60;
+        public int SafetyNetStepTicks = 6;
         /// <summary>Slow Time: 30 s per tap with the auto-scroll (kill line) exactly this percent slower.</summary>
         public int SlowTimeTicks = 1800;
         public int SlowTimePercent = 50;
 
         /// <summary>HERO POWERS (owner 2026-11-02): a hero power is the same effect as the bought power-up of its type for this percent of the duration (HeroPowerDurationFactor = 0.6). Integer percent, so the simulation stays deterministic.</summary>
-        public int HeroPowerDurationPercent = 60;
+        public int HeroPowerDurationPercent = 100;   // owner 2026-11-16: a hero power uses the matching normal power-up and its timing (no separate duration)
         /// <summary>The same factor as a float, for docs, UI text and tests (equal to HeroPowerDurationPercent / 100).</summary>
-        public const float HeroPowerDurationFactor = 0.6f;
+        public const float HeroPowerDurationFactor = 1.0f;
 
         /// <summary>Ticks of a hero power for a bought duration: the percent of it, rounded half up, at least 1.</summary>
         public int HeroTicks(int baseTicks)

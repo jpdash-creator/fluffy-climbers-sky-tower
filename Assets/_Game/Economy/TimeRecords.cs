@@ -449,6 +449,8 @@ namespace FluffyClimbers.Economy
         /// <summary>The attempt seed a level layout was built from (0 in endless).</summary>
         public int AttemptSeed;
         public string HeroId = "";
+        /// <summary>Pool variant (HeroRolls) of the copy of the hero that played the run; sent with the leaderboard upload so the server replays the same physics. Not saved in the records.</summary>
+        public int HeroVariant;
         /// <summary>Gameplay mode index 0..4 (GameSettings.Difficulty).</summary>
         public int Mode;
         public string GameVersion = "";
@@ -466,6 +468,8 @@ namespace FluffyClimbers.Economy
         public int Coins, Gems;
         /// <summary>The run's BASE score (SimState.Score) and best combo chain, for the best endless crown (CrownScore). 0 when a caller does not fill them (then no endless crown is stored).</summary>
         public int Score, BestCombo;
+        /// <summary>Every chain length of the run (chains of 2+ landings) for the crown pop-up; null when not filled. The crown only depends on <see cref="Score"/>.</summary>
+        public int[] Chains;
 
         public PaceValue Pace { get { return new PaceValue(Floors, Ticks); } }
         public int PaceHundredths { get { return TimeRecords.PaceHundredths(Floors, Ticks); } }

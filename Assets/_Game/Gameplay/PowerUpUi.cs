@@ -21,7 +21,9 @@ namespace FluffyClimbers.Gameplay
                 case PowerUp.DoubleJump: return "2x";
                 case PowerUp.WallStick: return "WAL";
                 case PowerUp.Shield: return "SHD";
-                case PowerUp.Magnet: return "MAG";
+                case PowerUp.SafetyNet: return "NET";
+                case PowerUp.Glide: return "GLD";
+                case PowerUp.WidePlatforms: return "WID";
                 case PowerUp.SlowTime: return "SLO";
                 default: return "?";
             }
@@ -37,7 +39,9 @@ namespace FluffyClimbers.Gameplay
                 case PowerUp.DoubleJump: return new Color(0.78f, 0.95f, 0.62f, 1f);
                 case PowerUp.WallStick: return new Color(0.92f, 0.78f, 1f, 1f);
                 case PowerUp.Shield: return new Color(0.6f, 0.95f, 0.92f, 1f);
-                case PowerUp.Magnet: return new Color(1f, 0.88f, 0.5f, 1f);
+                case PowerUp.SafetyNet: return new Color(1f, 0.88f, 0.5f, 1f);
+                case PowerUp.Glide: return new Color(0.7f, 0.9f, 1f, 1f);
+                case PowerUp.WidePlatforms: return new Color(0.78f, 0.95f, 0.8f, 1f);
                 case PowerUp.SlowTime: return new Color(0.84f, 0.86f, 1f, 1f);
                 default: return new Color(0.85f, 0.85f, 0.9f, 1f);
             }
@@ -68,7 +72,7 @@ namespace FluffyClimbers.Gameplay
             return s + ", " + unitsLeft + " left";
         }
 
-        /// <summary>Icon file name (Assets/Resources/Art/PowerUps) for a power-up, or null when it has no art yet.</summary>
+        /// <summary>Icon file name (Assets/Resources/Art/PowerUps) for a power-up, or null when it has no art yet. Safety Net reuses the old reserved Safety Net art; Glide Cape and Wide Platforms use the code badge until their icons exist (Art/Ui/powerup_pw_glide etc. override, see IconSprite).</summary>
         public static string IconName(PowerUp p)
         {
             switch (p)
@@ -78,7 +82,9 @@ namespace FluffyClimbers.Gameplay
                 case PowerUp.DoubleJump: return "pw_doublejump";
                 case PowerUp.WallStick: return "pw_wallstick";
                 case PowerUp.Shield: return "pw_shield";
-                case PowerUp.Magnet: return "pw_magnet";
+                case PowerUp.SafetyNet: return "pw_safety_net";
+                case PowerUp.Glide: return "pw_glide";
+                case PowerUp.WidePlatforms: return "pw_wide_platforms";
                 case PowerUp.SlowTime: return "pw_slowtime";
                 default: return null;
             }
@@ -92,7 +98,10 @@ namespace FluffyClimbers.Gameplay
             Sprite s;
             if (iconCache.TryGetValue(p, out s)) return s;
             string n = IconName(p);
-            s = n != null ? Resources.Load<Sprite>("Art/PowerUps/" + n) : null;
+            string id = PowerUps.IdOf(p);
+            // final art dropped into Art/Ui/powerup_<id> (pw_safety_net, pw_glide, pw_wide_platforms) wins; then the legacy folder; then null = code badge (CUX-10)
+            s = id.Length > 0 ? Resources.Load<Sprite>("Art/Ui/powerup_" + id) : null;
+            if (s == null && n != null) s = Resources.Load<Sprite>("Art/PowerUps/" + n);
             iconCache[p] = s;
             return s;
         }

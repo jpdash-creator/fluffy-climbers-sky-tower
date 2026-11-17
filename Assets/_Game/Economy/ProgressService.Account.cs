@@ -11,6 +11,7 @@ namespace FluffyClimbers.Economy
             EnsureEndlessFields();
             EnsurePowerUpFields();
             EnsureChestFields();
+            MigrateCrownFormula();   // a cloud save of the old crown formula is cleared as well
             Commit();
         }
 
@@ -39,6 +40,7 @@ namespace FluffyClimbers.Economy
         public void MarkCloudSynced()
         {
             Data.LastCloudSyncUtc = SaveSync.NowText();
+            Data.CloudResetPending = false;   // the cloud save now holds this device's save (a reset one included)
             store.Save(Data);
         }
     }

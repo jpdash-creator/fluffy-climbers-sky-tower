@@ -32,7 +32,7 @@ namespace FluffyClimbers.Simulation.Tests
             public int GemsPlaced;          // sum of gem values over all gem pickups
             public double CoinFactor;
             public int Coins3Star, CoinsCombo;
-            public int MilestoneFirst;      // deterministic first-clear milestone gems at 3 stars (0 for non milestone levels)
+            public int MilestoneFirst;      // always 0 since 2026-11-16 (the fixed milestone gems became collectible gems, counted in GemsPlaced)
             public int BotTicks, BotGems, BotCombo;
             public bool BotSolved;
         }
@@ -49,13 +49,6 @@ namespace FluffyClimbers.Simulation.Tests
                 foreach (JsonElement lv in doc.RootElement.EnumerateArray())
                     if (lv.GetProperty("id").GetString() == ll.Id) { ok = true; return lv.GetProperty("rewards").Clone(); }
             ok = false; return default(JsonElement);
-        }
-
-        static int Milestone(JsonElement gems, int seed, int stars)
-        {
-            JsonElement v;
-            int guaranteed = gems.TryGetProperty("firstClearGuaranteed", out v) ? v.GetInt32() : 0;
-            return CoinPayoutRules.MilestoneGems(guaranteed);   // fixed since 2026-11-13: 1, 1, 2, 2, 3 on levels 5, 10, 15, 20, 25
         }
 
         static string Build()
@@ -112,9 +105,7 @@ namespace FluffyClimbers.Simulation.Tests
                     }
                     bool ok;
                     JsonElement rw = Rewards(root, ll, out ok);
-                    JsonElement gems;
-                    if (ok && ll.Spec.LevelIndex % 5 == 0 && rw.TryGetProperty("gems", out gems))   // RewardCalculator.IsMilestone: levels 5, 10, 15, 20, 25
-                        lr.MilestoneFirst = Milestone(gems, ll.Spec.Seed, 3);
+                    // Bug List 4 item 9: there is no fixed first-clear gem reward any more (MilestoneFirst stays 0); the collectible gems of levels 5/10/15/20/25 are placed pickups and count in GemsPlaced.
 
                     // Bot: near-optimal line; gives a lower bound on play time and the gems/combo it picks up on the way.
                     Sim sim = new Sim(cfg, data, ll.Spec);

@@ -33,7 +33,7 @@ def rows(i):
 
 
 def goal(i):
-    if i == 5: return {"type": "comboChain", "value": 3, "count": 3}
+    if i == 5: return {"type": "reachFloor", "value": rows(i)}   # Bug List 4 item 10: plain reach floor 75, no combo chain, no ladder
     if i == 20: return {"type": "speedrun", "value": SPEEDRUN_VALUE, "timeSec": SPEEDRUN_TIME}
     if i == 10: return {"type": "noWallBounce", "value": rows(i)}
     if i == 15: return {"type": "findHiddenGem", "value": rows(i)}
@@ -48,18 +48,14 @@ def cls(i):
 
 
 
-# Economy review 2026-11-13: gems only on levels 5, 10, 15, 20, 25, fixed 1, 1, 2, 2, 3 (first clear only, nothing on replays, no gem pickups on the rows).
-MILESTONE_GEMS = {5: 1, 10: 1, 15: 2, 20: 2, 25: 3}
+# Bug List 4 item 9 (2026-11-16): the fixed milestone gems (1, 1, 2, 2, 3 on first clears) are gone. Levels 5, 10, 15, 20 hold 2 COLLECTIBLE gems with a seeded 50 percent chance and
+# level 25 holds 4 (GemLevels.GemsInLevel in Simulation, placed by LevelBuilder); the level JSON carries no gem reward any more.
 # Region skip price (owner 2026-11-13): 500 gems for every region 2 and up.
 GEM_SKIP = 500
 
 
 def gem_rewards(i):
-    """Economy review 2026-11-13: gems ONLY on levels 5, 10, 15, 20, 25 (1, 1, 2, 2, 3), fixed, first clear only; no other level pays gems.
-    Level 15 is the hidden-gem level: its 2 gems are this fixed reward (the hidden gem pickup is only the goal object)."""
-    g = MILESTONE_GEMS.get(i, 0)
-    if g:
-        return {"chance": 1.0, "min": g, "max": g, "firstClearGuaranteed": g}
+    """Bug List 4 item 9 (2026-11-16): no level pays a fixed gem reward; the gems are collectible pickups in the level (GemLevels.GemsInLevel)."""
     return {"chance": 0.0, "min": 0, "max": 0}
 
 

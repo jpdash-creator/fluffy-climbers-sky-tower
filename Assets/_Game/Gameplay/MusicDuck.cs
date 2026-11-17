@@ -7,8 +7,8 @@ namespace FluffyClimbers.Gameplay
     /// </summary>
     public sealed class MusicDuck
     {
-        public const float Floor = 0.30f;           // gain while a jingle plays (30 percent)
-        public const float AttackSeconds = 0.12f;   // full gain to the floor
+        public const float Floor = 0.12f;           // gain while a jingle plays (12 percent)
+        public const float AttackSeconds = 0f;      // owner 2026-11-17: the dip is instant (same call as the jingle start), no lingering loud tail
         public const float ReleaseSeconds = 0.40f;  // floor back to full gain
 
         float gain = 1f;
@@ -28,10 +28,14 @@ namespace FluffyClimbers.Gameplay
         {
             if (seconds < 0f) seconds = 0f;
             if (seconds > hold) hold = seconds;
+            gain = Floor;   // hard duck: the music is down before the jingle's first frame
         }
 
         /// <summary>Drops any dip at once (music switched off, or a new session).</summary>
         public void Reset() { gain = 1f; hold = 0f; }
+
+        /// <summary>The dip counts as started the moment <see cref="Duck"/> was called: gain is already at the floor.</summary>
+        public bool IsDucked { get { return gain <= Floor + 0.0001f; } }
 
         /// <summary>Advances the envelope by <paramref name="dt"/> seconds (real time, not scaled).</summary>
         public void Tick(float dt)
@@ -42,8 +46,7 @@ namespace FluffyClimbers.Gameplay
             {
                 hold -= dt;
                 if (hold < 0f) hold = 0f;
-                gain -= range * dt / AttackSeconds;
-                if (gain < Floor) gain = Floor;
+                gain = Floor;   // held down
             }
             else if (gain < 1f)
             {
@@ -78,15 +81,28 @@ namespace FluffyClimbers.Gameplay
         public bool IsPlaying(int slot) { return playing[slot]; }
         public int ClipIn(int slot) { return playing[slot] ? clipId[slot] : 0; }
 
-        /// <summary>Asks for <paramref name="id"/> (non-zero). Updates the slots and says what the audio layer must do.</summary>
-        public Action Request(int id)
+        /// <summary>Slot that was cut by the last hard-cut request (-1 = none). The audio layer zeroes its volume and stops its source on the same call.</summary>
+        public int CutSlot { get; private set; }
+
+        /// <summary>Asks for <paramref name="id"/> (non-zero), the old track fading out (the shuffle crossfade).</summary>
+        public Action Request(int id) { return Request(id, false); }
+
+        /// <summary>
+        /// Asks for <paramref name="id"/> (non-zero). Updates the slots and says what the audio layer must do. With <paramref name="hardCut"/> (every change of music
+        /// bed: menu to run, shop, rewards, popups; owner 2026-11-17) the other slot is stopped in the SAME call, so the old track is silent the moment the new one starts.
+        /// </summary>
+        public Action Request(int id, bool hardCut)
         {
+            CutSlot = -1;
             if (playing[active] && clipId[active] == id) return Action.Keep;
             int other = 1 - active;
-            if (playing[other] && clipId[other] == id) { active = other; return Action.Resume; }
+            Action result;
+            if (playing[other] && clipId[other] == id) { int old = active; active = other; result = Action.Resume; if (hardCut && playing[old]) { Stopped(old); CutSlot = old; } return result; }
+            int prev = active;
             active = other;
             clipId[active] = id;
             playing[active] = true;
+            if (hardCut && playing[prev]) { Stopped(prev); CutSlot = prev; }
             return Action.Start;
         }
 

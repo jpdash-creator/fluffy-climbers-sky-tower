@@ -50,7 +50,7 @@ namespace FluffyClimbers.Gameplay
 
     public sealed class StoreCaptureDriver : MonoBehaviour
     {
-        static readonly PowerUp[] Order = { PowerUp.Shield, PowerUp.Magnet, PowerUp.SlowTime, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Flight, PowerUp.Rocket };
+        static readonly PowerUp[] Order = { PowerUp.Shield, PowerUp.SafetyNet, PowerUp.SlowTime, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Flight, PowerUp.Rocket };
 
         RunController rc;
         Autopilot ap;

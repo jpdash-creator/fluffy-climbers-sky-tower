@@ -64,7 +64,11 @@ namespace FluffyClimbers.Economy
         T GrantWithRecord<T>(string productId, string kind, string tx, DateTime nowUtc, int days, Func<T> grant, Func<T, bool> ok)
         {
             PurchaseRecord rec = AddPurchaseRecord(productId, kind, tx, nowUtc, days);
-            T res = grant();
+            bool wasRecording = recordingPurchase;
+            recordingPurchase = true;   // the grant writes what it pays into the purchase ledger (ProgressService.Ledger.cs), in its own single save
+            T res;
+            try { res = grant(); }
+            finally { recordingPurchase = wasRecording; }
             if (rec != null && !ok(res)) Data.Purchases.Remove(rec);
             return res;
         }

@@ -21,7 +21,7 @@ namespace FluffyClimbers.LeaderboardService
     {
         public int[] SimVersions = { 1 };
         public int MaxRegion = 5;
-        public long OverallEntryLimit = 200000, LevelsEntryLimit = 150000, EndlessEntryLimit = 50000;
+        public long OverallEntryLimit = 250000, LevelsEntryLimit = 100000, EndlessEntryLimit = 150000;
         public int TopThreeFactorPercent = 150;
         public int PaidRanks = 10;
         public int BoardSize = 100;
@@ -50,36 +50,37 @@ namespace FluffyClimbers.LeaderboardService
         }
     }
 
-    /// <summary>Week arithmetic: a week runs from Monday 00:00 India time (UTC+05:30, no daylight saving) to the next Monday 00:00, i.e. Sunday 18:30 UTC. The week key is the ISO date of that Monday in IST.</summary>
+    /// <summary>Week arithmetic: a week runs from Monday 00:00 UTC (owner 2026-11-16; was India time) to the next Monday 00:00 UTC. The week key is the ISO date of that Monday in UTC (same yyyy-MM-dd shape as before).</summary>
     public static class WeekMath
     {
-        public static readonly TimeSpan IstOffset = new TimeSpan(5, 30, 0);
+        /// <summary>Offset of the week calendar from UTC: zero since 2026-11-16 (it was +05:30).</summary>
+        public static readonly TimeSpan WeekOffset = TimeSpan.Zero;
 
-        /// <summary>Monday 00:00 IST of the week containing <paramref name="utcNow"/>, as a UTC instant.</summary>
+        /// <summary>Monday 00:00 UTC of the week containing <paramref name="utcNow"/>, as a UTC instant.</summary>
         public static DateTime WeekStartUtc(DateTime utcNow)
         {
-            DateTime ist = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc) + IstOffset;
-            int back = ((int)ist.DayOfWeek + 6) % 7;   // Monday = 0
-            DateTime mondayIst = ist.Date.AddDays(-back);
-            return DateTime.SpecifyKind(mondayIst - IstOffset, DateTimeKind.Utc);
+            DateTime shifted = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc) + WeekOffset;
+            int back = ((int)shifted.DayOfWeek + 6) % 7;   // Monday = 0
+            DateTime mondayLocal = shifted.Date.AddDays(-back);
+            return DateTime.SpecifyKind(mondayLocal - WeekOffset, DateTimeKind.Utc);
         }
 
         public static string WeekKey(DateTime utcNow)
         {
             DateTime start = WeekStartUtc(utcNow);
-            return (start + IstOffset).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            return (start + WeekOffset).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         public static DateTime WeekEndUtc(DateTime utcNow) { return WeekStartUtc(utcNow).AddDays(7); }
 
-        /// <summary>Start (UTC instant) of the week with the given key (Monday 00:00 IST); false when the key is not a Monday date.</summary>
+        /// <summary>Start (UTC instant) of the week with the given key (Monday 00:00 UTC); false when the key is not a Monday date.</summary>
         public static bool TryStartOf(string weekKey, out DateTime startUtc)
         {
             startUtc = default(DateTime);
             DateTime d;
             if (weekKey == null || !DateTime.TryParseExact(weekKey, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out d)) return false;
             if (d.DayOfWeek != DayOfWeek.Monday) return false;
-            startUtc = DateTime.SpecifyKind(d - IstOffset, DateTimeKind.Utc);
+            startUtc = DateTime.SpecifyKind(d - WeekOffset, DateTimeKind.Utc);
             return true;
         }
     }

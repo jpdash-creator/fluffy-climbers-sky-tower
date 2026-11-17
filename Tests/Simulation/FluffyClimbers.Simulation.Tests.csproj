@@ -35,6 +35,8 @@
     <Compile Include="../../Assets/_Game/Economy/TimeRecordData.cs" />
     <Compile Include="../../Assets/_Game/Economy/MedalTargetFile.cs" />
     <Compile Include="../../Assets/_Game/Economy/CrownScore.cs" />
+    <!-- weekly crown key (integer maths, must equal the server WeekMath) -->
+    <Compile Include="../../Assets/_Game/Economy/WeekKey.cs" />
   </ItemGroup>
 
   <ItemGroup>

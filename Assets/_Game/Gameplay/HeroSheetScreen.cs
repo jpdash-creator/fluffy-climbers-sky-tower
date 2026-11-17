@@ -26,7 +26,7 @@ namespace FluffyClimbers.Gameplay
         static string F(double v) { return v.ToString("0.#", CultureInfo.InvariantCulture); }
 
         /// <summary>The real hero: name, rarity, region and powers from its spec, numbers from its stats through <see cref="CharacterStats.Sheet"/>.</summary>
-        public static HeroSheetData For(CharacterDef who)
+        public static HeroSheetData For(CharacterDef who, int copy = -1)
         {
             CharacterSpec spec = who.Info;
             string region = spec != null && spec.IsMergeTier ? "Merged" : "Found in chests";
@@ -36,8 +36,10 @@ namespace FluffyClimbers.Gameplay
                 region = r != null ? r.Name : "Region " + spec.Region;
             }
             ProgressService progress = GameSession.Progress;   // the player's own rolled numbers of a tier hero (docs/44 section 11); the table row when there is no save yet
-            CharacterStats stats = spec == null ? null : (progress != null ? progress.StatsOf(spec) : spec.Stats);
-            ShownStats shown = spec == null ? null : (progress != null ? progress.ShownOf(spec) : spec.Shown);
+            // one roll per copy (owner 2026-11-17): the sheet shows the CHOSEN copy of the hero when it is the chosen hero (copy -1), else the first copy, or the copy asked for
+            if (copy < 0) copy = progress != null && CharacterCatalog.Selected == who ? CharacterCatalog.SelectedCopy : 0;
+            CharacterStats stats = spec == null ? null : (progress != null ? progress.StatsOf(spec, copy) : spec.Stats);
+            ShownStats shown = spec == null ? null : (progress != null ? progress.ShownOf(spec, copy) : spec.Shown);
             return From(who.Name, spec != null ? spec.Rarity : CharacterRarity.Common, region, stats, spec != null ? spec.Powers : null, shown);
         }
 
@@ -76,7 +78,7 @@ namespace FluffyClimbers.Gameplay
                 if (i > 0) sb.Append(", ");
                 sb.Append(def != null ? def.Name : powers[i].ToString());
             }
-            sb.Append(". Free at the start of a run, ready again after ").Append(CharacterDefs.CooldownSeconds[(int)rarity]).Append(" s.");
+            sb.Append(". Each is free once per run, then from your stock.");
             return sb.ToString();
         }
     }

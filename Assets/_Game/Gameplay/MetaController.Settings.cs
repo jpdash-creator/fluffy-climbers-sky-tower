@@ -65,7 +65,7 @@ namespace FluffyClimbers.Gameplay
             float gap = Mathf.Ceil(UiKit.MinSpacingPx);
             bool privacyChoices = Services.PrivacyOptionsRequired;   // EEA/UK/CH players: the consent form can be reopened (owner 2026-11-10, UMP)
             bool nameRow = ShowDisplayNameRow(st);   // owner 2026-11-13: own leaderboard name, only with a linked Google account and the leaderboard on
-            float cap = SettingsCap() + (privacyChoices ? rowH + gap : 0f) + (nameRow ? rowH + gap : 0f);   // the extra row only exists where it is legally required
+            float cap = SettingsCap() + 30f + (privacyChoices ? rowH + gap : 0f) + (nameRow ? rowH + gap : 0f);   // the extra row only exists where it is legally required
 
             RectTransform panel = UiKit.BuildPopupFrame(screen, "Settings", art, new Vector2(SettingsW, cap), ShowMenu);
             RectTransform c = PopupBodyBegin(panel, "SettingsViewport", SettingsTop, SettingsPad, false);   // no ScrollRect: everything fits (Bug List 6 item 7)
@@ -90,9 +90,17 @@ namespace FluffyClimbers.Gameplay
             });
 
             SettingsSwitchAt(c, "Pace ghost", "icon_speed", x0, r3, cellW, rowH, () => GameSettings.PaceGhost, v => GameSettings.PaceGhost = v);
-            AddSettingsFooter(panel, c, x1, r3, cellW, rowH, admin);   // version label (right cell of the last row) and the Admin icon (frame, top left)
+            // Menu music (owner 2026-11-17): the right cell of the last row opens the track list (Random shuffle or one locked track); the version label moved to the foot of the popup (the popup must stay compact).
+            string mm = MusicCatalog.ChoiceLabel;
+            SettingsValueAt(c, "Menu music", "icon_music", x1, r3, cellW, rowH, Mathf.Max(220f, cellW - 136f), mm, () => ShowMenuMusic());
+            Transform mmBtn = c.Find("MenuMusicButton");
+            if (mmBtn != null)
+            {
+                Text mmText = mmBtn.GetComponentInChildren<Text>();
+                if (mmText != null) FitLabel(mmText);   // a long track name shrinks (never below 16 sp) instead of clipping, also at 130 percent text
+            }
 
-            float y = innerH + 28f;
+            float y = innerH + 20f;
 
             // ---- big button 1: the Google account (Sign in with Google / Unlink Google Account) ----
             if (st == AccountPopup.State.Unavailable)
@@ -148,7 +156,9 @@ namespace FluffyClimbers.Gameplay
                 y += rowH + gap;
             }
 
-            y -= gap;   // no gap after the last row
+            const float versionH = 30f;
+            AddSettingsFooter(panel, c, 0f, y, contentW, versionH, admin);   // version label (right aligned, a full gap under the last row; 7 quick taps open the admin code box) and the Admin icon (frame, top left)
+            y += versionH;
 
             PopupBodyEnd(panel, c, y, SettingsTop, SettingsPad, cap);
         }

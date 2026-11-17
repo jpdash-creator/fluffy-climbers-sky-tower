@@ -237,6 +237,8 @@ namespace FluffyClimbers.Gameplay
         {
             SaveEnvelope env = SaveSync.TryDeserialize(bytes);   // empty or corrupt = no usable cloud save
             SyncDecision decision = SaveSync.Decide(progress.Data, env, accountId);
+            // Reset progress whose upload never arrived: the device save (the reset one) wins over the old cloud save, so a reset can never be undone by a later sign-in or reinstall of the old cloud copy
+            if (progress.Data.CloudResetPending && env != null && SaveSync.IsReadable(env) && (decision == SyncDecision.UseCloud || decision == SyncDecision.AskPlayer)) decision = SyncDecision.UploadLocal;
             bool newerCloud = env != null && !SaveSync.IsReadable(env);
             switch (decision)
             {

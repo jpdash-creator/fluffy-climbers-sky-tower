@@ -32,3 +32,9 @@ Result: revision `fluffy-leaderboard-00001-zhn`, 100 percent traffic, URL https:
 
 Not done: Cloud Scheduler tick (needs LB_ADMIN_KEY secret), `config/leaderboard` seeding (defaults come from config.default.json), real-token test, Firebase Auth Play Games provider, client work.
 Redeploy after ANY simulation, generator, hero table or manifest change (same commit as the release).
+
+## Pending redeploy (2026-11-17): POST /delete-my-entries
+New endpoint for Settings > Reset progress (see LEADERBOARD-DESIGN.md, last section). Needs a new Cloud Run revision of `fluffy-leaderboard` (same command as step 6). No Firestore rules, indexes, env or secret change. Until deployed the app keeps the wipe queued (`leaderboardWipePending`) and retries.
+
+## Pending redeploy (2026-11-17): POST /sync-breakdown and breakdown deletion
+New endpoint `POST /sync-breakdown`, `breakdown` field in `GET /my-week?slots=1`, and `/delete-my-entries` now also removes `weeks/*/breakdowns/{uid}`: one new Cloud Run revision of `fluffy-leaderboard` (same command as step 6; the shared `BreakdownMerge.cs` and `LeaderboardSave.cs` are linked from Assets/_Game/Economy). ALSO deploy the Firestore TTL policy: `firebase deploy --only firestore:indexes` (new fieldOverride `breakdowns.expireAt` ttl). No rules change, no composite index, no env or secret change. Same revision also carries the earlier `/delete-my-entries` change.

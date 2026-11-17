@@ -128,7 +128,7 @@ namespace FluffyClimbers.Tests
         public void PowerUpGemPricesAre50And75()
         {
             PowerUpCatalog c = PowerUpCatalog.BuiltIn();
-            foreach (PowerUp t in new[] { PowerUp.Magnet, PowerUp.Shield, PowerUp.WallStick, PowerUp.DoubleJump })
+            foreach (PowerUp t in new[] { PowerUp.SafetyNet, PowerUp.Glide, PowerUp.WidePlatforms, PowerUp.Shield, PowerUp.WallStick, PowerUp.DoubleJump })
             {
                 Assert.AreEqual(1000, c.Get(t).CoinPrice, t.ToString());
                 Assert.AreEqual(50, c.Get(t).GemPrice, t.ToString());

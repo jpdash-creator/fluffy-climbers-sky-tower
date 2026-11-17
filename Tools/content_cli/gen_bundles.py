@@ -53,7 +53,7 @@ CARD_EXPECTED_GEMS = sum(w * g for _, w, g in CARD_TIERS) / float(CARD_WEIGHT_TO
 
 # power-up id -> gem value at list rates (docs/22 4.3). Order = shop order.
 POWERUPS = [("pw_flight", 75), ("pw_rocket", 75), ("pw_doublejump", 50), ("pw_wallstick", 50),
-            ("pw_shield", 50), ("pw_magnet", 50), ("pw_slowtime", 75)]
+            ("pw_shield", 50), ("pw_safety_net", 50), ("pw_glide", 50), ("pw_wide_platforms", 50), ("pw_slowtime", 75)]
 POWERUP_VALUE = dict(POWERUPS)
 
 ADJECTIVES = ["Gleeful", "Snuggly", "Hoppy", "Flashy", "Cuddly", "Dreamy", "Fizzy", "Gutsy", "Humble", "Minty",

@@ -61,7 +61,7 @@ LEVELS = {
     2: ("simple", 0.10, {"type": "reachFloor", "value": 90}),
     3: ("simple", 0.15, {"type": "reachFloor", "value": 90}),
     4: ("simple", 0.22, {"type": "reachFloor", "value": 90}),
-    5: ("complex", 0.40, {"type": "comboChain", "value": 3, "count": 3}),
+    5: ("complex", 0.40, {"type": "reachFloor", "value": 90}),   # Bug List 4 item 10: plain reach floor (no combo chain, no ladder); 90 rows kept in the 15-level teaser regions
     6: ("medium", 0.35, {"type": "reachFloor", "value": 120}),
     7: ("medium", 0.42, {"type": "noWallBounce", "value": 120}),
     8: ("medium", 0.50, {"type": "reachFloor", "value": 120}),
@@ -113,18 +113,13 @@ def coin_packs():
     return [{"id": "coinpack_%d" % c, "coins": c, "gemsList": gl, "gemsPromo": gp} for c, gl, gp in COIN_PACKS]
 
 
-# Economy review 2026-11-13: gems only on levels 5, 10, 15 (the 15-level teaser regions; regions 1-5 use 5, 10, 15, 20, 25 = 1, 1, 2, 2, 3 in migrate_levels_25.py).
-MILESTONE_GEMS = {5: 1, 10: 1, 15: 2, 20: 2, 25: 3}
+# Bug List 4 item 9 (2026-11-16): no fixed gem rewards in the level JSON; the gems are collectible pickups placed by the level builder (GemLevels.GemsInLevel).
 # Region skip price (owner 2026-11-13): 500 gems for every region 2 and up.
 GEM_SKIP = 500
 
 
 def gem_rewards(index):
-    """Economy review 2026-11-13: gems ONLY on levels 5, 10, 15, 20, 25 (1, 1, 2, 2, 3), fixed, first clear only; no other level pays gems.
-    Level 15 is the hidden-gem level: its 2 gems are this fixed reward (the hidden gem pickup is only the goal object)."""
-    g = MILESTONE_GEMS.get(index, 0)
-    if g:
-        return {"chance": 1.0, "min": g, "max": g, "firstClearGuaranteed": g}
+    """Bug List 4 item 9 (2026-11-16): no level pays a fixed gem reward; the gems are collectible pickups in the level (GemLevels.GemsInLevel)."""
     return {"chance": 0.0, "min": 0, "max": 0}
 
 

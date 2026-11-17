@@ -34,7 +34,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
             int[] trace = Harness.BotTrace(s, s.State);
             Harness.Play(s, trace);
             Assert.True(s.GoalReached, "the real session must reach the goal on the bot line");
-            Assert.True(s.RunFloors > 10 && s.State.Score > 100);
+            Assert.True(s.RunFloors > 10 && s.State.Score >= s.RunFloors);   // level 5 is a plain climb: the bot line may build no chain
             RunSubmission sub = Harness.Upload(s, Kinds.Level, seed);
             AssertReplayEquals(s, sub, Harness.Replayer.Replay(sub, Harness.Lim));
         }
@@ -123,6 +123,29 @@ namespace FluffyClimbers.LeaderboardService.Tests
             RunSubmission h = Harness.Upload(s, Kinds.Level, 9);
             h.InputsB64 = Convert.ToBase64String(InputCodec.Encode(more, more.Length));
             Assert.Equal("inputs_after_end", Harness.Replayer.Replay(h, Harness.Lim).Error);
+        }
+
+        [Fact]
+        public void APowerUpJumpASafetyNetCatchAndHeldJumpReplayExactly()
+        {
+            RunSession s = Harness.NewLevelSession("lvl_001_02", 2, 909);
+            var stock = new int[PowerUps.MaxType + 1];
+            foreach (PowerUp p in PowerUps.Implemented) stock[(int)p] = 5;
+            s.ApplyStock(stock);
+            int[] trace = Harness.BotTrace(s, s.State);
+            Harness.Play(s, trace, 0, trace.Length / 3);
+            Assert.False(s.Over);
+            // arm the net, run the cape with the jump held, widen the platforms, take a Double Jump window and a Flight/Rocket-free power-up jump
+            s.Step(PowerUps.InputBit(PowerUp.SafetyNet) | PowerUps.InputBit(PowerUp.Glide) | PowerUps.InputBit(PowerUp.WidePlatforms) | PowerUps.InputBit(PowerUp.DoubleJump));
+            Assert.True(s.State.SafetyNetArmed);
+            Harness.Play(s, trace, trace.Length / 3, trace.Length / 6);
+            for (int i = 0; i < 90 && !s.Over; i++) s.Step(SimInput.JumpHeld | (i % 30 == 0 ? SimInput.Jump : 0) | SimInput.Right);
+            int guard = 0;
+            while (!s.Over && guard++ < 40000) s.Step(SimInput.JumpHeld);   // stand still: the net catches the first fall, the second one ends the run
+            Assert.True(s.State.SafetyNetCatches > 0, "the net fired");
+            Assert.Equal(0, s.State.RevivesUsed);
+            RunSubmission sub = Harness.Upload(s, Kinds.Level, 909);
+            AssertReplayEquals(s, sub, Harness.Replayer.Replay(sub, Harness.Lim));
         }
 
         [Fact]

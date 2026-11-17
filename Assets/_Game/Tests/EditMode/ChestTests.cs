@@ -41,7 +41,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(0, ChestRolls.Price(ChestKind.Iron, 5));
             Assert.AreEqual(1, ChestRolls.PowerUpCount(ChestKind.Iron));
             Assert.AreEqual(3, ChestRolls.PowerUpCount(ChestKind.Golden));
-            Assert.AreEqual(7, Types().Count, "the seven implemented power-up types");
+            Assert.AreEqual(9, Types().Count, "the nine implemented power-up types");
             Assert.AreEqual(new[] { 50, 30, 20 }, ChestRolls.IronWeights);
             Assert.AreEqual(new[] { 60, 30, 10 }, ChestRolls.GoldenWeights);
         }
@@ -63,7 +63,7 @@ namespace FluffyClimbers.Tests
         public void WorthIsBetween2And6ForEveryChest()
         {
             PowerUpCatalog catalog = PowerUpCatalog.BuiltIn();
-            Assert.AreEqual(60.71, ChestRolls.AveragePowerUpGems(catalog), 0.01, "average gem price of one random power-up");
+            Assert.AreEqual(58.33, ChestRolls.AveragePowerUpGems(catalog), 0.01, "average gem price of one random power-up");
             foreach (ChestKind kind in new[] { ChestKind.Iron, ChestKind.Golden })
             {
                 Assert.That(ChestRolls.Worth(kind, catalog), Is.InRange(2.0, 6.0), kind + " worth at the average");
@@ -72,9 +72,9 @@ namespace FluffyClimbers.Tests
                 Assert.That(low, Is.InRange(2.0, 6.0), kind + " worst coins and cheapest power-ups");
                 Assert.That(high, Is.InRange(2.0, 6.0), kind + " best coins and dearest power-ups");
             }
-            Assert.AreEqual(3.56, ChestRolls.Worth(ChestKind.Iron, catalog), 0.02);
-            Assert.AreEqual(5.34, ChestRolls.Worth(ChestKind.Golden, catalog), 0.02);
-            Assert.AreEqual("Worth x3.6", ChestRolls.WorthLabel(ChestKind.Iron, catalog));
+            Assert.AreEqual(3.53, ChestRolls.Worth(ChestKind.Iron, catalog), 0.02);
+            Assert.AreEqual(5.32, ChestRolls.Worth(ChestKind.Golden, catalog), 0.02);
+            Assert.AreEqual("Worth x3.5", ChestRolls.WorthLabel(ChestKind.Iron, catalog));
             Assert.AreEqual("Worth x5.3", ChestRolls.WorthLabel(ChestKind.Golden, catalog));
         }
 

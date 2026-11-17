@@ -57,10 +57,29 @@ namespace FluffyClimbers.Economy
         }
 
         /// <summary>
+        /// Adds copies and deals every new copy of a tier hero its OWN roll (owner 2026-11-17). When <paramref name="bought"/> the new copies are also written to the purchase ledger with their rolls.
+        /// Returns the new count and saves once.
+        /// </summary>
+        internal int AddCopiesCore(string id, int count, bool bought)
+        {
+            int before = Math.Min(MergeRules.MaxCopies, Copies(id));
+            int now = Math.Min(MergeRules.MaxCopies, before + count);
+            Data.Copies[id] = now;
+            DealRolls(id);   // docs/44 section 11: the stats of a tier hero are dealt when the copy is obtained
+            if (bought)
+                for (int k = before; k < now; k++) LedgerAddHeroCopy(id, k);
+            Commit();
+            return now;
+        }
+
+        /// <summary>
         /// Merges 3 copies of the character into 1 copy of its next tier and saves at once. Nothing changes unless the result is Ok.
         /// The lower tier stays owned only while copies are left.
+        /// WHICH ROLLS GO (owner 2026-11-17, docs/44 section 11): the three copies that are merged away take their own rolls with them. <paramref name="copyIndexes"/> names the three cards (0-based, the Merge screen
+        /// passes the picked ones); without it (or with a bad list) the LAST three copies go, so the first cards of the hero keep their place (the chosen copy stays valid). The new tier copy is rolled FRESH
+        /// (it is a new hero, never a carry-over of an input roll) and is appended as the last copy of the next tier. The rolls of the copies that stay are untouched.
         /// </summary>
-        public MergeOutcome TryMerge(string id)
+        public MergeOutcome TryMerge(string id, IList<int> copyIndexes = null)
         {
             CharacterSpec from = CharacterDefs.Get(id);
             if (from == null) return new MergeOutcome { Result = MergeResult.Unknown, FromId = id };
@@ -68,13 +87,44 @@ namespace FluffyClimbers.Economy
             string toId = to != null ? to.Id : null;
             var work = new Dictionary<string, int>(2) { { from.Id, Copies(from.Id) } };
             if (toId != null) work[toId] = Copies(toId);
+            int copiesBefore = Math.Min(MergeRules.MaxCopies, Copies(from.Id));
             MergeOutcome o = MergeRules.Apply(work, from.Id, toId);
             if (o.Result != MergeResult.Ok) return o;
+            var consumedNos = new List<int>(MergeRules.CopiesNeeded);
+            DropMergedRolls(from.Id, copiesBefore, copyIndexes, consumedNos);
             Data.Copies[from.Id] = o.FromCopiesLeft;
             Data.Copies[toId] = o.ToCopies;
-            RollIfNew(toId);   // the merge result is a new hero: its stats are dealt now (a hero that already has a roll keeps it)
+            DealRolls(toId);   // the merge result is a new hero copy: its stats are dealt now, fresh
+            LedgerOnMerge(from.Id, toId, copiesBefore - o.FromCopiesLeft, consumedNos);   // ProgressService.Ledger.cs
             Commit();
             return o;
+        }
+
+        /// <summary>Removes the rolls of the three merged copies from the hero's list (the others shift down, in order) and reports the roll counters that left.</summary>
+        void DropMergedRolls(string fromId, int held, IList<int> copyIndexes, List<int> consumedNos)
+        {
+            if (!HeroRolls.IsRollable(fromId)) return;
+            DealRolls(fromId);   // dense lists first (an older save may not have dealt every copy yet)
+            List<int> rolls, nos;
+            if (!Data.HeroCopyRolls.TryGetValue(fromId, out rolls) || !Data.HeroCopyRollNos.TryGetValue(fromId, out nos)) return;
+            var gone = new List<int>(MergeRules.CopiesNeeded);
+            if (copyIndexes != null && copyIndexes.Count == MergeRules.CopiesNeeded)
+            {
+                foreach (int i in copyIndexes) if (i >= 0 && i < held && i < rolls.Count && !gone.Contains(i)) gone.Add(i);
+                if (gone.Count != MergeRules.CopiesNeeded) gone.Clear();
+            }
+            if (gone.Count == 0)
+                for (int i = held - MergeRules.CopiesNeeded; i < held; i++) gone.Add(i);
+            gone.Sort();
+            for (int k = gone.Count - 1; k >= 0; k--)
+            {
+                int i = gone[k];
+                if (i >= rolls.Count) continue;
+                consumedNos.Add(nos[i]);
+                rolls.RemoveAt(i);
+                nos.RemoveAt(i);
+            }
+            SyncLegacyRoll(fromId);
         }
     }
 }

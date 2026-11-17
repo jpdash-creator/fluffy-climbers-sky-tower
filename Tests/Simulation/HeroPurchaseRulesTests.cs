@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using FluffyClimbers.Economy;
+using FluffyClimbers.Simulation;
 using Xunit;
 
 namespace FluffyClimbers.Simulation.Tests
@@ -77,9 +78,9 @@ namespace FluffyClimbers.Simulation.Tests
                 List<string> lines = HeroPurchase.InfoLines(r);
                 Assert.Equal(3, lines.Count);
                 Assert.Contains(rule.PowerCount.ToString(), lines[0]);
-                Assert.Contains(rule.CooldownSeconds + " s", lines[0]);
+                Assert.Contains("free once per run", lines[0]);
                 Assert.Contains(TierRules.JumpBandText(r), lines[1]);
-                Assert.Contains(rule.RunCoinsMin + " to " + rule.RunCoinsMax + " coins", lines[2]);
+                Assert.Contains("Milestone bonus +" + CoinPayoutRules.HeroBonusCoins((int)r) + " coins", lines[2]);   // owner 2026-11-13: the rarity bonus on levels 5/10/15/20/25 replaced the run-bonus range
             }
             Assert.Equal(2, HeroPurchase.InfoLines(CharacterRarity.Common).Count);   // Common has no tier rule: two short lines
             Assert.Empty(HeroPurchase.InfoLines((CharacterRarity)99));

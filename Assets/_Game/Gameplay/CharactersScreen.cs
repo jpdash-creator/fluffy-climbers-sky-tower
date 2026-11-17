@@ -359,7 +359,7 @@ namespace FluffyClimbers.Gameplay
             sr.movementType = ScrollRect.MovementType.Elastic;
             sr.scrollSensitivity = 60f;
 
-            // Only heroes the player really owns, one card per copy. A tap on ANY card selects that hero type; the tick sits on the FIRST card of the chosen type only.
+            // Only heroes the player really owns, one card per copy. A tap on a card chooses THAT copy (hero + copy index); the tick sits on that one card only.
             CharacterDef chosen = CharacterCatalog.Selected;
             for (int i = 0; i < cards.Count; i++)
             {
@@ -387,7 +387,7 @@ namespace FluffyClimbers.Gameplay
                 var fit = face.gameObject.AddComponent<AspectRatioFitter>();   // the hero keeps its proportions inside the holder
                 fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
                 fit.aspectRatio = who.Rig.CanvasW / (float)who.Rig.CanvasH;
-                bool isChosen = who == chosen && card.IsFirstOfType;
+                bool isChosen = who == chosen && CharacterCatalog.IsChosen(progress, card);
                 if (isChosen) AddTick(outer, ChosenName, 56f);
 
                 var b = outer.gameObject.AddComponent<Button>();
@@ -395,7 +395,8 @@ namespace FluffyClimbers.Gameplay
                 outer.GetComponent<Image>().raycastTarget = true;
                 CharacterDef pick = who;
                 // a tap only selects the hero type (the (i) button on the stage opens its stat sheet)
-                b.onClick.AddListener(() => { CharacterCatalog.Selected = pick; Build(); });
+                int pickCopy = card.Copy;   // each copy is its own card and can be chosen on its own
+                b.onClick.AddListener(() => { CharacterCatalog.Select(pick, pickCopy); Build(); });
                 outer.gameObject.AddComponent<A11yLabel>().Text = who.Name + ", " + CharacterDefs.RarityNames[(int)rarity] + (isChosen ? ", chosen" : "");
             }
         }

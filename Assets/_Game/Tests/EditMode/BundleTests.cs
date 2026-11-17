@@ -91,8 +91,8 @@ namespace FluffyClimbers.Tests
         public void WorthIsAMultiplierInGemsWithNoDollars()
         {
             PowerUpCatalog pw = PowerUpCatalog.BuiltIn();
-            int gemPrice = pw.Get("pw_magnet").GemPrice;
-            BundleDef d = Def("w", 200, 2000, Pw("pw_magnet", 2));
+            int gemPrice = pw.Get("pw_safety_net").GemPrice;
+            BundleDef d = Def("w", 200, 2000, Pw("pw_safety_net", 2));
             double visible = 2000 / 20.0 + 2.0 * gemPrice;
             Assert.AreEqual(visible / 200.0, BundleWorth.Multiplier(d, pw, 0), 1e-9, "no card: visible contents only");
             Assert.AreEqual(0.0, BundleWorth.Multiplier(null), 1e-9);
@@ -152,7 +152,7 @@ namespace FluffyClimbers.Tests
         {
             Assert.AreEqual(0, BundleCatalog.FromJson("not json").Count);
             BundleCatalog c = BundleCatalog.FromJson("[{\"id\":\"a\",\"name\":\"A\",\"tier\":1,\"priceGems\":200,\"coins\":1000,\"powerups\":[{\"id\":\"pw_nope\",\"count\":1}],\"hiddenCard\":true}," +
-                                                      "{\"id\":\"b\",\"name\":\"B\",\"tier\":1,\"priceGems\":200,\"coins\":1000,\"powerups\":[{\"id\":\"pw_magnet\",\"count\":2}],\"hiddenCard\":true}]");
+                                                      "{\"id\":\"b\",\"name\":\"B\",\"tier\":1,\"priceGems\":200,\"coins\":1000,\"powerups\":[{\"id\":\"pw_safety_net\",\"count\":2}],\"hiddenCard\":true}]");
             Assert.AreEqual(1, c.Count);
             Assert.AreEqual("b", c.All[0].Id);
         }
@@ -161,7 +161,7 @@ namespace FluffyClimbers.Tests
 
         static BundleDef CardBundle(string id, int price)
         {
-            BundleDef d = Def(id, price, 12000, Pw("pw_magnet", 1));
+            BundleDef d = Def(id, price, 12000, Pw("pw_safety_net", 1));
             d.HiddenCard = true;
             return d;
         }
@@ -199,7 +199,7 @@ namespace FluffyClimbers.Tests
             svc.AddGems(500);
             int before = TotalCopies(svc);
             CharacterSpec card;
-            Assert.AreEqual(BundleResult.Ok, svc.TryBuyBundle(Def("n", 300, 1000, Pw("pw_magnet", 1)), out card));
+            Assert.AreEqual(BundleResult.Ok, svc.TryBuyBundle(Def("n", 300, 1000, Pw("pw_safety_net", 1)), out card));
             Assert.IsNull(card);
             Assert.AreEqual(before, TotalCopies(svc));
         }
@@ -320,15 +320,15 @@ namespace FluffyClimbers.Tests
             ProgressService svc = NewService();
             svc.AddGems(500);
             svc.AddCoins(100);
-            svc.GrantPowerUp("pw_magnet", 2);
-            BundleDef d = Def("t1", 300, 12000, Pw("pw_magnet", 3), Pw("pw_rocket", 1));
+            svc.GrantPowerUp("pw_safety_net", 2);
+            BundleDef d = Def("t1", 300, 12000, Pw("pw_safety_net", 3), Pw("pw_rocket", 1));
             int changed = 0;
             svc.Changed += () => changed++;
             Assert.AreEqual(BundleResult.Ok, svc.TryBuyBundle(d));
             Assert.AreEqual(1, changed, "one save");
             Assert.AreEqual(500 - 300, svc.Gems);
             Assert.AreEqual(12100, svc.Coins);
-            Assert.AreEqual(5, svc.PowerUpCount("pw_magnet"));
+            Assert.AreEqual(5, svc.PowerUpCount("pw_safety_net"));
             Assert.AreEqual(1, svc.PowerUpCount("pw_rocket"));
         }
 
@@ -338,7 +338,7 @@ namespace FluffyClimbers.Tests
             ProgressService svc = NewService();
             svc.AddGems(299);
             string before = Snapshot(svc);
-            Assert.AreEqual(BundleResult.NotEnoughGems, svc.TryBuyBundle(Def("t1", 300, 12000, Pw("pw_magnet", 3))));
+            Assert.AreEqual(BundleResult.NotEnoughGems, svc.TryBuyBundle(Def("t1", 300, 12000, Pw("pw_safety_net", 3))));
             Assert.AreEqual(before, Snapshot(svc));
         }
 
@@ -348,7 +348,7 @@ namespace FluffyClimbers.Tests
             ProgressService svc = NewService();
             svc.AddGems(1000);
             string before = Snapshot(svc);
-            Assert.AreEqual(BundleResult.Invalid, svc.TryBuyBundle(Def("bad", 300, 12000, Pw("pw_magnet", 3), Pw("pw_unknown", 1))));
+            Assert.AreEqual(BundleResult.Invalid, svc.TryBuyBundle(Def("bad", 300, 12000, Pw("pw_safety_net", 3), Pw("pw_unknown", 1))));
             Assert.AreEqual(before, Snapshot(svc), "nothing was granted and no gems were taken");
             Assert.AreEqual(BundleResult.Invalid, svc.TryBuyBundle((BundleDef)null));
             Assert.AreEqual(BundleResult.Invalid, svc.TryBuyBundle("no_such_bundle"));
@@ -444,7 +444,7 @@ namespace FluffyClimbers.Tests
         public void ASmallCatalogStillGivesDistinctOffers()
         {
             var defs = new List<BundleDef>();
-            for (int i = 0; i < 8; i++) defs.Add(Def("s" + i, 200, 1000 + i, Pw("pw_magnet", 1)));
+            for (int i = 0; i < 8; i++) defs.Add(Def("s" + i, 200, 1000 + i, Pw("pw_safety_net", 1)));
             ProgressService svc = NewService(BundleCatalog.FromDefs(defs));
             svc.AddCoins(300);
             Assert.AreEqual(6, svc.CurrentBundleOffers().Select(b => b.Id).Distinct().Count());
@@ -540,7 +540,7 @@ namespace FluffyClimbers.Tests
         [Test]
         public void NeverTwiceInARowEvenWithTwoBundles()
         {
-            var defs = new List<BundleDef> { Def("x", 200, 5000, Pw("pw_magnet", 1)), Def("y", 210, 5000, Pw("pw_shield", 1)) };
+            var defs = new List<BundleDef> { Def("x", 200, 5000, Pw("pw_safety_net", 1)), Def("y", 210, 5000, Pw("pw_shield", 1)) };
             ProgressService svc = NewService(BundleCatalog.FromDefs(defs));
             string last = null;
             for (int round = 0; round < 12; round++)

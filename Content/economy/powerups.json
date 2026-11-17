@@ -15,65 +15,72 @@
   },
   {
     "id": "pw_doublejump", "order": 3, "name": "Double Jump",
-    "description": "For 30 seconds you can jump once more in mid-air. Tap again to add 30 seconds.",
-    "trigger": "button", "durationSec": 30, "uses": 1, "stack": "add",
+    "description": "For 20 seconds you can jump once more in mid-air. Tap again to add 20 seconds.",
+    "trigger": "button", "durationSec": 20, "uses": 1, "stack": "add",
     "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "airJumpsPerAirPhase": 1 }, "icon": "pw_doublejump"
   },
   {
     "id": "pw_wallstick", "order": 4, "name": "Wall Stick",
-    "description": "For 30 seconds you stick to the side walls for up to 1.5 seconds. Jump to leap off. Tap again to add 30 seconds.",
-    "trigger": "button", "durationSec": 30, "uses": 1, "stack": "add",
+    "description": "For 20 seconds you stick to the side walls for up to 1.5 seconds. Jump to leap off. Tap again to add 20 seconds.",
+    "trigger": "button", "durationSec": 20, "uses": 1, "stack": "add",
     "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "holdSec": 1.5 }, "icon": "pw_wallstick"
   },
   {
     "id": "pw_shield", "order": 5, "name": "Shield",
-    "description": "Gongs cannot hurt you for 60 seconds. Tap again to add 60 seconds.",
-    "trigger": "button", "durationSec": 60, "uses": 1, "stack": "add",
+    "description": "Gongs cannot hurt you for 20 seconds. Tap again to add 20 seconds.",
+    "trigger": "button", "durationSec": 20, "uses": 1, "stack": "add",
     "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "gongsHarmless": true }, "icon": "pw_shield"
   },
   {
-    "id": "pw_magnet", "order": 6, "name": "Magnet",
-    "description": "Gems and stars come to you from farther away for 30 seconds. Tap again to add 30 seconds.",
-    "trigger": "button", "durationSec": 30, "uses": 1, "stack": "add",
+    "id": "pw_safety_net", "order": 6, "name": "Safety Net",
+    "description": "Arm it any time before a fall. The next time you fall, it jumps you up 3 floors. Arm the next one after a rescue. Not timed.",
+    "trigger": "button", "durationSec": 0, "uses": 1, "stack": "none",
     "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
-    "simParams": { "extraRadiusU": 2.0 }, "icon": "pw_magnet"
+    "simParams": { "bounceFloors": 3 }, "icon": "pw_safety_net"
   },
   {
-    "id": "pw_slowtime", "order": 7, "name": "Slow Time",
+    "id": "pw_glide", "order": 7, "name": "Glide Cape",
+    "description": "For 20 seconds the whole game slows to half speed after every jump until you land, so you can steer to the next platform. Tap again to add 20 seconds.",
+    "trigger": "button", "durationSec": 20, "uses": 1, "stack": "add",
+    "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
+    "simParams": {}, "icon": "pw_glide"
+  },
+  {
+    "id": "pw_wide_platforms", "order": 8, "name": "Wide Platforms",
+    "description": "For 20 seconds every platform is 20 percent wider to land on. Tap again to add 20 seconds.",
+    "trigger": "button", "durationSec": 20, "uses": 1, "stack": "add",
+    "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
+    "simParams": { "widthPercent": 120 }, "icon": "pw_wide_platforms"
+  },
+  {
+    "id": "pw_slowtime", "order": 9, "name": "Slow Time",
     "description": "The rising danger zone moves 50 percent slower for 30 seconds. Tap again to add 30 seconds.",
     "trigger": "button", "durationSec": 30, "uses": 1, "stack": "add",
     "price": { "coins": 1500, "gems": 75 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "scrollPercent": 50 }, "icon": "pw_slowtime"
   },
   {
-    "id": "pw_springboots", "order": 8, "name": "Spring Boots",
+    "id": "pw_springboots", "order": 10, "name": "Spring Boots",
     "description": "The next 3 jumps are 20 percent higher.",
     "trigger": "button", "durationSec": 0, "uses": 3, "stack": "refresh",
     "price": { "coins": 1000, "gems": 0 }, "unlockRegion": 1, "implemented": false,
     "simParams": { "peakPercent": 20, "peakClampU": 6.5 }, "icon": "pw_springboots"
   },
   {
-    "id": "pw_coindoubler", "order": 9, "name": "Coin Doubler",
+    "id": "pw_coindoubler", "order": 11, "name": "Coin Doubler",
     "description": "Doubles the coins paid at the end of this level.",
     "trigger": "button", "durationSec": 0, "uses": 1, "stack": "none",
     "price": { "coins": 120, "gems": 0 }, "unlockRegion": 1, "implemented": false,
     "simParams": { "multiplier": 2 }, "icon": "pw_coindoubler"
   },
   {
-    "id": "pw_starseeker", "order": 10, "name": "Star Seeker",
+    "id": "pw_starseeker", "order": 12, "name": "Star Seeker",
     "description": "Arrows at the screen edge point to stars you have not collected yet.",
     "trigger": "button", "durationSec": 12, "uses": 1, "stack": "none",
     "price": { "coins": 800, "gems": 0 }, "unlockRegion": 1, "implemented": false,
     "simParams": { "rangeU": 12.0 }, "icon": "pw_starseeker"
-  },
-  {
-    "id": "pw_safetynet", "order": 11, "name": "Safety Net",
-    "description": "Catches you the first time you would fall off the bottom.",
-    "trigger": "auto", "durationSec": 0, "uses": 1, "stack": "none",
-    "price": { "coins": 1500, "gems": 0 }, "unlockRegion": 1, "implemented": false,
-    "simParams": {}, "icon": "pw_safetynet"
   }
 ]

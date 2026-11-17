@@ -459,14 +459,15 @@ namespace FluffyClimbers.Gameplay
         {
             if (progress.IsRegionComingSoon(selectedRegion)) { BuildComingSoon(content); return; }
             if (!progress.IsRegionGoalsOpen(selectedRegion)) BuildLockedNote(content);
-            IReadOnlyList<RegionGoal> goals = progress.RegionGoals(selectedRegion);
+            // Owner Main Bug List 3: ready goals first, then the open ones in table order; claimed ones go to "Completed (N)" below.
+            List<RegionGoal> goals = RewardOrder.Sort(progress.RegionGoals(selectedRegion), g => progress.IsRegionGoalReady(g), g => progress.IsRegionGoalClaimed(g));
             bool divider = false;
             List<RewardEntry> done = null;
             for (int i = 0; i < goals.Count; i++)
             {
                 RegionGoal g = goals[i];
                 if (progress.IsRegionGoalClaimed(g)) { if (done == null) done = new List<RewardEntry>(16); done.Add(g); continue; }   // claimed goals wait in "Completed (N)" at the bottom
-                if (g.IsEndless && !divider) { BuildEndlessDivider(content); divider = true; }   // the endless tiers come last, under their own heading
+                if (g.IsEndless && !divider && !progress.IsRegionGoalReady(g)) { BuildEndlessDivider(content); divider = true; }   // the endless tiers come last, under their own heading
                 AddCard(content, g, true);
             }
             AddCompletedSection(content, done, true);

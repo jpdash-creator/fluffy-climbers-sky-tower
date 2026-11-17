@@ -19,12 +19,47 @@ namespace FluffyClimbers.Economy
         [JsonProperty("records", NullValueHandling = NullValueHandling.Ignore)] public ModeRecord[] Records;
     }
 
-    /// <summary>The numbers of the run that set a best crown: floors reached, the best combo chain, and the BASE score (floors x 10 + combo points) the crown was made from.</summary>
+    /// <summary>
+    /// The numbers of the run that set a best crown (formula of 2026-11-16): floors reached, the best combo chain, the BASE score (floors + sum of chain_length^2) the crown was made from,
+    /// and optionally the list of all chain lengths of the run (null when the caller could not supply it; then the chain squares are BaseScore - Floors).
+    /// </summary>
     public sealed class CrownRun
     {
         [JsonProperty("f")] public int Floors;
         [JsonProperty("c")] public int BestCombo;
         [JsonProperty("s")] public int BaseScore;
+        /// <summary>Every chain length of the run in order (chains of 2 or more landings), capped at <see cref="MaxStoredChains"/> entries. Null = not stored. Additive.</summary>
+        [JsonProperty("ch", NullValueHandling = NullValueHandling.Ignore)] public int[] Chains;
+        /// <summary>UTC Unix seconds when this version of the slot was recorded (weekly store only; 0 = unknown/older). Monotonic on the phone and used to decide which version wins when phone and cloud are merged (owner 2026-11-17). Additive.</summary>
+        [JsonProperty("at", DefaultValueHandling = DefaultValueHandling.Ignore)] public long At;
+        public const int MaxStoredChains = 64;
+
+        /// <summary>Copy of a chain list for storage (null for null or empty, longest chains kept when over the cap).</summary>
+        public static int[] CopyChains(int[] chains)
+        {
+            if (chains == null || chains.Length == 0) return null;
+            int n = chains.Length;
+            if (n <= MaxStoredChains) { var c = new int[n]; System.Array.Copy(chains, c, n); return c; }
+            var all = (int[])chains.Clone();
+            System.Array.Sort(all);
+            var top = new int[MaxStoredChains];
+            System.Array.Copy(all, n - MaxStoredChains, top, 0, MaxStoredChains);
+            return top;
+        }
+    }
+
+    /// <summary>
+    /// THIS WEEK's best crowns (owner 2026-11-14): the run behind the best crown per level id and Gameplay setting, and per Endless region id and setting (index 0..4, null = none).
+    /// Valid only while <see cref="WeekKey"/> equals the current week key (Monday 00:00 UTC since 2026-11-16, <see cref="WeekKeys"/>); another key means the week rolled over and everything here counts as empty.
+    /// The all-time crowns (LevelProgress.Crowns/CrownRuns, SaveData.EndlessCrowns) stay in the save untouched. Additive, no version bump.
+    /// </summary>
+    public sealed class WeekCrownData
+    {
+        [JsonProperty("weekKey")] public string WeekKey = "";
+        [JsonProperty("levels")] public Dictionary<string, CrownRun[]> Levels = new Dictionary<string, CrownRun[]>();
+        [JsonProperty("endless")] public Dictionary<string, CrownRun[]> Endless = new Dictionary<string, CrownRun[]>();
+        /// <summary>Time Attack (3:00) best crown per region id and setting this week (slot t.region.mode on the server). Null in a store written before 2026-11-16. Additive.</summary>
+        [JsonProperty("timeAttack", NullValueHandling = NullValueHandling.Ignore)] public Dictionary<string, CrownRun[]> TimeAttack;
     }
 
     /// <summary>Owned stock (docs/15 section 8.1). Only power-ups.</summary>
@@ -42,8 +77,12 @@ namespace FluffyClimbers.Economy
     {
         /// <summary>Version 3 added the character copies (docs/34); older saves are migrated on load (each owned character starts with 1 copy). Version 2 added the chest counter. Gear fields of older saves are ignored on load (gear was removed 2026-10-24).</summary>
         public const int CurrentVersion = 3;
+        /// <summary>The crown formula the stored crowns belong to: 2 = (floors + chain squares) x 5 x (1 + bonus) of 2026-11-16. Anything lower (a missing field) is cleared once on load (ProgressService.MigrateCrownFormula).</summary>
+        public const int CrownFormulaCurrent = 2;
 
         [JsonProperty("version")] public int Version = CurrentVersion;
+        /// <summary>Crown formula version of the stored crowns (see <see cref="CrownFormulaCurrent"/>). Defaults to 0 so an old save without the field is migrated. Additive, no save version bump.</summary>
+        [JsonProperty("crownFormula")] public int CrownFormula;
         [JsonProperty("coins")] public int Coins;
         [JsonProperty("gems")] public int Gems;
         [JsonProperty("levels")] public Dictionary<string, LevelProgress> Levels = new Dictionary<string, LevelProgress>();
@@ -53,6 +92,8 @@ namespace FluffyClimbers.Economy
         [JsonProperty("endlessBest")] public Dictionary<string, int> EndlessBest = new Dictionary<string, int>();
         /// <summary>Endless mode: the run behind the best crown per region id and Gameplay mode (index 0..4, null = none). Additive, no version bump; old saves load empty (best endless crown 0).</summary>
         [JsonProperty("endlessCrowns")] public Dictionary<string, CrownRun[]> EndlessCrowns = new Dictionary<string, CrownRun[]>();
+        /// <summary>This week's best crowns per level and per Endless region (see <see cref="WeekCrownData"/>); what the level and Endless pop-ups show. Null on old saves. Additive, no version bump.</summary>
+        [JsonProperty("weekCrowns", NullValueHandling = NullValueHandling.Ignore)] public WeekCrownData WeekCrowns;
         /// <summary>Endless coin cap: the UTC day (yyyyMMdd) the counter below belongs to, and how many paying endless runs finished that day.</summary>
         [JsonProperty("endlessDay")] public string EndlessDay = "";
         [JsonProperty("endlessRunsToday")] public int EndlessRunsToday;
@@ -101,6 +142,13 @@ namespace FluffyClimbers.Economy
         [JsonProperty("heroRolls")] public Dictionary<string, int> HeroRolls = new Dictionary<string, int>();
         /// <summary>The roll counter value each hero was rolled with, so a server can recompute the variant from (account seed, hero id, counter). Additive.</summary>
         [JsonProperty("heroRollNo")] public Dictionary<string, int> HeroRollNo = new Dictionary<string, int>();
+        /// <summary>
+        /// ONE ROLL PER COPY (owner 2026-11-17): hero id to the variant index of each held copy, in card order (entry i = copy i, the i-th card on the Heroes screen); -1 = not dealt yet (dealt at first use).
+        /// <c>heroRolls</c> above is kept as a mirror of copy 0 for older app versions and is the migration source: a save without this field gives every existing copy the existing roll of its hero id. Additive, no version bump.
+        /// </summary>
+        [JsonProperty("heroCopyRolls")] public Dictionary<string, List<int>> HeroCopyRolls = new Dictionary<string, List<int>>();
+        /// <summary>The roll counter each copy roll was dealt with (parallel to <see cref="HeroCopyRolls"/>; -1 = unknown), so a server can recompute it from (account seed, hero id, counter). Additive.</summary>
+        [JsonProperty("heroCopyRollNos")] public Dictionary<string, List<int>> HeroCopyRollNos = new Dictionary<string, List<int>>();
         /// <summary>Hero rolls made so far: the next roll uses this number, then it grows. Additive.</summary>
         [JsonProperty("heroRollCount")] public int HeroRollCount;
         /// <summary>Weekly leaderboard consent (Planning/LEADERBOARD-DESIGN.md 5.7): null until the player accepted the popup. Additive, no version bump.</summary>
@@ -109,5 +157,11 @@ namespace FluffyClimbers.Economy
         [JsonProperty("leaderboard")] public LeaderboardSaveData Leaderboard = new LeaderboardSaveData();
         /// <summary>The name the player chose for the weekly leaderboard (3 to 16 characters, checked by LeaderboardNameRules). Null or empty = the Google Play Games name is shown. Additive, no version bump.</summary>
         [JsonProperty("leaderboardName", NullValueHandling = NullValueHandling.Ignore)] public string LeaderboardDisplayName;
+        /// <summary>What the shops and real-money purchases granted (coins, gems, power-ups, hero copies with their rolled stats). Reset progress rebuilds the save from it (owner 2026-11-17, ProgressService.Ledger.cs). It travels in the cloud save with everything else. Additive, no version bump; null or missing = nothing recorded (older purchases cannot be told apart from earned items).</summary>
+        [JsonProperty("ledger", NullValueHandling = NullValueHandling.Ignore)] public PurchaseLedger Ledger = new PurchaseLedger();
+        /// <summary>Set by Reset progress while the player's scores on the leaderboard service still have to be deleted (offline or signed out at the time); cleared once the service confirmed. Additive.</summary>
+        [JsonProperty("leaderboardWipePending")] public bool LeaderboardWipePending;
+        /// <summary>Set by Reset progress when the reset save has not reached the cloud save yet; while set, the sync always uploads this device (an old cloud save must never bring the wiped progress back). Cleared by MarkCloudSynced. Additive.</summary>
+        [JsonProperty("cloudResetPending")] public bool CloudResetPending;
     }
 }

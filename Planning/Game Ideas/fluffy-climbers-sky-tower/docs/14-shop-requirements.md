@@ -150,7 +150,7 @@ Rules [CODE `Chests.cs`]: two chests, gems only, **Iron 100 gems (open 10: 1,000
 
 ## 8. Tab "Power-ups" and Characters
 
-Power-up rules [CODE `PowerUpCatalog.cs`, doc 27 section 7]: 7 types are sold (Flight, Rocket, Double Jump, Wall Stick, Shield, Magnet, Slow Time); **1,000 coins / 50 gems** (Magnet, Shield, Wall Stick, Double Jump) or **1,500 coins / 75 gems** (Slow Time, Rocket, Flight); 5 units -10 percent, 10 or more -20 percent. No stock cap, no loadout, no carry cap (rework 2026-10-31); every owned type is available in a run; a tap while active adds the full duration. Spring Boots, Coin Doubler, Star Seeker, Safety Net are hidden rows (not implemented).
+Power-up rules [CODE `PowerUpCatalog.cs`, doc 27 section 7]: 9 types are sold (Flight, Rocket, Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms, Slow Time); **1,000 coins / 50 gems** (Safety Net, Glide Cape, Wide Platforms, Shield, Wall Stick, Double Jump) or **1,500 coins / 75 gems** (Slow Time, Rocket, Flight); 5 units -10 percent, 10 or more -20 percent. No stock cap, no loadout, no carry cap (rework 2026-10-31); every owned type is available in a run; a tap while active adds the full duration. Spring Boots, Coin Doubler, Star Seeker, Safety Net are hidden rows (not implemented).
 
 | ID | Requirement | Pri | Acceptance criteria | State |
 |---|---|---|---|---|

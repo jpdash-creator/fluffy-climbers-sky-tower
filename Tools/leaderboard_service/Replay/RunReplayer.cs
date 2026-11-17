@@ -69,8 +69,8 @@ namespace FluffyClimbers.LeaderboardService
 
         public RunReplayer(ContentRepository repo) { this.repo = repo; }
 
-        /// <summary>Input bits a legitimate recording can hold: Left, Right, Jump and the seven bought power-up edges. Hero bits never reach the recorder (RunSession converts them).</summary>
-        public const int ValidInputMask = SimInput.Left | SimInput.Right | SimInput.Jump | SimInput.PowerMask;
+        /// <summary>Input bits a legitimate recording can hold: Left, Right, Jump, the held-jump level (Glide Cape) and the nine bought power-up edges. Hero bits never reach the recorder (RunSession converts them).</summary>
+        public const int ValidInputMask = SimInput.Left | SimInput.Right | SimInput.Jump | SimInput.PowerMask | SimInput.JumpHeld;
 
         /// <summary>The simulation config of a Gameplay setting: the shared defaults plus what GameSession.ApplyDifficulty sets (scroll step percent, gem chance, top speed-up of the setting). Keep in sync with GameSession.ApplyDifficulty; a test pins the source lines.</summary>
         public static SimConfig ConfigFor(int mode)
@@ -206,13 +206,14 @@ namespace FluffyClimbers.LeaderboardService
         /// <summary>Mirror of RunSession.TakePowerUnits seen from the record: every power bit in the stream was an ACCEPTED activation; a free hero use (ready cooldown, power in the hero's list) is not a bought unit, everything else is.</summary>
         static bool CountBought(ReplayResult res, HeroPowerCooldown cd, in SimState state, int input, Limits lim)
         {
-            for (int i = (int)PowerUp.Flight; i <= (int)PowerUp.SlowTime; i++)
+            for (int k = 0; k < PowerUps.Implemented.Length; k++)
             {
-                PowerUp p = (PowerUp)i;
+                PowerUp p = PowerUps.Implemented[k];
+                int i = (int)p;
                 if ((input & PowerUps.InputBit(p)) == 0) continue;
                 int idx = cd != null ? cd.IndexOf(p) : -1;
-                bool free = idx >= 0 && cd.IsReady(idx) && PowerUps.CanActivateHero(in state, p);
-                if (free) { cd.TryUse(idx); continue; }
+                bool free = idx >= 0 && cd.FreeAvailable(idx) && PowerUps.CanActivateHero(in state, p);
+                if (free) { cd.TryUseFree(idx); continue; }
                 if (++res.BoughtUnits[i] > lim.MaxBoughtUnitsPerTypePerRun) return false;
             }
             return true;

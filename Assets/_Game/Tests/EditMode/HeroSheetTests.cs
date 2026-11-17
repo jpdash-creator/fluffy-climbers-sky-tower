@@ -41,7 +41,7 @@ namespace FluffyClimbers.Tests
             StringAssert.Contains("Flight", d.PowerText);
             StringAssert.Contains("Rocket", d.PowerText);
             StringAssert.Contains("Slow Time", d.PowerText);
-            StringAssert.Contains("10 s", d.PowerText);
+            StringAssert.Contains("once per run", d.PowerText);   // Bug List 4: free once per run, same length as the normal power-up
         }
 
         [Test]

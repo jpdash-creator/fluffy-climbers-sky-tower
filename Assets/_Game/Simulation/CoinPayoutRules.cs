@@ -1,7 +1,7 @@
 namespace FluffyClimbers.Simulation
 {
     /// <summary>
-    /// Pure integer rules of the campaign coin payout, the milestone gems and the hero milestone bonus (owner, issue list 24 points 5 and 6, 2026-10-25; economy review 2026-11-13).
+    /// Pure integer rules of the campaign coin payout, the hero milestone bonus (owner, issue list 24 points 5 and 6, 2026-10-25; economy review 2026-11-13; the level milestone gems became collectible gems on 2026-11-16, see GemLevels).
     /// Kept in the Simulation folder (no engine types) so the dotnet tests run the same arithmetic as Economy/Rewards.cs.
     /// </summary>
     public static class CoinPayoutRules
@@ -59,24 +59,10 @@ namespace FluffyClimbers.Simulation
             return (int)gross;
         }
 
-        // ---- milestone gems (owner 2026-11-13): only levels 5, 10, 15, 20, 25, fixed amounts, first clear only ----
-
-        /// <summary>Fixed gems of the milestone levels 5, 10, 15, 20, 25 (paid once, on the first clear).</summary>
-        public static readonly int[] MilestoneGemTable = { 1, 1, 2, 2, 3 };
-
-        /// <summary>The fixed gems of a level index: 1, 1, 2, 2, 3 on levels 5, 10, 15, 20, 25, otherwise 0.</summary>
-        public static int MilestoneGemsOfLevel(int levelIndex)
-        {
-            if (levelIndex <= 0 || levelIndex % 5 != 0) return 0;
-            int slot = levelIndex / 5 - 1;
-            return slot < MilestoneGemTable.Length ? MilestoneGemTable[slot] : 0;
-        }
-
-        /// <summary>The milestone gems of a first clear as the level JSON states them (<c>rewards.gems.firstClearGuaranteed</c>, fixed: no chance roll any more).</summary>
-        public static int MilestoneGems(int firstClearGuaranteed)
-        {
-            return firstClearGuaranteed > 0 ? firstClearGuaranteed : 0;
-        }
+        // ---- level gems (owner 2026-11-16, Bug List 4 item 9) ----
+        // Main Bug List 7 item 2 (2026-11-17): FIXED first-clear gems 1/2/2/3/4 on levels 5/10/15/20/25 (GemLevels.FixedFirstClearGems, paid without pickups). On top, levels 5/10/15/20/25 hold
+        // 2 or 3 collectible gems (seeded 50 percent, GemLevels.GemsInLevel, placed by LevelBuilder); only gems the run collects pay (RunOutcome.GemsCollected), nothing at the end for uncollected ones.
+        // A replay of a 3-star level drops none (the gem pickups are stripped from the run). The hero milestone bonus below is unchanged.
 
         // ---- hero milestone bonus (owner 2026-11-13): paid by the hero selected for the run, first clear of levels 5/10/15/20/25 only ----
 

@@ -31,7 +31,7 @@ namespace FluffyClimbers.Tests
         [Test]
         public void CooldownIsReadyAtStartThenCountsDownInTicksPerPower()
         {
-            var cd = new HeroPowerCooldown(new[] { PowerUp.Shield, PowerUp.Magnet }, 15);
+            var cd = new HeroPowerCooldown(new[] { PowerUp.Shield, PowerUp.SafetyNet }, 15);
             Assert.IsTrue(cd.IsReady(0));
             Assert.IsTrue(cd.IsReady(1));
             Assert.IsTrue(cd.TryUse(0));
@@ -77,12 +77,35 @@ namespace FluffyClimbers.Tests
         // ---- duration factor ----
 
         [Test]
-        public void DurationFactorIsSixtyPercentAndDocumented()
+        public void HeroPowerUsesTheFullNormalTiming()
+        {
+            // owner 2026-11-16: the hero's own power is the matching normal power-up with its normal timing (no separate 60 percent)
+            var cfg = new SimConfig();
+            Assert.AreEqual(1.0f, SimConfig.HeroPowerDurationFactor);
+            Assert.AreEqual(100, cfg.HeroPowerDurationPercent);
+            Assert.AreEqual(cfg.ShieldTicks, cfg.HeroTicks(cfg.ShieldTicks));
+        }
+
+        [Test]
+        public void TheFreeUseIsOncePerRun_ARevivedRunKeepsItSpent_AndTheButtonFallsBackToOwnedStock()
         {
             var cfg = new SimConfig();
-            Assert.AreEqual(0.6f, SimConfig.HeroPowerDurationFactor);
-            Assert.AreEqual(60, cfg.HeroPowerDurationPercent);
-            Assert.AreEqual(Mathf.RoundToInt(cfg.ShieldTicks * 0.6f), cfg.HeroTicks(cfg.ShieldTicks));
+            var run = new RunSession(repo, cfg, "lvl_001_01");
+            CharacterSpec hero = HeroOf(CharacterRarity.Uncommon);
+            PowerUp p = hero.Powers[0];
+            run.ApplyStock(new int[PowerUps.MaxType + 1]);
+            run.ApplyHeroPowers(hero);
+            Assert.IsFalse(run.HeroPowerFreeUsed);
+            Assert.IsTrue(run.HeroFreeAvailable(p));
+            run.Step(PowerUps.InputBit(p));
+            Assert.AreEqual(1, run.State.PwUsed, "the free use works with no stock");
+            Assert.IsTrue(run.HeroPowerFreeUsed);
+            Assert.IsFalse(run.HeroFreeAvailable(p));
+            // the effect runs out; with no owned stock the press is dropped for good
+            run.State.DoubleJumpTicks = run.State.FlightTicks = run.State.RocketTicks = run.State.ShieldTicks = run.State.WallStickTicks = run.State.SlowTicks = 0;
+            run.Step(PowerUps.InputBit(p));
+            Assert.AreEqual(1, run.State.PwUsed, "no stock and the free use is spent");
+            Assert.AreEqual(0, run.PowerStock(p), "the owned count shows 0");
         }
 
         // ---- free use through the run session ----
@@ -93,7 +116,7 @@ namespace FluffyClimbers.Tests
             var cfg = new SimConfig();
             var run = new RunSession(repo, cfg, "lvl_001_01");
             var stock = new int[PowerUps.MaxType + 1];
-            stock[(int)PowerUp.Magnet] = 2;
+            stock[(int)PowerUp.SafetyNet] = 2;
             run.ApplyStock(stock);
             CharacterSpec hero = HeroOf(CharacterRarity.Legendary);
             run.ApplyHeroPowers(hero);
@@ -107,7 +130,7 @@ namespace FluffyClimbers.Tests
             int[] after = Enumerable.Range(0, PowerUps.MaxType + 1).Select(i => run.PowerStock((PowerUp)i)).ToArray();
             Assert.AreEqual(before, after, "no unit was taken");
             Assert.AreEqual(0, run.SettlePowerUps(null), "nothing to settle");
-            Assert.IsFalse(run.Hero.IsReady(idx), "the cooldown started");
+            Assert.IsFalse(run.Hero.FreeAvailable(idx), "the free use is spent for the whole run");
             Assert.AreEqual(0, run.BuildOutcome().PowerUpsUsed, "hero uses are not counted as used power-up units");
         }
 
@@ -126,7 +149,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(1, run.State.PwUsed);
             int ticks = PowerUps.ActiveTicks(in run.State, mine);
             run.Step(PowerUps.HeroInputBit(mine));
-            Assert.AreEqual(1, run.State.PwUsed, "on cooldown");
+            Assert.AreEqual(1, run.State.PwUsed, "free use spent, no stock");
             Assert.AreEqual(ticks - 1, PowerUps.ActiveTicks(in run.State, mine));
         }
 
@@ -156,7 +179,7 @@ namespace FluffyClimbers.Tests
 
             run.Step(PowerUps.InputBit(p));   // the normal button press of the type
             Assert.AreEqual(2, run.PowerStock(p), "free first: no unit taken");
-            Assert.IsFalse(run.Hero.IsReady(idx), "the hero cooldown started");
+            Assert.IsFalse(run.Hero.FreeAvailable(idx), "the hero's free use is spent");
             Assert.AreEqual(PowerUps.TotalTicks(cfg, p) - 1, PowerUps.ActiveTicks(in run.State, p), "same duration as a bought unit");
             Assert.AreEqual(0, run.BuildOutcome().PowerUpsUsed, "a free use is not a used unit");
 
@@ -185,7 +208,7 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void TheRarityCooldownStillAppliesToAFreePowerUsedThroughTheMergedButton()
+        public void AFreeUseThroughTheMergedButtonIsSpentForTheWholeRun_NoCooldownRefill()
         {
             var cfg = new SimConfig();
             var run = new RunSession(repo, cfg, "lvl_001_01");
@@ -195,7 +218,8 @@ namespace FluffyClimbers.Tests
             run.ApplyHeroPowers(hero);
             int idx = run.Hero.IndexOf(p);
             run.Step(PowerUps.InputBit(p));
-            Assert.AreEqual(CharacterDefs.CooldownSeconds[(int)CharacterRarity.Legendary] * SimConfig.TicksPerSecond - 1, run.Hero.RemainingTicks(idx));
+            for (int t = 0; t < 20 * SimConfig.TicksPerSecond; t++) run.Hero.Tick();
+            Assert.IsFalse(run.Hero.FreeAvailable(idx));
         }
 
         // ---- layout numbers (CUX-3/4) ----
@@ -214,11 +238,12 @@ namespace FluffyClimbers.Tests
                 {
                     Vector2 a = PowerUpBar.PositionFor(k, leftGroup);
                     Assert.GreaterOrEqual(a.y, PowerUpBar.BottomOffset, "above the pads");
-                    Assert.AreEqual(leftGroup ? PowerUpBar.SideOffset : -PowerUpBar.SideOffset, a.x, "its own edge");
+                    if (k < PowerUpBar.ColumnHeight) Assert.AreEqual(leftGroup ? PowerUpBar.SideOffset : -PowerUpBar.SideOffset, a.x, "its own edge");
                     for (int j = k + 1; j < max; j++)
                     {
                         Vector2 b = PowerUpBar.PositionFor(j, leftGroup);
-                        Assert.GreaterOrEqual(Mathf.Abs(a.y - b.y), PowerUpBar.ButtonSize + PowerUpBar.Gap - 0.01f, "buttons " + k + " and " + j);
+                        bool sameColumn = k / PowerUpBar.ColumnHeight == j / PowerUpBar.ColumnHeight;
+                        Assert.GreaterOrEqual(sameColumn ? Mathf.Abs(a.y - b.y) : Mathf.Abs(a.x - b.x), PowerUpBar.ButtonSize + PowerUpBar.Gap - 0.01f, "buttons " + k + " and " + j);
                     }
                 }
             }

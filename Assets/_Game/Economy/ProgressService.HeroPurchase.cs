@@ -28,7 +28,7 @@ namespace FluffyClimbers.Economy
             if (pick == null || !CharacterInventory.Exists(pick.Id)) return HeroBuyResult.Invalid;
             Data.Coins -= price;
             b.HeroBuys++;
-            AddCopies(pick.Id, 1);   // saves once: the coins, the counter and the copy
+            AddBoughtCopy(pick.Id);   // saves once: the coins, the counter, the copy and its purchase ledger entry (Reset progress keeps it)
             hero = pick;
             return HeroBuyResult.Ok;
         }

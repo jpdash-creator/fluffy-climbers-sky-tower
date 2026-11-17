@@ -14,6 +14,7 @@
     <!-- the REAL run session and its revive schedule: the test drives them like the game does and uploads what they record -->
     <Compile Include="../../Assets/_Game/Gameplay/RunSession.cs" Link="Linked/RunSession.cs" />
     <Compile Include="../../Assets/_Game/Gameplay/RevivePolicy.cs" Link="Linked/RevivePolicy.cs" />
+    <Compile Include="../../Assets/_Game/Economy/WeekKey.cs" Link="Linked/WeekKey.cs" />
   </ItemGroup>
 
   <ItemGroup>

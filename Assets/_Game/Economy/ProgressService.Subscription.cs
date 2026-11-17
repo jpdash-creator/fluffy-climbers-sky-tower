@@ -192,6 +192,7 @@ namespace FluffyClimbers.Economy
             if (!active) s.MonthlyClaims = 0;   // a fresh purchase starts the claim numbering again; an extension continues it (the schedule repeats every Days claims)
             s.Type = planId;
             if (payInstantGems) Data.Gems = SaturatingAdd(Data.Gems, def.InstantGems);   // false: a renewal the store reports (no new instant gems)
+            if (payInstantGems && recordingPurchase) LedgerAddGems(def.InstantGems);   // a real-money purchase: Reset progress keeps the instant gems (the period comes from the purchase records)
             Commit();
             return SubscriptionBuyResult.Ok;
         }

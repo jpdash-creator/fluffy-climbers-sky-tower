@@ -133,7 +133,7 @@ namespace ProjectBootstrap
             else if (n == "plate_cream" || n == "plate_sky") border = new Vector4(190f, 150f, 190f, 150f);
             else if (n == "plate_chip") border = new Vector4(150f, 150f, 150f, 150f);
             // Leaderboard kit (2026-11-13): stadium shapes slice only left and right (the rounded caps), so just the flat middle stretches; borders in px (left, bottom, right, top)
-            else if (n == "lb_row_gold") border = new Vector4(120f, 0f, 120f, 0f);
+            else if (n == "lb_row_gold") border = new Vector4(104f, 0f, 104f, 0f);
             else if (n.StartsWith("lb_row_")) border = new Vector4(112f, 0f, 112f, 0f);
             else if (n == "lb_tab_on") border = new Vector4(170f, 0f, 170f, 0f);
             else if (n == "lb_tab_off") border = new Vector4(150f, 0f, 150f, 0f);

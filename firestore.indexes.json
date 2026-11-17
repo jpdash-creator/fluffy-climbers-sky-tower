@@ -105,6 +105,12 @@
       "indexes": []
     },
     {
+      "collectionGroup": "breakdowns",
+      "fieldPath": "expireAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
       "collectionGroup": "tickets",
       "fieldPath": "expireAt",
       "ttl": true,

@@ -127,6 +127,7 @@ namespace FluffyClimbers.Gameplay
             if (Over) return;
             if ((input & SimInput.PowerMask) != 0) input = TakePowerUnits(input);
             if ((input & SimInput.HeroMask) != 0) input = TakeHeroPowers(input);
+            input &= ~SimInput.JumpHeld;   // the Glide is an automatic slow-mo now (2026-11-17): the held-jump level is not read by the simulation, keep recordings short
             bool wasGroundedForJumps = State.Grounded;
             inputRec.Add(input);   // timed records (doc 46): the input that really reaches the simulation, run-length coded, no allocation per tick
             Sim.Step(ref State, input);
@@ -205,6 +206,30 @@ namespace FluffyClimbers.Gameplay
             }
         }
 
+        /// <summary>
+        /// Picks up units bought DURING the run (the shop or any other purchase writes ProgressService.Inventory; pass ProgressService.BuildRunStock()): everything the saved stock holds above what this run has settled is
+        /// added to the run stock, and a type that was not owned before becomes owned (the HUD then draws its button, see PowerUpBar.SyncOwned). Only changes what the player CAN
+        /// activate; activation is still a normal recorded input, so the simulation and the replay verifier are untouched. Returns true when anything was added. Call it when the
+        /// inventory changed (RunController does, on ProgressService.Changed), never per tick.
+        /// </summary>
+        public bool SyncStock(int[] saved)
+        {
+            if (saved == null) return false;
+            bool changed = false;
+            for (int i = 1; i <= PowerUps.MaxType; i++)
+            {
+                if (!PowerUps.IsImplemented((PowerUp)i)) continue;
+                int have = i < saved.Length ? System.Math.Max(0, saved[i]) : 0;
+                if (have <= settledStock[i]) continue;
+                int add = have - settledStock[i];
+                stock[i] = (int)System.Math.Min((long)stock[i] + add, int.MaxValue);
+                settledStock[i] = have;
+                ownedAtStart[i] = true;
+                changed = true;
+            }
+            return changed;
+        }
+
         /// <summary>Units of the type still owned in this run.</summary>
         public int PowerStock(PowerUp type)
         {
@@ -235,19 +260,22 @@ namespace FluffyClimbers.Gameplay
         int TakePowerUnits(int input)
         {
             int result = input & ~SimInput.PowerMask;
-            for (int i = (int)PowerUp.Flight; i <= (int)PowerUp.SlowTime; i++)
+            PowerUp[] all = PowerUps.Implemented;
+            for (int k = 0; k < all.Length; k++)
             {
-                PowerUp p = (PowerUp)i;
+                PowerUp p = all[k];
+                int i = (int)p;
                 int bit = PowerUps.InputBit(p);
                 if ((input & bit) == 0 || !PowerUps.CanActivate(in State, p)) continue;
-                // USING ORDER (Bug List 6): FREE first, then bought. The merged button of a type uses the free hero power when it is ready and its effect is not running
-                // (no unit taken, its rarity cooldown starts); otherwise it takes one bought unit (a tap on a running effect stacks a bought unit). Same effect and duration either way.
+                // USING ORDER (Bug List 6, Bug List 4): FREE first, then bought. The merged button of a type uses the hero's ONE free use of the run when it is still unspent and
+                // its effect is not running (no unit taken); afterwards (or without a hero power) it takes one bought unit and works only from owned stock (a tap on a running
+                // timed effect stacks a bought unit). Same effect and 20 s timing either way.
                 int heroIdx = Hero != null ? Hero.IndexOf(p) : -1;
-                bool free = heroIdx >= 0 && Hero.IsReady(heroIdx) && PowerUps.CanActivateHero(in State, p);
+                bool free = heroIdx >= 0 && Hero.FreeAvailable(heroIdx) && PowerUps.CanActivateHero(in State, p);
                 if (!free && stock[i] <= 0) continue;
                 // Flight and Rocket exclude each other inside one tick as well (the lower id wins, like the simulation)
                 if (p == PowerUp.Rocket && (result & PowerUps.InputBit(PowerUp.Flight)) != 0) continue;
-                if (free) Hero.TryUse(heroIdx);
+                if (free) Hero.TryUseFree(heroIdx);
                 else { stock[i]--; powerUpsUsed++; }
                 result |= bit;
             }
@@ -260,6 +288,26 @@ namespace FluffyClimbers.Gameplay
 
         /// <summary>The hero's powers and their cooldowns, or null when the hero has none (Common heroes).</summary>
         public HeroPowerCooldown Hero { get; private set; }
+
+        /// <summary>
+        /// Owner 2026-11-16 (Bug List 4): the hero's own power is free ONCE per run. True once the run's ONE free use was spent by any hero power (false for a hero without powers or while unspent). A retry builds a new session, so it starts false again; a revive (ad or gems) keeps the session and therefore does NOT reset it. After the free use the button shows
+        /// the owned count of that power-up (0 shows 0) and works only from owned stock (<see cref="PowerStock"/>). Per type: <see cref="HeroFreeAvailable"/> (true only while the single free use is unspent).
+        /// </summary>
+        public bool HeroPowerFreeUsed { get { return Hero != null && Hero.AllFreeUsed; } }
+
+        /// <summary>True while the hero's free use of this power type is still unspent this run.</summary>
+        public bool HeroFreeAvailable(PowerUp type)
+        {
+            if (Hero == null) return false;
+            int idx = Hero.IndexOf(type);
+            return idx >= 0 && Hero.FreeAvailable(idx);
+        }
+
+        /// <summary>Makes the hero's free uses available again. Only for a restart that keeps the session object; NEVER call it for a revive.</summary>
+        public void ResetHeroPowerFree()
+        {
+            if (Hero != null) Hero.ResetFree();
+        }
 
         /// <summary>Gives the run the powers of the chosen hero. Null or a hero without powers = no hero buttons. Call before the HUD is built.</summary>
         public void ApplyHeroPowers(CharacterSpec hero)
@@ -283,13 +331,13 @@ namespace FluffyClimbers.Gameplay
             {
                 PowerUp p = Hero.Type(k);
                 int bit = PowerUps.HeroInputBit(p);
-                if ((input & bit) == 0 || !Hero.IsReady(k) || !PowerUps.CanActivateHero(in State, p)) continue;
+                if ((input & bit) == 0 || !Hero.FreeAvailable(k) || !PowerUps.CanActivateHero(in State, p)) continue;
                 if ((result & PowerUps.InputBit(p)) != 0) continue;   // a bought tap of the same type in this tick runs first (it would make this one a no-op)
                 // Flight and Rocket exclude each other inside one tick as well (the lower id wins, like the simulation)
                 if (p == PowerUp.Rocket && ((result & (PowerUps.InputBit(PowerUp.Flight) | PowerUps.HeroInputBit(PowerUp.Flight))) != 0)) continue;
                 if (p == PowerUp.Flight && (result & PowerUps.InputBit(PowerUp.Rocket)) != 0) continue;
-                Hero.TryUse(k);
-                result |= PowerUps.InputBit(p);   // Bug List 6: a free hero power is the bought effect at full strength and duration (no 60 percent), only without a unit
+                Hero.TryUseFree(k);
+                result |= PowerUps.InputBit(p);   // a free hero power is the bought effect at full strength and its normal 20 s timing, only without a unit
             }
             return result;
         }
@@ -324,6 +372,8 @@ namespace FluffyClimbers.Gameplay
         public int Mode;
         /// <summary>Id of the hero that plays this run (verification only); set by the RunController.</summary>
         public string HeroId = "";
+        /// <summary>Pool variant of the CHOSEN copy of that hero (HeroRolls; 0 = table row / Common hero); set by the RunController, uploaded with the run so the server replays the same physics.</summary>
+        public int HeroVariant;
 
         /// <summary>Run clock in ticks: from the first jump (SimState.StartTick, set by the simulation) to now, or to the end once the run is over. 0 before the first jump.</summary>
         public int RunTicks { get { return State.StartTick < 0 ? 0 : System.Math.Max(0, State.Tick - State.StartTick); } }
@@ -363,6 +413,7 @@ namespace FluffyClimbers.Gameplay
                 LayoutSeed = IsEndless ? Seed : Spec.Seed,
                 AttemptSeed = AttemptSeed,
                 HeroId = HeroId ?? "",
+                HeroVariant = HeroVariant,
                 Mode = Mode,
                 GameVersion = gameVersion ?? "",
                 Revived = RunRevived,

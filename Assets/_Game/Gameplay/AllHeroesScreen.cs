@@ -334,7 +334,7 @@ namespace FluffyClimbers.Gameplay
                 if (i > 0) sb.Append(", ");
                 sb.Append(def != null ? def.Name : powers[i].ToString());
             }
-            sb.Append("\nFree use, ready again after ").Append(CharacterDefs.CooldownSeconds[(int)e.Rarity]).Append(" s");
+            sb.Append("\nFree once per run, then owned stock");
             return sb.ToString();
         }
 

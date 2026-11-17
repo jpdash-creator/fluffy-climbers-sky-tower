@@ -514,7 +514,9 @@ namespace FluffyClimbers.Gameplay
         {
             if (!HeroCards.IsMergeSet(picked)) return;
             string id = picked[0].Id;
-            MergeOutcome o = progress.TryMerge(id);   // consumes exactly 3 copies of that hero and adds 1 of the next tier (the save keeps counts)
+            var copies = new System.Collections.Generic.List<int>(MergeRules.CopiesNeeded);
+            foreach (HeroCard c in picked) copies.Add(c.Copy);   // the three picked cards go, each with its own roll; the new tier copy is rolled fresh (owner 2026-11-17)
+            MergeOutcome o = progress.TryMerge(id, copies);   // consumes exactly 3 copies of that hero and adds 1 of the next tier
             picked.Clear();
             if (o.Result != MergeResult.Ok) { BuildNow(); return; }
             float now = Time.unscaledTime;

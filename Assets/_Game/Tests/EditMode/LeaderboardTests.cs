@@ -31,7 +31,7 @@ namespace FluffyClimbers.Tests
     }
 
     /// <summary>
-    /// Weekly leaderboard client logic (Planning/LEADERBOARD-DESIGN.md): the India-time week maths, the one-time consent, the persisted upload queue with backoff, the idempotent prize claim, the seed tickets,
+    /// Weekly leaderboard client logic (Planning/LEADERBOARD-DESIGN.md): the UTC week maths, the one-time consent, the persisted upload queue with backoff, the idempotent prize claim, the seed tickets,
     /// the parsers of the service and Firestore answers, and the switched-off default. Everything runs against a stub auth and a fake transport: no network, no Firebase.
     /// </summary>
     public class LeaderboardTests
@@ -43,7 +43,7 @@ namespace FluffyClimbers.Tests
         StubLeaderboardAuth auth;
         DateTime now;
 
-        static readonly DateTime T0 = new DateTime(2026, 11, 12, 11, 0, 0, DateTimeKind.Utc);   // Thursday 16:30 India time
+        static readonly DateTime T0 = new DateTime(2026, 11, 12, 11, 0, 0, DateTimeKind.Utc);   // Thursday 11:00 UTC
 
         [SetUp]
         public void SetUp()
@@ -85,26 +85,26 @@ namespace FluffyClimbers.Tests
 
         static HttpReply Json(string body, int status = 200) { return new HttpReply { Status = status, Body = body }; }
 
-        // ---------------- week maths (India time) ----------------
+        // ---------------- week maths (UTC, since 2026-11-16) ----------------
 
         [Test]
-        public void TheWeekRunsFromMondayMidnightIndiaTimeAndTheCountdownIsRight()
+        public void TheWeekRunsFromMondayMidnightUtcAndTheCountdownIsRight()
         {
-            Assert.AreEqual("2026-11-09", LeaderboardTime.WeekKey(T0), "Thursday 11:00 UTC is Thursday 16:30 in India: the week of Monday 9 November");
-            Assert.AreEqual(new DateTime(2026, 11, 15, 18, 30, 0, DateTimeKind.Utc), LeaderboardTime.WeekEndUtc(T0), "the week ends Sunday 18:30 UTC = Monday 00:00 India time");
-            Assert.AreEqual(new TimeSpan(3, 7, 30, 0), LeaderboardTime.Remaining(T0));
-            Assert.AreEqual("3d 07:30", LeaderboardTime.FormatCountdown(LeaderboardTime.Remaining(T0)));
+            Assert.AreEqual("2026-11-09", LeaderboardTime.WeekKey(T0), "Thursday 11:00 UTC: the week of Monday 9 November");
+            Assert.AreEqual(new DateTime(2026, 11, 16, 0, 0, 0, DateTimeKind.Utc), LeaderboardTime.WeekEndUtc(T0), "the week ends Monday 00:00 UTC");
+            Assert.AreEqual(new TimeSpan(3, 13, 0, 0), LeaderboardTime.Remaining(T0));
+            Assert.AreEqual("3d 13:00", LeaderboardTime.FormatCountdown(LeaderboardTime.Remaining(T0)));
 
-            var lastSecond = new DateTime(2026, 11, 15, 18, 29, 59, DateTimeKind.Utc);
+            var lastSecond = new DateTime(2026, 11, 15, 23, 59, 59, DateTimeKind.Utc);
             Assert.AreEqual("2026-11-09", LeaderboardTime.WeekKey(lastSecond));
             Assert.AreEqual(TimeSpan.FromSeconds(1), LeaderboardTime.Remaining(lastSecond));
             Assert.AreEqual("00:00:01", LeaderboardTime.FormatCountdown(LeaderboardTime.Remaining(lastSecond)));
 
-            var rollover = new DateTime(2026, 11, 15, 18, 30, 0, DateTimeKind.Utc);
-            Assert.AreEqual("2026-11-16", LeaderboardTime.WeekKey(rollover), "at 18:30 UTC on Sunday the next week starts");
+            var rollover = new DateTime(2026, 11, 16, 0, 0, 0, DateTimeKind.Utc);
+            Assert.AreEqual("2026-11-16", LeaderboardTime.WeekKey(rollover), "at Monday 00:00 UTC the next week starts");
             Assert.AreEqual(TimeSpan.FromDays(7), LeaderboardTime.Remaining(rollover));
 
-            var mondayEarly = new DateTime(2026, 11, 8, 18, 30, 0, DateTimeKind.Utc);   // Monday 00:00 India time exactly
+            var mondayEarly = new DateTime(2026, 11, 9, 0, 0, 0, DateTimeKind.Utc);   // Monday 00:00 UTC exactly
             Assert.AreEqual("2026-11-09", LeaderboardTime.WeekKey(mondayEarly));
             Assert.AreEqual("2026-11-02", LeaderboardTime.WeekKey(mondayEarly.AddSeconds(-1)), "one second earlier is still last week");
             Assert.AreEqual("01:02:03", LeaderboardTime.FormatCountdown(new TimeSpan(1, 2, 3)));
@@ -113,7 +113,7 @@ namespace FluffyClimbers.Tests
         [Test]
         public void TheClientWeekMatchesTheServerWeekKeyFormat()
         {
-            // the service writes the Monday date in India time ("2026-11-09"); the client builds the board address from the same key
+            // the service writes the Monday date in UTC ("2026-11-09"); the client builds the board address from the same key
             Assert.AreEqual("https://firestore.googleapis.com/v1/projects/fluffy-climbers-tower-jump/databases/(default)/documents/weeks/2026-11-09/boards/overall", LeaderboardConfig.BoardDocUrl("2026-11-09", "overall"));
         }
 
@@ -383,7 +383,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(LeaderboardConfig.SimVersion, q.SimVersion);
             Assert.AreEqual(Convert.ToBase64String(rec.Inputs), q.InputsB64);
             CollectionAssert.AreEqual(new[] { 300, 900 }, q.ReviveAt);
-            Assert.AreEqual(1500, q.Crown, "crown = score x (1 + 50 percent) on Insane");
+            Assert.AreEqual(7500, q.Crown, "crown = score x 5 x (1 + 50 percent) on Insane");
             Assert.AreEqual(41, q.Floors);
             Assert.AreEqual(2500, q.Ticks);
 
@@ -510,16 +510,19 @@ namespace FluffyClimbers.Tests
         [Test]
         public void MyWeekGivesTheRankLimitProgressAndTheClaimablePrizes()
         {
-            const string json = "{\"weekKey\":\"2026-11-09\",\"pid\":\"p37\",\"weekEndsAt\":\"2026-11-15T18:30:00Z\",\"serverTime\":\"2026-11-12T11:00:00Z\",\"totals\":{\"overall\":1234567,\"levels\":1000000,\"endless\":234567},"
-                + "\"ranks\":[{\"board\":\"overall\",\"crowns\":1234567,\"rank\":37,\"entryLimit\":200000,\"reachedLimit\":true},{\"board\":\"levels\",\"crowns\":1000000,\"rank\":0,\"entryLimit\":150000,\"reachedLimit\":true},{\"board\":\"endless\",\"crowns\":10,\"rank\":9,\"entryLimit\":50000,\"reachedLimit\":false}],"
+            const string json = "{\"weekKey\":\"2026-11-09\",\"pid\":\"p37\",\"weekEndsAt\":\"2026-11-16T00:00:00Z\",\"serverTime\":\"2026-11-12T11:00:00Z\",\"totals\":{\"overall\":1234567,\"levels\":1000000,\"endless\":234567},"
+                + "\"ranks\":[{\"board\":\"overall\",\"crowns\":1234567,\"rank\":37,\"entryLimit\":250000,\"reachedLimit\":true},{\"board\":\"levels\",\"crowns\":1000000,\"rank\":0,\"entryLimit\":100000,\"reachedLimit\":true},{\"board\":\"endless\",\"crowns\":10,\"rank\":9,\"entryLimit\":150000,\"reachedLimit\":false}],"
                 + "\"pendingPrizes\":[{\"weekKey\":\"2026-11-02\",\"board\":\"levels\",\"rank\":2,\"crowns\":400000,\"prize\":{\"bundles\":0,\"goldChests\":1,\"ironChests\":0,\"powerUps\":0,\"coins\":0},\"state\":\"open\"},"
                 + "{\"weekKey\":\"2026-11-02\",\"board\":\"overall\",\"rank\":9,\"crowns\":300000,\"prize\":{\"ironChests\":1,\"powerUps\":2},\"state\":\"granted\"}]}";
             MyWeekData d = LbJson.ParseMyWeek(json);
             Assert.AreEqual("2026-11-09", d.WeekKey);
             Assert.AreEqual("p37", d.Pid);
-            Assert.AreEqual(LeaderboardTime.ToUnix(new DateTime(2026, 11, 15, 18, 30, 0, DateTimeKind.Utc)), d.WeekEndsAtUnix);
+            Assert.AreEqual(LeaderboardTime.ToUnix(new DateTime(2026, 11, 16, 0, 0, 0, DateTimeKind.Utc)), d.WeekEndsAtUnix);
             Assert.AreEqual(37, d.RankOf("overall").Rank);
-            Assert.AreEqual(200000L, d.RankOf("overall").EntryLimit);
+            Assert.AreEqual(250000L, d.RankOf("overall").EntryLimit);
+            Assert.AreEqual(100000L, d.RankOf("levels").EntryLimit);
+            Assert.AreEqual(150000L, d.RankOf("endless").EntryLimit);
+            Assert.IsFalse(d.SlotsKnown, "no slot list in this answer");
             Assert.IsTrue(d.RankOf("overall").ReachedLimit);
             Assert.IsFalse(d.RankOf("endless").ReachedLimit);
             Assert.AreEqual(1234567L, d.Totals[0]);

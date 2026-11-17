@@ -290,6 +290,57 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
+        public void MergingThreeMomoLeavesNoCommonMomoAndSelectsTheBestOwnedHero()
+        {
+            try
+            {
+                GameSession.InitForTests(new MemorySaveStore());
+                ProgressService svc = GameSession.Progress;
+                Assert.AreEqual(1, CharacterCatalog.OwnedCards(svc).Count, "fresh save: one Momo");
+                Assert.IsTrue(CharacterCatalog.Owns(svc, CharacterCatalog.Momo));
+                svc.AddCopies("momo", 2);
+                Assert.AreEqual(MergeResult.Ok, svc.TryMerge("momo").Result);
+                Assert.AreEqual(0, svc.Copies("momo"));
+
+                CharacterDef u = CharacterCatalog.Get("momo_u");
+                Assert.IsFalse(CharacterCatalog.Owns(svc, CharacterCatalog.Momo), "Common Momo is gone at 0 copies");
+                CollectionAssert.DoesNotContain(CharacterCatalog.Available(svc), CharacterCatalog.Momo);
+                List<HeroCard> cards = CharacterCatalog.OwnedCards(svc);
+                Assert.AreEqual(1, cards.Count, "exactly one tile");
+                Assert.AreEqual("momo_u", cards[0].Id);
+                Assert.AreEqual(0, CharacterCatalog.MergeCards(svc).Count, "no Momo merge slot");
+
+                CharacterCatalog.Selected = CharacterCatalog.Momo;
+                Assert.AreSame(u, CharacterCatalog.Selected, "a not owned choice falls back to the best owned hero");
+                Assert.AreSame(u, CharacterCatalog.BestOwned(svc));
+            }
+            finally
+            {
+                CharacterCatalog.Selected = CharacterCatalog.Momo;
+                GameSession.Reset();
+            }
+        }
+
+        [Test]
+        public void MomoMergeDoesNotTouchOtherRegionsCommons()
+        {
+            ProgressService svc = NewService();
+            svc.AddCopies("forestgirl", 1);
+            int before = svc.Copies("forestgirl");
+            svc.AddCopies("momo", 2);
+            svc.TryMerge("momo");
+            Assert.AreEqual(before, svc.Copies("forestgirl"));
+            Assert.AreEqual(0, svc.Copies("momo"));
+        }
+
+        [Test]
+        public void ANoHeroStateNeverCrashesAndFallsBackToMomo()
+        {
+            Assert.AreSame(CharacterCatalog.Momo, CharacterCatalog.BestOwned(null));
+            Assert.IsFalse(CharacterCatalog.Owns(null, CharacterCatalog.Momo));
+        }
+
+        [Test]
         public void OldSavesMigrateToOneCopyPerOwnedCharacter()
         {
             var store = new MemorySaveStore();

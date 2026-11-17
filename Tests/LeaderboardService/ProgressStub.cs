@@ -14,6 +14,7 @@ namespace FluffyClimbers.Economy
         public bool Completed;
         public int StarMask, Score, Mode, CoinsCollected, GemsCollected, HiddenGems, GemPickupsTotal, GemPickupsTaken, ComboChains, BestCombo, PowerUpsUsed, Region, Jumps;
         public int Floors;
+        public int[] Chains;
         public string HeroId;
     }
 }

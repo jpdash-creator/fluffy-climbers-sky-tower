@@ -53,6 +53,7 @@ namespace FluffyClimbers.Gameplay
                 case TabBundles: return BundlesScreen.BagIcon(null) ?? ToyKit.Get(TabIcons[i]);   // Bundles tab = the same bag as the bundle rows
                 case TabCharacter: return ShopIcons.CharacterPower;
                 case TabGems: return ShopIcons.GemsCoins;
+                case TabVip: return ToyKit.Get("icon_vip_tab") ?? ToyKit.Get(TabIcons[i]);   // Bug List 6: red crown ticket + gold chest (the crown alone read as the leaderboard crown); falls back to the crown
                 default: return ToyKit.Get(TabIcons[i]);
             }
         }

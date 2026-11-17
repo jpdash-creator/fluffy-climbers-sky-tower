@@ -32,7 +32,7 @@ namespace FluffyClimbers.Simulation.Tests
             h = Mix(h, s.Coins); h = Mix(h, s.StarMask); h = Mix(h, s.Stars); h = Mix(h, s.Gems); h = Mix(h, s.HiddenGems);
             h = Mix(h, s.Hits); h = Mix(h, s.Invuln); h = Mix(h, s.BestGroundId); h = Mix(h, s.LastJumpFloors); h = Mix(h, s.BestJumpFloors);
             h = Mix(h, (int)s.JumpHist); h = Mix(h, (int)(s.JumpHist >> 32));
-            h = Mix(h, s.FlightTicks); h = Mix(h, s.RocketTicks); h = Mix(h, s.SlowFall); h = Mix(h, s.MagnetTicks); h = Mix(h, s.SlowTicks);
+            h = Mix(h, s.FlightTicks); h = Mix(h, s.RocketTicks); h = Mix(h, s.SlowFall); h = Mix(h, s.CapeTicks); h = Mix(h, s.WideTicks); h = Mix(h, s.SlowTicks);
             h = Mix(h, s.ShieldTicks); h = Mix(h, s.WallStickTicks); h = Mix(h, s.AirJumpUsed ? 1 : 0); h = Mix(h, s.DoubleJumpTicks);
             h = Mix(h, s.WallHold); h = Mix(h, s.WallCool); h = Mix(h, s.Assisted ? 1 : 0); h = Mix(h, s.ShieldSaves);
             h = Mix(h, s.RocketTargetRow); h = Mix(h, s.RocketTargetY.Raw);
@@ -127,7 +127,9 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Equal(8, PowerUps.InputBit(PowerUp.Flight));
             Assert.Equal(512, PowerUps.InputBit(PowerUp.SlowTime));
             int all = 0;
-            for (int i = 1; i <= PowerUps.TypeCount; i++) { Assert.Equal(0, all & PowerUps.InputBit((PowerUp)i)); all |= PowerUps.InputBit((PowerUp)i); }
+            for (int i = 0; i < PowerUps.Implemented.Length; i++) { int b = PowerUps.InputBit(PowerUps.Implemented[i]); Assert.NotEqual(0, b); Assert.Equal(0, all & b); all |= b; }
+            Assert.Equal(0, PowerUps.InputBit(PowerUp.Magnet));
+            Assert.False(PowerUps.IsImplemented(PowerUp.Magnet));
             Assert.Equal(SimInput.PowerMask, all);
             Assert.Equal(0, PowerUps.InputBit(PowerUp.SpringBoots));
             Assert.True(PowerUps.IsImplemented(PowerUp.SlowTime));
@@ -175,8 +177,8 @@ namespace FluffyClimbers.Simulation.Tests
             // sim with a loadout ran gives the same hash as before.
             World w = RealLevel(3, 7);
             long before = w.Data.ComputeHash();
-            SimState s = Fresh(w.Sim, PowerUp.Flight, PowerUp.Magnet, PowerUp.SlowTime);
-            Run(w.Sim, ref s, 200, Bit(PowerUp.Flight) | Bit(PowerUp.Magnet) | Bit(PowerUp.SlowTime));
+            SimState s = Fresh(w.Sim, PowerUp.Flight, PowerUp.Glide, PowerUp.SlowTime);
+            Run(w.Sim, ref s, 200, Bit(PowerUp.Flight) | Bit(PowerUp.Glide) | Bit(PowerUp.SlowTime));
             Assert.Equal(before, w.Data.ComputeHash());
             Assert.Equal(before, LevelBuilder.Build(Cfg, w.Spec).ComputeHash());
         }
@@ -290,7 +292,8 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Equal(0, s.Combo);
             Assert.Equal(0, s.BestJumpFloors);
             Assert.Equal(0UL, s.JumpHist);
-            Assert.Equal(s.Row * Cfg.FloorPoints, s.Score);
+            Assert.Equal(s.Row * Cfg.FloorPoints + 1, s.Score);   // Bug List 4: a power-up jump adds exactly +1 to the combo and closes the chain (1^2 = 1 point)
+            Assert.Equal(1, s.BestCombo);
             Assert.Equal(0, s.Coins);
         }
 
@@ -464,31 +467,18 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.True(shielded.ShieldTicks > 0);
         }
 
-        // ---------- Magnet ----------
+        // ---------- Glide Cape (replaces the Magnet, owner 2026-11-16) ----------
 
         [Theory]
         [InlineData(1)] [InlineData(2)] [InlineData(3)] [InlineData(4)] [InlineData(5)]
-        public void Power_Magnet_Region(int region)
+        public void Power_Glide_Region(int region)
         {
-            // a gem 2.2 u beside the player: out of reach normally (0.9), inside with the magnet (0.9 + 2)
-            Pickup gem = T3.Pk(PickupKind.Gem, 7.2, 0.5, 0.9);
-            LevelData d = T3.World(Cfg, new[] { gem }, null);
-            // use the region's own rules: sim from the real level with the gem world swapped in is not needed, the pickup logic is region independent;
-            // the real-level run below checks the magnet never breaks anything there.
-            Sim sim = new Sim(Cfg, d, Fx.FromRatio(5, 10), false, false);
-            SimState off = sim.NewState();
-            sim.Step(ref off, 0);
-            Assert.Equal(0, off.Gems);
-            SimState on = Fresh(sim, PowerUp.Magnet);
-            sim.Step(ref on, Bit(PowerUp.Magnet));
-            Assert.Equal(1, on.Gems);
-
             World w = RealLevel(region, 5);
-            SimState s = Fresh(w.Sim, PowerUp.Magnet);
-            w.Sim.Step(ref s, Bit(PowerUp.Magnet));
-            Assert.True(s.MagnetTicks > 0);
-            Run(w.Sim, ref s, Cfg.MagnetTicks, SimInput.Right);
-            Assert.False(PowerUps.IsActive(in s, PowerUp.Magnet));
+            SimState s = Fresh(w.Sim, PowerUp.Glide);
+            w.Sim.Step(ref s, Bit(PowerUp.Glide));
+            Assert.True(s.CapeTicks > 0);
+            Run(w.Sim, ref s, Cfg.GlideCapeTicks, SimInput.Right);
+            Assert.False(PowerUps.IsActive(in s, PowerUp.Glide));
         }
 
         // ---------- Slow Time ----------
@@ -543,7 +533,7 @@ namespace FluffyClimbers.Simulation.Tests
                 if (t % 35 == 0) dir = rnd.Next(3);
                 int input = dir == 1 ? SimInput.Left : (dir == 2 ? SimInput.Right : 0);
                 if (rnd.Next(20) == 0) input |= SimInput.Jump;
-                if (rnd.Next(120) == 0) input |= PowerUps.InputBit((PowerUp)(1 + rnd.Next(PowerUps.TypeCount)));
+                if (rnd.Next(120) == 0) input |= PowerUps.InputBit(PowerUps.Implemented[rnd.Next(PowerUps.TypeCount)]);
                 sim.Step(ref s, input);
                 Assert.True(s.PwUsed >= 0);
                 Assert.True(s.Stars >= prevStars);
@@ -589,9 +579,9 @@ namespace FluffyClimbers.Simulation.Tests
                 inputs[i] = ((i / 45) % 2 == 0 ? SimInput.Right : SimInput.Left) | (rnd.Next(18) == 0 ? SimInput.Jump : 0);
             }
             inputs[3] |= Bit(PowerUp.Rocket);
-            inputs[40] |= Bit(PowerUp.Magnet);
-            SimState a = Fresh(w.Sim, PowerUp.Rocket, PowerUp.Magnet);
-            SimState b = Fresh(w.Sim, PowerUp.Rocket, PowerUp.Magnet);
+            inputs[40] |= Bit(PowerUp.Glide);
+            SimState a = Fresh(w.Sim, PowerUp.Rocket, PowerUp.Glide);
+            SimState b = Fresh(w.Sim, PowerUp.Rocket, PowerUp.Glide);
             SimState plain = w.Sim.NewState();
             for (int i = 0; i < inputs.Length; i++)
             {
@@ -621,8 +611,8 @@ namespace FluffyClimbers.Simulation.Tests
                 Assert.Equal(baseStars, StarEvaluator.Stars(w.Spec, used, used.RevivesUsed, used.Tick));
                 Assert.Equal(StarEvaluator.Earned(w.Spec, fin, fin.RevivesUsed, fin.Tick), StarEvaluator.Earned(w.Spec, used, used.RevivesUsed, used.Tick));
                 // an unfinished run with every power-up used still earns nothing
-                SimState early = Fresh(w.Sim, PowerUp.Flight, PowerUp.Rocket, PowerUp.Magnet);
-                w.Sim.Step(ref early, Bit(PowerUp.Flight) | Bit(PowerUp.Magnet));
+                SimState early = Fresh(w.Sim, PowerUp.Flight, PowerUp.Rocket, PowerUp.Glide);
+                w.Sim.Step(ref early, Bit(PowerUp.Flight) | Bit(PowerUp.Glide));
                 Assert.Equal(0, StarEvaluator.Stars(w.Spec, early, 0, early.Tick));
             }
         }
@@ -646,8 +636,8 @@ namespace FluffyClimbers.Simulation.Tests
         public void StepStillDoesNotAllocateWithPowerUpsActive()
         {
             Sim sim = Tower(20, null, null);
-            SimState s = Fresh(sim, PowerUp.Flight, PowerUp.DoubleJump, PowerUp.Magnet);
-            sim.Step(ref s, Bit(PowerUp.Flight) | Bit(PowerUp.DoubleJump) | Bit(PowerUp.Magnet));
+            SimState s = Fresh(sim, PowerUp.Flight, PowerUp.DoubleJump, PowerUp.Glide);
+            sim.Step(ref s, Bit(PowerUp.Flight) | Bit(PowerUp.DoubleJump) | Bit(PowerUp.Glide) | Bit(PowerUp.WidePlatforms) | Bit(PowerUp.SafetyNet));
             long before = GC.GetAllocatedBytesForCurrentThread();
             for (int i = 0; i < 400; i++) sim.Step(ref s, (i % 40 == 0) ? SimInput.Jump : SimInput.Right);
             long after = GC.GetAllocatedBytesForCurrentThread();

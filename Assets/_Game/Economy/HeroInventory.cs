@@ -32,11 +32,7 @@ namespace FluffyClimbers.Economy
         public int AddCopies(string id, int count)
         {
             if (!CharacterInventory.Exists(id) || count < 1) return Copies(id);
-            int now = Math.Min(MergeRules.MaxCopies, Copies(id) + count);
-            p.Data.Copies[id] = now;
-            p.RollIfNew(id);   // docs/44 section 11: the stats of a tier hero are dealt when it is first obtained; further copies keep the first roll
-            p.SaveNow();
-            return now;
+            return p.AddCopiesCore(id, count, false);   // every new copy of a tier hero is dealt its OWN roll (owner 2026-11-17); saves once
         }
 
         /// <summary>The heroes the player may see, ordered by hero line then tier. A region hero that is owned but whose reveal is pending is not listed yet.</summary>

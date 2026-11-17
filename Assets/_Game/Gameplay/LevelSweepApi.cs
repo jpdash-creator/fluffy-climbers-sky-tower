@@ -141,7 +141,7 @@ namespace FluffyClimbers.Gameplay
                 cachedHash = Hash(ses.Data);
             }
             int owned = 0;
-            for (int i = (int)PowerUp.Flight; i <= (int)PowerUp.SlowTime; i++) if (ses.OwnedAtStart((PowerUp)i)) owned++;
+            for (int i = 0; i < PowerUps.Implemented.Length; i++) if (ses.OwnedAtStart(PowerUps.Implemented[i])) owned++;
             bool reached = ses.GoalReached;
             string fail = "";
             if (ses.Over && !reached) fail = ses.GoalLost ? "Wall touched!" : "You fell!";

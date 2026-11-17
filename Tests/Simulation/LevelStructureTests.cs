@@ -57,13 +57,13 @@ namespace FluffyClimbers.Simulation.Tests
                 Assert.Equal(ExpectedRows(idx), ll.Spec.RowsFor());
                 GoalType g = ll.Spec.Goal.Type;
                 Assert.True(g != GoalType.SurviveWave && g != GoalType.BossChase && g != GoalType.CollectCoins, ll.Id + " uses " + g);
-                // Bug List 6 item 4: special goals at 5 (combo), 10 (no wall bounce), 15 (hidden gem), 20 (speedrun); everything else reaches the top
-                if (idx == 5) Assert.Equal(GoalType.ComboChain, g);
-                else if (idx == 10) Assert.Equal(GoalType.NoWallBounce, g);
+                // Bug List 4 item 10: level 5 is a plain reach-floor 75; special goals at 10 (no wall bounce), 15 (hidden gem), 20 (speedrun); everything else reaches the top
+                if (idx == 10) Assert.Equal(GoalType.NoWallBounce, g);
                 else if (idx == 15) Assert.Equal(GoalType.FindHiddenGem, g);
                 else if (idx == 20) Assert.Equal(GoalType.Speedrun, g);
                 else Assert.Equal(GoalType.ReachFloor, g);
-                if (g != GoalType.ComboChain) Assert.Equal(ExpectedRows(idx), ll.Spec.Goal.Value);
+                Assert.Equal(ExpectedRows(idx), ll.Spec.Goal.Value);
+                if (idx == 5) { Assert.Equal(75, ll.Spec.Goal.Value); Assert.Equal(0, ll.Spec.Goal.Count); Assert.Equal(0, ll.Spec.Goal.TimeSec); Assert.Equal(-1, LevelBuilder.Build(cfg, ll.Spec).LadderStartRow); }
                 Assert.Empty(ll.Spec.FixedChunks);
                 Assert.False(ll.Spec.Ramp);
                 LevelData d = LevelBuilder.Build(cfg, ll.Spec);
@@ -167,7 +167,8 @@ namespace FluffyClimbers.Simulation.Tests
                     Assert.Equal(ll.Spec.Goal.Type == GoalType.FindHiddenGem ? 1 : 0, d.Pickups.Count(p => p.Kind == PickupKind.HiddenGem));
                     Assert.Equal(3, d.Pickups.Count(p => p.Kind == PickupKind.Star));
                 }
-                Assert.True(gems == 0, ll.Id + " has " + gems + " gem pickups (economy review 2026-11-13: none on the rows)");
+                // Bug List 4 item 9: the only gem pickups are the collectible gems of levels 5/10/15/20/25 (GemLevels.GemsInLevel, value 1 each); none on the rows
+                Assert.True(gems == 10 * GemLevels.GemsInLevel(idx, ll.Spec.Seed), ll.Id + " has " + gems + " gem pickups in 10 layouts");
                 Assert.Equal(0, doubles);
                 Assert.Equal(0, hiddenDouble);
                 if (ll.Spec.Goal.Type == GoalType.FindHiddenGem) Assert.True(hidden == 10);

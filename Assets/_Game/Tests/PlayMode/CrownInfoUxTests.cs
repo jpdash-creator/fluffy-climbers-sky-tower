@@ -110,7 +110,7 @@ namespace FluffyClimbers.Tests
                 for (int j = i + 1; j < boxes.Count; j++)
                     if (CrownOverlap(boxes[i].Value, boxes[j].Value)) problems.Add(tag + boxes[i].Key + " overlaps " + boxes[j].Key);
 
-            if (CrownTextIn(calc, "Formula") == null || !CrownTextIn(calc, "Formula").Contains("floors x " + CrownScore.FloorPoints)) problems.Add(tag + "the formula is missing");
+            if (CrownTextIn(calc, "Formula") == null || !CrownTextIn(calc, "Formula").Contains("floors + chain squares")) problems.Add(tag + "the formula is missing");
             if (CrownTextIn(calc, "Tip") == null) problems.Add(tag + "the tip line is missing");
             string bonus = "+" + SimConfig.DifficultyStepPercent[expect.Mode] + "%";
             if (CrownTextIn(calc, "RowBonusValue") != bonus) problems.Add(tag + "bonus shows '" + CrownTextIn(calc, "RowBonusValue") + "', expected " + bonus);
@@ -120,8 +120,17 @@ namespace FluffyClimbers.Tests
                 if (CrownTextIn(calc, "RowFloorsValue") != expect.FloorPoints.ToString()) problems.Add(tag + "floors points show '" + CrownTextIn(calc, "RowFloorsValue") + "', expected " + expect.FloorPoints);
                 if (CrownTextIn(calc, "RowComboValue") != expect.ComboPoints.ToString()) problems.Add(tag + "combo points show '" + CrownTextIn(calc, "RowComboValue") + "', expected " + expect.ComboPoints);
                 if (expect.FloorPoints + expect.ComboPoints != expect.BaseScore) problems.Add(tag + "the parts do not add up");
-                string fl = CrownTextIn(calc, "RowFloorsLabel");
-                if (fl == null || !fl.StartsWith(expect.Floors + " floors")) problems.Add(tag + "floors label shows '" + fl + "'");
+                if (CrownTextIn(calc, "RowFloorsLabel") != "Floors") problems.Add(tag + "floors label shows '" + CrownTextIn(calc, "RowFloorsLabel") + "'");
+                if (CrownTextIn(calc, "RowComboLabel") != "Chain Squares") problems.Add(tag + "chain squares label shows '" + CrownTextIn(calc, "RowComboLabel") + "'");
+            }
+            if (CrownTextIn(calc, "RowFactorLabel") != "Total (x5)") problems.Add(tag + "total label shows '" + CrownTextIn(calc, "RowFactorLabel") + "', expected 'Total (x5)'");
+            if (expect.PartsKnown && CrownTextIn(calc, "RowFactorValue") != expect.BeforeBonus.ToString()) problems.Add(tag + "total (x5) shows '" + CrownTextIn(calc, "RowFactorValue") + "', expected " + expect.BeforeBonus);
+            if (CrownTextIn(calc, "RowBonusLabel") != CrownInfoUi.BonusLabel(GameSettings.DifficultyNames[Mathf.Clamp(expect.Mode, 0, GameSettings.DifficultyNames.Length - 1)])) problems.Add(tag + "bonus label shows '" + CrownTextIn(calc, "RowBonusLabel") + "'");
+            if (CrownTextIn(calc, "RowCrownLabel") != "Total Crowns") problems.Add(tag + "crown label shows '" + CrownTextIn(calc, "RowCrownLabel") + "', expected 'Total Crowns'");
+            foreach (string rn in new[] { "RowFloorsLabel", "RowComboLabel", "RowFactorLabel", "RowBonusLabel", "RowCrownLabel" })
+            {
+                Text rl = FindRt(rn, calc) != null ? FindRt(rn, calc).GetComponent<Text>() : null;
+                if (rl != null && rl.preferredHeight > TimedUi.LineHeight() * 1.5f) problems.Add(tag + rn + " wraps to more than one line");
             }
             if (endless)
             {
@@ -155,13 +164,13 @@ namespace FluffyClimbers.Tests
                     RegionDef r1 = GameSession.Repo.GetRegionByIndex(1);
                     var levels = GameSession.Repo.LevelsOf(r1.Id);
                     ProgressService progress = GameSession.Progress;
-                    // 37 floors and a chain of 5: 370 + 5 x (1 + 4 + 9 + 16 + 25) = 645, crown 645 x 1.40 = 903
-                    progress.ApplyRun("lvl_001_01", new RunOutcome { Completed = true, StarMask = 1, Score = 645, Floors = 37, BestCombo = 5, Mode = 3 });
-                    progress.FinishEndlessRun(new RunRecord { Kind = RunKind.Endless, RegionId = r1.Id, Floors = 90, Ticks = 5400, Mode = 3, Score = 1050, BestCombo = 4 }, "20261113", out RecordResult rr);
+                    // 37 floors and a chain of 5: 37 + 5 squared = 62, crown 62 x 5 x 1.40 = 434
+                    progress.ApplyRun("lvl_001_01", new RunOutcome { Completed = true, StarMask = 1, Score = 62, Floors = 37, BestCombo = 5, Mode = 3 });
+                    progress.FinishEndlessRun(new RunRecord { Kind = RunKind.Endless, RegionId = r1.Id, Floors = 90, Ticks = 5400, Mode = 3, Score = 106, BestCombo = 4 }, "20261113", out RecordResult rr);
                     CrownBreakdown level = CrownBreakdown.From(progress.BestCrownRun("lvl_001_01", 3), 3, progress.BestCrown("lvl_001_01", 3));
                     CrownBreakdown endless = CrownBreakdown.From(progress.EndlessCrownRun(r1.Id, 3), 3);
-                    if (level.Crown != 903 || level.FloorPoints != 370 || level.ComboPoints != 275) problems.Add(percent + ": the stored level run is wrong (" + level.Crown + ")");
-                    if (endless.Crown != 1470) problems.Add(percent + ": the stored endless run is wrong (" + endless.Crown + ")");
+                    if (level.Crown != 434 || level.FloorPoints != 37 || level.ComboPoints != 25) problems.Add(percent + ": the stored level run is wrong (" + level.Crown + ")");
+                    if (endless.Crown != 742) problems.Add(percent + ": the stored endless run is wrong (" + endless.Crown + ")");
 
                     var holder = new RenderTexture[1];
                     foreach (Aspect a in Aspects)

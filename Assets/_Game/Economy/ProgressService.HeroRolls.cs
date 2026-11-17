@@ -1,66 +1,159 @@
+using System;
 using System.Collections.Generic;
 using FluffyClimbers.Simulation;
 
 namespace FluffyClimbers.Economy
 {
-    /// <summary>Per-player hero stats (owner 2026-11-12, docs/44 section 11): the roll of every tier hero is dealt once, when the hero is first obtained, and kept in the save (heroRolls).</summary>
+    /// <summary>
+    /// Per-player hero stats (owner 2026-11-12, docs/44 section 11; ONE ROLL PER COPY since 2026-11-17): every copy of a tier hero is dealt its OWN pool variant when that copy is obtained.
+    /// The save keeps a list per hero id (<see cref="SaveData.HeroCopyRolls"/>): entry i is the roll of copy i, the i-th card of the hero on the Heroes screen. The run, the hero sheet and the leaderboard
+    /// upload use the roll of the CHOSEN copy. Common heroes are never rolled.
+    /// </summary>
     public sealed partial class ProgressService
     {
-        /// <summary>Safe defaults for the roll fields; a stored variant that is no longer inside the hero's pool (or a hero that is not rolled) is dropped and dealt again at first use.</summary>
+        /// <summary>
+        /// Safe defaults for the roll fields, the one-time migration and the clean-up: a save from before per-copy rolls (only the per-hero <c>heroRolls</c>) gives EVERY copy it holds the existing roll of its hero id;
+        /// a stored variant that is no longer inside the hero's pool is dropped (-1, dealt again at first use); a list longer than the copies held is cut; a hero with no copies left has no list.
+        /// </summary>
         void EnsureRollFields()
         {
             if (Data.HeroRolls == null) Data.HeroRolls = new Dictionary<string, int>();
             if (Data.HeroRollNo == null) Data.HeroRollNo = new Dictionary<string, int>();
+            if (Data.HeroCopyRolls == null) Data.HeroCopyRolls = new Dictionary<string, List<int>>();
+            if (Data.HeroCopyRollNos == null) Data.HeroCopyRollNos = new Dictionary<string, List<int>>();
             if (Data.HeroRollCount < 0) Data.HeroRollCount = 0;
-            var bad = new List<string>();
-            foreach (KeyValuePair<string, int> kv in Data.HeroRolls)
-                if (!HeroRolls.IsValidVariant(kv.Key, kv.Value)) bad.Add(kv.Key);
-            foreach (string id in bad) { Data.HeroRolls.Remove(id); Data.HeroRollNo.Remove(id); }
+
+            // migration: every copy of a hero that only has the old single roll gets that roll
+            var legacy = new List<string>(Data.HeroRolls.Keys);
+            foreach (string id in legacy)
+            {
+                int v;
+                if (!Data.HeroRolls.TryGetValue(id, out v) || !HeroRolls.IsValidVariant(id, v)) { Data.HeroRolls.Remove(id); Data.HeroRollNo.Remove(id); continue; }
+                if (Data.HeroCopyRolls.ContainsKey(id)) continue;
+                int n = Math.Max(1, Math.Min(MergeRules.MaxCopies, Copies(id)));
+                int no;
+                if (!Data.HeroRollNo.TryGetValue(id, out no)) no = -1;
+                var rolls = new List<int>(n);
+                var nos = new List<int>(n);
+                for (int i = 0; i < n; i++) { rolls.Add(v); nos.Add(no); }
+                Data.HeroCopyRolls[id] = rolls;
+                Data.HeroCopyRollNos[id] = nos;
+            }
+
+            // clean-up
+            var ids = new List<string>(Data.HeroCopyRolls.Keys);
+            foreach (string id in ids)
+            {
+                List<int> rolls = Data.HeroCopyRolls[id];
+                int held = rolls != null && HeroRolls.IsRollable(id) ? Math.Min(MergeRules.MaxCopies, Copies(id)) : 0;
+                if (held <= 0) { Data.HeroCopyRolls.Remove(id); Data.HeroCopyRollNos.Remove(id); Data.HeroRolls.Remove(id); Data.HeroRollNo.Remove(id); continue; }
+                List<int> nos;
+                if (!Data.HeroCopyRollNos.TryGetValue(id, out nos) || nos == null) Data.HeroCopyRollNos[id] = nos = new List<int>(rolls.Count);
+                while (nos.Count < rolls.Count) nos.Add(-1);
+                if (rolls.Count > held) rolls.RemoveRange(held, rolls.Count - held);
+                if (nos.Count > rolls.Count) nos.RemoveRange(rolls.Count, nos.Count - rolls.Count);
+                for (int i = 0; i < rolls.Count; i++)
+                    if (!HeroRolls.IsValidVariant(id, rolls[i])) { rolls[i] = -1; nos[i] = -1; }
+                SyncLegacyRoll(id);
+            }
+            var orphans = new List<string>(Data.HeroCopyRollNos.Keys);
+            foreach (string id in orphans) if (!Data.HeroCopyRolls.ContainsKey(id)) Data.HeroCopyRollNos.Remove(id);
+        }
+
+        /// <summary>Keeps the old per-hero fields (<c>heroRolls</c>, <c>heroRollNo</c>) equal to copy 0, for older app versions that read the same cloud save.</summary>
+        void SyncLegacyRoll(string id)
+        {
+            List<int> rolls, nos;
+            if (Data.HeroCopyRolls.TryGetValue(id, out rolls) && rolls.Count > 0 && rolls[0] >= 0)
+            {
+                Data.HeroRolls[id] = rolls[0];
+                if (Data.HeroCopyRollNos.TryGetValue(id, out nos) && nos.Count > 0 && nos[0] >= 0) Data.HeroRollNo[id] = nos[0]; else Data.HeroRollNo.Remove(id);
+            }
+            else { Data.HeroRolls.Remove(id); Data.HeroRollNo.Remove(id); }
         }
 
         /// <summary>
-        /// Deals the roll of a hero that is obtained now, unless it already has one (a duplicate copy, or the hero came back after its copies were merged away, keeps the FIRST roll).
-        /// Common heroes and heroes of inactive lines are not rolled. Changes the save data only: the caller saves (every obtaining path already does, once).
+        /// Deals the roll of EVERY held copy of the hero that has none yet (a copy that was just obtained, or a copy of an older save). Copies that already have a roll keep it. Common heroes and heroes of inactive
+        /// lines are not rolled. Changes the save data only: the caller saves (every obtaining path already does, once).
         /// </summary>
-        internal void RollIfNew(string id)
+        internal void DealRolls(string id)
         {
             if (!HeroRolls.IsRollable(id)) return;
-            if (Data.HeroRolls == null) EnsureRollFields();
-            if (Data.HeroRolls.ContainsKey(id)) return;
-            BundleSaveData b = BundleState;
-            EnsureBundleSeed(b);   // the per-account seed the card draws use
-            int counter = Data.HeroRollCount++;
-            Data.HeroRolls[id] = HeroRolls.Pick(b.Seed, id, counter);
-            Data.HeroRollNo[id] = counter;
+            if (Data.HeroCopyRolls == null || Data.HeroCopyRollNos == null) EnsureRollFields();
+            int held = Math.Min(MergeRules.MaxCopies, Copies(id));
+            if (held <= 0) return;
+            List<int> rolls, nos;
+            if (!Data.HeroCopyRolls.TryGetValue(id, out rolls) || rolls == null) Data.HeroCopyRolls[id] = rolls = new List<int>(held);
+            if (!Data.HeroCopyRollNos.TryGetValue(id, out nos) || nos == null) Data.HeroCopyRollNos[id] = nos = new List<int>(held);
+            while (rolls.Count < held) rolls.Add(-1);
+            while (nos.Count < rolls.Count) nos.Add(-1);
+            BundleSaveData b = null;
+            for (int i = 0; i < held; i++)
+            {
+                if (rolls[i] >= 0) continue;
+                if (b == null) { b = BundleState; EnsureBundleSeed(b); }   // the per-account seed the card draws use
+                int counter = Data.HeroRollCount++;
+                rolls[i] = HeroRolls.Pick(b.Seed, id, counter);
+                nos[i] = counter;
+            }
+            SyncLegacyRoll(id);
+        }
+
+        /// <summary>True when every held copy of the hero already has its roll.</summary>
+        bool AllCopiesRolled(string id)
+        {
+            List<int> rolls;
+            if (Data.HeroCopyRolls == null || !Data.HeroCopyRolls.TryGetValue(id, out rolls) || rolls == null) return false;
+            int held = Math.Min(MergeRules.MaxCopies, Copies(id));
+            if (rolls.Count < held) return false;
+            for (int i = 0; i < held; i++) if (rolls[i] < 0) return false;
+            return true;
         }
 
         /// <summary>
-        /// The variant index of a hero for this player (0 = the table row). Rolled heroes return their stored roll; an OWNED tier hero without one (an older save) is dealt its roll now and saved;
-        /// a hero the player does not own yet shows the table row (nothing is stored until it is obtained).
+        /// The variant index of ONE copy of a hero for this player (0 = the table row). <paramref name="copy"/> is the 0-based card of the hero (clamped to the copies held).
+        /// Rolled copies return their stored roll; an OWNED tier hero copy without one (an older save) is dealt now and saved; a hero the player does not own shows the table row (nothing is stored).
         /// </summary>
-        public int HeroVariant(string id)
+        public int HeroVariant(string id, int copy)
         {
             if (!HeroRolls.IsRollable(id)) return 0;
-            if (Data.HeroRolls == null) EnsureRollFields();
-            int v;
-            if (Data.HeroRolls.TryGetValue(id, out v)) return v;
+            if (Data.HeroCopyRolls == null) EnsureRollFields();
             if (!OwnsCharacter(id)) return 0;
-            RollIfNew(id);
-            Commit();
-            return Data.HeroRolls[id];
+            if (!AllCopiesRolled(id)) { DealRolls(id); Commit(); }
+            List<int> rolls;
+            if (!Data.HeroCopyRolls.TryGetValue(id, out rolls) || rolls.Count == 0) return 0;
+            int v = rolls[Math.Max(0, Math.Min(copy, rolls.Count - 1))];
+            return v >= 0 ? v : 0;
         }
 
-        /// <summary>The stats this player's copy of the hero plays with (the rolled physics, the hero's own finds and run bonus). THE single source for the run, the hero sheet and the tests.</summary>
-        public CharacterStats StatsOf(CharacterSpec c)
+        /// <summary>The variant of the FIRST copy of the hero (the only copy for a hero held once).</summary>
+        public int HeroVariant(string id) { return HeroVariant(id, 0); }
+
+        /// <summary>The roll counter copy <paramref name="copy"/> of the hero was dealt with (-1 when unknown or not rolled); the server can recompute the variant from (account seed, hero id, counter).</summary>
+        public int HeroRollCounter(string id, int copy)
+        {
+            List<int> nos;
+            if (Data.HeroCopyRollNos == null || !Data.HeroCopyRollNos.TryGetValue(id, out nos) || nos == null || nos.Count == 0) return -1;
+            return nos[Math.Max(0, Math.Min(copy, nos.Count - 1))];
+        }
+
+        /// <summary>The stats this player's COPY of the hero plays with (the rolled physics, the hero's own finds and run bonus). THE single source for the run, the hero sheet and the tests.</summary>
+        public CharacterStats StatsOf(CharacterSpec c, int copy)
         {
             if (c == null) return CharacterStats.Default;
-            return HeroRolls.StatsFor(c, HeroVariant(c.Id));
+            return HeroRolls.StatsFor(c, HeroVariant(c.Id, copy));
         }
 
+        /// <summary>Stats of the first copy (see <see cref="StatsOf(CharacterSpec,int)"/>).</summary>
+        public CharacterStats StatsOf(CharacterSpec c) { return StatsOf(c, 0); }
+
         /// <summary>The numbers this player's copy of the hero shows on its sheet (null for a hero without shown stats).</summary>
-        public ShownStats ShownOf(CharacterSpec c)
+        public ShownStats ShownOf(CharacterSpec c, int copy)
         {
-            return c == null ? null : HeroRolls.ShownFor(c, HeroVariant(c.Id));
+            return c == null ? null : HeroRolls.ShownFor(c, HeroVariant(c.Id, copy));
         }
+
+        /// <summary>Shown numbers of the first copy.</summary>
+        public ShownStats ShownOf(CharacterSpec c) { return ShownOf(c, 0); }
     }
 }

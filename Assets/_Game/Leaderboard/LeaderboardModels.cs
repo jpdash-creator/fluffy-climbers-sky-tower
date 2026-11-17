@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using FluffyClimbers.Economy;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -116,6 +117,19 @@ namespace FluffyClimbers.Leaderboard
         public string Key { get { return WeekKey + "_" + Board; } }
     }
 
+    /// <summary>One slot of the week from GET /my-week?slots=1: the best crown of the week in one campaign level x Gameplay setting (<c>c.lvl_001_06.1</c>) or in a region x setting for Endless (<c>e.region_001_meadow_springs.4</c>) or Time Attack (<c>t....</c>).</summary>
+    public sealed class LbSlot
+    {
+        public string SlotId = "", HeroId = "";
+        public long Crown;
+        public int Floors, Mode;
+        /// <summary>Base score the crown was made from (floors + chain squares), 0 = unknown. Additive (owner 2026-11-17).</summary>
+        public int Score;
+        /// <summary>UTC Unix seconds of the version (0 = unknown) and whether the numbers are the service's replay result. Additive.</summary>
+        public long At;
+        public bool Verified;
+    }
+
     public sealed class MyWeekData
     {
         public string WeekKey = "", Pid = "";
@@ -125,6 +139,14 @@ namespace FluffyClimbers.Leaderboard
         public List<PendingPrize> Pending = new List<PendingPrize>();
         /// <summary>The answer carried the prize list (GET /my-week?prizes=1), so an empty <see cref="Pending"/> really means "nothing to claim".</summary>
         public bool PrizesKnown;
+        /// <summary>The slots of the week (only when the answer carried them, GET /my-week?slots=1). They sum to <see cref="Totals"/>[0] (Overall) when none is missing.</summary>
+        public List<LbSlot> Slots = new List<LbSlot>();
+        /// <summary>The answer carried the slot list, so an empty <see cref="Slots"/> really means "no run counted this week".</summary>
+        public bool SlotsKnown;
+        /// <summary>The answer carried a <c>totals</c> object (so a 0 in <see cref="Totals"/> is a real 0).</summary>
+        public bool TotalsKnown;
+        /// <summary>The player's crown calculation as the cloud holds it (GET /my-week?slots=1, field "breakdown": the uploaded display list with the service's replay results laid over it), null when the answer had none. Additive.</summary>
+        public List<WeekSlotInfo> Display;
 
         public MyWeekData()
         {
@@ -217,6 +239,7 @@ namespace FluffyClimbers.Leaderboard
             JObject totals = o["totals"] as JObject;
             if (totals != null)
             {
+                d.TotalsKnown = true;
                 d.Totals[0] = Long(totals["overall"]);
                 d.Totals[1] = Long(totals["levels"]);
                 d.Totals[2] = Long(totals["endless"]);
@@ -232,6 +255,19 @@ namespace FluffyClimbers.Leaderboard
                     br.EntryLimit = Long(r["entryLimit"]);
                     br.ReachedLimit = Bool(r["reachedLimit"]);
                 }
+            JArray slots = o["slots"] as JArray;
+            if (slots != null)
+            {
+                d.SlotsKnown = true;
+                foreach (JToken sl in slots)
+                {
+                    string sid = Str(sl["slotId"]);
+                    if (sid.Length == 0) continue;
+                    d.Slots.Add(new LbSlot { SlotId = sid, Crown = Long(sl["crown"]), Floors = (int)Long(sl["floors"]), HeroId = Str(sl["heroId"]), Mode = (int)Long(sl["mode"]), Score = (int)Long(sl["score"]), At = Long(sl["at"]), Verified = true });
+                }
+            }
+            JObject bd = o["breakdown"] as JObject;
+            if (bd != null) d.Display = LbBreakdownJson.ParseSlots(bd["slots"] as JArray);
             JArray pending = o["pendingPrizes"] as JArray;
             if (pending != null) d.PrizesKnown = true;
             if (pending != null)

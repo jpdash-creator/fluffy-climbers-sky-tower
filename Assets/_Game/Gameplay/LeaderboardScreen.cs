@@ -11,14 +11,14 @@ namespace FluffyClimbers.Gameplay
     /// <summary>
     /// The weekly crown leaderboard screen (Planning/LEADERBOARD-DESIGN.md, owner decisions 2026-11-12; redone 2026-11-13 with the painted kit <c>lb_*</c>, Bug List 1).
     /// Over the full-screen picture <c>leaderboard_bg</c>: a top row (Back, the week timer pill, the round Prizes button), then the painted frame with the ribbon title, three tabs (Overall, Regions, Endless),
-    /// the top 100 as pooled painted row plates (rank 1 gold, 2 silver, 3 bronze, 4 to 10 green, 11 and lower grey; medal or badge with the rank number, round avatar, name, big crown and crowns) and, when the player
-    /// is not among the 100, a pinned own card ("#348") under the list. A player inside the top 100 sees the list opened around their own row (glow outline and a YOU tag); ranks 1 to 10 open at the top.
+    /// the top 100 as pooled painted row plates (rank 1 gold, 2 silver, 3 bronze, the own row from 4 light green, everyone else grey; medal or badge with the rank number, round avatar, name, big crown and crowns) and, when the player
+    /// is not among the 100, a pinned own card ("#348") at the bottom of the list. Bug List 7 (2026-11-17): the list always opens at the top and 9 rows are visible at once; the own row is gold/silver/bronze for ranks 1 to 3, light green in place for ranks 4 to 8 and PINNED (light green, bottom of the viewport) from rank 9 on while its real row is off screen (see <see cref="LeaderboardPin"/>).
     /// A guest or signed-out player sees a sign-in card, a player without consent the consent card, a switched-off feature a "coming soon" card (inside the frame).
     /// Layout is measured (HeroSheetScreen pattern): a fitter rebuilds it when the screen shape changes. Only about a screenful of row objects exists; scrolling re-binds them (cached strings, no allocation);
     /// the only per-frame work is one compare of the remaining whole seconds for the timer. No sprite is scaled non-uniformly: the stadium plates slice only their rounded caps (scaled with the row height), the frame
     /// is a ribbon piece at uniform scale over a body whose flat middle stretches vertically.
     /// </summary>
-    public sealed class LeaderboardScreen
+    public sealed partial class LeaderboardScreen
     {
         public const string ScreenName = "Leaderboard";
 
@@ -36,14 +36,45 @@ namespace FluffyClimbers.Gameplay
         public enum State { ComingSoon, SignIn, Consent, Ready }
 
         // ---- metrics (canvas units of the 1080 x 1920 reference) ----
-        const float Side = 20f, TopY = 20f, TopRowH = 150f, BottomPad = 12f;
+        const float Side = 20f, TopY = 8f, BottomPad = 6f;
+        /// <summary>Height of the top row (Prizes button, timer pill): just the bigger of the two plus a little air (Bug List 7: banner as short as possible so 9 rows fit).</summary>
+        static float TopRowH { get { return Mathf.Max(Mathf.Max(128f, UiKit.MinTouchRef), Mathf.Max(100f, RewardsScreen.LineH(52) + 20f)) + 8f; } }
         const float FrameImgW = 794f, FrameTopImgH = 300f;
         /// <summary>Tab height: at least the 48 dp touch minimum on this screen density.</summary>
         static float TabH { get { return Mathf.Max(120f, UiKit.MinTouchRef); } }
-        const float RowH = 100f, RowGap = 8f, PadTop = 30f, PadSide = 6f, TabGap = 8f;
-        const float CapX = 26f, RankBoxW = 80f, PinnedRankW = 150f, AvatarSize = 70f, AvatarGap = 6f, YouTagW = 110f, YouTagH = 52f;
-        const float CrownTextW = 190f, CrownIconW = 66f, CrownIconH = 55f, RightPad = 30f;
-        const float NameRightReserve = RightPad + CrownTextW + 4f + CrownIconW + 8f;
+        // Row anatomy (Bug List 4 item 1, 2026-11-16; 1080 x 1920 reference). One line for every row: [rank: medal 1-3 or a plain number] [avatar circle] [name, one line, measured ellipsis] [crown icon] [crowns, right aligned].
+        // The own row gets a second line under the name (the "YOU (i)" tag). Every part sits inside the plate: the row height is derived from the medal, the avatar, the two text lines of the own row and the 48 dp touch minimum.
+        // Bug List 5 item 1 (2026-11-17): a taller row (140) with a smaller medal and avatar so nothing touches the painted border of any plate (the gold / silver / bronze caps are round: the medal corner sat on the border at 108 tall).
+        public const float MedalH = 92f, AvatarSize = 80f, RowVPad = 24f, RowBase = MedalH + 2f * RowVPad;
+        /// <summary>The height of every row (top 100 and the pinned own card): the content plus its padding, never below the 48 dp touch minimum, and tall enough for the own row's name line and tag line at the current text size.</summary>
+        public static float RowH { get { return Mathf.Max(Mathf.Max(RowBase, UiKit.MinTouchRef), RewardsScreen.LineH(NameFont) + YouTagH + 16f); } }
+        const float RowGap = 12f, PadTop = 8f, PadSide = 12f, TabGap = 8f;
+        /// <summary>How far the own row's glow rings grow past the plate (inside the list's side padding and row gap, so no ring is clipped or touches the next row).</summary>
+        const float GlowWideGrow = 8f, GlowThinGrow = 4f;
+        public const float RankBoxW = 90f;
+        const float CapX = 34f, PinnedRankW = 120f, AvatarGap = 6f, NameGap = 10f;
+        const float RightPad = 26f, CrownGap = 6f, IconGap = 6f;
+        // the amounts on the right: the 16 sp floor (smaller than before: 48), regular body font, not the heavy display face
+        const int NameFont = 42, CrownFont = 42, RankFont = 44;
+        /// <summary>Name and crown text sizes at the current accessibility text size (what the text components really use).</summary>
+        static int NameFontPx { get { return Mathf.RoundToInt(Mathf.Max(NameFont, UiKit.MinBodyTextPx) * UiKit.TextScale); } }
+        static int CrownFontPx { get { return Mathf.RoundToInt(Mathf.Max(CrownFont, UiKit.MinBodyTextPx) * UiKit.TextScale); } }
+        /// <summary>The crown icon follows the number: 0.9 of its font size tall (about 1.25 cap heights), 1.2 times wider than tall.</summary>
+        static float CrownIconH { get { return Mathf.Round(CrownFontPx * 0.9f); } }
+        static float CrownIconW { get { return Mathf.Round(CrownIconH * 1.2f); } }
+        const float TagBottom = 6f;
+        /// <summary>The "YOU" tag sits under the name of the own row (no (i) button since Bug List 5: the whole row opens the calculation); it grows with the text size.</summary>
+        static float YouTagW { get { return 130f + (UiKit.TextScale - 1f) * 90f; } }
+        static float YouTagH { get { return Mathf.Max(48f, Mathf.Round(Mathf.Max(42f, UiKit.MinBodyTextPx) * UiKit.TextScale) + 6f); } }
+        /// <summary>Two name lines fit the row at this text size (the own row never uses two: its YOU tag sits under the name).</summary>
+        static bool TwoLineNames { get { return RowH - 8f >= 2f * RewardsScreen.LineH(NameFont); } }
+        static readonly Color[] AvatarColors =
+        {
+            new Color(0.62f, 0.70f, 0.90f, 1f), new Color(0.98f, 0.76f, 0.62f, 1f), new Color(0.70f, 0.88f, 0.66f, 1f), new Color(0.92f, 0.70f, 0.86f, 1f),
+            new Color(0.98f, 0.90f, 0.58f, 1f), new Color(0.66f, 0.88f, 0.90f, 1f), new Color(0.84f, 0.76f, 0.94f, 1f), new Color(0.96f, 0.74f, 0.74f, 1f)
+        };
+        /// <summary>Bottom of the name box of the own row (above the tag).</summary>
+        static float OwnNameBottom { get { return TagBottom + YouTagH + 2f; } }
 
         static readonly Color Ink = UiKit.PanelInk;
         static readonly Color GlowColor = new Color(1f, 0.93f, 0.35f, 1f), GlowSoft = new Color(1f, 0.93f, 0.35f, 0.55f);
@@ -54,10 +85,10 @@ namespace FluffyClimbers.Gameplay
         sealed class Row
         {
             public GameObject Go;
-            public RectTransform Rt, NameRt, TagRt;
-            public Image Back, Medal, Photo, Glow, GlowWide;
+            public RectTransform Rt, NameRt, TagRt, HitRt;
+            public Image Back, Medal, Photo, Glow, GlowWide, AvatarBg;
             public Text Rank, Name, Crowns, Letter, Tag;
-            public GameObject TagGo;
+            public GameObject TagGo, HitGo;
             public bool Pinned, IsMe;
             public int PlateIdx = -1;
             public string Url = "";
@@ -76,9 +107,14 @@ namespace FluffyClimbers.Gameplay
         bool loading, loadFailed, signingIn, prizesOpen, consentAsked, pinnedShown;
         readonly List<Row> pool = new List<Row>();
         Row ownRow;
+        /// <summary>The own row may be pinned (rank 9 or lower, or not among the loaded rows); the pin card exists and is shown only while the real row is off screen.</summary>
+        bool pinCapable;
+        float vpFullH, pinH;
         BoardData data;
         string[] rankText = new string[0], crownText = new string[0], initialText = new string[0], nameText = new string[0];
         string pinnedRankText = "";
+        /// <summary>Width of the crown number column, measured from the widest number of the board and the pinned card; the icon and the name box follow it.</summary>
+        float crownW = 200f;
         Action hubHandler;
 
         public RectTransform Root { get { return root; } }
@@ -115,6 +151,7 @@ namespace FluffyClimbers.Gameplay
 
         State ComputeState()
         {
+            if (LeaderboardHub.FakeActive) return State.Ready;   // local test boards (Admin "Test 1000 users"): the boards show whatever the switch and the sign-in say
             return StateFor(LeaderboardHub.Enabled, LeaderboardHub.IsGoogleSignedIn, LeaderboardHub.IsSignedIn, LeaderboardHub.HasConsent);
         }
 
@@ -269,8 +306,9 @@ namespace FluffyClimbers.Gameplay
             }
             BuildTabs();
             ResolveOwn();
-            BuildList(TabH + 10f);
+            BuildList(TabH + 6f);
             BuildPinned();
+            UpdatePin(true);
         }
 
         void OnSignInTapped()
@@ -385,19 +423,24 @@ namespace FluffyClimbers.Gameplay
             if (data != null && mine.Length > 0)
                 for (int i = 0; i < data.Entries.Count; i++) if (data.Entries[i].Pid == mine) { ownIdx = i; break; }
             BoardRank r = MyRank;
-            pinnedShown = ownIdx < 0 && r != null && (r.Rank > 0 || r.Crowns > 0);
-            pinnedRankText = r != null && r.Rank > 0 ? "#" + r.Rank.ToString("N0", CultureInfo.InvariantCulture) : "--";
+            bool standing = r != null && (r.Rank > 0 || r.Crowns > 0);
+            pinCapable = LeaderboardPin.CanPin(ownIdx, standing);
+            pinnedShown = false;   // UpdatePin decides from the scroll position
+            int pr = ownIdx >= 0 ? data.Entries[ownIdx].Rank : (r != null ? r.Rank : 0);
+            pinnedRankText = pr > 0 ? "#" + pr.ToString("N0", CultureInfo.InvariantCulture) : "--";
         }
 
         // ---------------- the pooled list ----------------
 
         void BuildList(float topOffset)
         {
-            float bottomReserve = pinnedShown ? RowH + 12f : 0f;
-            vpH = Mathf.Max(0f, bodyH - topOffset - bottomReserve);
+            // the pin card takes the bottom of the viewport only while it is shown (UpdatePin moves the viewport's bottom edge)
+            pinH = RowH + PinGap;
+            vpFullH = Mathf.Max(0f, bodyH - topOffset);
+            vpH = vpFullH;
             viewport = UiKit.Rect(body, "Viewport");
             viewport.anchorMin = Vector2.zero; viewport.anchorMax = Vector2.one;
-            viewport.offsetMin = new Vector2(0f, bottomReserve);
+            viewport.offsetMin = Vector2.zero;
             viewport.offsetMax = new Vector2(0f, -topOffset);
             viewport.gameObject.AddComponent<RectMask2D>();
             Image hit = viewport.gameObject.AddComponent<Image>();
@@ -407,7 +450,7 @@ namespace FluffyClimbers.Gameplay
             content.anchorMin = new Vector2(0f, 1f); content.anchorMax = new Vector2(1f, 1f); content.pivot = new Vector2(0.5f, 1f);
             content.anchoredPosition = Vector2.zero;
             int n = data != null ? data.Entries.Count : 0;
-            float contentH = PadTop + n * (RowH + RowGap) + 8f;
+            float contentH = LeaderboardPin.ContentHeight(n, RowH, RowGap, PadTop);
             content.sizeDelta = new Vector2(0f, contentH);
             PrepareStrings();
 
@@ -418,14 +461,10 @@ namespace FluffyClimbers.Gameplay
             scroll.inertia = !GameSettings.ReducedMotion;
             scroll.scrollSensitivity = 40f;
 
-            // opening position: the own row centred (ranks 1 to 10 stay at the top); an earlier position of this board is kept across rebuilds
+            // opening position: ALWAYS the top (Bug List 7); an earlier position of this board is kept across rebuilds of the same screen
             float y = 0f;
             if (positionedBoard == board) y = lastScrollY;
-            else if (n > 0)
-            {
-                if (ownIdx >= 10) y = PadTop + ownIdx * (RowH + RowGap) + RowH * 0.5f - vpH * 0.5f;
-                positionedBoard = board;
-            }
+            else if (n > 0) positionedBoard = board;
             y = Mathf.Clamp(y, 0f, Mathf.Max(0f, contentH - vpH));
             content.anchoredPosition = new Vector2(0f, y);
             lastScrollY = y;
@@ -461,13 +500,22 @@ namespace FluffyClimbers.Gameplay
         {
             int n = data != null ? data.Entries.Count : 0;
             rankText = new string[n]; crownText = new string[n]; initialText = new string[n]; nameText = new string[n];
+            int widest = 1;
+            for (int i = 0; i < n; i++)
+            {
+                crownText[i] = CrownString(data.Entries[i].Crowns);
+                if (crownText[i].Length > widest) widest = crownText[i].Length;
+            }
+            BoardRank mine = MyRank;
+            if (pinCapable && mine != null) widest = Mathf.Max(widest, CrownString(mine.Crowns).Length);
+            float fs = CrownFontPx;
+            crownW = Mathf.Clamp(Mathf.Ceil(widest * fs * 0.58f) + 8f, Mathf.Ceil(fs * 3.2f), Mathf.Max(fs * 3.2f, RowW * 0.42f));
             for (int i = 0; i < n; i++)
             {
                 BoardRow r = data.Entries[i];
                 rankText[i] = RankString(r.Rank);
-                crownText[i] = CrownString(r.Crowns);
                 initialText[i] = InitialOf(r.Name);
-                nameText[i] = FitName(r.Name, i == ownIdx, false);
+                nameText[i] = FitName(r.Name, false, i != ownIdx && TwoLineNames);
             }
         }
 
@@ -487,25 +535,83 @@ namespace FluffyClimbers.Gameplay
             return (v / 1000000000.0).ToString("0.#", CultureInfo.InvariantCulture) + "B";
         }
 
-        float NameX(bool pinned, bool tag)
+        /// <summary>Left edge of the name. The own row's tag sits UNDER the name, so the name keeps the same width.</summary>
+        float NameX(bool pinned)
         {
-            float x = pinned ? CapX + PinnedRankW + AvatarGap + AvatarSize + 10f : CapX + RankBoxW + AvatarGap + AvatarSize + 10f;
-            return tag ? x + YouTagW + 6f : x;
+            return CapX + (pinned ? PinnedRankW : RankBoxW) + AvatarGap + AvatarSize + NameGap;
         }
 
-        /// <summary>A name that fits one line of the name slot at the current text size (cut with three dots): the layout audit counts the full-size text, so a long name must not run into the next slot.</summary>
-        string FitName(string name, bool tag, bool pinned)
+        /// <summary>Space the right side takes (padding, crown number column, icon and gaps): the name box ends before it.</summary>
+        float NameRightReserve { get { return RightPad + crownW + CrownGap + CrownIconW + IconGap; } }
+
+        static TextGenerator measurer;
+
+        /// <summary>Real width of a one-line string in the name font at <paramref name="px"/> (canvas units); falls back to an estimate when no font is available.</summary>
+        static float MeasureWidth(string s, int px)
+        {
+            Font f = UiKit.DefaultFont;
+            if (f == null) return s.Length * px * 0.6f;
+            try
+            {
+                if (measurer == null) measurer = new TextGenerator();
+                var st = new TextGenerationSettings
+                {
+                    font = f, fontSize = px, fontStyle = FontStyle.Normal, color = Color.white, scaleFactor = 1f, lineSpacing = 1f, richText = false,
+                    resizeTextForBestFit = false, updateBounds = false, horizontalOverflow = HorizontalWrapMode.Overflow, verticalOverflow = VerticalWrapMode.Overflow,
+                    textAnchor = TextAnchor.MiddleLeft, pivot = new Vector2(0f, 0.5f), generateOutOfBounds = true, generationExtents = Vector2.zero
+                };
+                return measurer.GetPreferredWidth(s, st);
+            }
+            catch (Exception) { return s.Length * px * 0.6f; }
+        }
+
+        /// <summary>
+        /// A name that fits the name slot at the current text size, measured with the real font, so it never runs into the crown icon. A long name of a row WITHOUT the YOU tag may use two lines (broken at a space when it can);
+        /// only what still does not fit is cut with three dots (Bug List 5: names are not truncated while there is room for them).
+        /// </summary>
+        string FitName(string name, bool pinned, bool allowTwoLines)
         {
             string n = string.IsNullOrEmpty(name) ? "Player" : name.Trim();
             if (n.Length == 0) n = "Player";
-            float boxW = Mathf.Max(60f, RowW - NameX(pinned, tag) - NameRightReserve);
-            float fontPx = Mathf.RoundToInt(Mathf.Max(42f, UiKit.MinBodyTextPx) * UiKit.TextScale);
-            int perLine = Mathf.Max(5, Mathf.FloorToInt(boxW / (fontPx * 0.52f)));
-            int max = perLine - 1;
-            if (n.Length <= max) return n;
-            int cut = Mathf.Max(1, max - 3);
-            if (char.IsHighSurrogate(n[cut - 1])) cut--;
-            return n.Substring(0, Mathf.Max(1, cut)).TrimEnd() + "...";
+            float boxW = Mathf.Max(60f, RowW - NameX(pinned) - NameRightReserve) - 6f;
+            int px = NameFontPx;
+            if (MeasureWidth(n, px) <= boxW) return n;
+            if (!allowTwoLines) return Ellipsize(n, px, boxW);
+            int split = -1;
+            for (int i = n.Length - 1; i > 0; i--)
+                if (n[i] == ' ' && MeasureWidth(n.Substring(0, i), px) <= boxW) { split = i; break; }
+            if (split < 0)
+            {
+                int lo = 1, hi = n.Length - 1;   // no space to break at: the longest prefix that fits
+                while (lo < hi)
+                {
+                    int mid = (lo + hi + 1) / 2;
+                    if (MeasureWidth(n.Substring(0, mid), px) <= boxW) lo = mid; else hi = mid - 1;
+                }
+                split = lo;
+                if (split > 0 && char.IsHighSurrogate(n[split - 1])) split--;
+            }
+            string first = n.Substring(0, Mathf.Max(1, split)).TrimEnd();
+            string rest = n.Substring(Mathf.Max(1, split)).TrimStart();
+            if (rest.Length == 0) return first;
+            return first + "\n" + Ellipsize(rest, px, boxW);
+        }
+
+        /// <summary>The longest prefix whose text plus three dots fits <paramref name="boxW"/>; the whole text when it fits.</summary>
+        static string Ellipsize(string n, int px, float boxW)
+        {
+            if (MeasureWidth(n, px) <= boxW) return n;
+            int lo = 1, hi = n.Length - 1;
+            while (lo < hi)
+            {
+                int mid = (lo + hi + 1) / 2;
+                int cut = mid;
+                if (cut > 0 && char.IsHighSurrogate(n[cut - 1])) cut--;
+                if (cut >= 1 && MeasureWidth(n.Substring(0, cut).TrimEnd() + "...", px) <= boxW) lo = mid; else hi = mid - 1;
+            }
+            int end = lo;
+            if (end > 0 && char.IsHighSurrogate(n[end - 1])) end--;
+            return n.Substring(0, Mathf.Max(1, end)).TrimEnd() + "...";
         }
 
         static string InitialOf(string name)
@@ -518,12 +624,13 @@ namespace FluffyClimbers.Gameplay
         {
             if (content != null) lastScrollY = content.anchoredPosition.y;
             BindPool(false);
+            UpdatePin(false);
         }
 
         void BindPool(bool force)
         {
             if (content == null || data == null) return;
-            const float pitch = RowH + RowGap;
+            float pitch = RowH + RowGap;
             int first = Mathf.Max(0, Mathf.FloorToInt((content.anchoredPosition.y - PadTop) / pitch) - 1);
             int maxFirst = Mathf.Max(0, data.Entries.Count - pool.Count);
             if (first > maxFirst) first = maxFirst;
@@ -547,16 +654,38 @@ namespace FluffyClimbers.Gameplay
 
         // ---------------- pinned own card ----------------
 
+        const float PinGap = 6f;
+
         void BuildPinned()
         {
-            if (!pinnedShown) return;
+            ownRow = null;
+            if (!pinCapable) return;
             ownRow = MakeRow(body, "OwnCard", true);
             ownRow.Rt.anchorMin = new Vector2(0f, 0f); ownRow.Rt.anchorMax = new Vector2(1f, 0f); ownRow.Rt.pivot = new Vector2(0.5f, 0f);
-            ownRow.Rt.offsetMin = new Vector2(PadSide, 4f); ownRow.Rt.offsetMax = new Vector2(-PadSide, 4f + RowH);
+            ownRow.Rt.offsetMin = new Vector2(PadSide, PinGap); ownRow.Rt.offsetMax = new Vector2(-PadSide, PinGap + RowH);
             BoardRank rank = MyRank;
             LbProfile p = LeaderboardHub.Profile;
             string name = string.IsNullOrEmpty(p.DisplayName) ? "You" : p.DisplayName;
-            Bind(ownRow, 0, pinnedRankText, FitName(name, false, true), CrownString(rank != null ? rank.Crowns : 0L), p.AvatarUrl, InitialOf(name), true);
+            long crowns = ownIdx >= 0 ? data.Entries[ownIdx].Crowns : (rank != null ? rank.Crowns : 0L);
+            Bind(ownRow, 0, pinnedRankText, FitName(name, true, false), CrownString(crowns), p.AvatarUrl, InitialOf(name), true);
+            ownRow.Go.SetActive(false);
+        }
+
+        /// <summary>
+        /// Shows or hides the pinned own card from the scroll position (called on every scroll change, never per frame): arithmetic only, no allocation.
+        /// While the card is shown the viewport ends above it (so no row ever sits under the card); the real row replaces the card the moment any part of it is in view.
+        /// </summary>
+        void UpdatePin(bool force)
+        {
+            if (!pinCapable || ownRow == null || content == null || viewport == null) return;
+            float visibleH = pinnedShown ? vpFullH - pinH : vpFullH;
+            bool want = LeaderboardPin.ShouldPin(ownIdx, true, content.anchoredPosition.y, visibleH, RowH, RowGap, PadTop);
+            if (want == pinnedShown && !force) return;
+            pinnedShown = want;
+            ownRow.Go.SetActive(want);
+            vpH = want ? vpFullH - pinH : vpFullH;
+            viewport.offsetMin = new Vector2(0f, want ? pinH : 0f);
+            BindPool(true);
         }
 
         // ---------------- one row ----------------
@@ -569,10 +698,10 @@ namespace FluffyClimbers.Gameplay
             r.Go = r.Rt.gameObject;
 
             // glow outline of the own row (a soft wide halo and a bright thin ring), only active on the own row
-            r.GlowWide = AddGlow(r.Rt, "Backdrop", 14f, GlowSoft);
-            r.Glow = AddGlow(r.Rt, "Backdrop", 7f, GlowColor);
+            r.GlowWide = AddGlow(r.Rt, "Backdrop", GlowWideGrow, GlowSoft);
+            r.Glow = AddGlow(r.Rt, "Backdrop", GlowThinGrow, GlowColor);
 
-            r.Back = UiKit.AddImage(r.Rt, "Plate", ToyKit.Get(pinned ? "lb_row_you" : "lb_row_grey"), Color.white);
+            r.Back = UiKit.AddImage(r.Rt, "Plate", ToyKit.Get(pinned ? "lb_row_green" : "lb_row_grey"), Color.white);
             r.Back.raycastTarget = false;
             CapsFollowHeight(r.Back, RowH);
             UiKit.Stretch(r.Back.rectTransform);
@@ -583,18 +712,19 @@ namespace FluffyClimbers.Gameplay
                 r.Medal = UiKit.AddImage(r.Rt, "Medal", null, Color.white);
                 r.Medal.preserveAspect = true;
                 r.Medal.color = Color.white;
-                Anchor(r.Medal.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(CapX + rankW * 0.5f, 0f), new Vector2(rankW, 92f));
+                Anchor(r.Medal.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(CapX + rankW * 0.5f, 0f), new Vector2(rankW, MedalH));
             }
-            r.Rank = Label(r.Rt, "RankText", "", pinned ? 48 : 44, Ink, TextAnchor.MiddleCenter, true, true);
+            r.Rank = Label(r.Rt, "RankText", "", pinned ? 46 : RankFont, Ink, TextAnchor.MiddleCenter, true, true);
             OneLine(r.Rank);
             r.Rank.resizeTextForBestFit = true;
             r.Rank.resizeTextMinSize = Mathf.RoundToInt(UiKit.MinBodyTextPx); r.Rank.resizeTextMaxSize = r.Rank.fontSize;
             r.Rank.horizontalOverflow = HorizontalWrapMode.Wrap; r.Rank.verticalOverflow = VerticalWrapMode.Truncate;
-            Anchor(r.Rank.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(CapX + rankW * 0.5f, 0f), pinned ? new Vector2(PinnedRankW, 64f) : new Vector2(54f, 50f));
+            Anchor(r.Rank.rectTransform, new Vector2(0f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(CapX + rankW * 0.5f, 0f), pinned ? new Vector2(PinnedRankW, 72f) : new Vector2(RankBoxW, 60f));
 
             float avX = CapX + rankW + AvatarGap;
-            Image av = UiKit.AddImage(r.Rt, "Avatar", Theme.RoundSprite, new Color(0.62f, 0.70f, 0.90f, 1f));
+            Image av = UiKit.AddImage(r.Rt, "Avatar", Theme.RoundSprite, AvatarColors[0]);
             av.type = Image.Type.Sliced; av.preserveAspect = false;
+            r.AvatarBg = av;
             Anchor(av.rectTransform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(avX, 0f), new Vector2(AvatarSize, AvatarSize));
             av.gameObject.AddComponent<Mask>().showMaskGraphic = true;
             r.Letter = Label(av.transform, "Letter", "?", 48, Ink, TextAnchor.MiddleCenter, true, true);
@@ -603,37 +733,50 @@ namespace FluffyClimbers.Gameplay
             r.Photo.preserveAspect = true;
             r.Photo.color = Color.white;
             UiKit.Stretch(r.Photo.rectTransform);
+            r.Photo.rectTransform.offsetMin = new Vector2(3f, 3f); r.Photo.rectTransform.offsetMax = new Vector2(-3f, -3f);   // the picture stays inside the round edge
             r.Photo.gameObject.SetActive(false);
 
-            if (!pinned)
-            {
-                RectTransform tag = UiKit.Rect(r.Rt, "YouTag");
-                Anchor(tag, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(NameX(false, false) - 4f, 0f), new Vector2(YouTagW, YouTagH));
-                Image tbg = UiKit.AddImage(tag, "Plate", ToyKit.Get("lb_pill_score"), Color.white);
-                CapsFollowHeight(tbg, YouTagH);
-                UiKit.Stretch(tbg.rectTransform);
-                r.Tag = Label(tag, "TagText", "YOU", 42, Ink, TextAnchor.MiddleCenter, true, true);
-                UiKit.Stretch(r.Tag.rectTransform);
-                r.Tag.rectTransform.offsetMin = new Vector2(4f, 2f); r.Tag.rectTransform.offsetMax = new Vector2(-4f, -2f);
-                r.Tag.horizontalOverflow = HorizontalWrapMode.Overflow;
-                r.TagRt = tag; r.TagGo = tag.gameObject;
-                r.TagGo.SetActive(false);
-            }
+            // the own row: a tag "YOU" UNDER the name; the whole row (the Hit area below) opens the calculation popup, there is no separate (i) button (Bug List 5)
+            RectTransform tag = UiKit.Rect(r.Rt, "YouTag");
+            Anchor(tag, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(NameX(pinned) - 4f, TagBottom), new Vector2(YouTagW, YouTagH));
+            Image tbg = UiKit.AddImage(tag, "Plate", ToyKit.Get("lb_pill_score"), Color.white);
+            CapsFollowHeight(tbg, YouTagH);
+            UiKit.Stretch(tbg.rectTransform);
+            r.Tag = Label(tag, "TagText", "YOU", 42, Ink, TextAnchor.MiddleCenter, true, true);
+            UiKit.Stretch(r.Tag.rectTransform);
+            r.Tag.rectTransform.offsetMin = new Vector2(10f, 2f); r.Tag.rectTransform.offsetMax = new Vector2(-10f, -2f);
+            r.Tag.horizontalOverflow = HorizontalWrapMode.Overflow;
+            r.TagRt = tag; r.TagGo = tag.gameObject;
+            r.TagGo.SetActive(pinned);
 
-            r.Name = Label(r.Rt, "NameText", "", 42, Ink, TextAnchor.MiddleLeft, false, true);
+            // the whole own row is the touch target of the calculation popup (only active on the own row)
+            r.HitGo = UiKit.Rect(r.Rt, "Hit").gameObject;
+            r.HitRt = (RectTransform)r.HitGo.transform;
+            UiKit.Stretch(r.HitRt);
+            Image hit = r.HitGo.AddComponent<Image>();
+            hit.color = new Color(1f, 1f, 1f, 0.001f);
+            // an EventTrigger (not a Button): a full-row Button would be flagged by the layout audit as overlapping the row's own texts (CUX-3 audit 2026-11-14); the row is the touch target
+            var trig = r.HitGo.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+            var tapEntry = new UnityEngine.EventSystems.EventTrigger.Entry { eventID = UnityEngine.EventSystems.EventTriggerType.PointerClick };
+            tapEntry.callback.AddListener(_ => OnOwnRowTapped());
+            trig.triggers.Add(tapEntry);
+            r.HitGo.AddComponent<A11yLabel>().Text = "Your crowns, tap for the calculation";
+            r.HitGo.SetActive(pinned);
+
+            r.Name = Label(r.Rt, "NameText", "", NameFont, Ink, TextAnchor.MiddleLeft, false, true);
             OneLine(r.Name);
             r.NameRt = r.Name.rectTransform;
             r.NameRt.anchorMin = new Vector2(0f, 0f); r.NameRt.anchorMax = new Vector2(1f, 1f);
-            r.NameRt.offsetMin = new Vector2(NameX(pinned, false), 6f); r.NameRt.offsetMax = new Vector2(-NameRightReserve, -6f);
+            r.NameRt.offsetMin = new Vector2(NameX(pinned), pinned ? OwnNameBottom : 4f); r.NameRt.offsetMax = new Vector2(-NameRightReserve, -4f);
 
             Image ci = Painted(r.Rt, "CrownIcon", "lb_icon_crown");
-            Anchor(ci.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-(RightPad + CrownTextW + 4f), 0f), new Vector2(CrownIconW, CrownIconH));
+            Anchor(ci.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-(RightPad + crownW + CrownGap), 0f), new Vector2(CrownIconW, CrownIconH));
 
-            r.Crowns = Label(r.Rt, "CrownsText", "", 52, Ink, TextAnchor.MiddleRight, true, true);
+            r.Crowns = Label(r.Rt, "CrownsText", "", CrownFont, Ink, TextAnchor.MiddleRight, false, true);
             OneLine(r.Crowns);
             r.Crowns.resizeTextForBestFit = true; r.Crowns.resizeTextMinSize = Mathf.RoundToInt(UiKit.MinBodyTextPx); r.Crowns.resizeTextMaxSize = r.Crowns.fontSize;
             r.Crowns.horizontalOverflow = HorizontalWrapMode.Wrap; r.Crowns.verticalOverflow = VerticalWrapMode.Truncate;
-            Anchor(r.Crowns.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-RightPad, 0f), new Vector2(CrownTextW, RowH - 20f));
+            Anchor(r.Crowns.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-RightPad, 0f), new Vector2(crownW, RowH - 24f));
             return r;
         }
 
@@ -678,14 +821,14 @@ namespace FluffyClimbers.Gameplay
 
         void Bind(Row r, int rank, string rankStr, string name, string crowns, string avatarUrl, string initial, bool me)
         {
-            int plate = r.Pinned ? 5 : rank == 1 ? 0 : rank == 2 ? 1 : rank == 3 ? 2 : rank >= 4 && rank <= 10 ? 3 : 4;
+            int plate = LeaderboardPin.PlateIndex(rank, me, r.Pinned);
             if (r.PlateIdx != plate)
             {
                 r.PlateIdx = plate;
                 Sprite ps = ToyKit.Get(PlateNames[plate]);
                 r.Back.sprite = ps != null ? ps : UiKit.PillSprite;
                 CapsFollowHeight(r.Back, RowH);
-                bool light = plate != 2 && plate != 5;   // bronze and the blue own card get white text with the outline
+                bool light = plate != 2;   // only bronze gets white text with the outline
                 Color ink = light ? Ink : Color.white;
                 StyleText(r.Rank, ink, !light);
                 StyleText(r.Name, ink, !light);
@@ -693,12 +836,13 @@ namespace FluffyClimbers.Gameplay
                 StyleText(r.Letter, Ink, false);
                 if (!r.Pinned)
                 {
-                    Sprite medal = ToyKit.Get(BadgeNames[plate]);
+                    // medals for ranks 1 to 3, a plain number from rank 4 on
+                    Sprite medal = plate <= 2 ? ToyKit.Get(BadgeNames[plate]) : null;
                     r.Medal.sprite = medal;
                     r.Medal.gameObject.SetActive(medal != null);
                     bool isMedal = plate <= 2;
-                    r.Rank.rectTransform.anchoredPosition = new Vector2(CapX + RankBoxW * 0.5f, isMedal ? -15f : 0f);
-                    r.Rank.rectTransform.sizeDelta = isMedal ? new Vector2(46f, 46f) : new Vector2(60f, 50f);
+                    r.Rank.rectTransform.anchoredPosition = new Vector2(CapX + RankBoxW * 0.5f, isMedal ? -MedalH * 0.15f : 0f);
+                    r.Rank.rectTransform.sizeDelta = isMedal ? new Vector2(54f, 54f) : new Vector2(RankBoxW, 60f);
                 }
             }
             if (!r.Pinned && r.IsMe != me)
@@ -707,12 +851,15 @@ namespace FluffyClimbers.Gameplay
                 r.Glow.gameObject.SetActive(me);
                 r.GlowWide.gameObject.SetActive(me);
                 r.TagGo.SetActive(me);
-                r.NameRt.offsetMin = new Vector2(NameX(false, me), 6f);
+                r.HitGo.SetActive(me);
+                r.NameRt.offsetMin = new Vector2(NameX(false), me ? OwnNameBottom : 4f);
             }
             UiKit.SetText(r.Rank, rankStr);
             UiKit.SetText(r.Name, name);
             UiKit.SetText(r.Crowns, crowns);
             UiKit.SetText(r.Letter, initial);
+            Color avc = AvatarColors[(int)(unchecked((uint)initial[0] * 2654435761u + (uint)name.Length * 40503u) % (uint)AvatarColors.Length)];   // a steady colour per player, no photo needed
+            if (r.AvatarBg.color != avc) r.AvatarBg.color = avc;
             string url = avatarUrl ?? "";
             if (r.Url != url)
             {
@@ -787,7 +934,7 @@ namespace FluffyClimbers.Gameplay
             {
                 // a new week started while the screen was open: read the fresh (empty) boards
                 lastRemaining = secs;
-                if (ComputeState() == State.Ready) { data = null; positionedBoard = -1; Layout(width, height); LoadData(true); }
+                if (ComputeState() == State.Ready) { data = null; slotsData = null; positionedBoard = -1; Layout(width, height); LoadData(true); }
                 return;
             }
             lastRemaining = secs;
@@ -945,18 +1092,37 @@ namespace FluffyClimbers.Gameplay
 
         // ---------------- helpers for the scene ----------------
 
+        /// <summary>Tests: scrolls the list to this offset in canvas units (0 = top), clamped; runs the same path as a finger scroll (rows re-bound, pin updated).</summary>
+        public void ScrollToOffset(float y)
+        {
+            if (content == null || viewport == null) return;
+            float max = Mathf.Max(0f, content.sizeDelta.y - vpH);
+            content.anchoredPosition = new Vector2(0f, Mathf.Clamp(y, 0f, max));
+            OnScrolled(Vector2.zero);
+        }
+
+        /// <summary>Tests: the scroll offset that puts row <paramref name="index"/> (0 based) at the top of the list.</summary>
+        public static float OffsetOfRow(int index) { return LeaderboardPin.RowTop(index, RowH, RowGap, PadTop) - PadTop; }
+
+        /// <summary>Tests: height of the list area right now (the full viewport, or less while the pinned card is shown).</summary>
+        public float ListHeight { get { return vpH; } }
+        /// <summary>Tests: whole rows that fit the full list area (no pinned card).</summary>
+        public int RowsFitting { get { return LeaderboardPin.RowsFitting(vpFullH, RowH, RowGap, PadTop); } }
+
         /// <summary>Tests: scrolls the list to the normalised position (1 = top, 0 = bottom).</summary>
         public void ScrollTo(float normalized)
         {
             if (scroll != null) scroll.verticalNormalizedPosition = Mathf.Clamp01(normalized);
             if (content != null) lastScrollY = content.anchoredPosition.y;
             BindPool(false);
+            UpdatePin(false);
         }
 
         /// <summary>Called when the screen is left (the meta scene destroys the root): drops the hub subscription.</summary>
         public void Dispose()
         {
             LeaderboardHub.Changed -= hubHandler;
+            breakdownOpen = false;
         }
     }
 

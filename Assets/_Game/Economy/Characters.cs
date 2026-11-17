@@ -100,27 +100,27 @@ namespace FluffyClimbers.Economy
         static readonly CharacterSpec Dandy = new CharacterSpec { Id = "dandy", Name = "Dandy", Rarity = CharacterRarity.Common, Region = 1, Stats = FromTable("dandy", 0, 100, 4) };
         static readonly CharacterSpec Pip = new CharacterSpec { Id = "pip", Name = "Pip", Rarity = CharacterRarity.Common, Region = 1, Stats = FromTable("pip", 0, 50, 1) };
 
-        // Region 2 (Mushroom Grove) extra Common heroes (F4.2): Capi is the starter, these four come as hero cards. Nib the squirrel = coin finder (Magnet, CoinFind), Spike the hedgehog = Shield,
+        // Region 2 (Mushroom Grove) extra Common heroes (F4.2): Capi is the starter, these four come as hero cards. Nib the squirrel = coin finder (Glide Cape, CoinFind), Spike the hedgehog = Shield,
         // Moss the snail kid = Wall Stick (best wall bounce), Fenn the fox kit = extra run coins and gems.
         static readonly CharacterSpec Nib = new CharacterSpec { Id = "nib", Name = "Nib", Rarity = CharacterRarity.Common, Region = 2, Stats = FromTable("nib", 20, 100, 2) };
         static readonly CharacterSpec Spike = new CharacterSpec { Id = "spike", Name = "Spike", Rarity = CharacterRarity.Common, Region = 2, Stats = FromTable("spike", 0, 50, 3) };
         static readonly CharacterSpec Moss = new CharacterSpec { Id = "moss", Name = "Moss", Rarity = CharacterRarity.Common, Region = 2, Stats = FromTable("moss", 0, 90, 3) };
         static readonly CharacterSpec Fenn = new CharacterSpec { Id = "fenn", Name = "Fenn", Rarity = CharacterRarity.Common, Region = 2, Stats = FromTable("fenn", 0, 100, 5) };
         // Region 3 (Sunny Beach) extra Common heroes (F4.3): Otto is the starter, these four come as hero cards. Pinch the crab = Shield, Shelly the sea turtle = Slow Time (calm control), Bloop the pufferfish kid = Double Jump (jump),
-        // Coco the monkey = Magnet and a coin find stat (no coins in his art).
+        // Coco the monkey = Safety Net and a coin find stat (no coins in his art).
         static readonly CharacterSpec Pinch = new CharacterSpec { Id = "pinch", Name = "Pinch", Rarity = CharacterRarity.Common, Region = 3, Stats = FromTable("pinch", 0, 60, 3) };
         static readonly CharacterSpec Shelly = new CharacterSpec { Id = "shelly", Name = "Shelly", Rarity = CharacterRarity.Common, Region = 3, Stats = FromTable("shelly", 0, 70, 2) };
         static readonly CharacterSpec Bloop = new CharacterSpec { Id = "bloop", Name = "Bloop", Rarity = CharacterRarity.Common, Region = 3, Stats = FromTable("bloop", 0, 90, 2) };
         static readonly CharacterSpec Coco = new CharacterSpec { Id = "coco", Name = "Coco", Rarity = CharacterRarity.Common, Region = 3, Stats = FromTable("coco", 30, 80, 1) };
 
         // Region 4 (Candy Canyon) extra Common heroes (F4.4): Bonbon is the starter, these four come as hero cards. Gummi the gummy bear = Shield (best wall bounce), Choco the chocolate bunny = Double Jump (jump),
-        // Marsh the marshmallow kid = Slow Time (calm control), Cookie the cookie kid = Magnet and a coin find stat. Region 4 stats sit slightly above Region 3, inside the Momo +-10 percent band (docs/42).
+        // Marsh the marshmallow kid = Slow Time (calm control), Cookie the cookie kid = Wide Platforms and a coin find stat. Region 4 stats sit slightly above Region 3, inside the Momo +-10 percent band (docs/42).
         static readonly CharacterSpec Gummi = new CharacterSpec { Id = "gummi", Name = "Gummi", Rarity = CharacterRarity.Common, Region = 4, Stats = FromTable("gummi", 0, 80, 3) };
         static readonly CharacterSpec Choco = new CharacterSpec { Id = "choco", Name = "Choco", Rarity = CharacterRarity.Common, Region = 4, Stats = FromTable("choco", 0, 100, 1) };
         static readonly CharacterSpec Marsh = new CharacterSpec { Id = "marsh", Name = "Marsh", Rarity = CharacterRarity.Common, Region = 4, Stats = FromTable("marsh", 0, 90, 4) };
         static readonly CharacterSpec Cookie = new CharacterSpec { Id = "cookie", Name = "Cookie", Rarity = CharacterRarity.Common, Region = 4, Stats = FromTable("cookie", 35, 80, 4) };
         // Region 5 (Bamboo Temple) extra Common heroes (F4.5): Bao is the starter, these four come as hero cards. Sprout the bamboo sprout = Shield, Tora the tiger cub = Double Jump (jump),
-        // Rusu the red panda = Magnet and a coin find stat, Ryu the wingless dragon pup = Rocket (speed). Region 5 stats sit above Region 4, inside the Momo +-10 percent band (docs/43).
+        // Rusu the red panda = Safety Net and a coin find stat, Ryu the wingless dragon pup = Rocket (speed). Region 5 stats sit above Region 4, inside the Momo +-10 percent band (docs/43).
         static readonly CharacterSpec Sprout = new CharacterSpec { Id = "sprout", Name = "Sprout", Rarity = CharacterRarity.Common, Region = 5, Stats = FromTable("sprout", 0, 70, 5) };
         static readonly CharacterSpec Tora = new CharacterSpec { Id = "tora", Name = "Tora", Rarity = CharacterRarity.Common, Region = 5, Stats = FromTable("tora", 0, 60, 4) };
         static readonly CharacterSpec Rusu = new CharacterSpec { Id = "rusu", Name = "Rusu", Rarity = CharacterRarity.Common, Region = 5, Stats = FromTable("rusu", 40, 80, 5) };

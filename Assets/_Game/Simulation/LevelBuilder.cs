@@ -759,6 +759,39 @@ namespace FluffyClimbers.Simulation
                     if (gemRows[gi] == row) list.Add(MakePickup(cfg, PickupKind.Gem, EdgeX(ctx, row, screen, wallMin, wallMax), ctx.Y[row] + Fx.FromRatio(12, 10), gemTiers[gi]));
             }
 
+            // Collectible gems (owner Bug List 4 item 9): levels 5, 10, 15, 20, 25 hold 2 or 3 gems with a seeded 50 percent chance (GemLevels.GemsInLevel,
+            // from the level seed alone). They are the only gems in the level (the fixed first-clear gems are paid by RewardCalculator): only gems the player picks up pay. Gem k of n sits in the k-th equal band of the climb
+            // (rows 6 .. limit - 3), on a Normal platform (never a hazard, moving or special kind) at a seeded row, floating 1.4 u above the platform centre: a normal
+            // jump off or onto that platform takes it, so no wall touch or risky route is needed (level 10 forbids wall bounces; level 15 ends on its hidden gem row,
+            // limitRow keeps the gems below it). Separate stream: stars and the old gem spots do not move.
+            int fixedGems = spec.Endless ? 0 : GemLevels.GemsInLevel(spec.LevelIndex, spec.LevelSeed);
+            if (fixedGems > 0)
+            {
+                Rng fr = new Rng(spec.Seed ^ 0x51ED270B);
+                int gLo = 6, gHi = limitRow - 3 < gLo + fixedGems ? gLo + fixedGems : limitRow - 3;
+                int span = gHi - gLo + 1;
+                for (int k = 0; k < fixedGems; k++)
+                {
+                    int bandLo = gLo + span * k / fixedGems, bandHi = gLo + span * (k + 1) / fixedGems - 1;
+                    if (bandHi < bandLo) bandHi = bandLo;
+                    int row = bandLo + fr.Next(bandHi - bandLo + 1);
+                    int best = -1;
+                    for (int off = 0; off <= bandHi - bandLo && best < 0; off++)
+                    {
+                        int cand = bandLo + (row - bandLo + off) % (bandHi - bandLo + 1);
+                        if (cand < 1 || cand > rows || ctx.K[cand] != PlatformKind.Normal) continue;
+                        bool taken = false;
+                        for (int si = 0; si < 3; si++) if (starRows[si] == cand) taken = true;
+                        for (int gi = 0; gi < gemRows.Length; gi++) if (gemRows[gi] == cand) taken = true;
+                        for (int q = 0; q < list.Count; q++)
+                            if (list[q].Kind == PickupKind.Gem && Fx.Abs(list[q].Y - ctx.Y[cand]) < Fx.FromInt(3)) taken = true;
+                        if (!taken) best = cand;
+                    }
+                    if (best < 0) best = row > rows ? rows : row;
+                    list.Add(MakePickup(cfg, PickupKind.Gem, Fx.Clamp(ctx.X[best], wallMin, wallMax), ctx.Y[best] + Fx.FromRatio(14, 10), 0));
+                }
+            }
+
             if (hiddenGem)
             {
                 Pickup g = new Pickup();

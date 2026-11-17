@@ -57,5 +57,46 @@ namespace FluffyClimbers.Economy
         [JsonProperty("granted")] public List<string> GrantedClaims = new List<string>();
         /// <summary>UTC day (yyyyMMdd) the consent popup was last declined: it asks again at most once a day.</summary>
         [JsonProperty("declinedDay")] public string DeclinedDay = "";
+        /// <summary>Last slot list (the player's calculation) the service answered for the current week, kept so the calculation popup works offline (owner Bug List 5, 2026-11-17). Additive, null until the first answer.</summary>
+        [JsonProperty("slotsCache", NullValueHandling = NullValueHandling.Ignore)] public LeaderboardSlotsCache SlotsCache;
+        /// <summary>Fingerprint (week + slots with their times) of the breakdown the service last confirmed, so an unchanged breakdown is not uploaded again (owner 2026-11-17). Empty = nothing confirmed. Additive.</summary>
+        [JsonProperty("bdSent", DefaultValueHandling = DefaultValueHandling.Ignore)] public string BreakdownSent = "";
+    }
+
+    /// <summary>One counted slot of the week: the best crown in one level, or one Endless / Time Attack region, in one Gameplay setting. Ids are the service ids (<c>c.lvl_001_06.1</c>, <c>e.region_001_meadow_springs.4</c>, <c>t....</c>).</summary>
+    public sealed class WeekSlotInfo
+    {
+        [JsonProperty("id")] public string SlotId = "";
+        [JsonProperty("crown")] public long Crown;
+        [JsonProperty("floors")] public int Floors;
+        [JsonProperty("mode")] public int Mode;
+        [JsonProperty("hero", NullValueHandling = NullValueHandling.Ignore)] public string HeroId = "";
+        /// <summary>Base score the crown was made from (floors + sum of chain_length^2); 0 = unknown (a slot taken from an old cache). Chain squares = Score - Floors. Additive.</summary>
+        [JsonProperty("score", DefaultValueHandling = DefaultValueHandling.Ignore)] public int Score;
+        /// <summary>Best combo chain of the run (display only). Additive.</summary>
+        [JsonProperty("combo", DefaultValueHandling = DefaultValueHandling.Ignore)] public int Combo;
+        /// <summary>Every chain length of the run (capped at <see cref="BreakdownMerge.MaxChains"/>); null = not known. Additive.</summary>
+        [JsonProperty("ch", NullValueHandling = NullValueHandling.Ignore)] public int[] Chains;
+        /// <summary>UTC Unix seconds when this version of the slot was made (owner 2026-11-17: the newest version wins on phone and cloud). 0 = unknown (older than the sync). On the cloud it is the phone's claim clamped by the server to [week start, receipt time].</summary>
+        [JsonProperty("at", DefaultValueHandling = DefaultValueHandling.Ignore)] public long At;
+        /// <summary>UTC Unix seconds when the SERVICE received this version (0 = never uploaded). The phone clock is not trusted, this is the server's own stamp.</summary>
+        [JsonProperty("ra", DefaultValueHandling = DefaultValueHandling.Ignore)] public long ReceivedAt;
+        /// <summary>True when the numbers come from the service's replay of a run (the authoritative result), false for display-only data uploaded by a phone.</summary>
+        [JsonProperty("v", DefaultValueHandling = DefaultValueHandling.Ignore)] public bool Verified;
+
+        public WeekSlotInfo Copy()
+        {
+            return new WeekSlotInfo { SlotId = SlotId, Crown = Crown, Floors = Floors, Mode = Mode, HeroId = HeroId, Score = Score, Combo = Combo, Chains = Chains == null ? null : (int[])Chains.Clone(), At = At, ReceivedAt = ReceivedAt, Verified = Verified };
+        }
+    }
+
+    /// <summary>The service's answer to "which slots make my crowns this week", stored in the save (see <see cref="LeaderboardSaveData.SlotsCache"/>).</summary>
+    public sealed class LeaderboardSlotsCache
+    {
+        [JsonProperty("week")] public string WeekKey = "";
+        [JsonProperty("slots")] public List<WeekSlotInfo> Slots = new List<WeekSlotInfo>();
+        /// <summary>Overall, Regions, Endless totals as the service counts them (valid when <see cref="TotalsKnown"/>).</summary>
+        [JsonProperty("totals")] public long[] Totals = new long[3];
+        [JsonProperty("totalsKnown")] public bool TotalsKnown;
     }
 }

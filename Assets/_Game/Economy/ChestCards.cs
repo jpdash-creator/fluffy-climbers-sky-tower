@@ -18,7 +18,7 @@ namespace FluffyClimbers.Economy
     public static partial class ChestRolls
     {
         public const int IronPowerUps = 1, GoldenPowerUps = 3;
-        /// <summary>Coin ranges and power-up counts are unchanged since Bug List 5 F3. With the 2026-11-13 odds and card values the worth is about x3.6 (Iron) and x5.3 (Gold); the owner accepts richer chests.</summary>
+        /// <summary>Coin ranges and power-up counts are unchanged since Bug List 5 F3. With the 2026-11-13 odds and card values the worth is about x3.5 (Iron) and x5.3 (Gold); the owner accepts richer chests.</summary>
         public const int IronMinCoins = 800, IronMaxCoins = 1200, GoldenMinCoins = 3000, GoldenMaxCoins = 4200;
         public const int IronPrice = 100, IronPriceTen = 1000, GoldenPrice = 300, GoldenPriceTen = 3000;
         /// <summary>The shop rate used in every worth number: 20 coins are worth 1 gem (same as bundles).</summary>
@@ -79,7 +79,7 @@ namespace FluffyClimbers.Economy
 
         /// <summary>
         /// Worth multiplier of ONE chest at its Open 1 price (Open 10 is ten of them for ten times the gems, so the same): (average coins / 20 + power-ups x the average gem price of one
-        /// random power-up + expected hero card gems) / gems paid. <paramref name="avgPowerUpGems"/> is the mean gem price of the implemented power-up types (60.71 today).
+        /// random power-up + expected hero card gems) / gems paid. <paramref name="avgPowerUpGems"/> is the mean gem price of the implemented power-up types (58.33 today).
         /// </summary>
         public static double WorthMultiplier(ChestKind kind, double avgPowerUpGems)
         {

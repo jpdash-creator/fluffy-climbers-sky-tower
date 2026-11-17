@@ -82,6 +82,41 @@ namespace FluffyClimbers.Gameplay
             return best;
         }
 
+        /// <summary>
+        /// Wide Platforms (owner Bug List 7): the NEXT WIDER painted piece of this kind and thorny side, i.e. the narrowest one whose walkable width is at least target (width x 1.2).
+        /// When no painted piece is that wide, the widest one at or above fallbackWidth is returned (closest legal option, never a stretched sprite); -1 when there is none.
+        /// </summary>
+        public int KindPieceIndexAtOrAbove(FluffyClimbers.Simulation.PlatformKind kind, int dir, float target, float fallbackWidth)
+        {
+            if (KindPieces == null) return -1;
+            int k = (int)kind;
+            int up = -1, widest = -1;
+            for (int i = 0; i < KindPieces.Length; i++)
+            {
+                if (KindPieces[i].Kind != k || KindPieces[i].Sprite == null) continue;
+                if (KindPieces[i].Dir != 0 && KindPieces[i].Dir != dir) continue;
+                float w = KindPieces[i].WidthUnits;
+                if (w >= target - 0.01f && (up < 0 || w < KindPieces[up].WidthUnits)) up = i;
+                if (w >= fallbackWidth - 1.01f && (widest < 0 || w > KindPieces[widest].WidthUnits)) widest = i;
+            }
+            return up >= 0 ? up : widest;
+        }
+
+        /// <summary>Same as <see cref="KindPieceIndexAtOrAbove"/> for the plain width pieces (WidthKinds: 0 normal, 1 crumble, 2 moving, 3 bounce); -1 when the region has none of that kind.</summary>
+        public int WidthPieceIndexAtOrAbove(int widthKind, float target)
+        {
+            if (WidthPieces == null || WidthUnits == null) return -1;
+            int up = -1, widest = -1;
+            for (int k = 0; k < WidthUnits.Length; k++)
+            {
+                if (WidthPieces[k] == null || WidthKinds == null || k >= WidthKinds.Length || WidthKinds[k] != widthKind) continue;
+                float w = WidthUnits[k];
+                if (w >= target - 0.01f && (up < 0 || w < WidthUnits[up])) up = k;
+                if (widest < 0 || w > WidthUnits[widest]) widest = k;
+            }
+            return up >= 0 ? up : widest;
+        }
+
         public Sprite KindSprite(FluffyClimbers.Simulation.PlatformKind kind)
         {
             int i = (int)kind;

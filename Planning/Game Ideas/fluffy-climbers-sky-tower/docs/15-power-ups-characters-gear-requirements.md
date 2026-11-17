@@ -12,7 +12,7 @@ Legend. Priority **P0/P1/P2**. Tags: **[OWNER]**, **[CODE]** read from the code,
 
 | ID | Item | Status 2026-11-01 |
 |---|---|---|
-| O-1 | Power-ups: Flight, Rocket, Double Jump, Wall Stick, many more. | Built: 7 types (Flight, Rocket, Double Jump, Wall Stick, Shield, Magnet, Slow Time). Four more rows exist hidden (Spring Boots, Coin Doubler, Star Seeker, Safety Net, not implemented). |
+| O-1 | Power-ups: Flight, Rocket, Double Jump, Wall Stick, many more. | Built: 9 types (Flight, Rocket, Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms, Slow Time; the Magnet was replaced 2026-11-16). Four more rows exist hidden (Spring Boots, Coin Doubler, Star Seeker, Safety Net, not implemented). |
 | O-2 | Chests: Coin, Gear, Power-up. | **Superseded (doc 20, doc 22):** two chests, **Iron** and **Gold**, each paying coins and power-ups. |
 | O-3 | Gear (Hats, Shirts, Pants, Boots). | **Removed 2026-10-24 (doc 20) and again 2026-11-01: no gear.** |
 | O-4 | VIP with 6 levels (jump, gems, coins percent). | **Superseded (doc 26 section 2):** Weekly and Monthly Subscription, no stat bonuses. |
@@ -65,7 +65,7 @@ The 5 playable regions and their mechanics: 1 Meadow Springs (bounce flowers plu
 
 - **Owned stock, no cap.** Counts per type are saved at once; stored counts above the old 99 are kept. Bought in the shop (coins or gems), won from Iron and Gold chests, Bundles, Rewards and the monthly Subscription (random type, equal chance).
 - **No loadout, no carry cap.** Every owned type has a round button in a compact side block above the jump button (mirrored for left-handed play). The old `loadout` field stays in the save and is ignored.
-- **A tap while active adds the full duration** onto the remaining time (Flight +10 s, Rocket +20 floors, Double Jump / Wall Stick / Magnet / Slow Time +30 s, Shield +60 s).
+- **A tap while active adds the full duration** onto the remaining time (Flight +10 s, Rocket +20 floors, Double Jump / Wall Stick / Shield / Glide Cape / Wide Platforms +20 s, Slow Time +30 s; Safety Net is armed, not timed).
 - Bundle prices: 5 units -10 percent, 10 or more -20 percent.
 - Ranked runs ignore power-ups. They never change what a star needs; every level stays bot-proven solvable with an empty stock.
 
@@ -75,17 +75,19 @@ The 5 playable regions and their mechanics: 1 Meadow Springs (bounce flowers plu
 |---|---|---|---|---|---|---|---|
 | 1 | **Flight** | Fly upward and steer; gongs cannot hurt you; stops 3 rows below the top | 10 s | 1,500 | 75 | 0.82 | Built |
 | 2 | **Rocket** | Auto-climb 20 floors in about 4 s; gongs harmless; stops before the last floors | about 4 s (20 floors) | 1,500 | 75 | 0.82 | Built |
-| 3 | **Double Jump** | One extra air jump per air phase | 30 s | 1,000 | 50 | 0.55 | Built |
-| 4 | **Wall Stick** | Stick to side walls up to 1.5 s, jump to leap off | 30 s | 1,000 | 50 | 0.55 | Built |
-| 5 | **Shield** | Gongs cannot hurt you | 60 s | 1,000 | 50 | 0.55 | Built |
-| 6 | **Magnet** | Gems and stars come from farther (+2.0 u) | 30 s | 1,000 | 50 | 0.55 | Built |
+| 3 | **Double Jump** | One extra air jump per air phase | 20 s | 1,000 | 50 | 0.55 | Built |
+| 4 | **Wall Stick** | Stick to side walls up to 1.5 s, jump to leap off | 20 s | 1,000 | 50 | 0.55 | Built |
+| 5 | **Shield** | Gongs cannot hurt you | 20 s | 1,000 | 50 | 0.55 | Built |
+| 6 | **Safety Net** | Armed any time before a fall; the first fall bounces you up about 10 floors, once per run (pw_safety_net) | not timed | 1,000 | 50 | 0.55 | Built (Bug List 4, replaces the Magnet) |
+| 6b | **Glide Cape** | Auto slow-mo: after every jump the whole game runs at half speed until you land (pw_glide, owner 2026-11-17) | 20 s | 1,000 | 50 | 0.55 | Built (Bug List 4) |
+| 6c | **Wide Platforms** | Platforms 20 percent wider to land on (was 50 until 2026-11-17) (pw_wide_platforms) | 20 s | 1,000 | 50 | 0.55 | Built (Bug List 4) |
 | 7 | **Slow Time** | The rising danger zone moves 50 percent slower | 30 s | 1,500 | 75 | 0.82 | Built |
 | 8 | Spring Boots | next 3 jumps 20 percent higher | 3 uses | 1,000 | - | - | Hidden, not implemented |
 | 9 | Coin Doubler | doubles the end-of-level coins | 1 use | 120 | - | - | Hidden, not implemented; not planned (pays more than it costs) |
 | 10 | Star Seeker | arrows to uncollected stars | 12 s | 800 | - | - | Hidden, not implemented |
-| 11 | Safety Net | catches the first fall | 1 use | 1,500 | - | - | Hidden, not implemented |
+| 11 | (old Safety Net row, reserved id pw_safetynet) | replaced by the real Safety Net above (id pw_safety_net) | - | - | - | - | Retired |
 
-Average value of a random power-up unit: **60.7 gems** (4 types at 50, 3 at 75). Cost per second of effect: Flight 7.5 gems, Rocket 18.75, Slow Time 2.5, Double Jump / Wall Stick / Magnet 1.67, Shield 0.83 (doc 27 RC 5).
+Average value of a random power-up unit: **58.3 gems** (6 types at 50, 3 at 75). Cost per second of effect: Flight 7.5 gems, Rocket 18.75, Slow Time 2.5, Double Jump / Wall Stick / Shield / Glide Cape / Wide Platforms 2.5 (doc 27 RC 5).
 
 ### 3.3 Interaction with region mechanics (tested per region)
 
@@ -95,8 +97,8 @@ Average value of a random power-up unit: **60.7 gems** (4 types at 50, 3 at 75).
 | Rocket | stops at the row limit | same | same | immune | same |
 | Double Jump | allowed after a launch | keeps use on a drifting platform | sticky penalty applies | knockback keeps the use | works |
 | Wall Stick | works | works | works | works | works |
-| Shield | n/a | n/a | n/a | absorbs gong hits for 60 s | n/a |
-| Magnet | pulls | pulls | pulls | pulls | pulls |
+| Shield | n/a | n/a | n/a | absorbs gong hits for 20 s | n/a |
+| Safety Net | bounces | bounces | bounces | bounces | bounces |
 | Slow Time | scroll only | drift unchanged | unchanged | gong period unchanged | unchanged |
 
 ### 3.4 Requirements
@@ -108,7 +110,7 @@ Average value of a random power-up unit: **60.7 gems** (4 types at 50, 3 at 75).
 | FR-PWR-3 | HUD buttons: one round button per owned type, at least 48 dp, thumb zone, ring for remaining time, text name (not colour only), left-handed mirror, no overlap with pause, jump or move pad. | P0 | `PowerUpButtonsFitEveryAspect`. | Built |
 | FR-PWR-4 | Flight and Rocket (row limit at the goal, no star auto-collect, gongs harmless). | P0 | Sim tests, deterministic replay. | Built |
 | FR-PWR-5 | Double Jump and Wall Stick. Spring Boots not built. | P0 | Sim tests. | Built (2 of 3) |
-| FR-PWR-6 | Shield, Magnet, Slow Time built. Safety Net, Star Seeker, Coin Doubler not built and hidden. | P1 | Sim tests per item. | Built (3 of 6) |
+| FR-PWR-6 | Shield, Safety Net, Glide Cape, Wide Platforms, Slow Time built. Safety Net, Star Seeker, Coin Doubler not built and hidden. | P1 | Sim tests per item. | Built (3 of 6) |
 | FR-PWR-7 | Cues without flashing; reduced motion shows a static icon. | P0 | Cue frequency audit. | Built |
 | FR-PWR-8 | Template for every new power-up. | P1 | `implemented` flag and `simParams` in `powerups.json`. | Built (format) |
 | FR-PWR-9 | Data file `Content/economy/powerups.json` (not `Content/items/`) and the built-in table are kept equal by a test. | P0 | `PowerUpTests`. | Built |
@@ -266,7 +268,7 @@ Built: `PowerUpTests`, `ChestTests`, `BundleTests`, `SubscriptionTests`, `Reward
 
 | Group | Tasks | State |
 |---|---|---|
-| T-PWR-1..6 | Data, HUD, Flight/Rocket, Double Jump/Wall Stick, Shield/Magnet/Slow Time, analytics | Done except analytics and the 4 hidden power-ups |
+| T-PWR-1..6 | Data, HUD, Flight/Rocket, Double Jump/Wall Stick, Shield/Safety Net/Glide/Wide Platforms/Slow Time, analytics | Done except analytics and the 4 hidden power-ups |
 | T-PWR-7 | Power-up icons real art | Done for the 7 sold types |
 | T-CHEST-1..6 | Chest data, roller, screen, animation, art | Done (Iron, Gold); pity, shards, earn rules **removed**, server roll Planned |
 | T-GEAR-1..7 | All gear tasks | **Removed (no gear)** |

@@ -185,7 +185,7 @@ Replays (history, now 50 percent once the level has 3 stars) paid 40 percent of 
 ### Item prices (as shipped)
 | Item | Coins | Gems | USD at reference rate |
 |---|---|---|---|
-| Double Jump, Wall Stick, Shield, Magnet | 1,000 | 50 | $0.55 |
+| Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms | 1,000 | 50 | $0.55 |
 | Flight, Rocket, Slow Time | 1,500 | 75 | $0.82 |
 | 5 power-ups of one type | -10 percent | -10 percent | |
 | 10 or more power-ups | -20 percent | -20 percent | |

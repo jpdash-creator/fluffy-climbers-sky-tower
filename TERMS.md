@@ -1,6 +1,6 @@
 # Fluffy Climbers: Tower Jump Terms of Use
 
-Last updated: 2026-11-13
+Last updated: 2026-11-17
 
 > **In short**
 >
@@ -118,7 +118,7 @@ Hero cards come only from regions you have unlocked. A hero you already own is g
 
 ## 9. Restoring purchases
 
-Settings > Restore asks the store for your purchase history and re-grants active subscription days (section 7). Consumable gem packs are delivered once and are never granted twice by Restore. Restore works only on a device signed in to the store account that made the purchase.
+Settings > Restore asks the store for your purchase history and re-grants active subscription days (section 7). The Game also keeps a purchase ledger (product id and store transaction id, no payment details) that survives a Reset and, while you are signed in, is part of your cloud save, so that purchases are recognised again after a reinstall and are never granted twice. Consumable gem packs are delivered once and are never granted twice by Restore. Restore works only on a device signed in to the store account that made the purchase.
 
 ## 10. Rewarded ads
 
@@ -131,11 +131,11 @@ Settings > Restore asks the store for your purchase history and re-grants active
 
 ## 11. Progress, saves and cloud sync
 
-- **Guests** save on their device only. If the device is lost, reset or the Game is uninstalled, the save, including gems, is gone and cannot be recovered by us. Android device backup is turned off for the Game.
-- **Leaderboards.** The weekly leaderboards (section 12a) are not part of your save: their data is kept on our leaderboard service for 90 days after each week and is not restored by a Reset or by installing on another device, except that the same Google Play Games account on another device continues the same weekly rows.
+- **Guests** save on their device only. If the device is lost, reset or the Game is uninstalled, the save, including gems, is gone and cannot be recovered by us. On the store version Android's own device backup is on by default, so Android may restore your save on a new or reset device from your Google backup; we do not receive or control that copy, and you can turn it off in your Android settings.
+- **Leaderboards.** The weekly leaderboards (section 12a) are not part of your save: their data is kept on our leaderboard service for 90 days after each week, and the same Google Play Games account on another device continues the same weekly rows. Reset progress while signed in deletes your weekly leaderboard entries (weekly scores and your uploaded crown calculation) and removes you from the boards of the open week; this cannot be undone. If the request cannot be sent at once, the Game keeps it and repeats it until it is confirmed. Your leaderboard display name and prize records are not removed by a reset; they are deleted on request (see our Privacy Policy, section 4a) or expire automatically.
 - **Google sign-in** keeps a copy of your save in your Google account through Google's Saved Games service. Uploads happen a few seconds after a change and when you pause or close the Game; they need a connection and can fail or be delayed. Google's terms govern that storage.
 - **Conflicts.** When the device save and the cloud save differ (for example two devices, or a guest save and an older cloud save), the Game shows you both and asks you to choose. **The save you do not pick is permanently replaced.** You are responsible for that choice. A cloud save written by a newer version of the Game is never overwritten by an older version; update the Game to continue.
-- **Reset progress** (Settings) permanently deletes all progress, wallet and items on the device and, when signed in, replaces the cloud save with the empty one. Only purchase records are kept so that subscriptions can be restored. There is no undo.
+- **Reset progress** (Settings) permanently deletes all progress, wallet and items on the device and, when signed in, replaces the cloud save with an empty one and deletes your weekly leaderboard entries. Only your shop purchase records (the purchase ledger) are kept, on the device and in the cloud save while you are signed in, so that purchases can be restored after a reinstall. Gems, coins and items that you already received are Virtual Items and are removed by a reset (section 5, Forfeiture); what Restore re-grants is described in section 9. There is no undo.
 - **Unlinking** your Google account stops uploads; the cloud save stays in your Google account until you delete it yourself (Google Play Games settings > delete Play Games data for this Game, or Google Drive > Settings > Manage apps > hidden app data). We hold no copy of it and cannot delete it for you.
 - **No liability for saves.** To the fullest extent permitted by law, we are not responsible for lost, corrupted, overwritten or unsynchronised progress or Virtual Items, whatever the cause (your choice in a conflict, device failure, uninstall, store or Google outage, a bug, cheating or an account change). We may, at our discretion and without obligation, try to help.
 - **Save integrity.** The save file is part of the Game. Reading, editing, copying, injecting or replacing it, or using an edited save in the Game, is prohibited (section 12).
@@ -161,8 +161,8 @@ You agree not to, and not to help anyone else to:
 
 ## 12a. Weekly leaderboards and prizes
 
-- **What they are.** The Game has three weekly leaderboards (Overall, Levels and Endless) that rank crown points. They are available only to players signed in with Google Play Games. Guests are not ranked. A week runs from Monday 00:00 to the next Monday 00:00 India time, and every board starts again at zero.
-- **Your name and picture are public.** By signing in and playing the leaderboards you agree that your Google Play Games display name, a link to your profile picture and your weekly score are stored on Google Cloud servers in Mumbai, India, and shown to all other players on the boards. If you do not want that, play as a guest or sign out of Google Play Games. Our Privacy Policy (section 4a) explains the data and how to have it deleted.
+- **What they are.** The Game has three weekly leaderboards (Overall, Levels and Endless) that rank crown points. They are available only to players signed in with Google Play Games. Guests are not ranked. A week runs from Monday 00:00 to the next Monday 00:00 UTC, and every board starts again at zero.
+- **Your name and picture are public.** By signing in and playing the leaderboards you agree that your Google Play Games display name, a link to your profile picture and your weekly score are stored on Google Cloud servers in Mumbai, India, and shown to all other players on the boards. If you do not want that, play as a guest or sign out of Google Play Games. Our Privacy Policy (section 4a) explains the data and how to have it deleted; Reset progress in Settings deletes your weekly scores (section 11).
 - **Runs are checked by us.** A score counts only after our server has replayed the run you submitted and reached the same result. Runs that cannot be replayed, or that differ from what you claimed, do not count. Scores can only be sent by the Game; we decide by the server's replay, not by what your device says.
 - **Cheating.** Section 12 applies in full. In particular, you must not forge, edit, replay-with-changes or generate runs, use bots, macros or other automation, send scores from a modified Game, or use several accounts to take prizes. We may remove scores, players and prizes that we reasonably believe were obtained that way, hide or change a display name or picture that is offensive or impersonates someone, and exclude players from the leaderboards or from prizes, without notice and without refund (section 13). Our decision on the ranking and on prizes is final, subject to your legal rights.
 - **Prizes.** After a week ends, the top 10 players of each board who also reach that board's entry limit can claim a prize from the Rewards screen in the Game. The first three ranks need a higher score than the entry limit (one and a half times it). The entry limits and the prize list can be changed by us before a week starts and are shown in the Game; a finished week keeps the limits it ran with. Prizes are Virtual Items (a bundle, chests, power-ups or coins) with no cash value, granted under section 5 and the odds shown in the Game, and each can be claimed once. A prize that you do not claim within 28 days after the week ends expires. Ties are decided by whoever reached the score first.

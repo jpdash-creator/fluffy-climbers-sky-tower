@@ -16,6 +16,7 @@ namespace FluffyClimbers.LeaderboardService
         readonly Dictionary<string, TotalsDoc> totals = new Dictionary<string, TotalsDoc>(); // weekKey|uid
         readonly Dictionary<string, BoardDoc> boards = new Dictionary<string, BoardDoc>();   // weekKey|board
         readonly Dictionary<string, ClaimDoc> claims = new Dictionary<string, ClaimDoc>();
+        readonly Dictionary<string, BreakdownDoc> breakdowns = new Dictionary<string, BreakdownDoc>();   // weekKey|uid
 
         static T Clone<T>(T o) where T : class { return o == null ? null : JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(o)); }
 
@@ -119,6 +120,47 @@ namespace FluffyClimbers.LeaderboardService
 
         readonly HashSet<string> usedTickets = new HashSet<string>();
         public Task<bool> ConsumeTicketAsync(string ticketId, string uid, DateTime expireAt) { lock (gate) return Task.FromResult(usedTickets.Add(ticketId)); }
+
+        public Task<DeletedEntries> DeletePlayerEntriesAsync(string uid)
+        {
+            lock (gate)
+            {
+                var res = new DeletedEntries();
+                var weeks = new HashSet<string>();
+                foreach (string k in slots.Keys.ToList())
+                {
+                    string[] parts = k.Split('|');   // weekKey|uid|slotId
+                    if (parts.Length >= 3 && parts[1] == uid) { slots.Remove(k); res.Slots++; weeks.Add(parts[0]); }
+                }
+                foreach (string k in totals.Keys.ToList())
+                {
+                    string[] parts = k.Split('|');   // weekKey|uid
+                    if (parts.Length == 2 && parts[1] == uid) { totals.Remove(k); res.Totals++; weeks.Add(parts[0]); }
+                }
+                foreach (string k in breakdowns.Keys.ToList())
+                {
+                    string[] parts = k.Split('|');   // weekKey|uid
+                    if (parts.Length == 2 && parts[1] == uid) { breakdowns.Remove(k); res.Breakdowns++; weeks.Add(parts[0]); }
+                }
+                res.WeekKeys.AddRange(weeks);
+                return Task.FromResult(res);
+            }
+        }
+
+        public Task<BreakdownDoc> GetBreakdownAsync(string weekKey, string uid) { lock (gate) { BreakdownDoc b; return Task.FromResult(breakdowns.TryGetValue(weekKey + "|" + uid, out b) ? Clone(b) : null); } }
+
+        public Task<BreakdownDoc> MergeBreakdownAsync(string weekKey, string uid, List<FluffyClimbers.Economy.WeekSlotInfo> upload, DateTime now, DateTime expireAt)
+        {
+            lock (gate)
+            {
+                string key = weekKey + "|" + uid;
+                BreakdownDoc cur;
+                breakdowns.TryGetValue(key, out cur);
+                BreakdownMergeResult m = BreakdownStep.Merge(cur, upload);
+                if (m.Changed) breakdowns[key] = cur = BreakdownStep.Build(weekKey, uid, m.Slots, now, expireAt);
+                return Task.FromResult(Clone(cur) ?? BreakdownStep.Build(weekKey, uid, m.Slots, now, expireAt));
+            }
+        }
 
         public Task<ClaimDoc> GetClaimAsync(string claimId) { lock (gate) { ClaimDoc c; return Task.FromResult(claims.TryGetValue(claimId, out c) ? Clone(c) : null); } }
     }

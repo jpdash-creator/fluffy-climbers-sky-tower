@@ -57,6 +57,7 @@ namespace FluffyClimbers.LeaderboardService
                 return u == null ? null : u.Uid;
             }
             IResult Out(ApiResult r) { return Results.Json(r.Body, statusCode: r.Status); }
+            bool Flag(string v) { return v == "1" || string.Equals(v, "true", StringComparison.OrdinalIgnoreCase); }
 
             app.MapGet("/healthz", () => Results.Ok(new { ok = true, content = repo.ContentHash, weekKey = WeekMath.WeekKey(DateTime.UtcNow) }));
 
@@ -72,16 +73,29 @@ namespace FluffyClimbers.LeaderboardService
                 return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await api.SubmitRunAsync(uid, sub));
             });
 
-            app.MapGet("/my-week", async (HttpContext c, bool? slots, bool? prizes) =>
+            // the app sends ?slots=1 and ?prizes=1: bind them as text (a bool? binding answers 400 to "1")
+            app.MapGet("/my-week", async (HttpContext c, string slots, string prizes) =>
             {
                 string uid = await Uid(c);
-                return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await api.MyWeekAsync(uid, slots == true, prizes == true));
+                return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await api.MyWeekAsync(uid, Flag(slots), Flag(prizes)));
             });
 
             app.MapPost("/claim-prize", async (HttpContext c, LeaderboardApi.ClaimRequest req) =>
             {
                 string uid = await Uid(c);
                 return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await api.ClaimPrizeAsync(uid, req));
+            });
+
+            app.MapPost("/delete-my-entries", async (HttpContext c) =>
+            {
+                string uid = await Uid(c);
+                return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await api.DeleteMyEntriesAsync(uid));
+            });
+
+            app.MapPost("/sync-breakdown", async (HttpContext c, LeaderboardApi.BreakdownRequest req) =>
+            {
+                string uid = await Uid(c);
+                return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await api.SyncBreakdownAsync(uid, req));
             });
 
             app.MapPost("/admin/tick", async (HttpContext c) =>

@@ -5,30 +5,30 @@ using System.Text;
 namespace FluffyClimbers.Leaderboard
 {
     /// <summary>
-    /// Week arithmetic of the weekly boards (mirrors the service WeekMath): a week runs from Monday 00:00 India time (UTC+05:30, no daylight saving) to the next Monday 00:00,
-    /// which is Sunday 18:30 UTC. Pure functions, no clock of their own (the caller passes UTC now), so tests can set any instant.
+    /// Week arithmetic of the weekly boards (mirrors the service WeekMath): a week runs from Monday 00:00 UTC (owner 2026-11-16; was India time) to the next Monday 00:00 UTC. Pure functions, no clock of their own (the caller passes UTC now), so tests can set any instant.
     /// </summary>
     public static class LeaderboardTime
     {
-        public static readonly TimeSpan IstOffset = new TimeSpan(5, 30, 0);
+        /// <summary>Offset of the week calendar from UTC: zero since 2026-11-16 (it was India time, +05:30).</summary>
+        public static readonly TimeSpan WeekOffset = TimeSpan.Zero;
         static readonly DateTime Epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        /// <summary>Monday 00:00 IST of the week that contains <paramref name="utcNow"/>, as a UTC instant.</summary>
+        /// <summary>Monday 00:00 UTC of the week that contains <paramref name="utcNow"/>, as a UTC instant.</summary>
         public static DateTime WeekStartUtc(DateTime utcNow)
         {
-            DateTime ist = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc) + IstOffset;
-            int back = ((int)ist.DayOfWeek + 6) % 7;   // Monday = 0
-            DateTime mondayIst = ist.Date.AddDays(-back);
-            return DateTime.SpecifyKind(mondayIst - IstOffset, DateTimeKind.Utc);
+            DateTime shifted = DateTime.SpecifyKind(utcNow, DateTimeKind.Utc) + WeekOffset;
+            int back = ((int)shifted.DayOfWeek + 6) % 7;   // Monday = 0
+            DateTime mondayLocal = shifted.Date.AddDays(-back);
+            return DateTime.SpecifyKind(mondayLocal - WeekOffset, DateTimeKind.Utc);
         }
 
-        /// <summary>The next Monday 00:00 India time (the moment the week ends and the boards reset), as a UTC instant.</summary>
+        /// <summary>The next Monday 00:00 UTC (the moment the week ends and the boards reset), as a UTC instant.</summary>
         public static DateTime WeekEndUtc(DateTime utcNow) { return WeekStartUtc(utcNow).AddDays(7); }
 
-        /// <summary>Week key = ISO date of that Monday in IST ("2026-11-09").</summary>
+        /// <summary>Week key = ISO date of that Monday in UTC ("2026-11-09").</summary>
         public static string WeekKey(DateTime utcNow)
         {
-            return (WeekStartUtc(utcNow) + IstOffset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return (WeekStartUtc(utcNow) + WeekOffset).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         }
 
         /// <summary>Time left until the week ends (never negative).</summary>

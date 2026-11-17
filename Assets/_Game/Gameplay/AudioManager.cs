@@ -17,11 +17,12 @@ namespace FluffyClimbers.Gameplay
     public sealed class AudioManager : MonoBehaviour
     {
         const int PoolSize = 8;
-        const float FadeSeconds = 0.8f;
+        const float FadeSeconds = 0.8f;         // the shuffle crossfade at the end of a menu track
+        const float HardFadeInSeconds = 0.12f;  // owner 2026-11-17: a changed bed starts almost at once (short ramp only to avoid a click); the old bed is cut on the same call
         const float MetaMusicVolume = 0.45f;
         const float RunMusicVolume = 0.28f;
+        const float MusicPitch = 1f;   // owner 2026-11-17: the menu loop file itself is now rendered at 50 percent pitch (original kept in Tools/music_gen/originals), so no runtime shift
         const string SfxFolder = "Audio/sfx/";
-        const string MusicLoopPath = "Audio/music/loop";
         const string MusicRegionPath = "Audio/music/region_";   // region_1 .. region_5
         const int RegionTracks = 30;   // one loop per region (owner 2026-10-24), loaded the first time the region is played
         const string MusicRunPath = "Audio/music/run";   // optional: when absent the run reuses the loop at a lower volume
@@ -91,7 +92,15 @@ namespace FluffyClimbers.Gameplay
         float[] musicVol;
         float[] musicTarget;
         MusicTrack wanted = MusicTrack.None;
-        AudioClip loopClip, runClip;
+        AudioClip runClip;
+        AudioClip[] menuClips;   // MusicCatalog order, loaded the first time each track plays
+        int menuIndex = -1;      // the menu track in use (shuffle position or the locked one)
+        bool menuFromLock;       // menuIndex was set by a locked choice or a preview: a switch to shuffle moves on to another track
+        int previewIndex = -1;   // >= 0 while the Menu music screen previews a track (plays even with Music off, loops)
+        bool shuffleOn;          // the active bed is a shuffling menu bed: the track is not looped and the next one is crossfaded in at its end
+        bool clipLoops = true;
+        float lastStart;
+        float fadeIn = HardFadeInSeconds;
         AudioClip[] regionClips;
         int wantedRegion;
 
@@ -107,9 +116,9 @@ namespace FluffyClimbers.Gameplay
                 clips[i] = Resources.Load<AudioClip>(SfxFolder + SfxNames[i]);   // null when missing: that cue stays silent
                 lastPlay[i] = -10f;
             }
-            loopClip = Resources.Load<AudioClip>(MusicLoopPath);
+            menuClips = new AudioClip[MusicCatalog.Count];
             runClip = Resources.Load<AudioClip>(MusicRunPath);
-            if (runClip == null) runClip = loopClip;
+            if (runClip == null) runClip = MenuClip(0);   // no dedicated run bed: the original menu loop at the run volume
             regionClips = new AudioClip[RegionTracks + 1];
 
             pool = new AudioSource[PoolSize];
@@ -117,7 +126,11 @@ namespace FluffyClimbers.Gameplay
             music = new AudioSource[2];
             musicVol = new float[2];
             musicTarget = new float[2];
-            for (int i = 0; i < 2; i++) music[i] = NewSource("Music" + i, true);
+            for (int i = 0; i < 2; i++)
+            {
+                music[i] = NewSource("Music" + i, true);
+                music[i].pitch = MusicPitch;
+            }
         }
 
         AudioSource NewSource(string sourceName, bool loop)
@@ -155,6 +168,38 @@ namespace FluffyClimbers.Gameplay
             if (SfxDucks[i]) DuckFor(Mathf.Min(c.length, MaxDuckHold));
         }
 
+        /// <summary>The menu clip of a MusicCatalog index (null when missing: the caller falls back to track 0 or stays silent, CUX-10).</summary>
+        AudioClip MenuClip(int index)
+        {
+            if (index < 0 || index >= menuClips.Length) return null;
+            if (menuClips[index] == null) menuClips[index] = Resources.Load<AudioClip>(MusicCatalog.ClipFolder + MusicCatalog.Ids[index]);
+            return menuClips[index];
+        }
+
+        /// <summary>Menu music screen: plays and loops the track at this MusicCatalog index now (even when Music is off, the player asked to hear it).</summary>
+        public static void PreviewMenuTrack(int index)
+        {
+            if (!Application.isPlaying) return;
+            AudioManager m = Instance;
+            if (m == null) return;
+            m.previewIndex = index;
+            m.ApplySettings();
+        }
+
+        /// <summary>Menu music screen closed or the player went back to Random: the menu bed follows the saved choice again.</summary>
+        public static void EndMenuPreview()
+        {
+            if (instance == null || instance.previewIndex < 0) return;
+            instance.previewIndex = -1;
+            instance.ApplySettings();
+        }
+
+        /// <summary>The MusicCatalog index being previewed on the Menu music screen, or -1.</summary>
+        public static int PreviewingMenuTrack { get { return instance != null ? instance.previewIndex : -1; } }
+
+        /// <summary>The MusicCatalog index of the track playing in the menus (-1 when none), for the Menu music screen.</summary>
+        public static int CurrentMenuTrack { get { return instance != null ? (instance.previewIndex >= 0 ? instance.previewIndex : instance.menuIndex) : -1; } }
+
         void SetTrack(MusicTrack track, int region)
         {
             wanted = track;
@@ -162,7 +207,11 @@ namespace FluffyClimbers.Gameplay
             ApplySettings();
         }
 
-        void ApplySettings()
+        /// <summary>
+        /// The ONE place that decides what the music does. <paramref name="hardCut"/> (the default: every change of bed, screen, popup, run start, setting) silences the old
+        /// track on this very call before the new one starts (no overlap, no tail); only the shuffle's own end-of-track crossfade passes false.
+        /// </summary>
+        void ApplySettings(bool hardCut = true)
         {
             if (pool == null) return;
             if (!GameSettings.Sound)
@@ -170,10 +219,35 @@ namespace FluffyClimbers.Gameplay
                 for (int i = 0; i < PoolSize; i++) pool[i].Stop();
             }
 
-            bool musicOn = GameSettings.Music;
+            bool preview = previewIndex >= 0 && wanted != MusicTrack.Run;
+            bool musicOn = GameSettings.Music || preview;
             AudioClip clip = null;
             float vol = 0f;
-            if (musicOn && wanted == MusicTrack.Meta) { clip = loopClip; vol = MetaMusicVolume; }
+            clipLoops = true;
+            shuffleOn = false;
+            if (musicOn && (wanted == MusicTrack.Meta || preview))
+            {
+                int idx;
+                if (preview) { idx = previewIndex; menuIndex = idx; menuFromLock = true; }
+                else
+                {
+                    int locked = MusicCatalog.LockedIndex;
+                    if (locked >= 0) { idx = locked; menuFromLock = true; }
+                    else
+                    {
+                        if (menuIndex < 0) menuIndex = MusicCatalog.PickNext(MusicCatalog.Count, MusicCatalog.LastPlayed, Random.Range(0, int.MaxValue));   // a different track than the last app start
+                        else if (menuFromLock) menuIndex = MusicCatalog.PickNext(MusicCatalog.Count, menuIndex, Random.Range(0, int.MaxValue));   // back to shuffle: move on from the locked or previewed track
+                        menuFromLock = false;
+                        idx = menuIndex;
+                        clipLoops = false;
+                        shuffleOn = true;
+                    }
+                    menuIndex = idx;
+                }
+                clip = MenuClip(idx);
+                if (clip == null) { clip = MenuClip(0); clipLoops = true; shuffleOn = false; }
+                vol = MetaMusicVolume;
+            }
             else if (musicOn && wanted == MusicTrack.Run)
             {
                 if (wantedRegion >= 1 && wantedRegion <= RegionTracks && regionClips[wantedRegion] == null) regionClips[wantedRegion] = Resources.Load<AudioClip>(MusicRegionPath + wantedRegion);   // null when missing: the shared run loop plays
@@ -200,7 +274,10 @@ namespace FluffyClimbers.Gameplay
             // One idempotent decision (MusicSelector): the same clip never restarts, a clip still fading out is taken back
             // without a restart, and a different clip cross-fades so two tracks never layer at full level.
             int id = clip.GetInstanceID();
-            MusicSelector.Action act = selector.Request(id);
+            MusicSelector.Action act = selector.Request(id, hardCut);
+            int cut = selector.CutSlot;
+            if (cut >= 0) { music[cut].Stop(); musicVol[cut] = 0f; musicTarget[cut] = 0f; music[cut].volume = 0f; }   // the old bed is gone this call
+            fadeIn = hardCut ? HardFadeInSeconds : FadeSeconds;
             int a = selector.Active;
             musicTarget[1 - a] = 0f;
             musicTarget[a] = vol;
@@ -209,11 +286,14 @@ namespace FluffyClimbers.Gameplay
                 AudioSource next = music[a];
                 next.Stop();
                 next.clip = clip;
-                next.loop = true;
+                next.loop = clipLoops;
                 musicVol[a] = 0f;
                 next.volume = 0f;
                 next.Play();
+                lastStart = Time.unscaledTime;
+                if (wanted == MusicTrack.Meta && !preview) MusicCatalog.LastPlayed = menuIndex;
             }
+            else music[a].loop = clipLoops;   // Keep or Resume: a switch between shuffle and locked on the same clip changes only the looping
             enabled = true;
         }
 
@@ -222,20 +302,38 @@ namespace FluffyClimbers.Gameplay
         {
             if (!GameSettings.Music || selector.ActiveClip == 0) return;
             duck.Duck(seconds);
+            float gain = duck.Gain;   // already at the floor: apply it to the sources now, not on the next Update (the jingle's first frame never meets a loud bed)
+            for (int i = 0; i < 2; i++) if (selector.IsPlaying(i)) music[i].volume = musicVol[i] * gain;
             enabled = true;
+        }
+
+        /// <summary>Shuffle: the playing menu track is near its end (or stopped by itself): crossfade in a different random track (never the same twice in a row).</summary>
+        void CheckShuffleEnd()
+        {
+            int a = selector.Active;
+            if (!selector.IsPlaying(a) || musicTarget[a] <= 0f || AudioListener.pause) return;
+            AudioSource s = music[a];
+            AudioClip c = s.clip;
+            if (c == null) return;
+            bool ending = c.length - s.time <= FadeSeconds + 0.05f;
+            bool stopped = !s.isPlaying && Time.unscaledTime - lastStart > 1f;
+            if (!ending && !stopped) return;
+            menuIndex = MusicCatalog.PickNext(MusicCatalog.Count, menuIndex, Random.Range(0, int.MaxValue));
+            ApplySettings(false);   // a new clip id: MusicSelector starts it in the other slot while this one fades out (the short crossfade)
         }
 
         void Update()
         {
             if (music == null) return;
+            if (shuffleOn) CheckShuffleEnd();
             float dt = Time.unscaledDeltaTime;
             duck.Tick(dt);
             float gain = duck.Gain;
-            float step = dt / FadeSeconds;
+            float stepDown = dt / FadeSeconds, stepUp = dt / fadeIn;
             for (int i = 0; i < 2; i++)
             {
                 if (!selector.IsPlaying(i)) continue;
-                if (musicVol[i] != musicTarget[i]) musicVol[i] = Mathf.MoveTowards(musicVol[i], musicTarget[i], step);
+                if (musicVol[i] != musicTarget[i]) musicVol[i] = Mathf.MoveTowards(musicVol[i], musicTarget[i], musicTarget[i] > musicVol[i] ? stepUp : stepDown);
                 music[i].volume = musicVol[i] * gain;
                 if (musicVol[i] <= 0f && musicTarget[i] <= 0f) { music[i].Stop(); selector.Stopped(i); }
             }

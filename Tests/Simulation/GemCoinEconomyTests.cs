@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 namespace FluffyClimbers.Simulation.Tests
 {
     /// <summary>
-    /// Economy review 2026-11-13 (owner), levels: NO gem pickups on the rows (every gem spot share is 0), gems only as the fixed milestone gems of levels 5/10/15/20/25 (1, 1, 2, 2, 3),
+    /// Economy review 2026-11-13 (owner), levels: NO gem pickups on the rows (every gem spot share is 0), gems only as collectible pickups (levels 5/10/15/20: 2 gems with a seeded 50 percent chance, level 25: 4; Bug List 4 item 9, 2026-11-16),
     /// campaign coin payout 56 + 48 per star + 4 per combo step (times the region factor), replays of a 3-star level pay 25 percent, and the coin income of a perfect player.
     /// Category: Economy.
     /// </summary>
@@ -55,12 +55,17 @@ namespace FluffyClimbers.Simulation.Tests
 
         [Fact]
         [Trait("Category", "Economy")]
-        public void NoGemSpotShareAndNoGemPickupsAnywhere()
+        public void NoGemSpotShareAnywhereAndOnlyTheCollectibleGemsArePlaced()
         {
             Assert.Equal(5, SimConfig.DifficultyGemPermille.Length);
             foreach (int share in SimConfig.DifficultyGemPermille) Assert.Equal(0, share);
             Assert.Equal(0, new SimConfig().GemSpotPermille);
-            for (int g = 1; g <= Regions; g++) Assert.Equal(0, PlacedGemPickups(g, SimConfig.DifficultyGemPermille[4]));
+            for (int g = 1; g <= Regions; g++)
+            {
+                int want = 0;
+                foreach (LoadedLevel ll in ContentLoader.LoadRegions(ContentLoader.FindRoot(), g, g)) want += GemLevels.GemsInLevel(ll.Spec.LevelIndex, ll.Spec.Seed);
+                Assert.Equal(want, PlacedGemPickups(g, SimConfig.DifficultyGemPermille[4]));
+            }
         }
 
         [Fact]
@@ -79,23 +84,53 @@ namespace FluffyClimbers.Simulation.Tests
 
         [Fact]
         [Trait("Category", "Economy")]
-        public void MilestoneGemsAreFixedOneOneTwoTwoThreePerRegion()
+        public void CollectibleGemsAreSeededTwoOrThreeOnLevels5To25AndFixedGemsAre1_2_2_3_4()
         {
-            Assert.Equal(new[] { 1, 1, 2, 2, 3 }, CoinPayoutRules.MilestoneGemTable);
+            int rolls = 0;
             for (int g = 1; g <= Regions; g++)
             {
-                int[] gems = JsonGemsPerLevel(g);
-                int total = 0;
-                for (int i = 1; i <= 25; i++)
+                int[] json = JsonGemsPerLevel(g);
+                foreach (LoadedLevel ll in ContentLoader.LoadRegions(ContentLoader.FindRoot(), g, g))
                 {
-                    Assert.Equal(CoinPayoutRules.MilestoneGemsOfLevel(i), gems[i]);
-                    total += gems[i];
+                    int idx = ll.Spec.LevelIndex;
+                    Assert.Equal(0, json[idx]);   // no fixed gem reward in the level JSON any more
+                    int n = GemLevels.GemsInLevel(idx, ll.Spec.Seed);
+                    Assert.Equal(n, GemLevels.GemsInLevel(idx, ll.Spec.Seed));   // deterministic
+                    if (idx % 5 == 0) { Assert.True(n == 0 || n == 2 || n == 3, ll.Id); rolls++; }
+                    else Assert.Equal(0, n);
+                    // the builder places exactly that many gem pickups (value 1 each)
+                    LevelData d = LevelBuilder.Build(new SimConfig(), ll.Spec);
+                    int placed = 0;
+                    foreach (Pickup p in d.Pickups)
+                    {
+                        if (p.Kind != PickupKind.Gem) continue;
+                        placed++;
+                        Assert.Equal(0, p.Tag);
+                    }
+                    Assert.Equal(n, placed);
                 }
-                Assert.Equal(1, gems[5]); Assert.Equal(1, gems[10]); Assert.Equal(2, gems[15]); Assert.Equal(2, gems[20]); Assert.Equal(3, gems[25]);
-                Assert.Equal(9, total);
             }
-            Assert.Equal(0, CoinPayoutRules.MilestoneGemsOfLevel(8));
-            Assert.Equal(0, CoinPayoutRules.MilestoneGemsOfLevel(0));
+            Assert.Equal(25, rolls);
+            // The roll is a fair coin over many seeds (the 20 shipped rolls are too few to measure).
+            int many = 0;
+            int twos = 0, threes = 0;
+            for (int seed = 1; seed <= 4000; seed++)
+            {
+                int c = GemLevels.GemsInLevel(5, seed * 7919);
+                if (c > 0) many++;
+                if (c == 2) twos++;
+                if (c == 3) threes++;
+                Assert.True(c == 0 || c == 2 || c == 3);
+            }
+            Assert.InRange(many, 1800, 2200);
+            Assert.InRange(twos, 800, 1200);
+            Assert.InRange(threes, 800, 1200);
+            Assert.Equal(new[] { 0, 1, 2, 2, 3, 4, 0 }, new[] { GemLevels.FixedFirstClearGems(1), GemLevels.FixedFirstClearGems(5), GemLevels.FixedFirstClearGems(10), GemLevels.FixedFirstClearGems(15), GemLevels.FixedFirstClearGems(20), GemLevels.FixedFirstClearGems(25), GemLevels.FixedFirstClearGems(30) });
+            int tops = 0;
+            for (int seed = 1; seed <= 1000; seed++) if (GemLevels.GemsInLevel(25, seed * 104729) > 0) tops++;
+            Assert.InRange(tops, 400, 600);   // level 25 is a 50 percent roll too, not always 4
+            Assert.Equal(0, GemLevels.GemsInLevel(8, 1));
+            Assert.Equal(0, GemLevels.GemsInLevel(0, 1));
         }
 
         [Fact]

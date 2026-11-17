@@ -146,6 +146,8 @@ namespace FluffyClimbers.Gameplay
             Session.Mode = GameSettings.Difficulty;   // timed records are per Gameplay mode
             CharacterSpec runHero = HeroOverride ?? CharacterCatalog.Selected.Info;
             Session.HeroId = runHero != null && runHero.Id != null ? runHero.Id : "";
+            // one roll per copy (owner 2026-11-17): the run plays, and the leaderboard replays, the roll of the CHOSEN copy (GameSession.BuildRunCfg uses the same copy)
+            Session.HeroVariant = runHero != null && GameSession.Progress != null && runHero.Id == CharacterCatalog.Selected.Id ? GameSession.Progress.HeroVariant(runHero.Id, CharacterCatalog.SelectedCopy) : 0;
             if (GameSession.Progress != null) Session.ApplyStock(GameSession.Progress.BuildRunStock());   // before the HUD is built: it makes one button per owned type
             Session.ApplyHeroPowers(HeroOverride ?? CharacterCatalog.Selected.Info);   // the chosen hero's free powers (none for Common heroes); before the HUD is built too
             acc = 0f;
@@ -206,6 +208,12 @@ namespace FluffyClimbers.Gameplay
         void OnApplicationPause(bool paused) { if (paused) Pause(); }
         void OnApplicationFocus(bool focus) { if (!focus) Pause(); }
 
+        // A purchase during the run (the saved inventory changed) must reach the run at once: the stock and the buttons follow (RunSession.SyncStock, PowerUpBar.SyncOwned).
+        bool stockDirty;
+        ProgressService hookedProgress;
+        void MarkStockDirty() { stockDirty = true; }
+        void OnDestroy() { if (hookedProgress != null) hookedProgress.Changed -= MarkStockDirty; }
+
         float bundleTickAcc;   // run time toward the 45 minute bundle timer (ProgressService.TickPlayTime)
 
         void Tick()
@@ -213,6 +221,14 @@ namespace FluffyClimbers.Gameplay
             if (Session == null) return;
             float dt = Mathf.Min(Time.deltaTime, 0.1f);   // the game never changes timeScale; deltaTime also honours Time.captureFramerate in tests
             Input.Update();
+            if (GameSession.Progress != null && hookedProgress != GameSession.Progress)
+            {
+                if (hookedProgress != null) hookedProgress.Changed -= MarkStockDirty;
+                hookedProgress = GameSession.Progress;
+                hookedProgress.Changed += MarkStockDirty;
+                stockDirty = true;
+            }
+            if (stockDirty) { stockDirty = false; Session.SyncStock(GameSession.Progress.BuildRunStock()); }
             if (!Paused && !Session.Over && Hud.IntroRemaining <= 0f && GameSession.Progress != null) GameSession.Progress.FeedPlayTime(dt, false, Session.Region.Index);   // reward statistics: play time (no file write in a run)
             if (!Paused && !Session.Over && GameSession.Progress != null) { bundleTickAcc += dt; if (bundleTickAcc >= 1f) { GameSession.Progress.TickPlayTime(bundleTickAcc, true); bundleTickAcc = 0f; } }   // bundle timer: run time counts, no offer starts in a run, no file write
 

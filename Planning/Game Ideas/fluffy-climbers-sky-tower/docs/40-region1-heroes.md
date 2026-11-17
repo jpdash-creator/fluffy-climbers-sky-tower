@@ -58,7 +58,7 @@ Tier heroes are independent hero physics sets under the rarity rules of docs/44-
 
 Shown versus played stats and physics caps no longer exist as a mechanic: every hero plays exactly the numbers of the hero table, see docs/44 sections 4 and 8.
 
-Hero power pools (`TierRules.Pools`; tier n uses the first n): Bumble Flight, Magnet, Slow Time, Shield. Ribbi Double Jump, Wall Stick, Magnet, Rocket. Dandy Slow Time, Shield, Magnet, Double Jump. Pip Shield, Wall Stick, Slow Time, Magnet. Momo (existing): Double Jump, Magnet, Shield, Rocket.
+Hero power pools (`TierRules.Pools`; tier n uses the first n): Bumble Flight, Glide Cape, Slow Time, Shield. Ribbi Double Jump, Wall Stick, Safety Net, Rocket. Dandy Slow Time, Shield, Glide Cape, Double Jump. Pip Shield, Wall Stick, Slow Time, Safety Net. Momo (existing): Double Jump, Safety Net, Shield, Rocket. (Bug List 4, 2026-11-16: the Magnet was replaced by Safety Net, Glide Cape and Wide Platforms.)
 
 ## 3. How a player gets them (all heroes tied in)
 
@@ -96,11 +96,11 @@ Region 2 has the same shape as Region 1: 5 characters x 5 tiers = 25 heroes. Cap
 
 | Hero | Identity | Identity power (first of the pool) | Run bonus |
 |---|---|---|---|
-| Capi (existing) | wall and safe footing | Wall Stick (pool: Wall Stick, Shield, Magnet, Slow Time) | 90 coins, 1 gem |
-| Nib | coin finder | Magnet (Magnet, Double Jump, Slow Time, Rocket) | 100 coins, 2 gems |
-| Spike | defence | Shield (Shield, Magnet, Slow Time, Rocket) | 50 coins, 3 gems |
+| Capi (existing) | wall and safe footing | Wall Stick (pool: Wall Stick, Shield, Glide Cape, Slow Time) | 90 coins, 1 gem |
+| Nib | coin finder | Glide Cape (Glide Cape, Double Jump, Slow Time, Rocket) | 100 coins, 2 gems |
+| Spike | defence | Shield (Shield, Safety Net, Slow Time, Rocket) | 50 coins, 3 gems |
 | Moss | wall bounce | Wall Stick (Wall Stick, Shield, Slow Time, Double Jump) | 90 coins, 3 gems |
-| Fenn | run bonus | Rocket (Rocket, Magnet, Double Jump, Shield) | 100 coins, 5 gems |
+| Fenn | run bonus | Rocket (Rocket, Wide Platforms, Double Jump, Shield) | 100 coins, 5 gems |
 
 All Commons follow the rarity rules of docs/44 section 4 (numbers: section 8); every (run coins, run gems) pair of the 13 Common heroes is distinct. Tier physics follow doc 44 sections 4 and 8 (no percent chain); run add-ons drawn by `Tools/tier_rows.py` (seed BaseSeed + line index + 1000 x tier, line index continues after Pip: Nib 9, Spike 10, Moss 11, Fenn 12; Capi is line 1). Nib and Fenn take the better of two draws for run coins and gems (their identity is the run bonus). Capi's Uncommon row is the existing constant. Run add-ons per tier:
 

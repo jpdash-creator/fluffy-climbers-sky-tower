@@ -118,6 +118,64 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
+        public void TwoCopiesOfOneLegendaryAreTwoCardsAndEachCanBeChosen()
+        {
+            GameSession.InitForTests(new MemorySaveStore());
+            ProgressService svc = GameSession.Progress;
+            svc.AddCopies("momo_l", 2);
+            List<HeroCard> cards = CharacterCatalog.OwnedCards(svc);
+            var legend = new List<HeroCard>();
+            foreach (HeroCard c in cards) if (c.Id == "momo_l") legend.Add(c);
+            Assert.AreEqual(2, legend.Count, "two copies = two separately listed cards");
+            Assert.AreNotEqual(legend[0].Key, legend[1].Key);
+            Assert.IsTrue(HeroRolls.IsValidVariant("momo_l", svc.HeroVariant("momo_l")), "the hero's physics stay a legal pool entry");
+            Assert.AreEqual(2, svc.Data.HeroCopyRolls["momo_l"].Count, "each copy has its own roll (owner 2026-11-17)");
+            int pool = HeroRolls.PoolSize("momo_l");
+            if (pool >= 2) { svc.Data.HeroCopyRolls["momo_l"][0] = 0; svc.Data.HeroCopyRolls["momo_l"][1] = pool - 1; }   // two different legal rolls
+            CharacterSpec legendSpec = CharacterDefs.Get("momo_l");
+
+            string oldChoice = UnityEngine.PlayerPrefs.GetString("settings.character", "momo");
+            int oldCopy = UnityEngine.PlayerPrefs.GetInt("settings.character.copy", 0);
+            try
+            {
+                CharacterDef l = CharacterCatalog.Get("momo_l");
+                for (int pick = 0; pick < 2; pick++)
+                {
+                    CharacterCatalog.Select(l, pick);
+                    Assert.AreSame(l, CharacterCatalog.Selected);
+                    Assert.AreEqual(pick, CharacterCatalog.SelectedCopy);
+                    // the run plays the roll of the CHOSEN copy, and the hero sheet shows it
+                    FluffyClimbers.Simulation.SimConfig want = GameSession.Cfg.Clone();
+                    svc.StatsOf(legendSpec, pick).ApplyTo(want);
+                    FluffyClimbers.Simulation.SimConfig got = GameSession.BuildRunCfg();
+                    Assert.AreEqual(want.JumpBase, got.JumpBase, "run uses copy " + pick);
+                    Assert.AreEqual(want.MaxSpeed, got.MaxSpeed, "run uses copy " + pick);
+                    Assert.AreEqual(want.Accel, got.Accel, "run uses copy " + pick);
+                    Assert.AreEqual(want.WallBoost, got.WallBoost, "run uses copy " + pick);
+                    HeroSheetData sheet = HeroSheetData.For(l), forCopy = HeroSheetData.For(l, pick);
+                    for (int row = 0; row < 4; row++) Assert.AreEqual(forCopy.Stats[row, 1], sheet.Stats[row, 1], "the sheet of the chosen hero shows the chosen copy (stat " + row + ")");
+                    int ticks = 0;
+                    foreach (HeroCard c in legend)
+                    {
+                        bool chosen = CharacterCatalog.IsChosen(svc, c);
+                        Assert.AreEqual(c.Copy == pick, chosen, "only the picked copy carries the tick (pick " + pick + ", copy " + c.Copy + ")");
+                        if (chosen) ticks++;
+                    }
+                    Assert.AreEqual(1, ticks);
+                }
+                CharacterCatalog.Select(l, 7);   // a stale index clamps to the last card, still exactly one tick
+                Assert.AreEqual(1, CharacterCatalog.SelectedCopy);
+                Assert.IsFalse(HeroCards.IsChosen(legend[0], "momo", 0, 2), "another hero's card is never chosen");
+            }
+            finally
+            {
+                UnityEngine.PlayerPrefs.SetString("settings.character", oldChoice);
+                UnityEngine.PlayerPrefs.SetInt("settings.character.copy", oldCopy);
+                GameSession.Reset();
+            }
+        }
+
+        [Test]
         public void CharacterTestOwnedListHasOnlyCommonHeroes()
         {
             ProgressService.TestAllCharacters = true;

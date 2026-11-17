@@ -41,7 +41,7 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void PowerPoolsUseOnlyImplementedPowersAndAreOrderedPrefixes()
         {
-            var implemented = new HashSet<PowerUp> { PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Shield, PowerUp.Magnet, PowerUp.SlowTime };
+            var implemented = new HashSet<PowerUp> { PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Shield, PowerUp.SafetyNet, PowerUp.Glide, PowerUp.WidePlatforms, PowerUp.SlowTime };
             Assert.Equal(TierRules.Lines.Length, TierRules.Pools.Count);
             foreach (string line in TierRules.Lines)
             {
@@ -61,7 +61,7 @@ namespace FluffyClimbers.Simulation.Tests
             }
             Assert.Empty(TierRules.PowersFor("momo", CharacterRarity.Common));
             Assert.NotNull(TierRules.ValidatePowers("momo", CharacterRarity.Rare, new[] { PowerUp.DoubleJump }));
-            Assert.NotNull(TierRules.ValidatePowers("momo", CharacterRarity.Uncommon, new[] { PowerUp.Magnet }));
+            Assert.NotNull(TierRules.ValidatePowers("momo", CharacterRarity.Uncommon, new[] { PowerUp.SafetyNet }));
         }
 
         [Fact]

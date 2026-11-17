@@ -40,7 +40,7 @@ namespace FluffyClimbers.Simulation.Tests
 
         private static readonly PowerUp[] Timed =
         {
-            PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Shield, PowerUp.Magnet, PowerUp.SlowTime
+            PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Shield, PowerUp.Glide, PowerUp.WidePlatforms, PowerUp.SlowTime
         };
 
         // ---------- base durations ----------
@@ -48,11 +48,14 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void BaseDurationsAreTheOwnerValues()
         {
-            Assert.Equal(30 * 60, PowerUps.TotalTicks(Cfg, PowerUp.Magnet));
-            Assert.Equal(60 * 60, PowerUps.TotalTicks(Cfg, PowerUp.Shield));
-            Assert.Equal(30 * 60, PowerUps.TotalTicks(Cfg, PowerUp.WallStick));
+            // owner 2026-11-16: Double Jump, Wall Stick, Shield, Glide Cape and Wide Platforms last exactly 20 s
+            Assert.Equal(20 * 60, PowerUps.TotalTicks(Cfg, PowerUp.Glide));
+            Assert.Equal(20 * 60, PowerUps.TotalTicks(Cfg, PowerUp.WidePlatforms));
+            Assert.Equal(20 * 60, PowerUps.TotalTicks(Cfg, PowerUp.Shield));
+            Assert.Equal(20 * 60, PowerUps.TotalTicks(Cfg, PowerUp.WallStick));
             Assert.Equal(30 * 60, PowerUps.TotalTicks(Cfg, PowerUp.SlowTime));
-            Assert.Equal(30 * 60, PowerUps.TotalTicks(Cfg, PowerUp.DoubleJump));
+            Assert.Equal(20 * 60, PowerUps.TotalTicks(Cfg, PowerUp.DoubleJump));
+            Assert.Equal(0, PowerUps.TotalTicks(Cfg, PowerUp.SafetyNet));
             Assert.Equal(4 * 60, PowerUps.TotalTicks(Cfg, PowerUp.Rocket));
             Assert.Equal(20, Cfg.RocketFloors);
             Assert.Equal(10 * 60, PowerUps.TotalTicks(Cfg, PowerUp.Flight));
@@ -61,7 +64,7 @@ namespace FluffyClimbers.Simulation.Tests
 
         [Theory]
         [InlineData(PowerUp.Flight)] [InlineData(PowerUp.Rocket)] [InlineData(PowerUp.DoubleJump)] [InlineData(PowerUp.WallStick)]
-        [InlineData(PowerUp.Shield)] [InlineData(PowerUp.Magnet)] [InlineData(PowerUp.SlowTime)]
+        [InlineData(PowerUp.Shield)] [InlineData(PowerUp.Glide)] [InlineData(PowerUp.WidePlatforms)] [InlineData(PowerUp.SlowTime)]
         public void OneTapStartsTheBaseDuration_AndUsesOneUnit(PowerUp p)
         {
             Sim sim = Tower(120);
@@ -77,7 +80,7 @@ namespace FluffyClimbers.Simulation.Tests
 
         [Theory]
         [InlineData(PowerUp.Flight)] [InlineData(PowerUp.Rocket)] [InlineData(PowerUp.DoubleJump)] [InlineData(PowerUp.WallStick)]
-        [InlineData(PowerUp.Shield)] [InlineData(PowerUp.Magnet)] [InlineData(PowerUp.SlowTime)]
+        [InlineData(PowerUp.Shield)] [InlineData(PowerUp.Glide)] [InlineData(PowerUp.WidePlatforms)] [InlineData(PowerUp.SlowTime)]
         public void ATapWhileActiveAddsTheFullBaseTimeOnTopOfTheRemainingTime(PowerUp p)
         {
             Sim sim = Tower(300);
@@ -97,15 +100,15 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void MagnetExample_30sPlusTapIsRemainingPlus30s()
+        public void GlideExample_20sPlusTapIsRemainingPlus20s()
         {
             Sim sim = Tower(10);
-            SimState s = With(sim, PowerUp.Magnet, 2);
-            sim.Step(ref s, Bit(PowerUp.Magnet));
-            Run(sim, ref s, 10 * 60, 0);   // 10 s gone, 20 s left
-            Assert.Equal(20 * 60 - 1, s.MagnetTicks);
-            sim.Step(ref s, Bit(PowerUp.Magnet));
-            Assert.Equal(50 * 60 - 2, s.MagnetTicks);   // 50 s (less the two ticks already counted down)
+            SimState s = With(sim, PowerUp.Glide, 2);
+            sim.Step(ref s, Bit(PowerUp.Glide));
+            Run(sim, ref s, 10 * 60, 0);   // 10 s gone, 10 s left
+            Assert.Equal(10 * 60 - 1, s.CapeTicks);
+            sim.Step(ref s, Bit(PowerUp.Glide));
+            Assert.Equal(30 * 60 - 2, s.CapeTicks);   // 30 s (less the two ticks already counted down)
         }
 
         [Fact]
@@ -133,17 +136,17 @@ namespace FluffyClimbers.Simulation.Tests
         {
             Sim sim = Tower(10);
             SimState s = sim.NewState();
-            for (int i = 0; i < 150; i++) sim.Step(ref s, Bit(PowerUp.Magnet));
+            for (int i = 0; i < 150; i++) sim.Step(ref s, Bit(PowerUp.Glide));
             Assert.Equal(150, s.PwUsed);
-            Assert.Equal(150 * Cfg.MagnetTicks - 150, s.MagnetTicks);
+            Assert.Equal(150 * Cfg.GlideCapeTicks - 150, s.CapeTicks);
 
             Assert.Equal(int.MaxValue, PowerUps.SatAdd(int.MaxValue, 1));
             Assert.Equal(int.MaxValue, PowerUps.SatAdd(int.MaxValue - 1, 5));
             SimState nearMax = sim.NewState();
-            nearMax.MagnetTicks = int.MaxValue - 5;
-            sim.Step(ref nearMax, Bit(PowerUp.Magnet));
-            Assert.True(nearMax.MagnetTicks > 0, "no overflow to negative");
-            Assert.Equal(int.MaxValue - 1, nearMax.MagnetTicks);   // saturated at int.MaxValue, then one tick counted down
+            nearMax.CapeTicks = int.MaxValue - 5;
+            sim.Step(ref nearMax, Bit(PowerUp.Glide));
+            Assert.True(nearMax.CapeTicks > 0, "no overflow to negative");
+            Assert.Equal(int.MaxValue - 1, nearMax.CapeTicks);  // saturated at int.MaxValue, then one tick counted down
             nearMax.PwUsed = int.MaxValue;
             sim.Step(ref nearMax, Bit(PowerUp.Shield));
             Assert.Equal(int.MaxValue, nearMax.PwUsed);
@@ -157,9 +160,9 @@ namespace FluffyClimbers.Simulation.Tests
             // Flight and Rocket exclude each other; the five others all run together with one of them
             sim.Step(ref s, SimInput.PowerMask);
             int active = 0;
-            for (int i = 1; i <= PowerUps.TypeCount; i++) if (PowerUps.IsActive(in s, (PowerUp)i)) active++;
-            Assert.Equal(6, active);
-            Assert.Equal(6, s.PwUsed);
+            for (int i = 0; i < PowerUps.Implemented.Length; i++) if (PowerUps.IsActive(in s, PowerUps.Implemented[i])) active++;
+            Assert.Equal(8, active);   // Flight, Double Jump, Wall Stick, Shield, Slow Time, Safety Net (armed), Glide Cape, Wide Platforms
+            Assert.Equal(8, s.PwUsed);
             Assert.Equal(0, s.RocketTicks);   // Flight won; the rocket was refused
         }
 
@@ -345,12 +348,12 @@ namespace FluffyClimbers.Simulation.Tests
         // ---------- Wall Stick ----------
 
         [Fact]
-        public void WallStick_LastsThirtySecondsPerTap()
+        public void WallStick_LastsTwentySecondsPerTap()
         {
             Sim sim = Tower(6);
             SimState s = With(sim, PowerUp.WallStick, 1);
             sim.Step(ref s, Bit(PowerUp.WallStick));
-            Run(sim, ref s, 29 * 60, 0);
+            Run(sim, ref s, 19 * 60, 0);
             Assert.True(PowerUps.IsActive(in s, PowerUp.WallStick));
             Run(sim, ref s, 60, 0);
             Assert.False(PowerUps.IsActive(in s, PowerUp.WallStick));
@@ -375,7 +378,7 @@ namespace FluffyClimbers.Simulation.Tests
             {
                 int input = (t / 50) % 2 == 0 ? SimInput.Right : SimInput.Left;
                 if (rnd.Next(15) == 0) input |= SimInput.Jump;
-                if (rnd.Next(90) == 0) input |= PowerUps.InputBit((PowerUp)(1 + rnd.Next(PowerUps.TypeCount)));
+                if (rnd.Next(90) == 0) input |= PowerUps.InputBit(PowerUps.Implemented[rnd.Next(PowerUps.TypeCount)]);
                 sim.Step(ref s, input);
                 unchecked
                 {

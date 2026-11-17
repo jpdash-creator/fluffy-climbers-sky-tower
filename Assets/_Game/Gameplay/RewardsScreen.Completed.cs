@@ -31,6 +31,12 @@ namespace FluffyClimbers.Gameplay
         void AddCardsWithCompleted(RectTransform content, IReadOnlyList<RewardEntry> entries, bool claimable)
         {
             List<RewardEntry> done = null;
+            // Weekly (claimable): ready cards first (RewardOrder), then the open ones in table order; Daily keeps the table order.
+            if (claimable)
+            {
+                RewardTab tab = Tab;
+                entries = RewardOrder.Sort(entries, e => progress.IsRewardReady(tab, e), e => EntryDone(e, true));
+            }
             for (int i = 0; i < entries.Count; i++)
             {
                 RewardEntry e = entries[i];

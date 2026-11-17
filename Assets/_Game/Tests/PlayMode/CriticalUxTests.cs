@@ -373,6 +373,9 @@ namespace FluffyClimbers.Tests
             yield return CheckScreen("settings-restored", () => { meta.ShowSettings(); meta.ShowPurchasesRestored(2); }, problems);
             yield return CheckScreen("settings-nothing-to-restore", () => { meta.ShowSettings(); meta.ShowPurchasesRestored(0); }, problems);
             yield return CheckScreen("settings-code-box", () => { meta.ShowSettings(); meta.ShowAdminCodeBox(); }, problems);
+            yield return CheckScreen("menu-music", () => { meta.ShowSettings(); meta.ShowMenuMusic(); }, problems);
+            yield return CheckScreen("menu-music-locked", () => { MusicCatalog.Choice = "sky_circuit"; meta.ShowSettings(); meta.ShowMenuMusic(); }, problems);
+            MusicCatalog.Choice = MusicCatalog.Random;
             GameSession.Progress.SetAccount("guest", "");
 
             // Characters: the chosen character on the land stage, the row of 3 icon tabs (All Heroes, Merge, Powers; no bottom bar) and the list of OWNED hero cards (one card per copy, no counts)
@@ -424,7 +427,7 @@ namespace FluffyClimbers.Tests
             {
                 CharacterRarity rr = rar;
                 int powers = CharacterDefs.PowerCount[(int)rr];
-                var list = new[] { PowerUp.Flight, PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Magnet };   // up to 4 powers (Legendary)
+                var list = new[] { PowerUp.Flight, PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Glide };   // up to 4 powers (Legendary)
                 var pw = new PowerUp[powers];
                 for (int i = 0; i < powers; i++) pw[i] = list[i];
                 string label = "hero-sheet-" + rr.ToString().ToLowerInvariant();
@@ -499,7 +502,7 @@ namespace FluffyClimbers.Tests
             GameSettings.ShowDevRowsForTests = true;
             AccountScenario("guest");
             var holder = new RenderTexture[1];
-            string[] names = { "SoundToggle", "MusicToggle", "HapticsToggle", "Reduced motionToggle", "Left-handedToggle", "Pace ghostToggle", "TextsizeButton", "Google", "SaveProgress", "Reset", "RestorePurchases", "PrivacyPolicy", "TermsOfUse", "Admin", "VersionTap" };
+            string[] names = { "SoundToggle", "MusicToggle", "HapticsToggle", "Reduced motionToggle", "Left-handedToggle", "Pace ghostToggle", "TextsizeButton", "Google", "SaveProgress", "Reset", "RestorePurchases", "PrivacyPolicy", "TermsOfUse", "Admin" };
             foreach (Aspect a in Aspects)
             {
                 UiKit.SafeAreaNormalized = () => FullSafe;
@@ -1597,7 +1600,7 @@ namespace FluffyClimbers.Tests
             yield return Load("Run");
             var rc = Object.FindFirstObjectByType<RunController>();
             var problems = new List<string>();
-            Assert.AreEqual(7, rc.Hud.Powers.ButtonCount, "one button per owned type, no loadout limit");
+            Assert.AreEqual(9, rc.Hud.Powers.ButtonCount, "one button per owned type, no loadout limit");
             yield return CheckScreen("run-powerups-intro", () => { }, problems);   // the buttons wait until the intro text is gone
             Assert.IsFalse(rc.Hud.Powers.Visible, "hidden during the intro");
             rc.Hud.SkipIntro();
@@ -1629,20 +1632,20 @@ namespace FluffyClimbers.Tests
             yield return CheckScreen("run-powerups-ready", () => { }, problems);
 
             // activate every type through the input path: rings drain, counts stay, seconds show, nothing overlaps; Rocket is refused while Flight runs
-            foreach (PowerUp t in new[] { PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Shield, PowerUp.Magnet, PowerUp.SlowTime })
+            foreach (PowerUp t in PowerUps.Implemented)
                 rc.Input.LatchPower(t);
             for (frame = 61; frame <= 90; frame++) yield return null;
-            Assert.AreEqual(6, rc.Session.State.PwUsed, "six buttons reached the simulation, the Rocket waits for the Flight");
+            Assert.AreEqual(8, rc.Session.State.PwUsed, "eight buttons reached the simulation, the Rocket waits for the Flight");
             yield return CheckScreen("run-powerups-active", () => { }, problems);
-            // stacking: another tap on the Magnet adds the full 30 s onto the remaining time
-            int magnetBefore = rc.Session.State.MagnetTicks;
-            rc.Input.LatchPower(PowerUp.Magnet);
+            // stacking: another tap on the Glide Cape adds the full 20 s onto the remaining time
+            int glideBefore = rc.Session.State.CapeTicks;
+            rc.Input.LatchPower(PowerUp.Glide);
             for (frame = 91; frame <= 100; frame++) yield return null;
-            Assert.Greater(rc.Session.State.MagnetTicks, magnetBefore + 1500, "a second tap adds the base time");
+            Assert.Greater(rc.Session.State.CapeTicks, glideBefore + 1000, "a second tap adds the base time");
             yield return CheckScreen("run-powerups-stacked", () => { }, problems);
             rc.Session.SettlePowerUps(GameSession.Progress);
             Assert.AreEqual(2, GameSession.Progress.PowerUpCount("pw_flight"), "a used unit is gone after the run settles");
-            Assert.AreEqual(1, GameSession.Progress.PowerUpCount("pw_magnet"), "two taps used two units");
+            Assert.AreEqual(1, GameSession.Progress.PowerUpCount("pw_glide"), "two taps used two units");
             Assert.AreEqual(3, GameSession.Progress.PowerUpCount("pw_rocket"), "a refused tap costs nothing");
             Report(problems);
         }
@@ -1725,9 +1728,9 @@ namespace FluffyClimbers.Tests
             var rc = Object.FindFirstObjectByType<RunController>();
             var problems = new List<string>();
             PowerUpBar bar = rc.Hud.Powers;
-            Assert.AreEqual(7, bar.ButtonCount, "all seven types are bought: one merged button each, no separate hero buttons");
-            Assert.AreEqual(3, bar.LeftCount, "left group: Flight, Rocket, Double Jump");
-            Assert.AreEqual(4, bar.RightCount, "right group: Magnet, Shield, Slow Time, Wall Stick");
+            Assert.AreEqual(9, bar.ButtonCount, "all nine types are bought: one merged button each, no separate hero buttons");
+            Assert.AreEqual(4, bar.LeftCount, "left group: Double Jump, Rocket, Flight, Glide Cape");
+            Assert.AreEqual(5, bar.RightCount, "right group: Shield, Wall Stick, Slow Time, Wide Platforms, Safety Net");
             Assert.AreEqual(4, rc.Session.Hero.Count, "a Legendary hero has four free hero powers");
             int free = 0;
             for (int i = 0; i < bar.ButtonCount; i++)
@@ -1736,7 +1739,7 @@ namespace FluffyClimbers.Tests
                 Assert.AreEqual(rc.Session.Hero.IndexOf(bar.ButtonType(i)) >= 0, bar.ButtonHasFree(i), "FREE only on the hero's own types");
                 if (bar.ButtonHasFree(i)) free++;
             }
-            Assert.AreEqual(4, free, "the four hero powers are merged into four of the seven buttons");
+            Assert.AreEqual(4, free, "the four hero powers are merged into four of the nine buttons");
             Assert.IsFalse(bar.Visible, "hidden during the intro");
             rc.Hud.SkipIntro();
             int frame = 0;
@@ -1764,8 +1767,8 @@ namespace FluffyClimbers.Tests
             for (frame = 61; frame <= 75; frame++) yield return null;
             Assert.IsTrue(PowerUps.IsActive(in rc.Session.State, first));
             Assert.AreEqual(stockBefore, rc.Session.PowerStock(first), "the free hero power takes no inventory unit");
-            Assert.IsFalse(rc.Session.Hero.IsReady(heroIdx), "its rarity cooldown started");
-            for (int k = 0; k < rc.Session.Hero.Count; k++) if (k != heroIdx) Assert.IsTrue(rc.Session.Hero.IsReady(k), "each hero power has its own cooldown");
+            Assert.IsFalse(rc.Session.Hero.FreeAvailable(heroIdx), "its one free use of the run is spent");
+            for (int k = 0; k < rc.Session.Hero.Count; k++) if (k != heroIdx) Assert.IsFalse(rc.Session.Hero.FreeAvailable(k), "one free use per run in total: no other hero power is free any more");
             rc.Input.LatchPower(first);
             for (frame = 76; frame <= 90; frame++) yield return null;
             Assert.AreEqual(stockBefore - 1, rc.Session.PowerStock(first), "the second tap uses a bought unit");
@@ -1787,8 +1790,8 @@ namespace FluffyClimbers.Tests
             var problems = new List<string>();
             PowerUpBar bar = rc.Hud.Powers;
             int want = 0;
-            for (int i = (int)PowerUp.Flight; i <= (int)PowerUp.SlowTime; i++)
-                if (rc.Session.Hero.IndexOf((PowerUp)i) >= 0 || rc.Session.OwnedAtStart((PowerUp)i)) want++;
+            foreach (PowerUp t in PowerUps.Implemented)
+                if (rc.Session.Hero.IndexOf(t) >= 0 || rc.Session.OwnedAtStart(t)) want++;
             Assert.GreaterOrEqual(want, 4, "the four hero powers each have a button");
             Assert.AreEqual(want, bar.ButtonCount, "one button per type: bought or free");
             for (int i = 0; i < bar.ButtonCount; i++)
@@ -2158,7 +2161,7 @@ namespace FluffyClimbers.Tests
         {
             GameSession.Progress.ResetAll();
             GameSession.Progress.GrantPowerUp("pw_flight", 3);
-            GameSession.Progress.GrantPowerUp("pw_magnet", 12);
+            GameSession.Progress.GrantPowerUp("pw_glide", 12);
             GameSession.Progress.GrantPowerUp("pw_wallstick", 99);
         }
 
@@ -2193,9 +2196,9 @@ namespace FluffyClimbers.Tests
             yield return null;
             yield return null;
             Assert.AreEqual("Powers", meta.CurrentScreen);
-            Assert.AreEqual(7, meta.CurrentPowers.Cards.Count, "all 7 power-ups");
-            var expected = new Dictionary<string, int> { { "pw_flight", 3 }, { "pw_rocket", 0 }, { "pw_doublejump", 0 }, { "pw_magnet", 12 }, { "pw_shield", 0 }, { "pw_slowtime", 0 }, { "pw_wallstick", 99 } };
-            Assert.AreEqual(7, expected.Count);
+            Assert.AreEqual(9, meta.CurrentPowers.Cards.Count, "all 9 power-ups (Bug List 4: Magnet replaced by Safety Net, Glide Cape, Wide Platforms)");
+            var expected = new Dictionary<string, int> { { "pw_flight", 3 }, { "pw_rocket", 0 }, { "pw_doublejump", 0 }, { "pw_glide", 12 }, { "pw_shield", 0 }, { "pw_slowtime", 0 }, { "pw_wallstick", 99 }, { "pw_safety_net", 0 }, { "pw_wide_platforms", 0 } };
+            Assert.AreEqual(9, expected.Count);
             foreach (KeyValuePair<string, int> kv in expected)
             {
                 RectTransform card = FindRt("Power_" + kv.Key);
@@ -2356,17 +2359,17 @@ namespace FluffyClimbers.Tests
             var meta = Object.FindFirstObjectByType<MetaController>();
             GameSession.Progress.ResetAll();
             GameSession.Progress.AddCoins(50000);
-            GameSession.Progress.GrantPowerUp("pw_magnet", 5);   // owning some must not change the card either
+            GameSession.Progress.GrantPowerUp("pw_glide", 5);   // owning some must not change the card either
             meta.ShowShop(ShopScreen.TabCharacter, ShopScreen.PowerupsSection);
             yield return null;
             yield return null;
-            AssertShopCardsSayX1(7);
+            AssertShopCardsSayX1(9);
             int before = GameSession.Progress.PowerUpCount("pw_flight");
             meta.CurrentShop.TapBuyPowerUp(GameSession.Progress.PowerUpDefs.Get("pw_flight"), PowerUpCurrency.Coins);
             yield return null;
             yield return null;
             Assert.AreEqual(before + 1, GameSession.Progress.PowerUpCount("pw_flight"), "the purchase went through");
-            AssertShopCardsSayX1(7);
+            AssertShopCardsSayX1(9);
         }
 
         static void AssertShopCardsSayX1(int cards)
@@ -2413,6 +2416,10 @@ namespace FluffyClimbers.Tests
             // Release layout: price buttons only, the buy tap says "Not available yet".
             yield return CheckScreen("vip-release", () => { SubscriptionState(null, false); meta.ShowSubscription(); }, problems);
             yield return CheckScreen("vip-release-buy-popup", () => { SubscriptionState(null, false); meta.ShowSubscription(); meta.CurrentSubscription.TapBuy("weekly"); }, problems);
+            yield return CheckScreen("vip-plan-info-weekly", () => { SubscriptionState(null, false); meta.ShowSubscription(); meta.CurrentSubscription.ShowInfo("weekly"); }, problems);
+            yield return CheckScreen("vip-plan-info-weekly-plus", () => { SubscriptionState(null, false); meta.ShowSubscription(); meta.CurrentSubscription.ShowInfo("weekly_plus"); }, problems);
+            yield return CheckScreen("vip-plan-info-monthly", () => { SubscriptionState(null, false); meta.ShowSubscription(); meta.CurrentSubscription.ShowInfo("monthly"); }, problems);
+            yield return CheckScreen("vip-plan-info-premium", () => { SubscriptionState(null, false); meta.ShowSubscription(); meta.CurrentSubscription.ShowInfo("monthly_premium"); }, problems);
             yield return CheckScreen("vip-opened-from-shop", () => { SubscriptionState(null, false); meta.ShowShop(); meta.ShowSubscription(); }, problems);
 
             // Development layout: the test note, the confirm popup, then an active plan.

@@ -87,7 +87,7 @@ namespace FluffyClimbers.Economy
                 }
                 return lines;
             }
-            lines.Add(r.PowerCount + (r.PowerCount == 1 ? " hero power" : " hero powers") + ", ready again after " + r.CooldownSeconds + " s");
+            lines.Add(r.PowerCount + (r.PowerCount == 1 ? " hero power" : " hero powers") + ", each free once per run");
             lines.Add(TierRules.JumpBandText(rarity) + " over the default hero, Speed, Control and Wall Bounce set by limits");
             int slot = (int)rarity;   // owner 2026-11-13: milestone bonus on the first clear of levels 5/10/15/20/25 (CoinPayoutRules tables)
             lines.Add("Milestone bonus +" + FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusCoins(slot) + " coins +" + FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusGemsByRarity[System.Math.Min(slot, FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusGemsByRarity.Length - 1)] + " gems");

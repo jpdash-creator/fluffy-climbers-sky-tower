@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "contentHash": "631036387820c8018a93e17fe9350c7d4d1dd2e0e565d59df5b66a41c0d4c410",
+  "contentHash": "04d36e1bd24ec6d829e877eab6084af9a819bfbcebfb203f5203cf62e59d0bd3",
   "regions": [
     {
       "id": "region_001_meadow_springs",
@@ -1430,16 +1430,14 @@
       "class": "medium",
       "difficulty": 0.541,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 75
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -1532,10 +1530,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -1628,10 +1625,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -1725,10 +1721,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -1821,10 +1816,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 3,
-          "max": 3,
-          "firstClearGuaranteed": 3
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -1912,16 +1906,14 @@
       "class": "medium",
       "difficulty": 0.529,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 75
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2014,10 +2006,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2110,10 +2101,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2207,10 +2197,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2303,10 +2292,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 3,
-          "max": 3,
-          "firstClearGuaranteed": 3
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2394,16 +2382,14 @@
       "class": "medium",
       "difficulty": 0.545,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 75
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2496,10 +2482,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2592,10 +2577,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2689,10 +2673,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2785,10 +2768,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 3,
-          "max": 3,
-          "firstClearGuaranteed": 3
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2876,16 +2858,14 @@
       "class": "medium",
       "difficulty": 0.595,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 75
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -2978,10 +2958,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -3074,10 +3053,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -3171,10 +3149,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -3267,10 +3244,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 3,
-          "max": 3,
-          "firstClearGuaranteed": 3
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -3358,16 +3334,14 @@
       "class": "medium",
       "difficulty": 0.504,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 75
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -3460,10 +3434,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -3556,10 +3529,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -3653,10 +3625,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -3749,10 +3720,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 3,
-          "max": 3,
-          "firstClearGuaranteed": 3
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -3840,16 +3810,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -3943,10 +3911,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -4039,10 +4006,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -4130,16 +4096,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -4233,10 +4197,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -4329,10 +4292,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -4420,16 +4382,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -4523,10 +4483,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -4619,10 +4578,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -4710,16 +4668,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -4813,10 +4769,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -4909,10 +4864,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5000,16 +4954,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5103,10 +5055,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5199,10 +5150,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5290,16 +5240,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5393,10 +5341,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5489,10 +5436,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5580,16 +5526,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5683,10 +5627,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5779,10 +5722,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5870,16 +5812,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -5973,10 +5913,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -6069,10 +6008,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -6160,16 +6098,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -6263,10 +6199,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -6359,10 +6294,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -6450,16 +6384,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -6553,10 +6485,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -6649,10 +6580,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -6740,16 +6670,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -6843,10 +6771,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -6939,10 +6866,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -7030,16 +6956,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -7133,10 +7057,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -7229,10 +7152,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -7320,16 +7242,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -7423,10 +7343,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -7519,10 +7438,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -7610,16 +7528,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -7713,10 +7629,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -7809,10 +7724,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -7900,16 +7814,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8003,10 +7915,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8099,10 +8010,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8190,16 +8100,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8293,10 +8201,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8389,10 +8296,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8480,16 +8386,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8583,10 +8487,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8679,10 +8582,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8770,16 +8672,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8873,10 +8773,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -8969,10 +8868,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -9060,16 +8958,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -9163,10 +9059,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -9259,10 +9154,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -9350,16 +9244,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -9453,10 +9345,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -9549,10 +9440,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -9640,16 +9530,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -9743,10 +9631,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -9839,10 +9726,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -9930,16 +9816,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10033,10 +9917,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10129,10 +10012,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10220,16 +10102,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10323,10 +10203,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10419,10 +10298,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10510,16 +10388,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10613,10 +10489,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10709,10 +10584,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10800,16 +10674,14 @@
       "class": "complex",
       "difficulty": 0.4,
       "goal": {
-        "type": "comboChain",
-        "value": 3,
-        "count": 3
+        "type": "reachFloor",
+        "value": 90
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10903,10 +10775,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 1,
-          "max": 1,
-          "firstClearGuaranteed": 1
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     },
@@ -10999,10 +10870,9 @@
       },
       "rewards": {
         "gems": {
-          "chance": 1.0,
-          "min": 2,
-          "max": 2,
-          "firstClearGuaranteed": 2
+          "chance": 0.0,
+          "min": 0,
+          "max": 0
         }
       }
     }

@@ -344,7 +344,7 @@ namespace FluffyClimbers.Gameplay
             }
         }
 
-        /// <summary>Contents in words, one item per line: "12,000 coins", "Magnet x3", then the hidden-card hint. Used by the popups and the screen reader label.</summary>
+        /// <summary>Contents in words, one item per line: "12,000 coins", "Safety Net x3", then the hidden-card hint. Used by the popups and the screen reader label.</summary>
         public static string Describe(BundleDef def, string separator)
         {
             return Describe(def, separator, true);
@@ -833,7 +833,7 @@ namespace FluffyClimbers.Gameplay
                 return;
             }
             RectTransform overlay = host.NewOverlay();
-            const float panelW = 860f, W = 780f, gap = 12f, chipsY = 215f, colW = 250f, colGap = 15f;
+            const float panelW = 860f, W = 780f, gap = 12f, chipsY = 250f, colW = 250f, colGap = 15f;   // 250 (was 215): a long bundle name that wraps to two lines at 130 percent text reached the first chip row on 3:4 (layout audit 2026-11-14)
             float chipsH = ChipBlockHeight(ChipRows(def));
             float heroY = chipsY + chipsH + gap * 2f, heroH = def.HiddenCard ? Mathf.Max(80f, TextHeight(heroText, 40f, W - 100f)) : 0f;
             float chanceY = heroY + heroH + (def.HiddenCard ? gap : 0f);

@@ -34,7 +34,7 @@ namespace FluffyClimbers.Economy
             unchecked { return ((openIndex + 1) * (int)0x9E3779B1) ^ (((int)kind + 1) * 0x5bd1e995) ^ (accountSeed * 0x2545F491); }
         }
 
-        /// <summary>Mean gem price of one random power-up of the implemented types (the number the worth uses). 60.71 with the built-in catalog.</summary>
+        /// <summary>Mean gem price of one random power-up of the implemented types (the number the worth uses). 58.33 with the built-in catalog (3 x 75 + 6 x 50 over 9 types).</summary>
         public static double AveragePowerUpGems(PowerUpCatalog powerUps)
         {
             double sum = 0.0;
@@ -152,7 +152,7 @@ namespace FluffyClimbers.Economy
         {
             if (CharacterDefs.Get(id) == null || OwnsCharacter(id)) return false;
             Data.Characters.Add(id);
-            RollIfNew(id);   // docs/44 section 11
+            DealRolls(id);   // docs/44 section 11: the granted hero is one copy with its own roll
             Commit();
             return true;
         }
@@ -181,13 +181,15 @@ namespace FluffyClimbers.Economy
                 {
                     int have = PowerUpCount(pid);
                     Data.Inventory.Powerups[pid] = SaturatingAdd(have, 1);   // no stock cap: a chest always gives its power-ups
+                    LedgerAddPowerUp(pid, 1);   // a chest opened for gems is a shop purchase: its content stays through Reset progress
                 }
                 Data.Coins = SaturatingAdd(Data.Coins, c.Coins);
+                LedgerAddCoins(c.Coins);
                 contents.Add(c);
             }
             bool saved = false;
             foreach (ChestContents c in contents)
-                if (c.Hero != null && CharacterInventory.Exists(c.Hero.Id)) { AddCopies(c.Hero.Id, 1); saved = true; }   // the existing API; the first save also holds everything above
+                if (c.Hero != null && CharacterInventory.Exists(c.Hero.Id)) { AddBoughtCopy(c.Hero.Id); saved = true; }   // the existing API; the first save also holds everything above
             if (!saved) Commit();
             return ChestOpenResult.Ok;
         }

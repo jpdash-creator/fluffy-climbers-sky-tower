@@ -8,11 +8,11 @@ Code: `Economy/Characters.cs` (`CharacterDefs.Pinch / Shelly / Bloop / Coco`, `B
 
 | Hero | Identity | Identity power (first of the pool) | Run bonus |
 |---|---|---|---|
-| Otto (existing) | calm swimmer | Magnet (Magnet, Double Jump, Flight, Shield) | 100 coins, 3 gems |
-| Pinch | defence, wall grip | Shield (Shield, Wall Stick, Slow Time, Magnet) | 60 coins, 3 gems |
-| Shelly | calm control | Slow Time (Slow Time, Shield, Magnet, Double Jump) | 70 coins, 2 gems |
+| Otto (existing) | calm swimmer | Glide Cape (Glide Cape, Double Jump, Flight, Shield) | 100 coins, 3 gems |
+| Pinch | defence, wall grip | Shield (Shield, Wall Stick, Slow Time, Wide Platforms) | 60 coins, 3 gems |
+| Shelly | calm control | Slow Time (Slow Time, Shield, Glide Cape, Double Jump) | 70 coins, 2 gems |
 | Bloop | jump | Double Jump (Double Jump, Slow Time, Rocket, Shield) | 90 coins, 2 gems |
-| Coco | coin finder | Magnet (Magnet, Double Jump, Rocket, Slow Time), coin find +30 per level | 80 coins, 1 gem |
+| Coco | coin finder | Safety Net (Safety Net, Double Jump, Rocket, Slow Time), coin find +30 per level | 80 coins, 1 gem |
 
 Hero physics and the rarity rules: see docs/44-power-mechanics-bible.md (section 4 the rules, section 8 the numbers of every hero); every (run coins, run gems) pair of the 17 Common heroes is distinct. Run add-ons drawn by `Tools/tier_rows.py` (seed BaseSeed + line index + 1000 x tier; line index continues after Fenn: Pinch 13, Shelly 14, Bloop 15, Coco 16; Otto is line 2). Coco takes the better of two draws for run coins and gems. Otto's Uncommon row is the existing constant. The script's rounding now follows .NET ("0.0" formats from 15 significant digits); the rows of Regions 1 and 2 reproduce unchanged. Coco's flat coin find (+30 coins per cleared level) is kept by every tier.
 
@@ -51,6 +51,6 @@ Approved paintings (1728 x 2304, flat grey) in `Art/_candidates`: Otto r1 / e2 /
 ## 4. Open points for the owner
 
 - Coco Legendary: the trim removes part of the glow and part of the tail near the cape. The sparkles and bubbles around the Legendary and Elite paintings are dropped (they would need separate back pieces).
-- Coco and Nib are both coin finders (Magnet + coin find); Coco's flat find is +30 (Nib +20).
+- Coco and Nib are both coin finders (Glide Cape + coin find); Coco's flat find is +30 (Nib +20).
 - Legendary run bonus pays up to 2,000 extra coins per run (docs/44 section 7b).
 - Regions 4 and 5 still have only Common and Uncommon (F4.4 and F4.5).

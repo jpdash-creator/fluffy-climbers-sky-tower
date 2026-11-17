@@ -17,7 +17,7 @@ namespace FluffyClimbers.LeaderboardService
     public sealed class ApplyOutcome
     {
         public bool Accepted;
-        /// <summary>rate_limited, variant_locked, implausible, ok.</summary>
+        /// <summary>rate_limited, implausible, ok.</summary>
         public string Error;
         public bool Improved;
         public long PreviousCrown, SlotCrown;
@@ -53,11 +53,9 @@ namespace FluffyClimbers.LeaderboardService
             // ---- plausibility ----
             if (rr.Crown > lim.MaxCrownPerRun) { outcome.Error = "implausible"; return outcome; }
 
-            // ---- hero variant lock: a hero keeps the variant it was first used with (all variants are equal strength by construction) ----
-            int lockedVariant;
-            if (newPlayer.HeroVariants.TryGetValue(inp.Run.HeroId, out lockedVariant) && lockedVariant != inp.Run.HeroVariant && HeroRolls.IsValidVariant(inp.Run.HeroId, lockedVariant)
-                && HeroRolls.IsRollable(inp.Run.HeroId))
-            { outcome.Error = "variant_locked"; return outcome; }
+            // ---- hero variant: since 2026-11-17 every COPY of a tier hero has its own roll, so one account legitimately plays one hero with several variants. There is no per-hero lock any more;
+            // the replay already proved the variant is a real pool entry (RunReplayer: bad_variant; Common heroes are never rolled) and all pool entries are equal strength by the Forgiveness Index gate.
+            // The last variant used is only recorded for support. ----
             newPlayer.HeroVariants[inp.Run.HeroId] = inp.Run.HeroVariant;
 
             newPlayer.LastSubmitAt = inp.Now;

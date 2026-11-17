@@ -27,13 +27,36 @@ namespace FluffyClimbers.Simulation
             for (int i = 0; i < powers.Length && Count < MaxPowers; i++)
             {
                 PowerUp p = powers[i];
-                if (!PowerUps.IsImplemented(p)) continue;
+                if (!PowerUps.IsImplemented(p) || !PowerUps.IsHeroCapable(p)) continue;
                 bool dup = false;
                 for (int j = 0; j < Count; j++) if (types[j] == p) dup = true;
                 if (dup) continue;
                 types[Count++] = p;
             }
         }
+
+        // ---- FREE ONCE PER RUN (owner 2026-11-16, Bug List 4): ONE free use per run IN TOTAL, shared by every power of the hero (the first free use of any of them spends it).
+        // The effect is the matching normal power-up with its normal timing. A retry builds a new session (free again); a revive keeps the session, so a spent free use stays spent
+        // and an unspent one stays available. The cooldown members above are kept for old callers; the run no longer uses them. ----
+
+        bool freeUsed;
+
+        /// <summary>True while the run's one free use is unspent and the power at this index exists.</summary>
+        public bool FreeAvailable(int index) { return index >= 0 && index < Count && !freeUsed; }
+
+        /// <summary>Spends the run's free use. Returns false (nothing changes) when it was already spent or the power does not exist.</summary>
+        public bool TryUseFree(int index)
+        {
+            if (!FreeAvailable(index)) return false;
+            freeUsed = true;
+            return true;
+        }
+
+        /// <summary>True once the run's free use was spent (false for a hero without powers).</summary>
+        public bool AllFreeUsed { get { return Count > 0 && freeUsed; } }
+
+        /// <summary>Makes the free use available again (a restart of the run; NOT called by a revive).</summary>
+        public void ResetFree() { freeUsed = false; }
 
         public PowerUp Type(int index) { return index >= 0 && index < Count ? types[index] : PowerUp.None; }
 

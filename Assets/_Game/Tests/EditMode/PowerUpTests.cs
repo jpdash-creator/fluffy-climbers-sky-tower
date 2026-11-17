@@ -36,7 +36,7 @@ namespace FluffyClimbers.Tests
             string json = File.ReadAllText(Path.Combine(ProjectRoot, "Content", "economy", "powerups.json"));
             PowerUpCatalog fromJson = PowerUpCatalog.FromJson(json);
             PowerUpCatalog builtIn = PowerUpCatalog.BuiltIn();
-            Assert.AreEqual(11, fromJson.All.Count);
+            Assert.AreEqual(12, fromJson.All.Count);
             Assert.AreEqual(fromJson.All.Count, builtIn.All.Count);
             for (int i = 0; i < builtIn.All.Count; i++)
             {
@@ -56,10 +56,10 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void SevenPowerUpsAreSoldAndTheirNumbersMatchTheSimulation()
+        public void NinePowerUpsAreSoldAndTheirNumbersMatchTheSimulation()
         {
             PowerUpCatalog c = PowerUpCatalog.BuiltIn();
-            Assert.AreEqual(7, c.Implemented.Count);
+            Assert.AreEqual(9, c.Implemented.Count);
             SimConfig cfg = new SimConfig();
             foreach (PowerUpDef d in c.Implemented)
             {
@@ -76,13 +76,20 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(1000, c.Get(PowerUp.DoubleJump).CoinPrice);
             Assert.AreEqual(1000, c.Get(PowerUp.WallStick).CoinPrice);
             Assert.AreEqual(1000, c.Get(PowerUp.Shield).CoinPrice);
-            Assert.AreEqual(1000, c.Get(PowerUp.Magnet).CoinPrice);
-            // owner durations of 2026-10-31 (seconds per tap): Magnet 30, Shield 60, Wall Stick 30, Slow Time 30, Double Jump 30, Rocket 4 (20 floors), Flight 10
-            Assert.AreEqual(30, c.Get(PowerUp.Magnet).DurationSec);
-            Assert.AreEqual(60, c.Get(PowerUp.Shield).DurationSec);
-            Assert.AreEqual(30, c.Get(PowerUp.WallStick).DurationSec);
+            foreach (PowerUp t in new[] { PowerUp.SafetyNet, PowerUp.Glide, PowerUp.WidePlatforms })
+            {
+                Assert.AreEqual(1000, c.Get(t).CoinPrice, "Bug List 4: the three new power-ups cost what the Magnet did");
+                Assert.AreEqual(50, c.Get(t).GemPrice);
+            }
+            Assert.IsNull(c.Get("pw_magnet"), "the Magnet is gone");
+            // owner durations of Bug List 4 (2026-11-16, seconds per tap): Double Jump, Wall Stick, Shield, Glide Cape, Wide Platforms 20; Safety Net is not timed; Slow Time 30; Rocket 4 (20 floors); Flight 10
+            Assert.AreEqual(20, c.Get(PowerUp.Shield).DurationSec);
+            Assert.AreEqual(20, c.Get(PowerUp.WallStick).DurationSec);
             Assert.AreEqual(30, c.Get(PowerUp.SlowTime).DurationSec);
-            Assert.AreEqual(30, c.Get(PowerUp.DoubleJump).DurationSec);
+            Assert.AreEqual(20, c.Get(PowerUp.DoubleJump).DurationSec);
+            Assert.AreEqual(20, c.Get(PowerUp.Glide).DurationSec);
+            Assert.AreEqual(20, c.Get(PowerUp.WidePlatforms).DurationSec);
+            Assert.AreEqual(0, c.Get(PowerUp.SafetyNet).DurationSec);
             Assert.AreEqual(4, c.Get(PowerUp.Rocket).DurationSec);
             Assert.AreEqual(10, c.Get(PowerUp.Flight).DurationSec);
             foreach (PowerUpDef d in c.Implemented) Assert.AreEqual(1, d.Uses, d.Id + ": one unit per tap");
@@ -106,6 +113,21 @@ namespace FluffyClimbers.Tests
         }
 
         // ---- stock ----
+
+        [Test]
+        public void OwnedMagnetsBecomeSafetyNetsOneToOneAndTheOldLoadoutDropsThem()
+        {
+            // Bug List 4 (2026-11-16): the Magnet is removed; the stock converts 1:1 and adds to Safety Nets already owned
+            var old = JsonConvert.DeserializeObject<SaveData>("{\"version\":3,\"inventory\":{\"powerups\":{\"pw_magnet\":3,\"pw_safety_net\":2,\"pw_flight\":4}},\"loadout\":[\"pw_magnet\",\"pw_shield\"],\"levels\":{},\"unlockedRegions\":[]}");
+            var st = new MemorySaveStore();
+            st.Save(old);
+            var svc = new ProgressService(repo, st);
+            Assert.AreEqual(5, svc.PowerUpCount("pw_safety_net"));
+            Assert.AreEqual(0, svc.PowerUpCount("pw_magnet"));
+            Assert.AreEqual(4, svc.PowerUpCount("pw_flight"));
+            Assert.IsFalse(svc.Data.Inventory.Powerups.ContainsKey("pw_magnet"));
+            CollectionAssert.DoesNotContain(svc.Data.Loadout, "pw_magnet");
+        }
 
         [Test]
         public void ANewOrOldSaveHasAnEmptyInventory()
@@ -155,31 +177,31 @@ namespace FluffyClimbers.Tests
         public void CountsSaturateInsteadOfOverflowing()
         {
             var svc = NewService();
-            Assert.AreEqual(int.MaxValue - 10, svc.GrantPowerUp("pw_magnet", int.MaxValue - 10));
-            Assert.AreEqual(10, svc.GrantPowerUp("pw_magnet", 50), "only the room that is left below int.MaxValue");
-            Assert.AreEqual(int.MaxValue, svc.PowerUpCount("pw_magnet"));
-            Assert.AreEqual(0, svc.GrantPowerUp("pw_magnet", 1));
+            Assert.AreEqual(int.MaxValue - 10, svc.GrantPowerUp("pw_safety_net", int.MaxValue - 10));
+            Assert.AreEqual(10, svc.GrantPowerUp("pw_safety_net", 50), "only the room that is left below int.MaxValue");
+            Assert.AreEqual(int.MaxValue, svc.PowerUpCount("pw_safety_net"));
+            Assert.AreEqual(0, svc.GrantPowerUp("pw_safety_net", 1));
             svc.AddCoins(100000);
-            Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp("pw_magnet", PowerUpCurrency.Coins));
-            Assert.AreEqual(int.MaxValue, svc.PowerUpCount("pw_magnet"), "buying on top of a full int saturates");
-            Assert.IsTrue(svc.TryConsumePowerUp("pw_magnet", 5));
-            Assert.AreEqual(int.MaxValue - 5, svc.PowerUpCount("pw_magnet"));
+            Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp("pw_safety_net", PowerUpCurrency.Coins));
+            Assert.AreEqual(int.MaxValue, svc.PowerUpCount("pw_safety_net"), "buying on top of a full int saturates");
+            Assert.IsTrue(svc.TryConsumePowerUp("pw_safety_net", 5));
+            Assert.AreEqual(int.MaxValue - 5, svc.PowerUpCount("pw_safety_net"));
         }
 
         [Test]
         public void ConsumeTakesUnitsOrChangesNothing()
         {
             var svc = NewService();
-            svc.GrantPowerUp("pw_magnet", 3);
-            Assert.IsFalse(svc.TryConsumePowerUp("pw_magnet", 4));
-            Assert.AreEqual(3, svc.PowerUpCount("pw_magnet"));
-            Assert.IsTrue(svc.TryConsumePowerUp("pw_magnet", 2));
-            Assert.AreEqual(1, NewService().PowerUpCount("pw_magnet"));
-            Assert.IsTrue(svc.TryConsumePowerUp("pw_magnet"));
-            Assert.AreEqual(0, svc.PowerUpCount("pw_magnet"));
-            Assert.IsFalse(svc.Data.Inventory.Powerups.ContainsKey("pw_magnet"), "zero counts are removed");
-            Assert.IsFalse(svc.TryConsumePowerUp("pw_magnet"));
-            Assert.IsFalse(svc.TryConsumePowerUp("pw_magnet", 0));
+            svc.GrantPowerUp("pw_safety_net", 3);
+            Assert.IsFalse(svc.TryConsumePowerUp("pw_safety_net", 4));
+            Assert.AreEqual(3, svc.PowerUpCount("pw_safety_net"));
+            Assert.IsTrue(svc.TryConsumePowerUp("pw_safety_net", 2));
+            Assert.AreEqual(1, NewService().PowerUpCount("pw_safety_net"));
+            Assert.IsTrue(svc.TryConsumePowerUp("pw_safety_net"));
+            Assert.AreEqual(0, svc.PowerUpCount("pw_safety_net"));
+            Assert.IsFalse(svc.Data.Inventory.Powerups.ContainsKey("pw_safety_net"), "zero counts are removed");
+            Assert.IsFalse(svc.TryConsumePowerUp("pw_safety_net"));
+            Assert.IsFalse(svc.TryConsumePowerUp("pw_safety_net", 0));
         }
 
         // ---- buying ----
@@ -264,7 +286,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(30, given);
             int owned = 0;
             foreach (PowerUpDef d in svc.PowerUpDefs.Implemented) owned += svc.PowerUpCount(d.Id);
-            Assert.AreEqual(7 * 99 + 30, owned, "nothing was skipped because a stack was full");
+            Assert.AreEqual(9 * 99 + 30, owned, "nothing was skipped because a stack was full");
         }
 
         // ---- no loadout: every owned type is in the run ----
@@ -276,7 +298,7 @@ namespace FluffyClimbers.Tests
             svc.GrantPowerUp("pw_flight", 250);
             svc.GrantPowerUp("pw_doublejump", 2);
             svc.GrantPowerUp("pw_shield", 9);
-            svc.GrantPowerUp("pw_magnet", 1);
+            svc.GrantPowerUp("pw_safety_net", 1);
             svc.GrantPowerUp("pw_slowtime", 1);
             svc.GrantPowerUp("pw_wallstick", 1);
             svc.GrantPowerUp("pw_rocket", 3);
@@ -287,7 +309,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(2, stock[(int)PowerUp.DoubleJump]);
             Assert.AreEqual(1, stock[(int)PowerUp.WallStick]);
             Assert.AreEqual(9, stock[(int)PowerUp.Shield]);
-            Assert.AreEqual(1, stock[(int)PowerUp.Magnet]);
+            Assert.AreEqual(1, stock[(int)PowerUp.SafetyNet]);
             Assert.AreEqual(1, stock[(int)PowerUp.SlowTime]);
             Assert.AreEqual(0, stock[(int)PowerUp.SpringBoots]);
             Assert.AreEqual(250, svc.PowerUpCount("pw_flight"), "building the run stock does not take anything");
@@ -298,23 +320,23 @@ namespace FluffyClimbers.Tests
         {
             var session = new RunSession(repo, new SimConfig(), "lvl_001_01");
             var stock = new int[PowerUps.MaxType + 1];
-            stock[(int)PowerUp.Magnet] = 2;
-            stock[(int)PowerUp.Shield] = 1;
+            stock[(int)PowerUp.Shield] = 2;
+            stock[(int)PowerUp.DoubleJump] = 1;
             session.ApplyStock(stock);
-            Assert.IsTrue(session.OwnedAtStart(PowerUp.Magnet));
+            Assert.IsTrue(session.OwnedAtStart(PowerUp.Shield));
             Assert.IsFalse(session.OwnedAtStart(PowerUp.Flight));
 
             session.Step(PowerUps.InputBit(PowerUp.Flight));   // not owned: dropped
             Assert.AreEqual(0, session.State.PwUsed);
-            session.Step(PowerUps.InputBit(PowerUp.Magnet));
-            Assert.AreEqual(1799, session.State.MagnetTicks);
-            Assert.AreEqual(1, session.PowerStock(PowerUp.Magnet));
-            session.Step(PowerUps.InputBit(PowerUp.Magnet));   // stacks: 30 s on top of the remaining time
-            Assert.AreEqual(1799 + 1800 - 1, session.State.MagnetTicks);
-            Assert.AreEqual(0, session.PowerStock(PowerUp.Magnet));
-            session.Step(PowerUps.InputBit(PowerUp.Magnet));   // nothing left: dropped
+            session.Step(PowerUps.InputBit(PowerUp.Shield));
+            Assert.AreEqual(1199, session.State.ShieldTicks);
+            Assert.AreEqual(1, session.PowerStock(PowerUp.Shield));
+            session.Step(PowerUps.InputBit(PowerUp.Shield));   // stacks: 20 s on top of the remaining time
+            Assert.AreEqual(1199 + 1200 - 1, session.State.ShieldTicks);
+            Assert.AreEqual(0, session.PowerStock(PowerUp.Shield));
+            session.Step(PowerUps.InputBit(PowerUp.Shield));   // nothing left: dropped
             Assert.AreEqual(2, session.State.PwUsed);
-            Assert.AreEqual(1799 + 1800 - 2, session.State.MagnetTicks);
+            Assert.AreEqual(1199 + 1200 - 2, session.State.ShieldTicks);
         }
 
         [Test]
@@ -322,10 +344,10 @@ namespace FluffyClimbers.Tests
         {
             var session = new RunSession(repo, new SimConfig(), "lvl_001_01");
             var stock = new int[PowerUps.MaxType + 1];
-            for (int i = 1; i <= PowerUps.TypeCount; i++) stock[i] = 2;
+            for (int i = 0; i < PowerUps.Implemented.Length; i++) stock[(int)PowerUps.Implemented[i]] = 2;
             session.ApplyStock(stock);
             session.Step(SimInput.PowerMask);
-            Assert.AreEqual(6, session.State.PwUsed, "Flight, Double Jump, Wall Stick, Shield, Magnet, Slow Time; the Rocket waits for the Flight");
+            Assert.AreEqual(8, session.State.PwUsed, "Flight, Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms, Slow Time; the Rocket waits for the Flight");
             Assert.AreEqual(2, session.PowerStock(PowerUp.Rocket), "a refused tap costs nothing");
             Assert.AreEqual(1, session.PowerStock(PowerUp.Flight));
         }
@@ -362,10 +384,51 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
+        public void APowerUpBoughtDuringTheRunIsUsableAtOnce_AndItsButtonAppears()
+        {
+            var svc = NewService();
+            svc.Data.Coins = 100000;
+            var session = new RunSession(repo, new SimConfig(), "lvl_001_01");
+            session.ApplyStock(svc.BuildRunStock());
+            Assert.IsFalse(session.OwnedAtStart(PowerUp.Flight));
+            var go = new GameObject("BarRoot", typeof(RectTransform));
+            try
+            {
+                var bar = new PowerUpBar();
+                bar.Build((RectTransform)go.transform, session, (rt, anchor, pos, size) => { rt.anchorMin = rt.anchorMax = anchor; rt.anchoredPosition = pos; rt.sizeDelta = size; });
+                Assert.AreEqual(0, bar.ButtonCount, "nothing owned: no button");
+
+                session.Step(PowerUps.InputBit(PowerUp.Flight));   // not owned yet: dropped
+                Assert.AreEqual(0, session.State.PwUsed);
+
+                Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp("pw_flight", PowerUpCurrency.Coins, 2));   // the purchase happens mid-run
+                Assert.IsTrue(session.SyncStock(svc.BuildRunStock()));
+                Assert.AreEqual(2, session.PowerStock(PowerUp.Flight));
+                Assert.IsTrue(session.OwnedAtStart(PowerUp.Flight));
+                Assert.IsTrue(bar.SyncOwned(), "the bar is rebuilt with the new type");
+                Assert.AreEqual(1, bar.ButtonCount);
+                Assert.AreEqual(PowerUp.Flight, bar.ButtonType(0));
+                Assert.IsFalse(bar.SyncOwned(), "nothing changed: no second rebuild");
+                Assert.IsFalse(session.SyncStock(svc.BuildRunStock()), "nothing new to pick up");
+
+                session.Step(PowerUps.InputBit(PowerUp.Flight));   // the very next tap works
+                Assert.AreEqual(1, session.State.PwUsed);
+                Assert.Greater(session.State.FlightTicks, 0);
+                Assert.AreEqual(1, session.PowerStock(PowerUp.Flight));
+                Assert.AreEqual(1, session.SettlePowerUps(svc));
+                Assert.AreEqual(1, svc.PowerUpCount("pw_flight"), "bought 2, used 1, one left in the save");
+                svc.TryBuyPowerUp("pw_flight", PowerUpCurrency.Coins, 1);
+                Assert.IsTrue(session.SyncStock(svc.BuildRunStock()));
+                Assert.AreEqual(2, session.PowerStock(PowerUp.Flight), "a second purchase adds on top of the rest");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
         public void TheBarPlacesTwoTypeGroupsWithGapsAndAbovePads()
         {
-            Assert.AreEqual(3, PowerGroups.MaxLeft, "left: Flight, Rocket, Double Jump");
-            Assert.AreEqual(4, PowerGroups.MaxRight, "right: Magnet, Shield, Slow Time, Wall Stick");
+            Assert.AreEqual(4, PowerGroups.MaxLeft, "left: Double Jump, Rocket, Flight, Glide Cape");
+            Assert.AreEqual(5, PowerGroups.MaxRight, "right group: see PowerGroups (one column of five)");
             Assert.GreaterOrEqual(PowerUpBar.ButtonSize, UiKit.MinTouchPx, "at least 48 dp");
             Assert.GreaterOrEqual(PowerUpBar.Gap, UiKit.MinSpacingPx, "at least 8 dp between neighbours");
             Assert.GreaterOrEqual(PowerUpBar.BottomOffset, RunLayout.BottomPadRef + UiKit.MinSpacingPx, "above the jump pad (floating over the field, no bottom strip) with a gap");
@@ -378,7 +441,9 @@ namespace FluffyClimbers.Tests
                     for (int j = i + 1; j < max; j++)
                     {
                         Vector2 b = PowerUpBar.PositionFor(j, leftGroup);
-                        Assert.GreaterOrEqual(Mathf.Abs(a.y - b.y), PowerUpBar.ButtonSize + PowerUpBar.Gap - 0.01f, "buttons " + i + " and " + j);
+                        bool sameColumn = i / PowerUpBar.ColumnHeight == j / PowerUpBar.ColumnHeight;
+                        float gap = sameColumn ? Mathf.Abs(a.y - b.y) : Mathf.Abs(a.x - b.x);   // a second column sits beside the first
+                        Assert.GreaterOrEqual(gap, PowerUpBar.ButtonSize + PowerUpBar.Gap - 0.01f, "buttons " + i + " and " + j);
                     }
                 }
             }

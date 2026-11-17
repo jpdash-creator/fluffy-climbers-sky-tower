@@ -152,6 +152,7 @@ namespace FluffyClimbers.LeaderboardService
             DateTime t = now();
             string weekKey = WeekMath.WeekKey(t);
             PlayerWeek w = await store.GetPlayerWeekAsync(weekKey, uid, withSlots);
+            object breakdown = withSlots ? await BreakdownViewAsync(weekKey, uid, w) : null;
             var ranks = new List<RankInfo>();
             foreach (string board in Boards.All)
             {
@@ -166,9 +167,68 @@ namespace FluffyClimbers.LeaderboardService
                 weekKey, pid = PidOf(uid), weekEndsAt = WeekMath.WeekEndUtc(t), serverTime = t,
                 totals = w.Totals == null ? new { overall = 0L, levels = 0L, endless = 0L } : new { overall = w.Totals.Overall, levels = w.Totals.Levels, endless = w.Totals.Endless },
                 ranks,
-                slots = withSlots ? w.Slots.ConvertAll(s => (object)new { s.SlotId, s.Crown, s.Floors, s.HeroId, s.Mode }) : null,
+                slots = withSlots ? w.Slots.ConvertAll(s => (object)new { s.SlotId, s.Crown, s.Floors, s.HeroId, s.Mode, s.Score, at = ToUnix(s.At) }) : null,
+                breakdown,
                 pendingPrizes = pending
             });
+        }
+
+        static long ToUnix(DateTime t) { return new DateTimeOffset(DateTime.SpecifyKind(t, DateTimeKind.Utc)).ToUnixTimeSeconds(); }
+
+        static object Project(WeekSlotInfo s)
+        {
+            return new { id = s.SlotId, crown = s.Crown, floors = s.Floors, mode = s.Mode, hero = s.HeroId ?? "", score = s.Score, combo = s.Combo, chains = s.Chains, at = s.At, ra = s.ReceivedAt, verified = s.Verified };
+        }
+
+        // ------------------------------------------------------------------ crown calculation (breakdown): display only, owner 2026-11-17
+
+        /// <summary>
+        /// What GET /my-week?slots=1 shows as the player's calculation: the display list the phone uploaded, with the service's own replay results laid over it (the service's numbers win for every slot that has one; a slot
+        /// without a replay result keeps the uploaded numbers, the newer version having won when the upload was merged). Reads ranking data, writes nothing.
+        /// </summary>
+        async Task<object> BreakdownViewAsync(string weekKey, string uid, PlayerWeek w)
+        {
+            BreakdownDoc doc = await store.GetBreakdownAsync(weekKey, uid);
+            var verified = new List<WeekSlotInfo>(w.Slots.Count);
+            foreach (SlotDoc s in w.Slots) verified.Add(new WeekSlotInfo { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId ?? "", Score = s.Score, At = ToUnix(s.At), ReceivedAt = ToUnix(s.At), Verified = true });
+            List<WeekSlotInfo> merged = BreakdownMerge.ApplyVerified(BreakdownCodec.Read(doc == null ? null : doc.SlotsJson), verified);
+            return new { weekKey, receivedAt = doc == null ? 0L : ToUnix(doc.ReceivedAt), slots = merged.ConvertAll(Project) };
+        }
+
+        public sealed class BreakdownSlotIn { public string Id { get; set; } public long Crown { get; set; } public int Floors { get; set; } public int Score { get; set; } public int Combo { get; set; } public int[] Chains { get; set; } public long At { get; set; } }
+        public sealed class BreakdownRequest { public string WeekKey { get; set; } public List<BreakdownSlotIn> Slots { get; set; } }
+
+        readonly ConcurrentDictionary<string, long> lastBreakdownMs = new ConcurrentDictionary<string, long>();
+
+        /// <summary>
+        /// POST /sync-breakdown: the phone uploads its own crown calculation of the CURRENT week (per slot: floors, score = floors + chain squares, chains, crown, time) and gets the merged cloud version back, so both sides hold the
+        /// latest. Per slot the newer version wins; the phone's clock is not trusted (times are clamped to [week start, now], the crown is recomputed from the score, the service stamps its own receipt time).
+        /// DISPLAY ONLY: this call reads and writes only weeks/{week}/breakdowns/{uid}; ranks, totals, boards, entry limits and prizes never use it (they come from the replay-verified slots). uid from the token only. Idempotent.
+        /// </summary>
+        public async Task<ApiResult> SyncBreakdownAsync(string uid, BreakdownRequest req)
+        {
+            if (string.IsNullOrEmpty(uid)) return ApiResult.Fail(401, "unauthorized");
+            DateTime t = now();
+            string wk = WeekMath.WeekKey(t);
+            if (req == null || string.IsNullOrEmpty(req.WeekKey)) return ApiResult.Fail(400, "bad_request");
+            if (req.WeekKey != wk) return ApiResult.Fail(409, "week_mismatch", wk);
+            if (req.Slots != null && req.Slots.Count > BreakdownMerge.MaxSlots) return ApiResult.Fail(400, "too_many_slots");
+            long ms = t.Ticks / TimeSpan.TicksPerMillisecond;
+            long prev;
+            bool had = lastBreakdownMs.TryGetValue(uid, out prev);
+            lastBreakdownMs[uid] = ms;
+            if (had && ms - prev < 1000) return ApiResult.Fail(429, "rate_limited");
+            if (lastBreakdownMs.Count > 50000) lastBreakdownMs.Clear();
+
+            Limits lim = await LimitsAsync();
+            var raw = new List<WeekSlotInfo>(req.Slots == null ? 0 : req.Slots.Count);
+            if (req.Slots != null)
+                foreach (BreakdownSlotIn s in req.Slots)
+                    if (s != null) raw.Add(new WeekSlotInfo { SlotId = s.Id, Crown = s.Crown, Floors = s.Floors, Score = s.Score, Combo = s.Combo, Chains = s.Chains, At = s.At });
+            List<WeekSlotInfo> upload = BreakdownMerge.Sanitize(raw, ToUnix(t), ToUnix(WeekMath.WeekStartUtc(t)), true);
+            BreakdownDoc doc = await store.MergeBreakdownAsync(wk, uid, upload, t, WeekMath.WeekEndUtc(t).AddDays(lim.RetentionDays));
+            List<WeekSlotInfo> slots = BreakdownCodec.Read(doc.SlotsJson);
+            return ApiResult.Ok(new { weekKey = wk, receivedAt = ToUnix(t), count = slots.Count, slots = slots.ConvertAll(Project) });
         }
 
         // ------------------------------------------------------------------ prizes
@@ -244,6 +304,25 @@ namespace FluffyClimbers.LeaderboardService
                 ExpireAt = start.AddDays(7).AddDays(lim.RetentionDays)
             });
             return ApiResult.Ok(new { claimId, state = claim.State, grant = claim.State == "issued", rank = claim.Rank, crowns = claim.Crowns, prize = claim.Items });
+        }
+
+        // ------------------------------------------------------------------ POST /delete-my-entries
+
+        /// <summary>
+        /// "Reset progress" in the app: removes every score of the caller (their slots, weekly totals and uploaded crown calculation in all weeks) and takes them out of the open weeks' boards (rebuilt without them).
+        /// Closed (final) boards are frozen for prizes and stay as they are until their retention expires; the profile name and prize claims are kept. Idempotent: a second call deletes nothing.
+        /// uid comes from the verified token only, so a player can only delete their own entries.
+        /// </summary>
+        public async Task<ApiResult> DeleteMyEntriesAsync(string uid)
+        {
+            if (string.IsNullOrEmpty(uid)) return ApiResult.Fail(401, "unauthorized");
+            Limits lim = await LimitsAsync();
+            DateTime t = now();
+            DeletedEntries d = await store.DeletePlayerEntriesAsync(uid);
+            foreach (string wk in d.WeekKeys)
+                foreach (string board in Boards.All)
+                    await store.RebuildBoardAsync(wk, board, lim, t, false);   // a final board is returned unchanged by the store
+            return ApiResult.Ok(new { deleted = true, slots = d.Slots, totals = d.Totals, breakdowns = d.Breakdowns, weeks = d.WeekKeys.Count });
         }
 
         // ------------------------------------------------------------------ admin (Cloud Scheduler, X-Admin-Key)

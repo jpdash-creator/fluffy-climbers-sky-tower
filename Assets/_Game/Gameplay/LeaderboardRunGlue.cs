@@ -61,7 +61,7 @@ namespace FluffyClimbers.Gameplay
                 return;
             }
             if (!LeaderboardHub.CanUpload) return;
-            QueuedRun q = Build(rec, score, ticket, progress.HeroVariant(rec.HeroId), LeaderboardTime.ToUnix(LeaderboardHub.Clock()));
+            QueuedRun q = Build(rec, score, ticket, rec.HeroVariant, LeaderboardTime.ToUnix(LeaderboardHub.Clock()));
             if (q != null) LeaderboardHub.Submit(q);
         }
     }
