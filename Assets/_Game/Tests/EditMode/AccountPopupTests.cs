@@ -99,7 +99,7 @@ namespace FluffyClimbers.Tests
             bool ok = true; string text = null;
             AccountPopup.RunPrimary(AccountPopup.State.Guest, (o, t) => { ok = o; text = t; });
             Assert.IsFalse(ok);
-            Assert.AreEqual("Sign-in cancelled.", text);
+            Assert.AreEqual(AccountSync.SignInNotCompletedText, text);
             Assert.AreEqual(AccountPopup.State.Guest, AccountPopup.Current);
         }
 

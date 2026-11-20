@@ -69,6 +69,8 @@ namespace FluffyClimbers.Editor.Build
                 if (text.Length > 0 && text[0] == '\uFEFF') text = text.Substring(1);
                 string patched = ReleaseManifestPatch.EnableLeaderboard(text, LeaderboardConfig.DefaultBaseUrl);
                 original = bytes;   // set before the write: from here on Restore() must put the file back
+                // ContentManifestBuildStep regenerates this file at the start of BuildPlayer and would erase the patch below: make the generator apply it too.
+                ReleaseManifestPatch.PendingLeaderboardBaseUrl = LeaderboardConfig.DefaultBaseUrl;
                 File.WriteAllBytes(ManifestPath, new UTF8Encoding(false).GetBytes(patched));
                 AssetDatabase.ImportAsset(ManifestPath, ImportAssetOptions.ForceSynchronousImport);
                 string url;
@@ -80,6 +82,7 @@ namespace FluffyClimbers.Editor.Build
 
             public void Restore()
             {
+                ReleaseManifestPatch.PendingLeaderboardBaseUrl = null;
                 if (original == null) return;
                 File.WriteAllBytes(ManifestPath, original);
                 original = null;

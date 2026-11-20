@@ -13,6 +13,13 @@ namespace FluffyClimbers.Content
     /// </summary>
     public static class ReleaseManifestPatch
     {
+        /// <summary>
+        /// Set by AndroidReleaseBuild for the duration of a release build: the leaderboard base URL ContentManifestBuilder must write into remoteConfig.leaderboard (enabled).
+        /// ContentManifestBuildStep regenerates the manifest from Content/ at the start of every player build and used to erase a patch made before BuildPlayer (the closed-testing
+        /// AAB shipped with the leaderboard OFF). Lives here because both editor assemblies reference this one. Null = manifest as generated (development builds keep it OFF).
+        /// </summary>
+        public static string PendingLeaderboardBaseUrl;
+
         /// <summary>Returns the manifest text with remoteConfig.leaderboard set to enabled + baseUrl (same layout as ContentManifestMerger: indent 2, LF, one trailing newline).</summary>
         public static string EnableLeaderboard(string manifestJson, string baseUrl)
         {

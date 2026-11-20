@@ -101,7 +101,7 @@ namespace FluffyClimbers.Leaderboard
                 if (settings != null && string.IsNullOrEmpty(settings.WebClientId)) settings.WebClientId = LeaderboardConfig.WebClientId;
                 PlayGamesPlatform.Instance.RequestServerSideAccess(false, code =>
                 {
-                    if (string.IsNullOrEmpty(code)) { FallbackToSavedUser(done, "no server auth code"); return; }
+                    if (string.IsNullOrEmpty(code)) { FallbackToSavedUser(done, "no server auth code (Play Games could not issue one for the web client id; check the Play Games server credential and the web client id)"); return; }
                     Credential credential = PlayGamesAuthProvider.GetCredential(code);
                     auth.SignInWithCredentialAsync(credential).ContinueWithOnMainThread(task =>
                     {
@@ -141,6 +141,9 @@ namespace FluffyClimbers.Leaderboard
 
         static void Finish(Action<LbSignInOutcome, string> done, LbSignInOutcome outcome, string error)
         {
+            // Logged (Debug.Log* reaches logcat tag Unity in release builds too): without it a failed leaderboard sign-in is completely silent.
+            if (outcome == LbSignInOutcome.Success) Debug.Log("[Leaderboard] Firebase sign-in ok");
+            else Debug.LogWarning("[Leaderboard] Firebase sign-in " + outcome + ": " + error);
             if (done != null) done(outcome, error);
         }
     }

@@ -102,6 +102,9 @@ namespace FluffyClimbers.Monetization
 
         static SignInOutcome Map(SignInStatus s)
         {
+            // Logged so logcat shows why: the plugin returns Canceled for "Google said not authenticated" too (see AccountSync.SignInNotCompletedText). The Play Games
+            // service log line "Invalid key value: <base64 SHA-1>:<package>" means the signing key's SHA-1 is not a Play Games Services credential (docs/35 step 4).
+            if (s != SignInStatus.Success) Debug.LogWarning("[PlayGames] sign-in status " + s + ". If logcat (GamesSDK / Auth) says 'Invalid key value', register this build's signing SHA-1 (docs/35 step 4).");
             if (s == SignInStatus.Success) return SignInOutcome.Success;
             if (s == SignInStatus.Canceled) return SignInOutcome.Cancelled;
             return SignInOutcome.Failed;

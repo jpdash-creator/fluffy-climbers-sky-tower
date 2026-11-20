@@ -145,6 +145,12 @@ namespace FluffyClimbers.Gameplay
 
         // ---------------- sign in / out (login screen and Settings) ----------------
 
+        /// <summary>
+        /// The Play Games v2 plugin reports SignInStatus.Canceled whenever Google answers "not authenticated", which includes a rejected sign-in (for example an app signing
+        /// key whose SHA-1 is not registered as a Play Games credential), not only a dismissed sheet. So the text must not claim the player cancelled.
+        /// </summary>
+        public const string SignInNotCompletedText = "Google Play sign-in did not complete. Update Google Play Games, check your connection and try again.";
+
         /// <summary>Interactive sign-in. done(ok, message): message is a short player-facing reason when ok is false.</summary>
         public static void SignInAndLink(Action<bool, string> done)
         {
@@ -154,7 +160,7 @@ namespace FluffyClimbers.Gameplay
             {
                 if (!r.Success)
                 {
-                    if (done != null) done(false, r.Status == SignInOutcome.Cancelled ? "Sign-in cancelled." : "Could not sign in. Check your connection and try again.");
+                    if (done != null) done(false, r.Status == SignInOutcome.Cancelled ? SignInNotCompletedText : "Could not sign in. Check your connection and try again.");
                     return;
                 }
                 string id = Account.PlayerId;

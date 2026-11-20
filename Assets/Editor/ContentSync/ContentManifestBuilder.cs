@@ -46,6 +46,7 @@ namespace FluffyClimbers.Editor.ContentSync
         public static bool Build()
         {
             string text = ContentManifestMerger.Build(ContentRoot);
+            if (!string.IsNullOrEmpty(ReleaseManifestPatch.PendingLeaderboardBaseUrl)) text = ReleaseManifestPatch.EnableLeaderboard(text, ReleaseManifestPatch.PendingLeaderboardBaseUrl);   // release builds only, see ReleaseManifestPatch.PendingLeaderboardBaseUrl
             string path = OutputFile;
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             bool changed = !File.Exists(path) || File.ReadAllText(path, Encoding.UTF8) != text;

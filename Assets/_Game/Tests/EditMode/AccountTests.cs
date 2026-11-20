@@ -319,7 +319,8 @@ namespace FluffyClimbers.Tests
             string msg = null;
             AccountSync.SignInAndLink((o, m) => { ok = o; msg = m; });
             Assert.IsFalse(ok);
-            StringAssert.Contains("cancelled", msg);
+            Assert.AreEqual(AccountSync.SignInNotCompletedText, msg);
+            StringAssert.DoesNotContain("cancelled", msg);
             Assert.AreNotEqual(SaveSync.ModeGoogle, p.Data.AccountMode);
         }
     }
