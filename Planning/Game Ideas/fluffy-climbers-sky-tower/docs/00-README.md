@@ -56,6 +56,7 @@ All names (game, mascot, regions, items) are **placeholders** and can be changed
 34. [34-character-merge.md](34-character-merge.md) - character merge (3 copies make the next tier), Merge screen, hero powers in a run; its stat and percent rules moved to doc 44
 44. [44-power-mechanics-bible.md](44-power-mechanics-bible.md) - **Power mechanics bible: hero physics, rarity tiers, the Forgiveness Index, generator, results** (single source of truth for hero physics; replaces doc 29 and the stat rules of doc 34)
 46. [46-timed-gameplay.md](46-timed-gameplay.md) - **Timed gameplay: Time, Pace, per-level records, medals, Pace Ghost, endless splits, Time Attack, time reward goals** (owner spec 2026-11-09)
+50. [50-region-build-requirements-and-template.md](50-region-build-requirements-and-template.md) - **Region build requirements and template: how to build a region and its 25 levels from scratch (regions 6 to 30), derived from regions 1 to 5: rules, one-time preparation, build steps, gates, owner checkpoints, region sheet template, starter sheets, as-built reference** (2026-11-21)
 
 
 > **Critical:** user experience and accessibility are critical; gameplay must be seamless and never choppy, and screen items must never overlap improperly. See doc 11. Every doc and every release is bound by it.
