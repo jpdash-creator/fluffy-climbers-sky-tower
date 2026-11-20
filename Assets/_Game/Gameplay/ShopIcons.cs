@@ -12,6 +12,7 @@ namespace FluffyClimbers.Gameplay
     {
         public const string CharacterPowerResource = "icon_character_power";
         public const string GemsCoinsResource = "icon_gems_coins";
+        public const string ShopTabResource = "icon_shop_tab";
 
         static Sprite characterPower, gemsCoins;
 
@@ -36,7 +37,7 @@ namespace FluffyClimbers.Gameplay
             get
             {
                 if (gemsCoins != null) return gemsCoins;
-                Sprite real = ToyKit.Get(GemsCoinsResource);
+                Sprite real = ToyKit.Get(ShopTabResource) ?? ToyKit.Get(GemsCoinsResource);   // owner 2026-11-17: gem + coin + No Ads (option A); falls back to the gem + coin icon
                 if (real != null) return gemsCoins = real;
                 return gemsCoins = Compose(new[] { ToyKit.Get("icon_gem"), ToyKit.Get("icon_coin") }, new[] { new Rect(0.0f, 0.2f, 0.56f, 0.6f), new Rect(0.44f, 0.2f, 0.56f, 0.6f) }, ToyKit.Get("icon_gem"));
             }

@@ -1259,6 +1259,10 @@ namespace FluffyClimbers.Tests
             var reward = GameSession.Progress.ApplyRun(GameSession.CurrentLevelId, outcome);
             yield return CheckScreen("run-results", () => rc.Hud.ShowResults(rc.Session, reward, true), problems);
             rc.Hud.CloseOverlay();
+            yield return CheckScreen("run-results-double-coins", () => rc.Hud.ShowResults(rc.Session, reward, true, true), problems);   // "Double the coins" (owner 2026-11-17): the x2 ad button row
+            rc.Hud.CloseOverlay();
+            yield return CheckScreen("run-results-double-coins-done", () => { rc.Hud.ShowResults(rc.Session, reward, true, true); rc.Hud.MarkDoubleCoinsDone(Mathf.Max(1, reward.PayoutCoins)); }, problems);   // done state: extra coins shown, disabled
+            rc.Hud.CloseOverlay();
 
             // Endless mode (owner decision 2026-10-20): its HUD (Floor / Best) and the game over overlay obey the same rules.
             rc.StartEndlessRun(GameSession.Repo.GetRegionByIndex(1).Id);
@@ -1950,6 +1954,10 @@ namespace FluffyClimbers.Tests
             // Release layout: the gem buttons say "Not available yet".
             yield return CheckScreen("shop-tab-gems", () => meta.ShowShop(ShopScreen.TabGems, ShopScreen.GemsSection), problems);
             yield return CheckScreen("shop-tab-gems-coins-section", () => meta.ShowShop(ShopScreen.TabGems, ShopScreen.CoinsSection), problems);
+            // Remove Ads section between the gems and the coins (owner 2026-11-17): for sale, then owned ("Ads removed", disabled).
+            yield return CheckScreen("shop-tab-gems-remove-ads", () => { meta.ShowShop(ShopScreen.TabGems, ShopScreen.GemsSection); RectTransform adsCard = FindRt(ShopScreen.RemoveAdsCardName); Assert.IsNotNull(adsCard, "the Remove Ads card is on the Gems page"); Assert.IsNull(adsCard.Find("Price"), "the price is on the button, not a loose text above it (owner 2026-11-20)"); Transform adsBuy = adsCard.Find(ShopScreen.RemoveAdsBuyName); Assert.IsNotNull(adsBuy, "the buy button"); Text adsBuyText = adsBuy.GetComponentInChildren<Text>(); Assert.IsNotNull(adsBuyText); StringAssert.Contains("$", adsBuyText.text, "the price reads on the green button"); }, problems);
+            yield return CheckScreen("shop-tab-gems-remove-ads-owned", () => { GameSession.Progress.ApplyStorePurchase(ProductCatalog.AdsRemove, "ux-test", System.DateTime.UtcNow); meta.ShowShop(ShopScreen.TabGems, ShopScreen.GemsSection); }, problems);
+            GameSession.Progress.Data.AdsRemoved = false;
             yield return CheckScreen("shop-tab-character-powerups", () => meta.ShowShop(ShopScreen.TabCharacter, ShopScreen.PowerupsSection), problems);
             yield return CheckScreen("shop-tab-character-powerups-bought", () => { meta.ShowShop(ShopScreen.TabCharacter, ShopScreen.PowerupsSection); meta.CurrentShop.TapBuyPowerUp(GameSession.Progress.PowerUpDefs.Get("pw_flight"), PowerUpCurrency.Coins); }, problems);
             // Shop 2a: Heroes and Power-ups are coins only: no gem buy button anywhere on the Character page (CriticalUX)
@@ -2039,6 +2047,12 @@ namespace FluffyClimbers.Tests
             yield return CheckScreen("rewards-weekly-ready", () => meta.ShowRewards(RewardTab.Weekly), problems);
             yield return CheckScreen("rewards-daily-ready", () => meta.ShowRewards(RewardTab.Daily), problems);
             yield return CheckScreen("rewards-daily-claimed", () => { meta.ShowRewards(RewardTab.Daily); GameSession.Progress.TryClaimReward(RewardTab.Daily, "dp_40"); meta.ShowRewards(RewardTab.Daily); }, problems);
+            // Daily free power-up card (owner 2026-11-17): ad ready, ad not ready (dimmed), then claimed today.
+            yield return CheckScreen("rewards-daily-ad-powerup-ready", () => { Services.Ads = new StubAdService { Immediate = true }; meta.ShowRewards(RewardTab.Daily); Assert.IsNotNull(FindRt(RewardsScreen.AdPowerUpCardName), "the card is on the Daily tab"); }, problems);
+            yield return CheckScreen("rewards-daily-ad-powerup-not-ready", () => { Services.Ads = new StubAdService { Immediate = true, Ready = false }; meta.ShowRewards(RewardTab.Daily); }, problems);
+            Services.Ads = new StubAdService { Immediate = true };
+            yield return CheckScreen("rewards-daily-ad-powerup-claimed", () => { meta.ShowRewards(RewardTab.Daily); meta.CurrentRewards.ClaimDailyAdPowerUp(); meta.ShowRewards(RewardTab.Daily); }, problems);
+            Services.Reset();
             yield return CheckScreen("rewards-main-claimed", () =>
             {
                 // region 1: the first goals of two groups claimed (green check cards), the rest still ready or open; the circle keeps its dot while something is left

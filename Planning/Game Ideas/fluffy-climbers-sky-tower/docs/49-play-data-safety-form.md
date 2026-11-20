@@ -85,7 +85,7 @@ the same collected / shared / required answers as Step 4 above. Keep the two in 
 
 ## Leaderboard and Firebase: answers to enter (owner decision 2026-11-12)
 
-Added when the weekly leaderboard (`Planning/LEADERBOARD-DESIGN.md`) and Firebase Authentication were built. The feature is OFF in the app until the owner switches it on, but the data safety form must be right BEFORE a build that contains the code is released (the SDKs are in the build either way). Source text: `POLICY.md` section 4a (what is sent), `TERMS.md` section 12a (public name and picture), `POLICY.md` section 18 (the mirror table, aligned 2026-11-12).
+Added when the weekly leaderboard (`Planning/LEADERBOARD-DESIGN.md`) and Firebase Authentication were built. Since 2026-11-17 the closed-testing release AAB has the leaderboard ON (the release build patches the shipped manifest temporarily; development APK builds stay OFF), so the data safety form must be right BEFORE a build that contains the code is released (the SDKs are in the build either way). Source text: `POLICY.md` section 4a (what is sent), `TERMS.md` section 12a (public name and picture), `POLICY.md` section 18 (the mirror table, aligned 2026-11-12).
 
 Enter or change these items. Everything else in Steps 2 to 4 above stays as it is.
 

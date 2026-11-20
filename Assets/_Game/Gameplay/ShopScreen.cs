@@ -423,6 +423,7 @@ namespace FluffyClimbers.Gameplay
         {
             RectTransform list = NewSectionedList();
             BuildPackList(true, list);
+            BuildRemoveAdsSection(list);   // owner 2026-11-17: one centred card between the gems and the coins
             RectTransform coinsBanner = ShopChrome.SectionBanner(list, "Coins");
             BuildPackList(false, list);
             AttachScroller(list, pageSection == CoinsSection ? coinsBanner : null);

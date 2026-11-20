@@ -130,6 +130,7 @@ namespace FluffyClimbers.Economy
             SaveSync.CarryAccount(old, Data);   // resetting progress keeps the login choice and the linked account (docs/35)
             Data.Purchases = old.Purchases ?? new List<PurchaseRecord>();   // paid purchases are never lost by a reset (docs/38)
             Data.FirstPurchase = old.FirstPurchase ?? new List<string>();   // a once-only first-purchase bonus stays used
+            Data.AdsRemoved = old.AdsRemoved;   // a bought "Remove Ads" is a purchase: a reset never takes it away (the purchase record is kept too)
             Data.LeaderboardConsent = old.LeaderboardConsent;   // consent, name and granted claims are account settings, not progress
             Data.LeaderboardDisplayName = old.LeaderboardDisplayName;
             Data.Leaderboard = new LeaderboardSaveData();

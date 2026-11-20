@@ -37,6 +37,8 @@ namespace FluffyClimbers.Gameplay
     /// </summary>
     public static class GameSession
     {
+        static GameSession() { if (FluffyClimbers.Monetization.AdGate.AdsRemoved == null) FluffyClimbers.Monetization.AdGate.AdsRemoved = () => Progress != null && Progress.AdsRemoved; }
+
         /// <summary>Regions playable in this build (launch scope: five regions).</summary>
         public const int PlayableRegions = 5;
 

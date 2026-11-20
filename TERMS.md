@@ -4,7 +4,7 @@ Last updated: 2026-11-17
 
 > **In short**
 >
-> - Fluffy Climbers: Tower Jump is a free arcade game with optional purchases and optional rewarded ads (shown by Google AdMob). You never need to watch an ad or buy anything to play. You get a personal licence to play it. Do not copy, resell, modify, cheat in or reverse engineer it.
+> - Fluffy Climbers: Tower Jump is a free arcade game with optional purchases, optional rewarded ads and occasional interstitial ads (shown by Google AdMob). You never need to watch a rewarded ad or buy anything to play, and the one-time purchase "Remove Ads" switches all ads off. You get a personal licence to play it. Do not copy, resell, modify, cheat in or reverse engineer it.
 > - Gems, coins, power-ups, heroes, chests and subscription benefits are virtual items licensed to you, not property. They have no money value, cannot be transferred and are not refunded by us.
 > - Gem packs and the weekly and monthly subscription plans are billed by Google Play (or the Apple App Store). Subscriptions renew automatically until you cancel them in the Play Store. Manage, cancel and request refunds through your store account.
 > - Chests and bundles contain random rewards. The odds are shown in the Game and in section 5.
@@ -125,6 +125,7 @@ Settings > Restore asks the store for your purchase history and re-grants active
 - Rewarded ads are optional. They are offered on buttons such as "watch an ad to revive" and play only after you tap. You never have to watch an ad or make a purchase to play the Game, and you can always decline; the normal Retry button is never blocked by an ad offer.
 - Ads are shown by Google AdMob using the Google Mobile Ads SDK. Where the law requires it, Google's consent form asks for your choices before ads are requested, and you can review or change them at any time under "Privacy choices" in Settings (see the Privacy Policy, section 6).
 - A reward is granted only when AdMob reports that you watched the ad to the end. If an ad is not available (no connection, no ad to show, network error), the button is disabled or hidden and no reward is given; you may still use the gem option where offered.
+- Interstitial ads: a full-screen ad may be shown before a new run starts after you restart a level or tower (at most on every third restart, never twice within four minutes, never before the first run of a level, and only when an ad is already loaded, so a restart is never delayed). "Remove Ads" is a one-time purchase that switches off all interstitials and gives every ad reward at once without an ad; it can be restored with "Restore purchases" and is kept when you reset your progress.
 - Ads are limited per run and per day. We may change the placements, rewards, lengths and caps at any time.
 - Ads are supplied by Google AdMob and its advertisers (Privacy Policy section 6). We do not control, endorse or take responsibility for their content, and tapping an ad takes you out of the Game to a third-party page or store listing. Ads may be unavailable in some countries or for some ages.
 - Watching ads to earn rewards for anyone other than yourself, automating ad views, faking completion signals, or manipulating ad delivery is ad fraud and a breach of these terms.

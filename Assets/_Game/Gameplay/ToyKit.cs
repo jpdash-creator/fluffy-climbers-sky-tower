@@ -40,6 +40,12 @@ namespace FluffyClimbers.Gameplay
             return s;
         }
 
+        /// <summary>The "Ads" icon of every ad button (owner 2026-11-17; Resources/Art/Ui/icon_ads). Missing art falls back to the play icon, so an ad button is never blank (CUX-10).</summary>
+        public static Sprite AdsIcon { get { return Get("icon_ads") ?? Get("icon_play"); } }
+
+        /// <summary>The "No Ads" icon of the Remove Ads card (Resources/Art/Ui/icon_no_ads); falls back to the Ads icon, then the play icon.</summary>
+        public static Sprite NoAdsIcon { get { return Get("icon_no_ads") ?? AdsIcon; } }
+
         public static bool IsKitSprite(Sprite s)
         {
             if (s == null) return false;

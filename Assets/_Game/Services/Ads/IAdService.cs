@@ -13,6 +13,15 @@ namespace FluffyClimbers.Monetization
         /// false on no-fill, error, early close or if an ad is already showing.
         /// </summary>
         void ShowRewarded(string placement, Action<bool> onDone);
+
+        /// <summary>True when an interstitial for this placement is loaded and can start at once. Never blocks; no ad (placeholder ids in a release build, no consent, not loaded) is simply false.</summary>
+        bool IsInterstitialReady(string placement);
+
+        /// <summary>
+        /// Shows a full-screen interstitial. onDone runs exactly once on the main thread: true when it was shown and closed, false when nothing was shown
+        /// (not ready, error, another ad up). It never blocks: the caller continues in both cases.
+        /// </summary>
+        void ShowInterstitial(string placement, Action<bool> onDone);
     }
 
     /// <summary>Implemented by an ad service that needs the GDPR/consent flag (Services.ConsentGiven).</summary>

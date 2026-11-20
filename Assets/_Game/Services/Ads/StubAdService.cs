@@ -14,6 +14,8 @@ namespace FluffyClimbers.Monetization
         /// <summary>Tests set this to complete at once without a MonoBehaviour pump.</summary>
         public bool Immediate;
         public int ShowCount { get; private set; }
+        /// <summary>Interstitials shown so far (tests).</summary>
+        public int InterstitialCount { get; private set; }
         bool showing;
 
         sealed class Pump : MonoBehaviour
@@ -40,11 +42,28 @@ namespace FluffyClimbers.Monetization
             showing = true;
             Action finish = () => { showing = false; if (onDone != null) onDone(true); };
             if (Immediate || !Application.isPlaying) { finish(); return; }
+            StartPump(finish);
+        }
+
+        void StartPump(Action finish)
+        {
             var go = new GameObject("StubAdPump");
             UnityEngine.Object.DontDestroyOnLoad(go);
             Pump p = go.AddComponent<Pump>();
             p.Left = DelaySeconds;
             p.Done = finish;
+        }
+
+        public bool IsInterstitialReady(string placement) { return Ready && !showing; }
+
+        public void ShowInterstitial(string placement, Action<bool> onDone)
+        {
+            if (!IsInterstitialReady(placement)) { if (onDone != null) onDone(false); return; }
+            InterstitialCount++;
+            showing = true;
+            Action finish = () => { showing = false; if (onDone != null) onDone(true); };
+            if (Immediate || !Application.isPlaying) { finish(); return; }
+            StartPump(finish);
         }
     }
 }

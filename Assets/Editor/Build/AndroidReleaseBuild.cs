@@ -2,7 +2,11 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Text;
 using System.Text.RegularExpressions;
+using FluffyClimbers.Content;
+using FluffyClimbers.Gameplay;
+using FluffyClimbers.Leaderboard;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
@@ -19,6 +23,10 @@ namespace FluffyClimbers.Editor.Build
     /// set only in memory (PlayerSettings.Android.keystorePass / keyaliasPass, which Unity does not serialize); they are cleared again afterwards and are
     /// never logged. Versioning and the build log are the same code as the APK build (AndroidBuild.BumpAndApplyVersion / AppendBuildLog).
     /// Every editor build setting this class changes is restored at the end, so the development APK build keeps working.
+    /// Owner decision 2026-11-17 (closed testing): the release AAB has the weekly leaderboard ON. For the duration of the build the shipped manifest
+    /// (Assets/Resources/Content/content_manifest.json, remoteConfig.leaderboard = { enabled: true, baseUrl: LeaderboardConfig.DefaultBaseUrl }) is patched and then
+    /// restored byte for byte (also on failure). The development APK build never touches it, so it keeps the leaderboard OFF. The release also refuses to build when the
+    /// admin/dev/test lockdown text or the Google Play billing mode is not as expected (ReleaseBuildGuard).
     /// The Gradle hooks (AdMob app id and permissions, short label, no backup) are IPostGenerateGradleAndroidProject and run for every Android build, so they apply here too.
     /// </summary>
     public static class AndroidReleaseBuild
@@ -33,6 +41,8 @@ namespace FluffyClimbers.Editor.Build
         const string MappingEntry = "BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map";
         const string SymbolsEntryPrefix = "BUNDLE-METADATA/com.android.tools.build.debugsymbols/";
         const string Tag = "[ReleaseBuild] ";
+        const string ManifestPath = "Assets/Resources/Content/content_manifest.json";   // the file ContentRepository.LoadFromResources reads the remote config from
+        const string BillingModePath = "Assets/Resources/BillingMode.json";
 
         // Same three scenes as the APK build (AndroidBuild). Nothing else ever goes into the release.
         static readonly string[] Scenes = { "Assets/Scenes/Boot.unity", "Assets/Scenes/Meta.unity", "Assets/Scenes/Run.unity" };
@@ -44,6 +54,49 @@ namespace FluffyClimbers.Editor.Build
         public static void BuildReleaseFromCommandLine()
         {
             EditorApplication.Exit(BuildRelease() ? 0 : 1);
+        }
+
+        /// <summary>Temporary leaderboard-ON patch of the shipped manifest. Restore() writes the original bytes back and is safe to call twice.</summary>
+        sealed class ManifestOverride
+        {
+            byte[] original;
+
+            public bool Apply()
+            {
+                if (!File.Exists(ManifestPath)) return Fail("shipped manifest not found: " + ManifestPath);
+                byte[] bytes = File.ReadAllBytes(ManifestPath);
+                string text = new UTF8Encoding(false).GetString(bytes);
+                if (text.Length > 0 && text[0] == '\uFEFF') text = text.Substring(1);
+                string patched = ReleaseManifestPatch.EnableLeaderboard(text, LeaderboardConfig.DefaultBaseUrl);
+                original = bytes;   // set before the write: from here on Restore() must put the file back
+                File.WriteAllBytes(ManifestPath, new UTF8Encoding(false).GetBytes(patched));
+                AssetDatabase.ImportAsset(ManifestPath, ImportAssetOptions.ForceSynchronousImport);
+                string url;
+                if (!ReleaseManifestPatch.IsLeaderboardEnabled(File.ReadAllText(ManifestPath), out url))
+                    return Fail("could not switch the leaderboard on in " + ManifestPath + ".");
+                Debug.Log(Tag + "leaderboard switched ON for this release in " + ManifestPath + " (baseUrl " + url + "); the file is restored after the build.");
+                return true;
+            }
+
+            public void Restore()
+            {
+                if (original == null) return;
+                File.WriteAllBytes(ManifestPath, original);
+                original = null;
+                AssetDatabase.ImportAsset(ManifestPath, ImportAssetOptions.ForceSynchronousImport);
+                Debug.Log(Tag + "restored " + ManifestPath + " byte for byte (development builds keep the leaderboard OFF).");
+            }
+        }
+
+        /// <summary>Pre-build lockdown checks: no admin/dev/test tools in a release player and real purchases only (see ReleaseBuildGuard). Returns an error text or null.</summary>
+        static string LockdownProblem()
+        {
+            string admin = File.Exists("Assets/_Game/Gameplay/AdminAccess.cs") ? File.ReadAllText("Assets/_Game/Gameplay/AdminAccess.cs") : null;
+            string settings = File.Exists("Assets/_Game/Gameplay/GameSettings.cs") ? File.ReadAllText("Assets/_Game/Gameplay/GameSettings.cs") : null;
+            string shop = File.Exists("Assets/_Game/Gameplay/ShopScreen.cs") ? File.ReadAllText("Assets/_Game/Gameplay/ShopScreen.cs") : null;
+            string problem = ReleaseBuildGuard.SourceProblem(admin, settings, shop);
+            if (problem != null) return problem;
+            return ReleaseBuildGuard.BillingProblem(File.Exists(BillingModePath) ? File.ReadAllText(BillingModePath) : null);
         }
 
         /// <summary>The settings this build changes, so they can be put back.</summary>
@@ -127,15 +180,20 @@ namespace FluffyClimbers.Editor.Build
         static bool BuildRelease()
         {
             SavedSettings saved = null;
+            var manifestOverride = new ManifestOverride();
             try
             {
                 // ---- 1. checks that must pass BEFORE the build number is used up ----
                 if (AltTesterBuildHook.Requested())
                     return Fail("AltTester was requested (-altTester or BT_ALTTESTER=1). A release build never contains AltTester. Unset it and run again.");
                 string defines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Android) ?? "";
-                if (Regex.IsMatch(defines, @"(^|;)(" + AltTesterBuildHook.Symbol + @"|DEVELOPMENT_BUILD)(;|$)"))
+                if (Regex.IsMatch(defines, @"(^|;)(" + AltTesterBuildHook.Symbol + @"|DEVELOPMENT_BUILD|STORE_CAPTURE)(;|$)"))
                     return Fail("The Android scripting define symbols contain a test symbol (" + defines + "). Remove it in Player Settings first.");
                 if (!CheckScenes()) return false;
+                string lockdownProblem = LockdownProblem();   // no admin/dev/test tools, Google Play billing (owner 2026-11-17)
+                if (lockdownProblem != null) return Fail(lockdownProblem);
+                string playerFlags = ReleaseBuildGuard.StateProblem(false, false, false, false);   // the flags a release PLAYER compiles to (the Editor itself always has the tools on)
+                if (playerFlags != null) return Fail(playerFlags);
                 string adProblem = AdMobBuildConfig.ReleaseProblem();   // placeholder AdMob app id = no release (docs/33)
                 if (adProblem != null) return Fail(adProblem);
                 string storeProblem = StoreConfigPreflight.Check();   // Play Games project id, Play licence key, Games SDK resolved (docs/33, docs/35)
@@ -187,7 +245,10 @@ namespace FluffyClimbers.Editor.Build
                     options = BuildOptions.None   // NOT Development, no AllowDebugging, no profiler connection
                 };
                 DateTime buildStartUtc = DateTime.UtcNow.AddMinutes(-1);
-                BuildReport report = BuildPipeline.BuildPlayer(options);   // AltTesterBuildHook.Begin is never called, so its scene hook stays inactive
+                if (!manifestOverride.Apply()) return false;   // leaderboard ON for the closed-testing AAB; restored in finally
+                BuildReport report;
+                try { report = BuildPipeline.BuildPlayer(options); }   // AltTesterBuildHook.Begin is never called, so its scene hook stays inactive
+                finally { manifestOverride.Restore(); }
 
                 // ---- 4. result, log row, post-build assertion ----
                 Debug.Log(Tag + "result " + report.summary.result + ", size " + (report.summary.totalSize / (1024 * 1024)) + " MB, errors " + report.summary.totalErrors);
@@ -206,6 +267,7 @@ namespace FluffyClimbers.Editor.Build
                 string artifactProblem = VerifyDeobfuscationAndSymbols(versionedPath, versionName, buildStartUtc);
                 if (artifactProblem != null) return Fail(artifactProblem + " Do NOT upload this file to Google Play.");
                 File.Copy(versionedPath, LatestAab, true);
+                Debug.Log(Tag + "leaderboard enabled in AAB (remoteConfig.leaderboard.enabled=true, baseUrl " + LeaderboardConfig.DefaultBaseUrl + "); no admin/dev/test tools compiled in (non-development build, ToolsCompiledIn=false, DevBuild=false); real Google Play billing only.");
                 Debug.Log(Tag + "OK: " + versionedPath + " (copy: " + LatestAab + "), " + (new FileInfo(versionedPath).Length / (1024 * 1024)) + " MB. Upload the versioned file to Google Play.");
                 return true;
             }
@@ -216,6 +278,7 @@ namespace FluffyClimbers.Editor.Build
             }
             finally
             {
+                manifestOverride.Restore();   // no-op after the build; covers an exception between Apply and the build call
                 if (saved != null) saved.Restore();
             }
         }

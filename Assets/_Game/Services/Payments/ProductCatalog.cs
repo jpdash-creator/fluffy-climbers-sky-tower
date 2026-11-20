@@ -64,6 +64,8 @@ namespace FluffyClimbers.Monetization
         public const string SubMonthly = Prefix + "sub.monthly";
         public const string SubWeeklyPlus = Prefix + "sub.weekly_plus";
         public const string SubMonthlyPremium = Prefix + "sub.monthly_premium";
+        /// <summary>One-time NON-CONSUMABLE "Remove Ads" (owner 2026-11-17, $2.99): no interstitials, and every rewarded ad placement pays its reward at once. Kept in the save as SaveData.AdsRemoved.</summary>
+        public const string AdsRemove = Prefix + "ads.remove";
         /// <summary>Planned (doc 22 point 7: $0.99 = 100 gems + 2,000 coins). Not live: do not create it in the store yet.</summary>
         public const string StarterPack = Prefix + "bundle.starter";
 
@@ -92,6 +94,8 @@ namespace FluffyClimbers.Monetization
                 "200 gems now, then each day 10 gems + 600 coins for 30 days, a power-up every 5th claim"),
             new ProductDef(SubMonthlyPremium, ProductKind.Subscription, "Monthly Premium", 9.99, 0.0, 300, 0, 30, true,
                 "300 gems now, then each day 20 gems + 1,000 coins for 30 days, a power-up every 5th claim, a Gold chest on claims 1, 11 and 21"),
+            new ProductDef(AdsRemove, ProductKind.NonConsumable, "Remove Ads", 2.99, 0.0, 0, 0, 0, true,
+                "No more ads: no interstitials, and every ad reward is given at once (one-time purchase)"),
             new ProductDef(StarterPack, ProductKind.Consumable, "Starter Pack", 0.99, 0.0, 100, 2000, 0, false,
                 "100 gems + 2,000 coins (planned, once per account)"),
         };

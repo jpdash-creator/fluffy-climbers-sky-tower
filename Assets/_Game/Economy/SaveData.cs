@@ -157,6 +157,8 @@ namespace FluffyClimbers.Economy
         [JsonProperty("leaderboard")] public LeaderboardSaveData Leaderboard = new LeaderboardSaveData();
         /// <summary>The name the player chose for the weekly leaderboard (3 to 16 characters, checked by LeaderboardNameRules). Null or empty = the Google Play Games name is shown. Additive, no version bump.</summary>
         [JsonProperty("leaderboardName", NullValueHandling = NullValueHandling.Ignore)] public string LeaderboardDisplayName;
+        /// <summary>"Remove Ads" (non-consumable, owner 2026-11-17) was bought or restored: no interstitial, rewarded placements pay at once. Set by ProgressService.ApplyStorePurchase and RestoreFromRecords, kept by Reset progress. Additive, no version bump.</summary>
+        [JsonProperty("adsRemoved", DefaultValueHandling = DefaultValueHandling.Ignore)] public bool AdsRemoved;
         /// <summary>What the shops and real-money purchases granted (coins, gems, power-ups, hero copies with their rolled stats). Reset progress rebuilds the save from it (owner 2026-11-17, ProgressService.Ledger.cs). It travels in the cloud save with everything else. Additive, no version bump; null or missing = nothing recorded (older purchases cannot be told apart from earned items).</summary>
         [JsonProperty("ledger", NullValueHandling = NullValueHandling.Ignore)] public PurchaseLedger Ledger = new PurchaseLedger();
         /// <summary>Set by Reset progress while the player's scores on the leaderboard service still have to be deleted (offline or signed out at the time); cleared once the service confirmed. Additive.</summary>

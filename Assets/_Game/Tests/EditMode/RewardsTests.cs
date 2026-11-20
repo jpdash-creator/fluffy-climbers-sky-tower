@@ -849,7 +849,7 @@ namespace FluffyClimbers.Tests
             try
             {
                 Assert.IsNotNull(root.transform.Find("RewardsRoot/Body/Tabs"));
-                Assert.AreEqual(1 + 20, s.ListContent.childCount, "scene header + 20 tasks");
+                Assert.AreEqual(1 + 1 + 20, s.ListContent.childCount, "scene header + the daily ad power-up card + 20 tasks");
                 Assert.IsNotNull(s.ListContent.Find("Scene/TrackPanel/Cells/Cell40"), "the first chest of the points track");
                 Assert.IsNotNull(s.ListContent.Find("Scene/TrackPanel/Cells/Cell200"), "the last chest (the hero gift) of the points track");
                 s.SelectTab(RewardTab.Weekly);

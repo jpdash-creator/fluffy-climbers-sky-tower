@@ -8,11 +8,13 @@ using UnityEngine;
 namespace FluffyClimbers.Monetization
 {
     /// <summary>
-    /// Rewarded ads through Google AdMob (Google Mobile Ads Unity plugin 11.x). Compiled only with FLUFFY_ADMOB; on device only (the editor uses StubAdService).
+    /// Rewarded ads and the restart interstitial through Google AdMob (Google Mobile Ads Unity plugin 11.x). Compiled only with FLUFFY_ADMOB; on device only (the editor uses StubAdService).
     /// Order: request configuration -> UMP consent (ConsentInformation.Update, ConsentForm.LoadAndShowConsentFormIfRequired) -> MobileAds.Initialize only when
     /// CanRequestAds -> load the rewarded ad. After every show the next ad is loaded; failed loads retry with exponential backoff. Ids come from AdsConfig.
     /// All SDK callbacks may arrive on another thread, so each is marshalled to the main thread (MobileAdsEventExecutor.ExecuteInUpdate). The update
     /// driver is enabled only while a retry or a finish is pending, so nothing runs per frame while idle.
+    /// The interstitial (placement restart_interstitial) is preloaded after the SDK starts, reloaded after every show with the same backoff, and never needs consent logic here:
+    /// the SDK only starts when ads may be requested, and the caller (InterstitialPolicy) also checks Services.ConsentGiven.
     /// </summary>
     public sealed class AdMobAdService : IAdService, IConsentAware, IAdLifecycle, IPrivacyOptions, IAdFailureInfo
     {
@@ -35,6 +37,19 @@ namespace FluffyClimbers.Monetization
         }
 
         const float BackoffStart = 5f, BackoffMax = 120f;
+
+        // interstitial state (one slot: the only interstitial placement is the restart one)
+        string interstitialUnitId;
+        InterstitialAd interstitialAd;
+        bool interstitialLoading;
+        int interstitialFailures;
+        float interstitialRetryAt = -1f;
+        Action<bool> interstitialDone;
+        InterstitialAd interstitialShowing;
+        bool interstitialFailed;
+        int interstitialCloseCountdown;
+        float interstitialStartedAt;
+        const float InterstitialWatchdogSeconds = 90f;
 
         readonly Dictionary<string, Slot> slots = new Dictionary<string, Slot>();
         readonly List<Slot> slotList = new List<Slot>();
@@ -128,6 +143,9 @@ namespace FluffyClimbers.Monetization
                 sdkReady = true;
                 Debug.Log("[Ads] Mobile Ads SDK initialised, consent can request ads=" + canRequestAds);
                 RequestLoad(GetSlot(AdsConfig.RewardedUnitId(AdPlacements.Revive)));
+                interstitialUnitId = AdsConfig.InterstitialUnitId(AdPlacements.RestartInterstitial);
+                if (interstitialUnitId == null) AdsConfig.WarnIfInterstitialUnconfigured();
+                else RequestLoadInterstitial();
             }));
         }
 
@@ -216,9 +234,69 @@ namespace FluffyClimbers.Monetization
             if (driver != null) driver.enabled = true;
         }
 
+        // ---- interstitial loading -----------------------------------------------------------------------------------------
+
+        void RequestLoadInterstitial()
+        {
+            if (interstitialUnitId == null || !sdkReady || interstitialLoading || interstitialAd != null) return;
+            interstitialLoading = true;
+            interstitialRetryAt = -1f;
+            try
+            {
+                InterstitialAd.Load(interstitialUnitId, new AdRequest(), (ad, error) => OnMain(() => OnInterstitialLoaded(ad, error)));
+            }
+            catch (Exception e)
+            {
+                interstitialLoading = false;
+                Debug.LogWarning("[Ads] interstitial load threw: " + e.Message);
+                ScheduleInterstitialRetry();
+            }
+        }
+
+        void OnInterstitialLoaded(InterstitialAd ad, LoadAdError error)
+        {
+            interstitialLoading = false;
+            if (error != null || ad == null)
+            {
+                Debug.LogWarning("[Ads] interstitial load failed: " + (error != null ? error.ToString() : "no ad"));
+                ScheduleInterstitialRetry();
+                return;
+            }
+            interstitialFailures = 0;
+            interstitialAd = ad;
+            Debug.Log("[Ads] interstitial loaded (unit " + interstitialUnitId + ")");
+        }
+
+        void ScheduleInterstitialRetry()
+        {
+            interstitialFailures++;
+            float delay = BackoffStart;
+            for (int i = 1; i < interstitialFailures && delay < BackoffMax; i++) delay *= 2f;
+            if (delay > BackoffMax) delay = BackoffMax;
+            interstitialRetryAt = Time.unscaledTime + delay;
+            if (driver != null) driver.enabled = true;
+        }
+
         void Tick()
         {
             bool needed = false;
+            if (interstitialCloseCountdown > 0 && --interstitialCloseCountdown == 0) FinishInterstitial();
+            if (interstitialCloseCountdown > 0) needed = true;
+            if (interstitialDone != null)
+            {
+                if (Time.realtimeSinceStartup - interstitialStartedAt > InterstitialWatchdogSeconds)
+                {
+                    Debug.LogWarning("[Ads] interstitial watchdog: no close/fail callback, ending the show");
+                    interstitialFailed = true;
+                    FinishInterstitial();
+                }
+                else needed = true;
+            }
+            if (interstitialRetryAt >= 0f)
+            {
+                if (Time.unscaledTime >= interstitialRetryAt) RequestLoadInterstitial();
+                else needed = true;
+            }
             if (closeCountdown > 0 && --closeCountdown == 0) Finish();
             if (closeCountdown > 0) needed = true;
             if (pendingDone != null)
@@ -248,7 +326,7 @@ namespace FluffyClimbers.Monetization
         public bool IsReady(string placement)
         {
             if (!begun) Begin();
-            if (!sdkReady || pendingDone != null) return false;
+            if (!sdkReady || pendingDone != null || interstitialDone != null) return false;
             Slot s = GetSlot(AdsConfig.RewardedUnitId(placement));
             if (s == null) return false;
             if (s.Ad == null) { RequestLoad(s); return false; }
@@ -290,6 +368,66 @@ namespace FluffyClimbers.Monetization
                 failedToShow = true;
                 Finish();
             }
+        }
+
+        // ---- interstitial ------------------------------------------------------------------------------------------------
+
+        public bool IsInterstitialReady(string placement)
+        {
+            if (!begun) Begin();
+            if (!sdkReady || interstitialUnitId == null || pendingDone != null || interstitialDone != null) return false;
+            if (interstitialAd == null) { RequestLoadInterstitial(); return false; }
+            try { return interstitialAd.CanShowAd(); }
+            catch (Exception) { return false; }
+        }
+
+        public void ShowInterstitial(string placement, Action<bool> onDone)
+        {
+            if (!IsInterstitialReady(placement))
+            {
+                if (onDone != null) onDone(false);   // nothing shown, the caller carries on at once
+                return;
+            }
+            Debug.Log("[Ads] showing interstitial for '" + placement + "'");
+            InterstitialAd ad = interstitialAd;
+            interstitialAd = null;
+            interstitialShowing = ad;
+            interstitialDone = onDone ?? (_ => { });
+            interstitialFailed = false;
+            interstitialCloseCountdown = 0;
+            interstitialStartedAt = Time.realtimeSinceStartup;
+            if (driver != null) driver.enabled = true;   // runs the watchdog while the ad is up
+            try
+            {
+                ad.OnAdFullScreenContentClosed += OnInterstitialClosedRaw;
+                ad.OnAdFullScreenContentFailed += OnInterstitialFailedRaw;
+                ad.Show();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[Ads] interstitial show threw: " + e.Message);
+                interstitialFailed = true;
+                FinishInterstitial();
+            }
+        }
+
+        void OnInterstitialClosedRaw() { OnMain(() => { if (interstitialShowing == null) return; interstitialCloseCountdown = 2; if (driver != null) driver.enabled = true; }); }
+        void OnInterstitialFailedRaw(AdError error) { OnMain(() => { if (interstitialShowing == null) return; Debug.LogWarning("[Ads] interstitial show failed: " + error); interstitialFailed = true; FinishInterstitial(); }); }
+
+        /// <summary>Completes the current interstitial exactly once (true when it was shown and closed), then loads the next one.</summary>
+        void FinishInterstitial()
+        {
+            Action<bool> cb = interstitialDone;
+            if (cb == null) return;
+            interstitialDone = null;
+            interstitialCloseCountdown = 0;
+            InterstitialAd ad = interstitialShowing;
+            interstitialShowing = null;
+            bool shown = !interstitialFailed;
+            try { if (ad != null) ad.Destroy(); } catch (Exception) { }
+            RequestLoadInterstitial();
+            try { cb(shown); }
+            catch (Exception e) { Debug.LogException(e); }
         }
 
         void OnClosedRaw() { OnMain(() => { if (showingAd == null) return; closeCountdown = 2; if (driver != null) driver.enabled = true; }); }

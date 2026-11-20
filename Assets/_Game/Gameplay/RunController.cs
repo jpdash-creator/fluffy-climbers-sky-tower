@@ -173,12 +173,13 @@ namespace FluffyClimbers.Gameplay
             Input.Pad = Hud.Pad;
             Hud.OnPause = Pause;
             Hud.OnResume = Resume;
-            Hud.OnRetry = () => { if (Session.IsTimeAttack) StartTimeAttackRun(Session.Region.Id); else if (Session.IsEndless) StartEndlessRun(Session.Region.Id); else StartRun(GameSession.CurrentLevelId); };
+            Hud.OnRetry = Restart;
+            Hud.OnDoubleCoins = DoubleCoins;
             Hud.OnMenu = ExitToMeta;
             Hud.OnNext = PlayNext;
             Hud.OnRevive = Revive;
             Hud.OnReviveAd = ReviveByAd;
-            Services.Ads.IsReady(AdPlacements.Revive);   // starts consent/SDK/ad loading early (no-op on the stub)
+            AdGate.Preload(AdPlacements.Revive);   // starts consent/SDK/ad loading early (no-op on the stub)
             Hud.OnPower = type => Input.LatchPower((PowerUp)type);
         }
 
@@ -294,7 +295,9 @@ namespace FluffyClimbers.Gameplay
                 LevelDef nextForTicket = GameSession.NextLevel(Session.Level);
                 if (nextForTicket != null && LeaderboardHub.WantsTicket) LeaderboardHub.Prefetch("level", nextForTicket.Id, GameSettings.Difficulty);   // "Next level" finds its ticket ready
                 GameSession.LastResult = new RunResult { LevelId = Session.Level.Id, Completed = true, Reward = reward, Stars = reward.Stars, Score = Session.State.Score, Floors = levelRecord.Floors, Ticks = levelRecord.Ticks, PaceNumerator = levelRecord.Floors, PaceDenominator = levelRecord.Ticks, Revived = levelRecord.Revived, Record = levelRecorded };
-                Hud.ShowResults(Session, reward, GameSession.NextLevel(Session.Level) != null && GameSession.Progress.IsLevelUnlocked(GameSession.NextLevel(Session.Level)));
+                doubleCoinsUsed = false;
+                bool offerDouble = ProgressService.DoubleCoinsAmount(reward) > 0 && AdGate.IsRewardedReady(AdPlacements.DoubleReward);   // hidden when no ad is ready
+                Hud.ShowResults(Session, reward, GameSession.NextLevel(Session.Level) != null && GameSession.Progress.IsLevelUnlocked(GameSession.NextLevel(Session.Level)), offerDouble);
             }
             else
             {
@@ -331,10 +334,61 @@ namespace FluffyClimbers.Gameplay
 
         void ShowFailedOffer()
         {
-            Hud.ShowFailed(Session, GameSession.Progress != null ? GameSession.Progress.Gems : 0, Services.Ads.IsReady(AdPlacements.Revive));
+            Hud.ShowFailed(Session, GameSession.Progress != null ? GameSession.Progress.Gems : 0, AdGate.IsRewardedReady(AdPlacements.Revive));
         }
 
         bool adBusy;
+
+        /// <summary>The restart itself (no ad): a fresh attempt of the same level, Endless or Time Attack tower.</summary>
+        void RestartNow()
+        {
+            if (Session == null) return;
+            if (Session.IsTimeAttack) StartTimeAttackRun(Session.Region.Id);
+            else if (Session.IsEndless) StartEndlessRun(Session.Region.Id);
+            else StartRun(GameSession.CurrentLevelId);
+        }
+
+        /// <summary>
+        /// Every restart (Retry on the failed popup, Restart in the pause menu, "Play again" on the results) goes through here. Every 3rd one may show a full-screen interstitial first
+        /// (<see cref="InterstitialPolicy"/>: 4 minutes apart, consent needed, an ad already loaded); in every other case the restart happens in the same tap. The new run starts when
+        /// the ad closes or fails, never later (CUX-7: the one-tap retry is never blocked).
+        /// </summary>
+        void Restart()
+        {
+            if (adBusy || Session == null) return;
+            InterstitialPolicy policy = InterstitialPolicy.Shared;
+            bool show = policy.OnRestart(Time.realtimeSinceStartup, Services.ConsentGiven, AdGate.IsInterstitialReady(AdPlacements.RestartInterstitial));
+            if (!show) { RestartNow(); return; }
+            adBusy = true;
+            AdGate.ShowInterstitial(AdPlacements.RestartInterstitial, shown =>
+            {
+                adBusy = false;
+                if (shown) policy.MarkShown(Time.realtimeSinceStartup);   // the 4 minute pause counts from the close
+                if (this == null) return;                                  // left the scene while the ad was up
+                RestartNow();
+            });
+        }
+
+        bool doubleCoinsUsed;
+
+        /// <summary>"Double the coins" on the results screen: a rewarded ad, then the level's payout coins are added once more (saved by ProgressService). One use per result.</summary>
+        void DoubleCoins()
+        {
+            if (adBusy || Session == null || doubleCoinsUsed || GameSession.Progress == null) return;
+            if (!AdGate.IsRewardedReady(AdPlacements.DoubleReward)) { Hud.HideDoubleCoins(); return; }
+            adBusy = true;
+            RunSession sess = Session;
+            RewardResult reward = LastReward;
+            AdGate.ShowRewarded(AdPlacements.DoubleReward, granted =>
+            {
+                adBusy = false;
+                if (this == null || sess != Session || doubleCoinsUsed) return;
+                if (!granted) return;                                       // early close or error: nothing is paid, the button stays for another try
+                doubleCoinsUsed = true;
+                int extra = GameSession.Progress.GrantDoubleCoins(reward);
+                Hud.MarkDoubleCoinsDone(extra);
+            });
+        }
 
         void AfterRevive()
         {
@@ -359,10 +413,10 @@ namespace FluffyClimbers.Gameplay
             if (adBusy || Session == null) return;
             if (Session.AdRewardPending) { if (Session.TryReviveFree()) AfterRevive(); return; }
             // No ad loaded: IsReady also asks the ad service to start loading one. Tell the player; the button stays (dimmed), Retry/Home/Shop stay usable.
-            if (!Services.Ads.IsReady(AdPlacements.Revive)) { if (!Hud.ShowAdNotReady()) { ShowFailedOffer(); Hud.ShowAdNotReady(); } return; }
+            if (!AdGate.IsRewardedReady(AdPlacements.Revive)) { if (!Hud.ShowAdNotReady()) { ShowFailedOffer(); Hud.ShowAdNotReady(); } return; }
             adBusy = true;
             RunSession sess = Session;
-            Services.Ads.ShowRewarded(AdPlacements.Revive, granted =>
+            AdGate.ShowRewarded(AdPlacements.Revive, granted =>
             {
                 adBusy = false;
                 if (this == null || sess != Session) return;               // left the run while the ad was up

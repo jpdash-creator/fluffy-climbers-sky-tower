@@ -22,6 +22,7 @@ Owner list 33, item 5. Code: `Assets/_Game/Services` (assembly `FluffyClimbers.S
 | Gems5000 | ...gems.pack_5000 | Consumable | 5,000 Gems | 49.99 | 24.99 | 5,000 gems |
 | Gems10000 | ...gems.pack_10000 | Consumable | 10,000 Gems | 89.99 | 44.99 | 10,000 gems |
 | Gems15000 | ...gems.pack_15000 | Consumable | 15,000 Gems | 119.99 | 59.99 | 15,000 gems |
+| AdsRemove | ...ads.remove | **Non-consumable** (one time) | Remove Ads | 2.99 | - | No interstitials; every ad reward is given at once without an ad (owner 2026-11-17). Save flag `adsRemoved`, restored by Restore purchases. **Live: create it in the console** (INR set there). 14 live products in all |
 | SubWeekly | ...sub.weekly | Subscription (1 week) | Weekly Subscription | 1.49 | - | 100 gems now; daily 10 gems + 500 coins, 7 days |
 | SubMonthly | ...sub.monthly | Subscription (1 month) | Monthly Subscription | 4.99 | - | 200 gems now; daily 10 gems + 600 coins, 30 days; power-up every 5th claim |
 | StarterPack | ...bundle.starter | Consumable | Starter Pack | 0.99 | - | 100 gems + 2,000 coins. **PLANNED, `Live=false`: do not create yet** (doc 22 point 7) |
@@ -32,16 +33,19 @@ Owner list 33, item 5. Code: `Assets/_Game/Services` (assembly `FluffyClimbers.S
 
 | Constant | Name (= key in `ads_config.json` `rewardedAdUnitIds`) | Where | State |
 |---|---|---|---|
-| Revive | `revive` | Failed overlay, free first revive | **Built** |
-| DoubleReward | `double_reward` | Results after a win, x2 coins | Planned |
-| DailyPowerUp | `daily_powerup` | Rewards/home, 1 free power-up a day | Planned |
+| Revive | `revive` | Failed overlay: BOTH ad revives of a run (1st and 2nd, max 2 ads per run; gems 5 then 10 stay the alternative) | **Built** |
+| DoubleReward | `double_reward` | Results after a win: x2 button (Ads icon + "x2"), adds the level's PayoutCoins once more; hidden when no ad is ready or already used | **Built** (2026-11-17) |
+| DailyPowerUp | `daily_powerup` | Rewards > Daily tab card: 1 seeded-random implemented power-up per local day; reads "Claimed" afterwards | **Built** (2026-11-17) |
 | ShopFreeGems | `shop_free_gems` | Shop, small capped gem reward | Planned, optional |
+| RestartInterstitial | `interstitialAdUnitIds.restart` (INTERSTITIAL, not rewarded) | Before the new run on every 3rd restart (Retry, pause Restart, Play again; never the first run of a level): at least 4 minutes apart, never without consent, only when an ad is already loaded (never delays the retry, CUX-7) | **Built** (2026-11-17) |
 
-No interstitials or banners at launch (doc 13 4.3).
+Interstitial rule = `InterstitialPolicy` (pure, tested). `ads_config.json` `interstitialAdUnitIds {default, restart}`: placeholders `REPLACE_WITH_INTERSTITIAL_UNIT_ID`; a release build with placeholders shows NO interstitial and logs once; dev builds use Google's sample interstitial `ca-app-pub-3940256099942544/1033173712`. No banners.
+
+**Remove Ads (`AdGate`)**: with `ProgressService.AdsRemoved` every interstitial is skipped and every rewarded placement grants at once without an ad (same button, same flow; gems options unchanged). All game code asks `AdGate`, never `Services.Ads` directly. Ad buttons show the Ads icon (`icon_ads`, fallback play icon; the accessibility label says "Watch an ad"); the shop card uses `icon_no_ads`.
 
 ## 4. Code overview
 
-- `IAdService { IsReady(placement); ShowRewarded(placement, Action<bool> onDone); }`. `StubAdService` (always ready, true after 1 s; editor and tests) and `AdMobAdService` (own assembly `FluffyClimbers.Services.AdMob`, define constraint `FLUFFY_ADMOB`, device only). The revive flow calls `Services.Ads.ShowRewarded(AdPlacements.Revive, ...)`; the old `Gameplay/Ads` path and all LevelPlay code are deleted.
+- `IAdService { IsReady(placement); ShowRewarded(placement, Action<bool> onDone); IsInterstitialReady(placement); ShowInterstitial(placement, Action<bool> onDone); }`. `StubAdService` (always ready, true after 1 s; editor and tests) and `AdMobAdService` (own assembly `FluffyClimbers.Services.AdMob`, define constraint `FLUFFY_ADMOB`, device only). The revive flow calls `Services.Ads.ShowRewarded(AdPlacements.Revive, ...)`; the old `Gameplay/Ads` path and all LevelPlay code are deleted.
 - `IPaymentService { Initialize(); GetLocalizedPrice(id); Purchase(id, done); Restore(done); }`. `StubPaymentService` (success at once; editor and development builds only), `UnavailablePaymentService` (a release build without a working store refuses every purchase, nothing is ever granted) and `UnityIapPaymentService` (`#if FLUFFY_UNITY_IAP`, assembly `FluffyClimbers.Services.UnityIap`, Unity IAP v5 `StoreController`). The interface also has two events, `RecoveredPurchase` and `ActiveSubscriptionFound`.
 - `Services.Ads`, `Services.Payments`, `Services.ConsentGiven`, `Services.PrivacyOptionsRequired`, `Services.ShowPrivacyOptions(Action onClosed)`: the locator. `PrivacyOptionsRequired` is true only when UMP says a privacy options entry must be offered (Settings shows the button then); stubs and the editor return false and call `onClosed` at once. Real services are used on device only when the define is on, else stubs. The editor always uses stubs.
 - Purchase contract: grant and **save inside** the `Purchase` callback; the store transaction is confirmed right after the callback returns, unless the callback sets `PurchaseResult.Reject` (then it stays unconfirmed and Google refunds it after about 3 days). The receipt is validated BEFORE the callback runs (section 5, step 7). A purchase recovered at start-up (app killed mid-purchase, pending purchase approved later) is raised by `IPaymentService.RecoveredPurchase`; `Gameplay/StoreLink.Start` (a boot step in `BootLoader`) subscribes before `Initialize()`; with no subscriber it stays unconfirmed and is re-delivered next launch.

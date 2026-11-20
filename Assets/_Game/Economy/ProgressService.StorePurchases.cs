@@ -65,8 +65,19 @@ namespace FluffyClimbers.Economy
                 SubscriptionBuyResult r = GrantWithRecord(productId, PurchaseRecord.KindSubscription, tx, nowUtc, def.PeriodDays, () => CreditSubscription(plan, nowUtc), x => x == SubscriptionBuyResult.Ok);
                 return r == SubscriptionBuyResult.Ok ? StorePurchaseOutcome.Granted : StorePurchaseOutcome.NotGranted;
             }
+            if (def.Kind == ProductKind.NonConsumable && productId == AdsRemoveProductId)
+            {
+                bool done = GrantWithRecord(productId, PurchaseRecord.KindNonConsumable, tx, nowUtc, 0, () => { Data.AdsRemoved = true; Commit(); return true; }, x => x);
+                return done ? StorePurchaseOutcome.Granted : StorePurchaseOutcome.NotGranted;
+            }
             return StorePurchaseOutcome.UnknownProduct;
         }
+
+        /// <summary>Same text as ProductCatalog.AdsRemove (Economy cannot see the Services assembly; a unit test keeps them equal).</summary>
+        public const string AdsRemoveProductId = ProductIdPrefix + "ads.remove";
+
+        /// <summary>True once "Remove Ads" was bought or restored: the ad gate then skips every interstitial and pays every rewarded placement without an ad.</summary>
+        public bool AdsRemoved { get { return Data.AdsRemoved; } }
 
         /// <summary>
         /// The store says this subscription is active now (start-up or Restore). When the game's own time has run out (a renewal happened while the app was closed) a new period

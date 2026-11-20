@@ -158,6 +158,24 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
+        public void BothRevivesOfARunCanBeFreeByAdAndAThirdNeedsGems()
+        {
+            // owner 2026-11-17: the second revive is also free by rewarded ad (max 2 ads per run); gems stay the alternative and an unready ad means gems only
+            RunSession s = NewDeadSession();
+            Assert.IsTrue(s.AdReviveOffered);
+            s.MarkAdWatched();
+            Assert.IsTrue(s.TryReviveFree(), "1st revive by ad");
+            Kill(s);
+            Assert.IsTrue(s.AdReviveOffered, "the 2nd revive is offered by ad too");
+            s.MarkAdWatched();
+            Assert.IsTrue(s.TryReviveFree(), "2nd revive by ad");
+            Assert.AreEqual(2, s.Revive.AdsUsed);
+            Kill(s);
+            Assert.IsFalse(s.AdReviveOffered, "no third ad");
+            Assert.AreEqual(5, s.NextReviveCost, "gems still cost 5 for the first gem revive: ads never make them dearer");
+        }
+
+        [Test]
         public void AfterAGemReviveTheAdIsStillOfferedAndGemsCostTen()
         {
             progress.AddGems(5);

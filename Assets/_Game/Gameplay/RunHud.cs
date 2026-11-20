@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using FluffyClimbers.Economy;
 using FluffyClimbers.Simulation;
 using UnityEngine;
@@ -77,6 +77,8 @@ namespace FluffyClimbers.Gameplay
     public sealed partial class RunHud : MonoBehaviour
     {
         public Action OnPause, OnResume, OnRetry, OnNext, OnMenu, OnRevive, OnReviveAd;
+        /// <summary>The "x2" button of the result screen was tapped (RunController plays the rewarded ad and pays the coins again).</summary>
+        public Action OnDoubleCoins;
         /// <summary>A power-up button was pressed (the PowerUp type id). The run controller latches it into the next tick's input.</summary>
         public Action<int> OnPower;
         /// <summary>The close mark of the current overlay (pause: resume, end screens: back to the level select).</summary>
@@ -680,15 +682,19 @@ namespace FluffyClimbers.Gameplay
                 int cost = s.NextReviveCost;
                 if (offerAd)
                 {
-                    string adLabel = s.AdRewardPending ? "FREE" : s.Revive.AdLabel;   // "Watch Ad": no ad length in the text (owner 2026-11-10)
+                    // The Ads icon replaces the "Watch Ad" text (owner 2026-11-17); a revive whose ad was already watched keeps the word FREE.
+                    bool adIconOnly = !s.AdRewardPending;
+                    string adLabel = s.AdRewardPending ? "FREE" : "";
                     string adA11y = s.AdRewardPending ? "Revive for free, ad watched" : (adDim ? "Watch an ad to revive, not ready yet" : "Watch an ad to revive");
-                    Button adBtn = ReviveButton(panel, adLabel, adA11y, ToyKit.Get("icon_play"), 1, -step * 0.5f, reviveY, w, () => { if (OnReviveAd != null) OnReviveAd(); });
+                    Button adBtn = ReviveButton(panel, adLabel, adA11y, ToyKit.AdsIcon, 1, -step * 0.5f, reviveY, w, () => { if (OnReviveAd != null) OnReviveAd(); }, adIconOnly);
                     if (adDim)
                     {
                         // Dimmed, never hidden or disabled: the tap still reaches RunController, which starts an ad load and calls ShowAdNotReady.
                         Image bi = adBtn.GetComponent<Image>();
                         if (bi != null) bi.color = new Color(0.55f, 0.55f, 0.55f, 0.85f);
                         Text bt = adBtn.GetComponentInChildren<Text>();
+                        Image adIc = adBtn.transform.Find("Icon") != null ? adBtn.transform.Find("Icon").GetComponent<Image>() : null;
+                        if (adIc != null) adIc.color = new Color(1f, 1f, 1f, 0.6f);
                         if (bt != null) bt.color = new Color(0.10f, 0.06f, 0.14f, 0.8f);
                         Text hint = UiKit.AddText(panel, "AdHint", AdNotReadyText, 38, Theme.Ink, TextAnchor.MiddleCenter, true);
                         hint.fontStyle = FontStyle.Bold;
@@ -727,14 +733,15 @@ namespace FluffyClimbers.Gameplay
         }
 
         /// <summary>A revive button: icon at the left, a short label (Watch Ad or gem price) that shrinks to fit at 130 percent text (CUX-4, CUX-5; not colour only).</summary>
-        Button ReviveButton(Transform panel, string label, string a11y, Sprite icon, int role, float x, float y, float width, Action act)
+        Button ReviveButton(Transform panel, string label, string a11y, Sprite icon, int role, float x, float y, float width, Action act, bool iconOnly = false)
         {
             float h = ReviveButtonH;
             Button b = UiKit.AddButton(panel, a11y, label, ToyKit.Button(role == 1 ? 1 : 0), Color.white, new Vector2(width, h), act, 44);
             UiKit.Place((RectTransform)b.transform, new Vector2(0.5f, 0f), new Vector2(x, y), new Vector2(width, h));
             b.GetComponent<A11yLabel>().Text = a11y;
             Text t = b.GetComponentInChildren<Text>();
-            if (t != null)
+            if (iconOnly && t != null) { t.text = ""; t.gameObject.SetActive(false); }   // the Ads icon alone, centred (the accessibility label says "Watch an ad")
+            else if (t != null)
             {
                 var tr = (RectTransform)t.transform;
                 tr.offsetMin = new Vector2(h * 0.78f, tr.offsetMin.y);
@@ -750,10 +757,10 @@ namespace FluffyClimbers.Gameplay
                 Image ic = UiKit.AddImage(b.transform, "Icon", icon, Color.white);
                 ic.raycastTarget = false;
                 RectTransform r = ic.rectTransform;
-                r.anchorMin = r.anchorMax = new Vector2(0f, 0.5f);
+                r.anchorMin = r.anchorMax = iconOnly ? new Vector2(0.5f, 0.5f) : new Vector2(0f, 0.5f);
                 r.pivot = new Vector2(0.5f, 0.5f);
-                r.anchoredPosition = new Vector2(h * 0.42f, 0f);
-                r.sizeDelta = new Vector2(h * 0.56f, h * 0.56f);
+                r.anchoredPosition = iconOnly ? Vector2.zero : new Vector2(h * 0.42f, 0f);
+                r.sizeDelta = iconOnly ? new Vector2(h * 0.7f, h * 0.7f) : new Vector2(h * 0.56f, h * 0.56f);
             }
             return b;
         }
@@ -788,7 +795,7 @@ namespace FluffyClimbers.Gameplay
             FitPanelToSafeArea();
         }
 
-        public void ShowResults(RunSession s, RewardResult reward, bool hasNext)
+        public void ShowResults(RunSession s, RewardResult reward, bool hasNext, bool doubleOffer = false)
         {
             RecordResult rec = LastRecord(false);
             ResultTiming timing = ResultTiming.For(s, rec, false, false);
@@ -805,7 +812,14 @@ namespace FluffyClimbers.Gameplay
             float yEarned = yMedals + medalsH;
             float yTime = yEarned + 2f * PillPitch, yTail = yTime + 2f * PillPitch - SectionGap;   // 6 px gaps between the pill rows; the ribbons start right under the pace row
             float actionTopL = ButtonY + ButtonSizeFor(150f);
-            float panelH = yTail + timing.TailHeight + 12f + actionTopL;
+            // "Double the coins" (rewarded ad, owner 2026-11-17): its own row between the earned rows and the action row, sized by the real touch minimum and shown only when an ad is ready.
+            float dblRow = doubleOffer ? DoubleCoinsRowH : 0f;
+            float panelH = yTail + timing.TailHeight + 12f + dblRow + actionTopL;
+            if (doubleOffer && panelH > UiKit.CanvasSizeRef().y * UiKit.SafeAreaNormalized().height)
+            {
+                doubleOffer = false;   // never overflow the safe area (CUX-3): on a short screen or at 130 percent text the x2 row is left out rather than squeezed below 48 dp
+                panelH -= dblRow;
+            }
             OpenOverlay("Level clear!", panelH);
             AudioManager.Play(Sfx.Win);
             OnClose = () => { if (OnMenu != null) OnMenu(); };
@@ -840,12 +854,59 @@ namespace FluffyClimbers.Gameplay
             if (reward.FirstClear) ToyKit.InfoPill(row2, ToyKit.Get("icon_crown"), "First", new Color(1f, 0.9f, 0.4f), 270f, PillH);
             if (!string.IsNullOrEmpty(reward.UnlockedRegionId)) ToyKit.InfoPill(row2, ToyKit.Get("icon_flag"), "New", new Color(0.7f, 1f, 0.75f), 270f, PillH);
             timing.Build(panel, yTime, yTime + PillPitch, yTail);
+            doubleCoinsButton = null;
+            if (doubleOffer)
+            {
+                int extra = ProgressService.DoubleCoinsAmount(reward);
+                doubleCoinsButton = ReviveButton(panel, "x2", "Watch an ad to double your coins, " + extra + " more", ToyKit.AdsIcon, 1, 0f, actionTopL + 12f, ReviveBtnWSolo, () => { if (OnDoubleCoins != null) OnDoubleCoins(); });
+                doubleCoinsButton.name = DoubleCoinsButtonName;
+                // [Ads icon] [coin] x2: what doubles is coins (owner 2026-11-17)
+                float bh = ReviveButtonH;
+                Sprite coinSprite = art != null ? art.CoinIcon : null;
+                if (coinSprite != null)
+                {
+                    Image coin = UiKit.AddImage(doubleCoinsButton.transform, "CoinIcon", coinSprite, Color.white);
+                    coin.raycastTarget = false;
+                    coin.preserveAspect = true;
+                    RectTransform cr = coin.rectTransform;
+                    cr.anchorMin = cr.anchorMax = new Vector2(0f, 0.5f);
+                    cr.pivot = new Vector2(0.5f, 0.5f);
+                    cr.anchoredPosition = new Vector2(bh * 0.42f + bh * 0.56f + bh * 0.12f, 0f);
+                    cr.sizeDelta = new Vector2(bh * 0.56f, bh * 0.56f);
+                    Text dt = doubleCoinsButton.GetComponentInChildren<Text>();
+                    if (dt != null) { var dtr = (RectTransform)dt.transform; dtr.offsetMin = new Vector2(bh * 0.78f + bh * 0.68f, dtr.offsetMin.y); }
+                }
+            }
             // Three equal round buttons (owner issue 16.7).
             OverlayRow(
                 MakeAct("Next", "Next level", 1, ToyKit.Get("icon_play"), 150f, () => { if (OnNext != null) OnNext(); }, hasNext),
                 MakeAct("Retry", "Play again", 0, Glyphs.Restart, 150f, () => { if (OnRetry != null) OnRetry(); }),
                 MakeAct("Home", "Level select", 2, ToyKit.Get("icon_home"), 150f, () => { if (OnMenu != null) OnMenu(); }));
             FitPanelToSafeArea();
+        }
+
+        public const string DoubleCoinsButtonName = "DoubleCoins";
+        Button doubleCoinsButton;
+        /// <summary>Height the "Double the coins" row adds to the result popup: the button at the touch minimum plus the gap above the action row and below the earned rows.</summary>
+        static float DoubleCoinsRowH { get { return ReviveButtonH + 12f + 10f; } }
+
+        /// <summary>The coins were doubled: the button turns into a quiet confirmation with the extra coins (no second ad), same place and size.</summary>
+        public void MarkDoubleCoinsDone(int extra)
+        {
+            if (doubleCoinsButton == null) return;
+            doubleCoinsButton.interactable = false;
+            Text t = doubleCoinsButton.GetComponentInChildren<Text>();
+            if (t != null) t.text = "+" + extra;
+            A11yLabel a = doubleCoinsButton.GetComponent<A11yLabel>();
+            if (a != null) a.Text = "Coins doubled, " + extra + " added";
+            Image bi = doubleCoinsButton.GetComponent<Image>();
+            if (bi != null) bi.color = new Color(0.75f, 0.85f, 0.7f, 1f);
+        }
+
+        /// <summary>No ad could start after all: the button goes away (the layout keeps its space, nothing moves).</summary>
+        public void HideDoubleCoins()
+        {
+            if (doubleCoinsButton != null) doubleCoinsButton.gameObject.SetActive(false);
         }
 
         /// <summary>

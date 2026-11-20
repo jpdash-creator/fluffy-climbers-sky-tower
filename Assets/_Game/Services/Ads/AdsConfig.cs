@@ -5,6 +5,7 @@ namespace FluffyClimbers.Monetization
     /// <summary>
     /// AdMob settings from Resources/Services/ads_config.json (docs/33). Schema:
     /// { "androidAppId", "rewardedAdUnitIds": { "default", "revive", "double_reward", "daily_powerup", "shop_free_gems" },
+    ///   "interstitialAdUnitIds": { "default", "restart" } (every 3rd restart; a release build with placeholders shows NO interstitial and logs one warning),
     ///   "testMode", "tagForChildDirectedTreatment" ("unspecified"|"true"|"false"), "maxAdContentRating" ("G"|"PG"|"T"|"MA"),
     ///   "debugGeography" ("disabled"|"eea"|"not_eea"; development builds only), "testDeviceIds": [] }.
     /// Rules: the shipped file holds placeholders. The editor and development builds with placeholders (or testMode=true) use Google's public SAMPLE ids;
@@ -15,17 +16,23 @@ namespace FluffyClimbers.Monetization
         public const string PlaceholderAppId = "REPLACE_WITH_ADMOB_APP_ID";
         public const string PlaceholderUnitId = "REPLACE_WITH_REWARDED_UNIT_ID";
         public const string SampleAppId = "ca-app-pub-3940256099942544~3347511713";
+        public const string PlaceholderInterstitialUnitId = "REPLACE_WITH_INTERSTITIAL_UNIT_ID";
         public const string SampleRewardedUnitId = "ca-app-pub-3940256099942544/5224354917";
+        public const string SampleInterstitialUnitId = "ca-app-pub-3940256099942544/1033173712";
         public const string ResourcePath = "Services/ads_config";
 
         [System.Serializable]
         sealed class Units { public string @default; public string revive; public string double_reward; public string daily_powerup; public string shop_free_gems; }
 
         [System.Serializable]
+        sealed class InterstitialUnits { public string @default; public string restart; }
+
+        [System.Serializable]
         sealed class Data
         {
             public string androidAppId;
             public Units rewardedAdUnitIds;
+            public InterstitialUnits interstitialAdUnitIds;
             public bool testMode;
             public string tagForChildDirectedTreatment;
             public string maxAdContentRating;
@@ -33,7 +40,7 @@ namespace FluffyClimbers.Monetization
             public string[] testDeviceIds;
         }
 
-        static bool loaded, warned;
+        static bool loaded, warned, warnedInterstitial;
         static Data data;
 
         static void Load()
@@ -48,10 +55,11 @@ namespace FluffyClimbers.Monetization
             catch (System.Exception e) { Debug.LogWarning("[Ads] ads_config.json unreadable: " + e.Message); }
             if (data == null) data = new Data();
             if (data.rewardedAdUnitIds == null) data.rewardedAdUnitIds = new Units();
+            if (data.interstitialAdUnitIds == null) data.interstitialAdUnitIds = new InterstitialUnits();
         }
 
         /// <summary>Tests: forget the cached file.</summary>
-        public static void Reset() { loaded = false; warned = false; data = null; }
+        public static void Reset() { loaded = false; warned = false; warnedInterstitial = false; data = null; }
 
         public static bool IsPlaceholder(string id) { return string.IsNullOrEmpty(id) || id.StartsWith("REPLACE_WITH"); }
 
@@ -83,6 +91,31 @@ namespace FluffyClimbers.Monetization
             string id = !IsPlaceholder(placementId) ? placementId : defaultId;
             if (!IsPlaceholder(id)) return id.Trim();
             return null;
+        }
+
+        /// <summary>Pure rule: the interstitial unit id for a placement ("default" fallback), or null for "no interstitial" (release build with placeholders).</summary>
+        public static string ResolveInterstitialUnitId(string placementId, string defaultId, bool testMode, bool devContext)
+        {
+            if (testMode || devContext) return SampleInterstitialUnitId;   // never real units in the editor or a development build (invalid traffic)
+            string id = !IsPlaceholder(placementId) ? placementId : defaultId;
+            if (!IsPlaceholder(id)) return id.Trim();
+            return null;
+        }
+
+        public static string InterstitialUnitId(string placement)
+        {
+            Load();
+            InterstitialUnits u = data.interstitialAdUnitIds;
+            string specific = placement == AdPlacements.RestartInterstitial ? u.restart : null;
+            return ResolveInterstitialUnitId(specific, u.@default, data.testMode, IsDevContext);
+        }
+
+        /// <summary>Logs one clear warning (once) when interstitials are off because the unit ids are placeholders in a release build. Rewarded ads are not affected.</summary>
+        public static void WarnIfInterstitialUnconfigured()
+        {
+            if (warnedInterstitial || InterstitialUnitId(AdPlacements.RestartInterstitial) != null) return;
+            warnedInterstitial = true;
+            Debug.LogWarning("[Ads] interstitialAdUnitIds in ads_config.json are still placeholders and this is a release build: NO interstitial is shown (rewarded ads still work). Put the real Interstitial unit id there (docs/33, Planning/CLOSED-TESTING-OWNER-STEPS.md).");
         }
 
         public static string AppId { get { Load(); return ResolveAppId(data.androidAppId, data.testMode, IsDevContext); } }

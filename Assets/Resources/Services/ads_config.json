@@ -7,6 +7,10 @@
     "daily_powerup": "REPLACE_WITH_REWARDED_UNIT_ID",
     "shop_free_gems": "REPLACE_WITH_REWARDED_UNIT_ID"
   },
+  "interstitialAdUnitIds": {
+    "default": "REPLACE_WITH_INTERSTITIAL_UNIT_ID",
+    "restart": "REPLACE_WITH_INTERSTITIAL_UNIT_ID"
+  },
   "testMode": false,
   "tagForChildDirectedTreatment": "unspecified",
   "maxAdContentRating": "T",

@@ -19,6 +19,9 @@ Play Console > your app > **Monetize > Products > In-app products > Create produ
 | 7 | `com.jdlabs.fluffyclimbers.gems.pack_5000` | 5,000 Gems | 5,000 gems for chests, power-ups and coins in Fluffy Climbers. | 49.99 | 4,749 |
 | 8 | `com.jdlabs.fluffyclimbers.gems.pack_10000` | 10,000 Gems | 10,000 gems for chests, power-ups and coins in Fluffy Climbers. | 89.99 | 8,549 |
 | 9 | `com.jdlabs.fluffyclimbers.gems.pack_15000` | 15,000 Gems | 15,000 gems for chests, power-ups and coins in Fluffy Climbers. | 119.99 | 11,399 |
+| 10 | `com.jdlabs.fluffyclimbers.ads.remove` | Remove Ads | Removes all ads. One-time purchase: no interstitials, ad rewards given at once. | 2.99 | set INR in the console |
+
+**Product 10 (Remove Ads) is a ONE-TIME product that is NOT consumed** (gems are consumable). In the Play Console create it as a normal in-app product; the game treats it as a non-consumable (it is acknowledged, never consumed) and restores it with Restore purchases. **14 live products in all: 10 one-time products (9 gem packs + Remove Ads) + 4 subscriptions.**
 
 All descriptions are at most 80 characters. The first-purchase double (packs up to 1,000 gems) is granted by the game, not by the store: do not mention it in the product text.
 

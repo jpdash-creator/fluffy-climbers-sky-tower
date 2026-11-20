@@ -209,15 +209,22 @@ namespace FluffyClimbers.Monetization
 
         void ReportOwned(Orders orders)
         {
-            if (orders == null || ActiveSubscriptionFound == null || orders.ConfirmedOrders == null) return;
+            if (orders == null || orders.ConfirmedOrders == null) return;
             for (int i = 0; i < orders.ConfirmedOrders.Count; i++)
             {
                 ConfirmedOrder o = orders.ConfirmedOrders[i];
                 string id = IdOf(o);
                 ProductDef def = ProductCatalog.Get(id);
-                if (def == null || def.Kind != ProductKind.Subscription) continue;
+                if (def == null || (def.Kind != ProductKind.Subscription && def.Kind != ProductKind.NonConsumable)) continue;
                 string error;
                 if (!Validate(o, id, out error)) continue;
+                if (def.Kind == ProductKind.NonConsumable)
+                {
+                    // An owned one-time product (Remove Ads): the same idempotent grant as a recovered purchase (ledger key product + transaction). Nothing to confirm: it is already confirmed.
+                    if (RecoveredPurchase != null) RecoveredPurchase(new PurchaseResult { Status = PurchaseStatus.Success, ProductId = id, TransactionId = TransactionOf(o), Receipt = o.Info != null ? o.Info.Receipt : null });
+                    continue;
+                }
+                if (ActiveSubscriptionFound == null) continue;
                 ActiveSubscriptionFound(new PurchaseResult { Status = PurchaseStatus.Success, ProductId = id, TransactionId = TransactionOf(o), Receipt = o.Info != null ? o.Info.Receipt : null });
             }
         }

@@ -273,6 +273,7 @@ namespace FluffyClimbers.Gameplay
             else if (Tab == RewardTab.Daily)
             {
                 BuildSceneHeader(content, true);
+                BuildDailyAdPowerUpCard(content);   // owner 2026-11-17: one free power-up a day for watching an ad
                 AddCardsWithCompleted(content, defs.DailyActions, false);   // a finished daily action moves to "Completed (N)" at once
             }
             else

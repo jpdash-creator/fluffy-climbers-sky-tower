@@ -117,7 +117,10 @@ namespace FluffyClimbers.Economy
                     restored++;
                 }
             }
-            // Non-consumables: none are sold today. When one is added, grant it here (by product id) and count it.
+            // Non-consumable "Remove Ads": a recorded purchase sets the flag again (a reset or another device with the records); the flag is the entitlement, so it counts once.
+            if (!Data.AdsRemoved)
+                foreach (PurchaseRecord p in Purchases)
+                    if (p.ProductId == AdsRemoveProductId) { Data.AdsRemoved = true; restored++; break; }
             if (restored > 0) Commit();
             return restored;
         }
