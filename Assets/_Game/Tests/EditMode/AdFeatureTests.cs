@@ -252,5 +252,43 @@ namespace FluffyClimbers.Tests
             AdGate.AdsRemoved = () => false;
             Assert.IsTrue(AdGate.IsInterstitialReady(AdPlacements.RestartInterstitial));
         }
+
+        // ---- preloading ----
+
+        /// <summary>Records which placements were asked for (asking is what makes the real service start a load).</summary>
+        sealed class AskRecorder : IAdService
+        {
+            public readonly System.Collections.Generic.List<string> Rewarded = new System.Collections.Generic.List<string>();
+            public readonly System.Collections.Generic.List<string> Interstitial = new System.Collections.Generic.List<string>();
+            public bool IsReady(string placement) { Rewarded.Add(placement); return false; }
+            public void ShowRewarded(string placement, Action<bool> onDone) { if (onDone != null) onDone(false); }
+            public bool IsInterstitialReady(string placement) { Interstitial.Add(placement); return false; }
+            public void ShowInterstitial(string placement, Action<bool> onDone) { if (onDone != null) onDone(false); }
+        }
+
+        [Test]
+        public void PreloadAllAsksForEveryBuiltRewardedPlacementAndTheInterstitial()
+        {
+            var rec = new AskRecorder();
+            Services.Ads = rec;
+            AdGate.AdsRemoved = () => false;
+            AdGate.PreloadAll();
+            CollectionAssert.AreEquivalent(new[] { AdPlacements.Revive, AdPlacements.DoubleReward, AdPlacements.DailyPowerUp }, rec.Rewarded);
+            CollectionAssert.AreEqual(new[] { AdPlacements.RestartInterstitial }, rec.Interstitial);
+            var covered = new System.Collections.Generic.List<string>(AdPlacements.BuiltRewarded) { AdPlacements.RestartInterstitial };
+            CollectionAssert.AreEquivalent(AdPlacements.Built, covered, "every built placement is covered by the preload");
+        }
+
+        [Test]
+        public void PreloadDoesNothingWithAdsRemoved()
+        {
+            var rec = new AskRecorder();
+            Services.Ads = rec;
+            AdGate.AdsRemoved = () => true;
+            AdGate.PreloadAll();
+            AdGate.PreloadInterstitial(AdPlacements.RestartInterstitial);
+            Assert.AreEqual(0, rec.Rewarded.Count);
+            Assert.AreEqual(0, rec.Interstitial.Count);
+        }
     }
 }

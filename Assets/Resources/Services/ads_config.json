@@ -3,13 +3,13 @@
   "rewardedAdUnitIds": {
     "default": "ca-app-pub-7325859214707779/6470697007",
     "revive": "ca-app-pub-7325859214707779/6470697007",
-    "double_reward": "REPLACE_WITH_REWARDED_UNIT_ID",
-    "daily_powerup": "REPLACE_WITH_REWARDED_UNIT_ID",
+    "double_reward": "ca-app-pub-7325859214707779/4123122888",
+    "daily_powerup": "ca-app-pub-7325859214707779/1997194982",
     "shop_free_gems": "REPLACE_WITH_REWARDED_UNIT_ID"
   },
   "interstitialAdUnitIds": {
-    "default": "REPLACE_WITH_INTERSTITIAL_UNIT_ID",
-    "restart": "REPLACE_WITH_INTERSTITIAL_UNIT_ID"
+    "default": "ca-app-pub-7325859214707779/8179459958",
+    "restart": "ca-app-pub-7325859214707779/8179459958"
   },
   "testMode": false,
   "tagForChildDirectedTreatment": "unspecified",

@@ -36,5 +36,19 @@ namespace FluffyClimbers.Monetization
 
         /// <summary>Starts consent/SDK/ad loading early; skipped with ads removed (nothing will ever be shown).</summary>
         public static void Preload(string placement) { if (!Removed) Services.Ads.IsReady(placement); }
+
+        /// <summary>Starts loading the restart interstitial early (IsInterstitialReady asks the service to load one when none is loaded); skipped with ads removed.</summary>
+        public static void PreloadInterstitial(string placement) { if (!Removed) Services.Ads.IsInterstitialReady(placement); }
+
+        /// <summary>
+        /// Preloads EVERY built ad (revive, x2 coins, daily power-up and the restart interstitial), so each button and the 3rd-restart ad are ready when the player gets there
+        /// instead of the first ask starting a load that is not done yet. Called at run start; cheap when an ad is already loaded (no request is made).
+        /// </summary>
+        public static void PreloadAll()
+        {
+            if (Removed) return;
+            for (int i = 0; i < AdPlacements.BuiltRewarded.Count; i++) Services.Ads.IsReady(AdPlacements.BuiltRewarded[i]);
+            Services.Ads.IsInterstitialReady(AdPlacements.RestartInterstitial);
+        }
     }
 }

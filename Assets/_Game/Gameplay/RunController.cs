@@ -179,7 +179,7 @@ namespace FluffyClimbers.Gameplay
             Hud.OnNext = PlayNext;
             Hud.OnRevive = Revive;
             Hud.OnReviveAd = ReviveByAd;
-            AdGate.Preload(AdPlacements.Revive);   // starts consent/SDK/ad loading early (no-op on the stub)
+            AdGate.PreloadAll();   // starts consent/SDK/ad loading early and loads revive, x2 coins, daily power-up and the restart interstitial (no-op on the stub)
             Hud.OnPower = type => Input.LatchPower((PowerUp)type);
         }
 

@@ -142,7 +142,8 @@ namespace FluffyClimbers.Monetization
             {
                 sdkReady = true;
                 Debug.Log("[Ads] Mobile Ads SDK initialised, consent can request ads=" + canRequestAds);
-                RequestLoad(GetSlot(AdsConfig.RewardedUnitId(AdPlacements.Revive)));
+                // Preload every built rewarded placement (revive, x2 coins, daily power-up): placements that share a unit id share one slot, so no duplicate request.
+                for (int i = 0; i < AdPlacements.BuiltRewarded.Count; i++) RequestLoad(GetSlot(AdsConfig.RewardedUnitId(AdPlacements.BuiltRewarded[i])));
                 interstitialUnitId = AdsConfig.InterstitialUnitId(AdPlacements.RestartInterstitial);
                 if (interstitialUnitId == null) AdsConfig.WarnIfInterstitialUnconfigured();
                 else RequestLoadInterstitial();

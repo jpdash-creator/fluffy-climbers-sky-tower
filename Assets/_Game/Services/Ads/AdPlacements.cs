@@ -22,5 +22,8 @@ namespace FluffyClimbers.Monetization
 
         public static readonly IReadOnlyList<string> All = new[] { Revive, DoubleReward, DailyPowerUp, ShopFreeGems, RestartInterstitial };
         public static readonly IReadOnlyList<string> Built = new[] { Revive, DoubleReward, DailyPowerUp, RestartInterstitial };
+
+        /// <summary>The built REWARDED placements (everything in <see cref="Built"/> except the interstitial). All of them are preloaded when the SDK starts and at every run start.</summary>
+        public static readonly IReadOnlyList<string> BuiltRewarded = new[] { Revive, DoubleReward, DailyPowerUp };
     }
 }
