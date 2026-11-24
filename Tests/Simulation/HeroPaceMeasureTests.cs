@@ -122,10 +122,12 @@ namespace FluffyClimbers.Simulation.Tests
         {
             List<Profile> p = Profiles();
             Assert.Equal(9, p.Count);
-            Assert.Equal(new[] { 190, 209, 216, 219, 228, 196, 200, 203, 209 }, p.Select(x => x.Launch).ToArray());
+            // not pinned to numbers: the hero table is re-tuned by the owner (Final Change 3 moved Momo's tiers), so only the shape is checked
+            for (int i = 1; i < 5; i++) Assert.True(p[i].Launch > p[i - 1].Launch, "Momo's five tiers launch higher with every tier");
             for (int i = 5; i < 9; i++) Assert.True(p[i].Launch < p[i - 4].Launch || i == 8 && p[i].Launch <= p[i - 4].Launch);
             SimConfig a = ConfigFor(2, p[0]), b = MedalCalibrationTests.ConfigFor(2);
-            Assert.Equal(b.JumpBase.Raw, a.JumpBase.Raw);   // Common = the default hero
+            // Common sits 0 to 5 percent over the default launch (docs/44 section 3; Momo Common is 19.2 against the default 19.0)
+            Assert.True(a.JumpBase.Raw >= b.JumpBase.Raw && a.JumpBase.Raw <= b.JumpBase.Raw * 105 / 100, "Common launch is within the 0 to 5 percent band over the default");
         }
 
         [Fact]
