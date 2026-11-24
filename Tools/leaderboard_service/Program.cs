@@ -92,6 +92,12 @@ namespace FluffyClimbers.LeaderboardService
                 return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await api.DeleteMyEntriesAsync(uid));
             });
 
+            app.MapPost("/register-me", async (HttpContext c) =>
+            {
+                string uid = await Uid(c);
+                return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await api.RegisterMeAsync(uid));
+            });
+
             app.MapPost("/sync-breakdown", async (HttpContext c, LeaderboardApi.BreakdownRequest req) =>
             {
                 string uid = await Uid(c);

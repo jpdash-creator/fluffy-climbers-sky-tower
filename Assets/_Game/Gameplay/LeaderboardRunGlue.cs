@@ -56,8 +56,8 @@ namespace FluffyClimbers.Gameplay
             if (rec == null || progress == null) return;
             if (ticket == null)
             {
-                // a run that could have been ranked but the consent is missing: ask once on the menu
-                if (LeaderboardHub.Enabled && LeaderboardHub.IsGoogleSignedIn && !LeaderboardHub.HasConsent && LeaderboardHub.ShouldAskConsent) ConsentPending = true;
+                // Final Change 4: a Google-signed-in player is joined automatically (no popup); the run itself had no ticket, the next one will
+                LeaderboardHub.AutoJoin();
                 return;
             }
             if (!LeaderboardHub.CanUpload) return;

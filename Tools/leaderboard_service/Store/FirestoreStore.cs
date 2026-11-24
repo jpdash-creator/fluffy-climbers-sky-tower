@@ -84,6 +84,23 @@ namespace FluffyClimbers.LeaderboardService
             return (more.Count ?? 0) + (tie.Count ?? 0);
         }
 
+        public Task<bool> EnsureTotalsAsync(string weekKey, string uid, string pid, string name, string avatar, DateTime now, DateTime expireAt)
+        {
+            return db.RunTransactionAsync(async tx =>
+            {
+                DocumentReference r = Totals(weekKey, uid);
+                DocumentSnapshot s = await tx.GetSnapshotAsync(r);
+                if (s.Exists)
+                {
+                    TotalsDoc cur = s.ConvertTo<TotalsDoc>();
+                    if (cur.Name != name || cur.Avatar != avatar) tx.Update(r, new Dictionary<string, object> { { "name", name }, { "avatar", avatar } });
+                    return false;
+                }
+                tx.Create(r, SlotMath.NewZeroTotals(uid, pid, name, avatar, now, expireAt));
+                return true;
+            });
+        }
+
         public async Task<BoardDoc> GetBoardAsync(string weekKey, string board)
         {
             DocumentSnapshot s = await Board(weekKey, board).GetSnapshotAsync();
@@ -103,8 +120,7 @@ namespace FluffyClimbers.LeaderboardService
             {
                 TotalsDoc t = d.ConvertTo<TotalsDoc>();
                 long c = t.Get(board);
-                if (c <= 0) continue;
-                n++;
+                n++;   // 0-crown rows (signed-in players without a score) stay: they rank below every scorer and win no prize (crowns below the entry limit)
                 doc.Entries.Add(new BoardEntry { Rank = n, Pid = t.Pid, Name = t.Name, Avatar = t.Avatar, Crowns = c });
                 last = c;
                 if (t.ExpireAt > expire) expire = t.ExpireAt;

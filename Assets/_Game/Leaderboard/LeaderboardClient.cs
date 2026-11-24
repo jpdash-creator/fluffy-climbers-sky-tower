@@ -138,6 +138,12 @@ namespace FluffyClimbers.Leaderboard
             });
         }
 
+        /// <summary>POST /register-me: after sign-in and the profile write, asks the service to put the player on all three boards of the current week with 0 crowns (never lowers a score). done(true) only on a 2xx answer; the caller may call it again any time.</summary>
+        public void RegisterMe(Action<bool> done)
+        {
+            Call("POST", cfg.Url("/register-me"), "{}", r => { if (done != null) done(r.Ok); });
+        }
+
         /// <summary>POST /delete-my-entries (Settings > Reset progress): the service deletes every score of this player. done(true) only on a 2xx answer; any other result (offline, no token, error) is false and the caller keeps the request queued.</summary>
         public void DeleteMyEntries(Action<bool> done)
         {

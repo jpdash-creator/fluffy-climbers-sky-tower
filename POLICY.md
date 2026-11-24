@@ -1,6 +1,6 @@
 # Fluffy Climbers: Tower Jump Privacy Policy
 
-Last updated: 2026-11-17
+Last updated: 2026-11-24
 
 > **In short**
 >
@@ -82,7 +82,7 @@ The Game has three weekly leaderboards: Overall, Levels and Endless. They rank t
 
 **Your own display name.** Once you are signed in with Google, Settings lets you choose a display name for the leaderboards instead of your Google Play Games name (3 to 16 letters, numbers, spaces or underscores; a built-in filter refuses rude words). The name is your own choice: do not use your real name or any personal detail if you do not want other players to see it. It is saved in your game save (and in your cloud save) and, once you have confirmed the leaderboards, sent with your other leaderboard data and shown to other players. It is not checked for uniqueness. You can change it at any time, and clearing it brings your Google Play Games name back. We may hide or change a name that is offensive or impersonates someone.
 
-**Your confirmation.** Before the Game first sends anything to the leaderboard it asks you once to confirm that your leaderboard name (the display name you chose, or your Google Play Games name) and profile picture will be shown to other players and that your runs are sent to our server for checking. Nothing is sent until you confirm, and you can leave the leaderboards at any time in Settings. The Game also asks our server for a one-time ticket with a random level seed before a run you want to submit; the ticket contains your Firebase user id, the level or tower, the setting and an expiry, and is stored in used form for a few days to stop it being reused.
+**Signing in joins you.** Signing in with Google Play Games is your choice to take part. From then on your leaderboard name (the display name you chose, or your Google Play Games name) and profile picture are shown to other players, you appear on every board (with 0 points until you score), and your runs are sent to our server for checking; the Game tells you this next to the sign-in button and in Settings. Nothing is sent while you play as a guest, and you can leave the leaderboards at any time by switching to guest play in Settings. The Game also asks our server for a one-time ticket with a random level seed before a run you want to submit; the ticket contains your Firebase user id, the level or tower, the setting and an expiry, and is stored in used form for a few days to stop it being reused.
 
 **Who processes it.** The data is processed for us by Google as our processor, using Firebase Authentication, Cloud Firestore and Google Cloud Run, in Google's data centre region in Mumbai, India (asia-south1). Google's terms and privacy information for these services apply (the Google Cloud and Firebase privacy documentation).
 

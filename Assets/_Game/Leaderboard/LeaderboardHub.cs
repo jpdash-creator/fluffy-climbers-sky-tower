@@ -178,7 +178,7 @@ namespace FluffyClimbers.Leaderboard
             {
                 signingIn = false;
                 bool ok = outcome == LbSignInOutcome.Success && auth.IsReady;
-                if (ok) AfterSignIn();
+                if (ok) { if (!HasConsent && IsGoogleSignedIn && !fakeOn && progress != null) progress.GrantLeaderboardConsent(Now); AfterSignIn(); }
                 Raise();
                 if (done != null) done(ok);
             });
@@ -197,6 +197,7 @@ namespace FluffyClimbers.Leaderboard
         /// <summary>Called when the menu starts: a returning player who accepted the consent is signed in to Firebase silently (retried a few times while Play Games is still signing in).</summary>
         public static void OnMenuStart()
         {
+            AutoJoin();
             if (!Enabled || !HasConsent) return;
             TrySilentSignIn();
         }
@@ -210,7 +211,18 @@ namespace FluffyClimbers.Leaderboard
             SignIn(null);
         }
 
-        /// <summary>The player pressed "Join leaderboards": stores the consent, writes the profile, sends what is queued.</summary>
+        /// <summary>
+        /// Owner Final Change 4 (2026-11-24): signing in with Google Play Games IS the opt-in. A signed-in player (Google mode, feature on) gets the consent stored silently, so no Join card or popup is
+        /// needed and the profile row (0 crowns) is written at once. A guest never joins. Safe to call often; does nothing when consent exists. Returns true when consent was just granted.
+        /// </summary>
+        public static bool AutoJoin()
+        {
+            if (fakeOn || progress == null || HasConsent || !Enabled || !IsGoogleSignedIn) return false;
+            AcceptConsent();
+            return true;
+        }
+
+        /// <summary>Stores the consent, writes the profile, sends what is queued (called by <see cref="AutoJoin"/>; the old Join button path is gone).</summary>
         public static void AcceptConsent()
         {
             if (progress == null) return;
@@ -300,7 +312,12 @@ namespace FluffyClimbers.Leaderboard
             string key = auth.Uid + "|" + LbJson.SafeName(p.DisplayName) + "|" + LbJson.SafeAvatar(p.AvatarUrl);
             if (key == profileKey) return;
             profileKey = key;   // set first: a failure below clears it so the next tick tries again
-            client.WriteProfile(auth.Uid, p, ok => { if (!ok) profileKey = ""; });
+            client.WriteProfile(auth.Uid, p, ok =>
+            {
+                if (!ok) { profileKey = ""; return; }
+                // Final Change 4: the profile exists now, so the service lists the player on all three boards (0 crowns until the first score); a failure retries with the next profile sync
+                client.RegisterMe(done => { if (!done) profileKey = ""; else { MarkStale(); Raise(); } });
+            });
         }
 
         // ---------------- run tickets ----------------
@@ -392,6 +409,7 @@ namespace FluffyClimbers.Leaderboard
         public static void Tick()
         {
             if (!Enabled) return;
+            AutoJoin();
             if (HasConsent && !auth.IsReady) TrySilentSignIn();
             RunPendingWipe();   // retried until the service confirms
             if (!CanUpload) return;

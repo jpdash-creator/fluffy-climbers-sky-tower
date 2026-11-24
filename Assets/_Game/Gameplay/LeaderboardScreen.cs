@@ -160,6 +160,7 @@ namespace FluffyClimbers.Gameplay
             root = UiKit.Rect(screen, "LeaderboardRoot");
             UiKit.Stretch(root);
             AvatarCache.Trim();
+            LeaderboardHub.AutoJoin();   // Final Change 4: signed in with Play Games = on the boards, no Join card
             data = LeaderboardHub.CachedBoard(LbBoards.All[board]);
             hubHandler = OnHubChanged;
             LeaderboardHub.Changed += hubHandler;
@@ -295,7 +296,7 @@ namespace FluffyClimbers.Gameplay
                     StateCard("Weekly leaderboards", "The weekly crown leaderboards are coming soon. Keep climbing: your crowns will count.", null, null);
                     return;
                 case State.SignIn:
-                    StateCard("Play for the crown", "Sign in with Google Play Games to join the weekly leaderboards and win prizes. Guests do not appear on the boards.", signingIn ? "Signing in..." : "Sign in", signingIn ? (Action)null : OnSignInTapped);
+                    StateCard("Play for the crown", "Sign in with Google Play Games to join the weekly leaderboards and win prizes. Your name and picture are then shown to other players. Guests do not appear on the boards.", signingIn ? "Signing in..." : "Sign in", signingIn ? (Action)null : OnSignInTapped);
                     return;
                 case State.Consent:
                     StateCard("Join the weekly leaderboards", "Choose to appear on the boards. Your name and profile picture are shown to other players.", "Join leaderboards", () => { if (host.ShowConsent != null) host.ShowConsent(); });
@@ -317,6 +318,7 @@ namespace FluffyClimbers.Gameplay
             {
                 signingIn = false;
                 if (!Alive) return;
+                LeaderboardHub.AutoJoin();
                 Layout(width, height);
                 if (ComputeState() == State.Ready) LoadData(true);
                 else if (ComputeState() == State.Consent && LeaderboardHub.ShouldAskConsent && !consentAsked) { consentAsked = true; if (host.ShowConsent != null) host.ShowConsent(); }

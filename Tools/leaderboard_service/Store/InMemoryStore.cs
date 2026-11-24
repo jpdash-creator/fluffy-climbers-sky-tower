@@ -74,6 +74,18 @@ namespace FluffyClimbers.LeaderboardService
                 return Task.FromResult((long)WeekTotals(weekKey).Count(t => t.Get(board) > crowns || (t.Get(board) == crowns && t.At(board) < at)));
         }
 
+        public Task<bool> EnsureTotalsAsync(string weekKey, string uid, string pid, string name, string avatar, DateTime now, DateTime expireAt)
+        {
+            lock (gate)
+            {
+                TotalsDoc t;
+                string key = weekKey + "|" + uid;
+                if (totals.TryGetValue(key, out t)) { t.Name = name; t.Avatar = avatar; return Task.FromResult(false); }
+                totals[key] = SlotMath.NewZeroTotals(uid, pid, name, avatar, now, expireAt);
+                return Task.FromResult(true);
+            }
+        }
+
         public Task<BoardDoc> GetBoardAsync(string weekKey, string board)
         {
             lock (gate) { BoardDoc b; return Task.FromResult(boards.TryGetValue(weekKey + "|" + board, out b) ? Clone(b) : null); }
@@ -85,7 +97,7 @@ namespace FluffyClimbers.LeaderboardService
             {
                 BoardDoc old;
                 if (boards.TryGetValue(weekKey + "|" + board, out old) && old.Final) return Task.FromResult(Clone(old));
-                var rows = WeekTotals(weekKey).Where(t => t.Get(board) > 0)
+                var rows = WeekTotals(weekKey)
                     .OrderBy(t => t, Comparer<TotalsDoc>.Create((a, b) => SlotMath.Compare(a.Get(board), a.At(board), a.Pid, b.Get(board), b.At(board), b.Pid)))
                     .Take(limits.BoardSize).ToList();
                 var doc = new BoardDoc { Board = board, WeekKey = weekKey, Entries = new List<BoardEntry>(), RebuiltAt = now, Final = final, LimitUsed = limits.EntryLimit(board), TopThreeFactorPercent = limits.TopThreeFactorPercent };

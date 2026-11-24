@@ -78,7 +78,7 @@ namespace FluffyClimbers.LeaderboardService
             long delta = rr.Crown - outcome.PreviousCrown;
 
             newTotals = totals == null
-                ? new TotalsDoc { Uid = inp.Uid, ExpireAt = expire }
+                ? new TotalsDoc { Uid = inp.Uid, ExpireAt = expire, OverallAt = inp.Now, LevelsAt = inp.Now, EndlessAt = inp.Now }
                 : totals;
             newTotals.Pid = newPlayer.Pid;
             newTotals.Name = newPlayer.DisplayName;
@@ -96,6 +96,12 @@ namespace FluffyClimbers.LeaderboardService
             outcome.GrownBoards.Add(Boards.Overall);
             outcome.GrownBoards.Add(rr.Board);
             return outcome;
+        }
+
+        /// <summary>A weekly totals row with 0 crowns and every *At = now (zero rows rank by join time, after all scorers).</summary>
+        public static TotalsDoc NewZeroTotals(string uid, string pid, string name, string avatar, DateTime now, DateTime expireAt)
+        {
+            return new TotalsDoc { Uid = uid, Pid = pid, Name = name, Avatar = avatar, OverallAt = now, LevelsAt = now, EndlessAt = now, UpdatedAt = now, ExpireAt = expireAt };
         }
 
         /// <summary>Sort order of every board: crowns descending, then the earlier time the total was reached, then pid (stable, never visible).</summary>

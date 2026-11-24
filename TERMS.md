@@ -1,6 +1,6 @@
 # Fluffy Climbers: Tower Jump Terms of Use
 
-Last updated: 2026-11-17
+Last updated: 2026-11-24
 
 > **In short**
 >

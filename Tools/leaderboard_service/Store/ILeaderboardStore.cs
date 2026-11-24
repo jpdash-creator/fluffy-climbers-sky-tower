@@ -37,6 +37,9 @@ namespace FluffyClimbers.LeaderboardService
         /// <summary>Number of players strictly ahead of (crowns, at) on a board: more crowns, or equal crowns reached earlier.</summary>
         Task<long> CountAheadAsync(string weekKey, string board, long crowns, DateTime at);
 
+        /// <summary>Creates the week's totals row with 0 crowns on every board when the player has none (At = now, so zero rows rank by join time); an existing row only gets its name and avatar refreshed, never a lower score. True when created.</summary>
+        Task<bool> EnsureTotalsAsync(string weekKey, string uid, string pid, string name, string avatar, DateTime now, DateTime expireAt);
+
         Task<BoardDoc> GetBoardAsync(string weekKey, string board);
 
         /// <summary>Builds the top <c>BoardSize</c> from the totals and writes the board document (not when it is already final).</summary>

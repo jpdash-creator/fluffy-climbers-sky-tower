@@ -156,7 +156,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.Equal(2, (int)Body(mine).ranks[0].Rank);
             Assert.Equal(1, (int)Body(await rig.Api.MyWeekAsync("p_big", false, false)).ranks[0].Rank);
             Assert.Equal(3, (int)Body(await rig.Api.MyWeekAsync("p_small", false, false)).ranks[0].Rank);
-            Assert.Equal(0, (int)Body(await rig.Api.MyWeekAsync("p_small", false, false)).ranks[2].Rank);   // no endless crowns: unranked there
+            Assert.Equal(1, (int)Body(await rig.Api.MyWeekAsync("p_small", false, false)).ranks[2].Rank);   // no endless crowns: a 0-crown row since 2026-11-24, ranked among the zeros by join time (p_small joined first)
         }
 
         [Fact]

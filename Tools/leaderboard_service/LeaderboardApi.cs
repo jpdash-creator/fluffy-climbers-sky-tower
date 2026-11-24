@@ -144,6 +144,42 @@ namespace FluffyClimbers.LeaderboardService
             }
         }
 
+        // ------------------------------------------------------------------ POST /register-me
+
+        readonly ConcurrentDictionary<string, long> lastRegisterMs = new ConcurrentDictionary<string, long>();
+
+        /// <summary>
+        /// POST /register-me (owner 2026-11-24): a signed-in player with a profile (players/{uid}) is on ALL THREE boards of the current week, with 0 crowns when they have not scored: ranked below every scorer, zero rows
+        /// ordered by join time. Creates the week's totals row only when none exists; an existing row (any score) is never lowered, only its name and avatar refreshed. Zero rows win no prize (crowns below the entry limit).
+        /// uid from the token only. Idempotent.
+        /// </summary>
+        public async Task<ApiResult> RegisterMeAsync(string uid)
+        {
+            if (string.IsNullOrEmpty(uid)) return ApiResult.Fail(401, "unauthorized");
+            DateTime t = now();
+            long ms = t.Ticks / TimeSpan.TicksPerMillisecond;
+            long prev;
+            bool had = lastRegisterMs.TryGetValue(uid, out prev);
+            lastRegisterMs[uid] = ms;
+            if (had && ms - prev < 1000) return ApiResult.Fail(429, "rate_limited");
+            if (lastRegisterMs.Count > 50000) lastRegisterMs.Clear();
+
+            PlayerDoc p = await store.GetPlayerAsync(uid);
+            if (p == null || string.IsNullOrWhiteSpace(p.DisplayName)) return ApiResult.Fail(404, "no_profile");
+            Limits lim = await LimitsAsync();
+            string wk = WeekMath.WeekKey(t);
+            bool created = await store.EnsureTotalsAsync(wk, uid, PidOf(uid), p.DisplayName, p.AvatarUrl, t, WeekMath.WeekEndUtc(t).AddDays(lim.RetentionDays));
+            if (created)
+                foreach (string board in Boards.All)
+                {
+                    BoardDoc b = await store.GetBoardAsync(wk, board);
+                    bool room = b == null || b.Entries == null || b.Entries.Count < lim.BoardSize;   // a full board has 100 scorers or better ahead of a zero row
+                    bool stale = b == null || (t - b.RebuiltAt).TotalSeconds >= lim.BoardRebuildSeconds;
+                    if (room && stale) await store.RebuildBoardAsync(wk, board, lim, t, false);
+                }
+            return ApiResult.Ok(new { registered = true, created, weekKey = wk, pid = PidOf(uid) });
+        }
+
         // ------------------------------------------------------------------ GET /my-week
 
         public async Task<ApiResult> MyWeekAsync(string uid, bool withSlots, bool withPrizes)
@@ -158,7 +194,7 @@ namespace FluffyClimbers.LeaderboardService
             {
                 long crowns = w.Totals == null ? 0 : w.Totals.Get(board);
                 int rank = 0;
-                if (crowns > 0) rank = (int)(1 + await store.CountAheadAsync(weekKey, board, crowns, w.Totals.At(board)));
+                if (w.Totals != null) rank =(int)(1 + await store.CountAheadAsync(weekKey, board, crowns, w.Totals.At(board)));
                 ranks.Add(new RankInfo { Board = board, Crowns = crowns, Rank = rank, EntryLimit = lim.EntryLimit(board), ReachedLimit = crowns >= lim.EntryLimit(board) });
             }
             List<object> pending = withPrizes ? await PendingPrizesAsync(uid, lim, t) : null;

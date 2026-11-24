@@ -4,6 +4,7 @@ using FluffyClimbers.Content;
 using FluffyClimbers.Economy;
 using FluffyClimbers.Gameplay;
 using FluffyClimbers.Leaderboard;
+using FluffyClimbers.Monetization;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -199,6 +200,30 @@ namespace FluffyClimbers.Tests
             LeaderboardHub.AcceptConsent();
             Assert.IsTrue(LeaderboardHub.CanUpload);
             Assert.IsTrue(progress.HasLeaderboardConsent);
+        }
+
+        [Test]
+        public void SigningInWithGoogleJoinsAutomaticallyAndAGuestNeverDoes()
+        {
+            var prev = Services.Account;
+            try
+            {
+                GoLive(false, false);
+                net.Handler = (m, u, b) => Json("{}");
+                Services.Account = new UnavailableAccountService();
+                Assert.IsFalse(LeaderboardHub.AutoJoin(), "not signed in with Play Games: nothing happens");
+                Assert.IsFalse(progress.HasLeaderboardConsent);
+
+                var stub = new StubAccountService { UseMemoryOnly = true };
+                Services.Account = stub;
+                stub.SignIn(r => { });
+                LeaderboardHub.AccountModeIsGoogle = () => true;
+                Assert.IsTrue(LeaderboardHub.IsGoogleSignedIn);
+                Assert.IsTrue(LeaderboardHub.AutoJoin(), "Google sign-in is the opt-in");
+                Assert.IsTrue(progress.HasLeaderboardConsent);
+                Assert.IsFalse(LeaderboardHub.AutoJoin(), "already joined");
+            }
+            finally { Services.Account = prev; }
         }
 
         // ---------------- upload queue ----------------
