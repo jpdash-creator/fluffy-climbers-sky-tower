@@ -350,35 +350,32 @@ namespace FluffyClimbers.Tests
             finally { LbCleanUp(); }
         }
 
+        /// <summary>Owner Final Change 4 (2026-11-24): signing in with Play Games IS the opt-in. No Join card, no popup; a guest sends nothing and stays on the sign-in card.</summary>
         [UnityTest]
-        public IEnumerator ConsentPopupAnswersStoreOrDeclineAndNothingIsSentBeforeYes()
+        public IEnumerator SigningInJoinsTheBoardsWithoutAPopupAndAGuestSendsNothing()
         {
             yield return Load("Meta");
             var meta = Object.FindFirstObjectByType<MetaController>();
             try
             {
+                // a guest (not signed in): no consent is stored, nothing is sent, the screen offers the sign-in
+                PlayLbTransport guestNet = LbServer("rows", false);
+                LbState(guestNet, true, false, false);
+                meta.ShowLeaderboard(0);
+                yield return null;
+                Assert.IsFalse(GameSession.Progress.HasLeaderboardConsent, "a guest never joins");
+                Assert.AreEqual(LeaderboardScreen.State.SignIn, meta.CurrentLeaderboard.Current, "the guest sees the sign-in card");
+                Assert.AreEqual(0, guestNet.Calls, "no call to the service for a guest");
+                Assert.IsNull(FindRt("JoinLeaderboards"), "there is no Join button any more");
+
+                // signed in with Play Games and no consent stored yet: the board opens and the consent is stored by itself
                 PlayLbTransport net = LbServer("rows", false);
                 LbState(net, true, true, false);
                 meta.ShowLeaderboard(0);
                 yield return null;
-                Assert.IsFalse(GameSession.Progress.HasLeaderboardConsent);
-                meta.ShowLeaderboardConsent();
-                yield return null;
-                Assert.IsNotNull(FindRt("JoinLeaderboards"), "the popup offers Join leaderboards");
-                Assert.IsNotNull(FindRt("PrivacyPolicy"), "and the privacy policy");
-                Button later = FindRt("NotNow").GetComponent<Button>();
-                int callsBefore = net.Calls;
-                later.onClick.Invoke();
-                yield return null;
-                Assert.IsFalse(GameSession.Progress.HasLeaderboardConsent, "Not now stores nothing");
-                Assert.IsFalse(GameSession.Progress.ShouldAskLeaderboardConsent(LeaderboardTime.DayKey(DateTime.UtcNow)), "and is not asked again today");
-                Assert.AreEqual(callsBefore, net.Calls, "no call to the service before the player said yes");
-                meta.ShowLeaderboardConsent();
-                yield return null;
-                FindRt("JoinLeaderboards").GetComponent<Button>().onClick.Invoke();
-                yield return null;
-                Assert.IsTrue(GameSession.Progress.HasLeaderboardConsent, "Join stores leaderboardConsent");
-                Assert.AreEqual(LeaderboardScreen.State.Ready, meta.CurrentLeaderboard.Current, "the screen shows the boards after the consent");
+                Assert.IsTrue(GameSession.Progress.HasLeaderboardConsent, "signing in joins the leaderboards automatically");
+                Assert.IsNull(FindRt("JoinLeaderboards"), "and no consent popup or Join card is shown");
+                Assert.AreEqual(LeaderboardScreen.State.Ready, meta.CurrentLeaderboard.Current, "the screen shows the boards at once");
             }
             finally { LbCleanUp(); }
         }
