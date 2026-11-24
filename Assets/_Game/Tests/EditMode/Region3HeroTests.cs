@@ -132,14 +132,24 @@ namespace FluffyClimbers.Tests
         {
             var svc = new ProgressService(ContentRepository.LoadFromResources(), new MemorySaveStore(), 5);
             foreach (string id in Inactive) Assert.IsFalse(svc.OwnsCharacter(id), id);
-            // owner 2026-11-13: only the gold-on-25-levels goal gives a random ACTIVE Common hero; levels 10/15/20 and 75 stars pay coins
-            foreach (string goal in new[] { "g_3_levels_2", "g_3_levels_3", "g_3_levels_4", "g_3_stars_5", "g_3_gold_5" })
+            // owner Final Change 1 (2026-11-22): no reward gives a hero any more. Every goal of the region pays gems, coins and power-ups only; claiming all of them
+            // (Admin switch: every goal reads as complete) adds no hero copy, active or inactive.
+            ProgressService.TestMainRewardsAllowed = true;
+            try
             {
-                RegionGoal g = svc.RewardDefs.FindGoal(goal);
-                Assert.IsNotNull(g, goal);
-                Assert.IsTrue(string.IsNullOrEmpty(g.HeroId), goal + " names no hero any more");
-                Assert.AreEqual(goal.EndsWith("gold_5") ? RewardEntry.RandomOpenRegionHero : 0, g.HeroRegion, goal);
+                Assert.IsTrue(svc.AdminSetMainRewardsReady(true));
+                int copies = 0;
+                foreach (CharacterSpec c in CharacterDefs.All) copies += svc.Copies(c.Id);
+                RewardClaimOutcome res = svc.ClaimAllRegion(3);
+                Assert.AreEqual(RewardClaimResult.Ok, res.Result);
+                Assert.AreEqual(RegionGoalTable.GoalsPerRegion, svc.RegionGoalsClaimedCount(3));
+                Assert.AreEqual(0, res.HeroIds.Count, "the goals of region 3 give no hero");
+                int after = 0;
+                foreach (CharacterSpec c in CharacterDefs.All) after += svc.Copies(c.Id);
+                Assert.AreEqual(copies, after);
+                foreach (string id in Inactive) Assert.IsFalse(svc.OwnsCharacter(id), id);
             }
+            finally { ProgressService.TestMainRewardsAllowed = false; }
         }
 
         [Test]

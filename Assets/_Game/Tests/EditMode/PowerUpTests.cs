@@ -70,17 +70,26 @@ namespace FluffyClimbers.Tests
                 int ticks = PowerUps.TotalTicks(cfg, d.Type);
                 Assert.AreEqual(d.DurationSec * SimConfig.TicksPerSecond, ticks, d.Id + " duration in the catalog and in SimConfig");
             }
-            Assert.AreEqual(1500, c.Get(PowerUp.Flight).CoinPrice);
-            Assert.AreEqual(1500, c.Get(PowerUp.Rocket).CoinPrice);
-            Assert.AreEqual(1500, c.Get(PowerUp.SlowTime).CoinPrice);
-            Assert.AreEqual(1000, c.Get(PowerUp.DoubleJump).CoinPrice);
-            Assert.AreEqual(1000, c.Get(PowerUp.WallStick).CoinPrice);
-            Assert.AreEqual(1000, c.Get(PowerUp.Shield).CoinPrice);
-            foreach (PowerUp t in new[] { PowerUp.SafetyNet, PowerUp.Glide, PowerUp.WidePlatforms })
+            // owner Final Change 1 (2026-11-22): 2,000 coins / 100 gems, 3,000 / 150, 4,000 / 200 (before: 1,000 / 50 and 1,500 / 75)
+            foreach (PowerUp t in new[] { PowerUp.WallStick, PowerUp.Shield, PowerUp.WidePlatforms })
             {
-                Assert.AreEqual(1000, c.Get(t).CoinPrice, "Bug List 4: the three new power-ups cost what the Magnet did");
-                Assert.AreEqual(50, c.Get(t).GemPrice);
+                Assert.AreEqual(2000, c.Get(t).CoinPrice, t.ToString());
+                Assert.AreEqual(100, c.Get(t).GemPrice, t.ToString());
             }
+            foreach (PowerUp t in new[] { PowerUp.SafetyNet, PowerUp.DoubleJump, PowerUp.Glide, PowerUp.SlowTime })
+            {
+                Assert.AreEqual(3000, c.Get(t).CoinPrice, t.ToString());
+                Assert.AreEqual(150, c.Get(t).GemPrice, t.ToString());
+            }
+            foreach (PowerUp t in new[] { PowerUp.Flight, PowerUp.Rocket })
+            {
+                Assert.AreEqual(4000, c.Get(t).CoinPrice, t.ToString());
+                Assert.AreEqual(200, c.Get(t).GemPrice, t.ToString());
+            }
+            // the three reserved, unimplemented rows keep their old numbers
+            Assert.AreEqual(1000, c.Get(PowerUp.SpringBoots).CoinPrice);
+            Assert.AreEqual(120, c.Get(PowerUp.CoinDoubler).CoinPrice);
+            Assert.AreEqual(800, c.Get(PowerUp.StarSeeker).CoinPrice);
             Assert.IsNull(c.Get("pw_magnet"), "the Magnet is gone");
             // owner durations of Bug List 4 (2026-11-16, seconds per tap): Double Jump, Wall Stick, Shield, Glide Cape, Wide Platforms 20; Safety Net is not timed; Slow Time 30; Rocket 4 (20 floors); Flight 10
             Assert.AreEqual(20, c.Get(PowerUp.Shield).DurationSec);
@@ -102,12 +111,16 @@ namespace FluffyClimbers.Tests
         public void BundlePricesFollowTheDiscountRules()
         {
             PowerUpDef flight = PowerUpCatalog.BuiltIn().Get("pw_flight");
-            Assert.AreEqual(1500, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Coins, 1));
-            Assert.AreEqual(1500 * 4 * 100 / 100, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Coins, 4));
-            Assert.AreEqual(6750, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Coins, 5));    // -10 percent
-            Assert.AreEqual(12000, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Coins, 10));   // -20 percent
-            Assert.AreEqual(75, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Gems, 1));
-            Assert.AreEqual(338, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Gems, 5), "75 x 5 x 90 percent, rounded half up");
+            Assert.AreEqual(4000, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Coins, 1));
+            Assert.AreEqual(4000 * 4 * 100 / 100, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Coins, 4));
+            Assert.AreEqual(18000, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Coins, 5));    // -10 percent
+            Assert.AreEqual(32000, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Coins, 10));   // -20 percent
+            Assert.AreEqual(38400, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Coins, 12));   // 10 or more: -20 percent
+            Assert.AreEqual(200, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Gems, 1));
+            Assert.AreEqual(900, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Gems, 5), "200 x 5 x 90 percent");
+            Assert.AreEqual(1600, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Gems, 10), "200 x 10 x 80 percent");
+            var odd = new PowerUpDef { Id = "odd", CoinPrice = 1500, GemPrice = 75 };   // a price that does not divide evenly keeps the rounding rule tested
+            Assert.AreEqual(338, PowerUpCatalog.PriceFor(odd, PowerUpCurrency.Gems, 5), "75 x 5 x 90 percent = 337.5, rounded half up");
             Assert.AreEqual(0, PowerUpCatalog.PriceFor(flight, PowerUpCurrency.Gems, 0));
             Assert.AreEqual(0, PowerUpCatalog.PriceFor(null, PowerUpCurrency.Gems, 1));
         }
@@ -210,27 +223,29 @@ namespace FluffyClimbers.Tests
         public void BuyWithCoinsDebitsAndAddsInOneSave()
         {
             var svc = NewService();
-            svc.AddCoins(3000);
-            Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp("pw_flight", PowerUpCurrency.Coins));
-            Assert.AreEqual(1500, svc.Coins);
+            svc.AddCoins(6000);
+            Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp("pw_flight", PowerUpCurrency.Coins));   // 4,000 coins
+            Assert.AreEqual(2000, svc.Coins);
             Assert.AreEqual(1, svc.PowerUpCount("pw_flight"));
             var again = NewService();
-            Assert.AreEqual(1500, again.Coins);
+            Assert.AreEqual(2000, again.Coins);
             Assert.AreEqual(1, again.PowerUpCount("pw_flight"));
         }
 
         [Test]
-        public void GemsBuyPowerUpsAtFiftyAndSeventyFiveGems()
+        public void GemsBuyPowerUpsAtTheirGemPrices()
         {
             var svc = NewService();
-            svc.AddGems(300);
-            Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp("pw_doublejump", PowerUpCurrency.Gems, 2));   // 2 x 50
-            Assert.AreEqual(200, svc.Gems);
+            svc.AddGems(700);
+            Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp("pw_doublejump", PowerUpCurrency.Gems, 2));   // 2 x 150
+            Assert.AreEqual(400, svc.Gems);
             Assert.AreEqual(2, svc.PowerUpCount("pw_doublejump"));
-            Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp("pw_rocket", PowerUpCurrency.Gems));          // 75
-            Assert.AreEqual(125, svc.Gems);
+            Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp("pw_rocket", PowerUpCurrency.Gems));          // 200
+            Assert.AreEqual(200, svc.Gems);
+            Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp("pw_shield", PowerUpCurrency.Gems));          // 100
+            Assert.AreEqual(100, svc.Gems);
             Assert.AreEqual(PowerUpBuyResult.NotEnoughGems, svc.TryBuyPowerUp("pw_flight", PowerUpCurrency.Gems, 2));
-            Assert.AreEqual(125, svc.Gems);
+            Assert.AreEqual(100, svc.Gems);
             Assert.AreEqual(0, svc.PowerUpCount("pw_flight"));
         }
 

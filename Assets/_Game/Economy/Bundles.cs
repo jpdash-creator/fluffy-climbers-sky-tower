@@ -14,7 +14,7 @@ namespace FluffyClimbers.Economy
 
     /// <summary>
     /// One gem bundle (docs/26 section 3 and docs/37, Content/economy/bundles.json made by Tools/content_cli/gen_bundles.py): a price in gems and
-    /// contents of coins and power-ups (no gems back) plus one HIDDEN hero card (Uncommon or better) that is drawn when the bundle is bought.
+    /// contents of coins and power-ups (no gems back) plus one HIDDEN hero card (Common 50, Uncommon 40, Rare 10 percent) that is drawn when the bundle is bought.
     /// </summary>
     public sealed class BundleDef
     {
@@ -33,7 +33,7 @@ namespace FluffyClimbers.Economy
         /// <summary>One funny line about the bundle's name (Bug List 2 C2.b.vi), shown only in the info popup. "" when the file has none.</summary>
         public string Joke = "";
 
-        /// <summary>Value of the visible contents at list rates in gems: coins / 20 + power-ups at their gem prices (50 or 75). The hidden card is NOT in it (see <see cref="TotalValueGems"/>).</summary>
+        /// <summary>Value of the visible contents at list rates in gems: coins / 20 + power-ups at their gem prices (100, 150 or 200). The hidden card is NOT in it (see <see cref="TotalValueGems"/>).</summary>
         public double ValueGems(PowerUpCatalog powerUps)
         {
             double v = Coins / 20.0;
@@ -54,7 +54,7 @@ namespace FluffyClimbers.Economy
 
     /// <summary>
     /// How many times its price a bundle is worth (owner Bug List 1 B4.a.ii): total value in GEMS (coins at the shop rate coins / 20, power-ups at their gem prices,
-    /// the hidden card at its expected gem value from <see cref="BundleCards.TierGems"/>) divided by the gems paid. Shown as "Worth x2.1" (1.85 to 3.6 since 2026-11-13, see docs/37). No currency amounts anywhere. Pure.
+    /// the hidden card at its expected gem value from <see cref="BundleCards.TierGems"/>) divided by the gems paid. Shown as "Worth x4.5" (3.0 to 6.0 for every bundle since Final Change 1, 2026-11-22). No currency amounts anywhere. Pure.
     /// </summary>
     public static class BundleWorth
     {
@@ -70,7 +70,7 @@ namespace FluffyClimbers.Economy
             return bundle.TotalValueGems(powerUps ?? Defs()) / paid;
         }
 
-        /// <summary>"Worth x2.1" (one decimal, invariant culture), always at the LIST price.</summary>
+        /// <summary>"Worth x4.5" (one decimal, invariant culture), always at the LIST price.</summary>
         public static string Text(BundleDef bundle) { return Text(bundle, 0); }
 
         /// <summary>
@@ -82,7 +82,7 @@ namespace FluffyClimbers.Economy
             return "Worth x" + Multiplier(bundle, null, 0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        /// <summary>"Worth x2.1 for 340 gems" (the info popup line): worth at the list price, then the gems really paid (the discounted price for a timer offer).</summary>
+        /// <summary>"Worth x4.5 for 340 gems" (the info popup line): worth at the list price, then the gems really paid (the discounted price for a timer offer).</summary>
         public static string Line(BundleDef bundle, int gemsPaid)
         {
             int paid = gemsPaid > 0 ? gemsPaid : (bundle != null ? bundle.PriceGems : 0);
@@ -104,10 +104,10 @@ namespace FluffyClimbers.Economy
         public const string ResourcePath = "Content/bundles";
 
         /// <summary>
-        /// Version of the bundle pool (4 = the 2026-11-13 pool: coin part cut 30 percent, same ids, prices and power-ups, worth 1.85 to 3.6 with the new card values; 3 = the Bug List 2 C2.b pool: 200 to 500 gems, worth 1.5 to 2.5, with jokes; 2 = the 200 to 600 gem pool). A save that holds offers or a timer offer from an older pool
+        /// Version of the bundle pool (5 = the Final Change 1 pool of 2026-11-22: redrawn from scratch, 200 to 1,000 gems, worth 3.0 to 6.0, card Common 50 / Uncommon 40 / Rare 10; 4 = the 2026-11-13 pool: coin part cut 30 percent, same ids, prices and power-ups, worth 1.85 to 3.6 with the new card values; 3 = the Bug List 2 C2.b pool: 200 to 500 gems, worth 1.5 to 2.5, with jokes; 2 = the 200 to 600 gem pool). A save that holds offers or a timer offer from an older pool
         /// is reset once (the offers are drawn again), because ids bnd_0001 to bnd_2000 now mean different bundles.
         /// </summary>
-        public const int PoolVersion = 4;
+        public const int PoolVersion = 5;
 
         readonly List<BundleDef> all = new List<BundleDef>();
         readonly Dictionary<string, BundleDef> byId = new Dictionary<string, BundleDef>();

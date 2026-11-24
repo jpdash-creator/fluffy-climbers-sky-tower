@@ -1046,6 +1046,13 @@ namespace FluffyClimbers.Gameplay
             fxMagnet = NewSprite("FxMagnet", ring, 9);
             fxBoost = NewSprite("FxBoost", ring, 9);
             fxShield.enabled = fxMagnet.enabled = fxBoost.enabled = false;
+            if (session.Sim.KeepMoving)
+            {
+                // Keep Moving level (owner Final Change 1, 2026-11-22): the countdown ring around the HERO (never on a platform), built once, shown for the last 2 seconds only
+                fxKeepMoving = NewSprite(KeepMovingRingName, ring, 12);
+                fxKeepMoving.color = KeepMovingRingColor;
+                fxKeepMoving.enabled = false;
+            }
             Sprite wingsPic = PowerGearArt.WingsPicture;
             if (wingsPic != null)
             {
@@ -1076,6 +1083,35 @@ namespace FluffyClimbers.Gameplay
             if (st.WideTicks > 0) m |= 1 << (int)PowerUp.WidePlatforms;
             if (st.SlowTicks > 0) m |= 1 << (int)PowerUp.SlowTime;
             return m;
+        }
+
+        // ---- Keep Moving countdown ring (owner Final Change 1, 2026-11-22) ----
+        SpriteRenderer fxKeepMoving;
+        /// <summary>Name of the ring object (tests).</summary>
+        public const string KeepMovingRingName = "FxKeepMoving";
+        /// <summary>Ring diameter in world units when it appears (2 s left) and when the time is up; with reduced motion it keeps <see cref="KeepMovingRingStill"/> (the HUD text counts down instead).</summary>
+        public const float KeepMovingRingMax = 2.9f, KeepMovingRingMin = 1.3f, KeepMovingRingStill = 2.2f;
+        static readonly Color KeepMovingRingColor = new Color(1f, 0.42f, 0.2f, 0.95f);
+        /// <summary>True while the Keep Moving ring is drawn (tests).</summary>
+        public bool KeepMovingRingShown { get { return fxKeepMoving != null && fxKeepMoving.enabled; } }
+        /// <summary>Current diameter of the Keep Moving ring in world units (tests); 0 while hidden.</summary>
+        public float KeepMovingRingDiameter { get { return KeepMovingRingShown ? fxKeepMoving.transform.localScale.x * 2f : 0f; } }
+
+        /// <summary>
+        /// The ring closes in on the hero while the last 2 seconds on a platform run out (Sim.KeepMovingWarning / KeepMovingTicksLeft): its size IS the time left, so it is not a pulse.
+        /// One sprite, uniform scale (CUX-9), no allocation (CUX-1). Reduced motion: a still ring; the HUD cue "MOVE! 2 / 1" carries the countdown (never colour or motion alone).
+        /// </summary>
+        void UpdateKeepMovingFx(float cx, float cy)
+        {
+            if (fxKeepMoving == null) return;
+            SimState st = session.State;
+            bool show = session.Sim.KeepMovingWarning(in st);
+            if (fxKeepMoving.enabled != show) fxKeepMoving.enabled = show;
+            if (!show) return;
+            float f = Mathf.Clamp01(session.Sim.KeepMovingTicksLeft(in st) / (float)Mathf.Max(1, session.Cfg.KeepMovingWarnTicks));
+            float d = reduced ? KeepMovingRingStill : KeepMovingRingMin + (KeepMovingRingMax - KeepMovingRingMin) * f;
+            fxKeepMoving.transform.position = new Vector3(cx, cy, 0f);
+            fxKeepMoving.transform.localScale = new Vector3(d * 0.5f, d * 0.5f, 1f);
         }
 
         /// <summary>Sounds and bursts from the change of the power-up state between two ticks.</summary>
@@ -1305,6 +1341,7 @@ namespace FluffyClimbers.Gameplay
             player.rotation = reduced ? Quaternion.identity : Quaternion.Euler(0f, 0f, Mathf.Clamp(-s.Vx.F() * 40f, -12f, 12f));
             SetPlayerColor(s.Invuln > 0 && (reduced || (tick / 10) % 2 == 0) ? new Color(1f, 1f, 1f, 0.55f) : Color.white);
             UpdatePowerFx(px, py + h * 0.5f);
+            UpdateKeepMovingFx(px, py + playerHeight * 0.5f);   // centred on the unstretched hero so the squash of a landing does not move the ring
             UpdateGearFx(px, py + h * 0.5f, h);
 
             // Platforms (moving ones follow the sim, vanishing ones blink, crumbling ones fade).

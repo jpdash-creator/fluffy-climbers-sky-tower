@@ -962,12 +962,16 @@ namespace FluffyClimbers.Tests
         }
 
         /// <summary>
-        /// Level screen (Bug List 6 item 6): the Gameplay row has five buttons (Relaxed, Easy, Normal, Hard, Insane), sits directly below the region name, centred,
-        /// above the level path, every button is at least 48 dp with 8 dp between them, its label is never wider than its button, and exactly one is marked selected
-        /// (check mark and "selected" label). Picking a button stores the setting and moves the mark.
+        /// Level screen (owner Final Change 1, 2026-11-22). From the top: the wallet and progress pills, THEN the five Gameplay settings (Relaxed, Easy, Normal, Hard, Insane),
+        /// THEN the region name row with the Endless button, then the level path. The settings have NO button plates: each slot (icon plus name) is the button, at least 48 dp
+        /// with 8 dp between neighbours. Exactly one is selected and it is told apart three ways (never colour alone): a white ring around its icon, a larger icon and a bold
+        /// white name; the other four are smaller and slightly faded. Every name has an outline over the art, sits under its icon and never touches its neighbour or leaves the
+        /// safe area. The accessibility text names the setting, its speed rule and its reward bonus. The Endless button is wider than the old 136 square and carries the
+        /// infinity and the stopwatch glyph side by side (one button: it opens the Endless popup with START and Time Attack). Checked at 100 and 130 percent text, on every
+        /// aspect, with and without a notch. Picking a setting stores it and moves the mark.
         /// </summary>
         [UnityTest]
-        public IEnumerator LevelScreenHasGameplayRowBelowRegionName()
+        public IEnumerator LevelScreenHasGameplayRowAboveRegionName()
         {
             foreach (int percent in new[] { 100, 130 })
             {
@@ -978,66 +982,318 @@ namespace FluffyClimbers.Tests
                 var problems = new List<string>();
                 var holder = new RenderTexture[1];
                 string[] names = GameSettings.DifficultyNames;
+                bool popupChecked = false;
                 foreach (Aspect a in Aspects)
                 {
-                    UiKit.SafeAreaNormalized = () => FullSafe;
-                    GameSettings.Difficulty = 0;
-                    meta.ShowLevels(r1);
-                    yield return ApplyAspect(a, holder);
-                    yield return null;
-                    string tag = a.Name + "@" + percent + ": ";
-                    RectTransform row = FindRt(MetaController.GameplayRowName), header = FindRt("Header"), path = FindRt("PathViewport");
-                    if (row == null || header == null || path == null) { problems.Add(tag + "Gameplay row, region name or path missing"); continue; }
-                    Rect rb = CanvasBox(row), hb = CanvasBox(header), pb = CanvasBox(path);
-                    if (rb.yMax > hb.yMin + 1f) problems.Add(tag + "the Gameplay row must be below the region name");
-                    if (hb.yMin - rb.yMax > 60f) problems.Add(tag + "the Gameplay row is not directly below the region name (" + Mathf.RoundToInt(hb.yMin - rb.yMax) + " gap)");
-                    if (pb.yMax > rb.yMin + 1f) problems.Add(tag + "the level path must start after the Gameplay row");
-                    var boxes = new List<Rect>();
-                    float left = float.MaxValue, right = float.MinValue;
-                    int marked = 0;
-                    for (int i = 0; i < names.Length; i++)
+                    foreach (Rect safe in new[] { FullSafe, NotchSafe })
                     {
-                        RectTransform b = FindRt("Gameplay" + names[i], row);
-                        if (b == null) { problems.Add(tag + "button " + names[i] + " missing"); continue; }
-                        Rect bb = CanvasBox(b);
-                        boxes.Add(bb);
-                        left = Mathf.Min(left, bb.xMin);
-                        right = Mathf.Max(right, bb.xMax);
-                        if (bb.width < UiKit.MinTouchPx - 1f || bb.height < UiKit.MinTouchPx - 1f) problems.Add(tag + names[i] + " below 48 dp");
-                        if (bb.xMin < rb.xMin - 1f || bb.xMax > rb.xMax + 1f) problems.Add(tag + names[i] + " leaves the row");
-                        Text label = b.Find("Label").GetComponent<Text>();
-                        float scale = b.GetComponentInParent<Canvas>().rootCanvas.scaleFactor;
-                        if (label.fontSize < UiKit.MinBodyTextPx - 1f) problems.Add(tag + names[i] + " label below 16 sp");
-                        if (label.preferredWidth > bb.width + 0.5f) problems.Add(tag + names[i] + " label (" + Mathf.RoundToInt(label.preferredWidth) + ") is wider than its button (" + Mathf.RoundToInt(bb.width) + ")");
-                        if (b.Find("Icon") != null && ((RectTransform)b.Find("Icon")).sizeDelta.x < 80f) problems.Add(tag + names[i] + " icon must be bigger (at least 80 px)");
-                        if (b.Find("Icon") == null || b.Find("Icon").GetComponent<Image>().sprite == null) problems.Add(tag + names[i] + " has no icon (fallback glyph missing)");
-                        if (b.Find("Check") != null) problems.Add(tag + names[i] + " must not have a tick mark (Bug List 8 item 2a)");
-                        var ringOutline = b.GetComponent<Outline>();
-                        bool on = ringOutline != null && ringOutline.enabled;
-                        if (on) marked++;
-                        if (on != (i == GameSettings.Difficulty)) problems.Add(tag + names[i] + " selected mark does not match the setting");
-                        if (b.GetComponent<A11yLabel>() == null || !b.GetComponent<A11yLabel>().Text.Contains(names[i])) problems.Add(tag + names[i] + " needs an accessibility label");
-                    }
-                    if (boxes.Count == names.Length)
-                    {
-                        for (int i = 1; i < boxes.Count; i++)
+                        Rect safeNow = safe;
+                        UiKit.SafeAreaNormalized = () => safeNow;
+                        GameSettings.Difficulty = 0;
+                        meta.ShowLevels(r1);
+                        yield return ApplyAspect(a, holder);
+                        yield return null;
+                        string tag = a.Name + (safe == NotchSafe ? "+notch" : "") + "@" + percent + ": ";
+                        RectTransform row = FindRt(MetaController.GameplayRowName), header = FindRt("Header"), titleRow = FindRt("TitleRow"), path = FindRt("PathViewport");
+                        RectTransform pills = FindRt("RegionBar"), endless = FindRt("Endless");
+                        if (row == null || header == null || titleRow == null || path == null || pills == null || endless == null) { problems.Add(tag + "Gameplay row, region name row, Endless button, progress pills or path missing"); continue; }
+                        Rect rb = CanvasBox(row), hb = CanvasBox(header), tb = CanvasBox(titleRow), pb = CanvasBox(path), qb = CanvasBox(pills), eb = CanvasBox(endless);
+                        float canvasScale = row.GetComponentInParent<Canvas>().rootCanvas.scaleFactor;
+                        float safeLeft = safe.xMin * a.W / canvasScale, safeRight = safe.xMax * a.W / canvasScale;
+
+                        // order from the top: pills, Gameplay row, region name row, path (canvas y grows upward)
+                        if (rb.yMax > qb.yMin + 1f) problems.Add(tag + "the Gameplay row must be below the progress pills");
+                        if (qb.yMin - rb.yMax > 40f) problems.Add(tag + "the Gameplay row is not directly below the progress pills (" + Mathf.RoundToInt(qb.yMin - rb.yMax) + " gap)");
+                        if (tb.yMax > rb.yMin + 1f) problems.Add(tag + "the region name row must be below the Gameplay row");
+                        if (rb.yMin - tb.yMax > 40f) problems.Add(tag + "the region name row is not directly below the Gameplay row (" + Mathf.RoundToInt(rb.yMin - tb.yMax) + " gap)");
+                        if (pb.yMax > tb.yMin + 1f) problems.Add(tag + "the level path must start below the region name row");
+                        if (rb.xMin < safeLeft - 2f || rb.xMax > safeRight + 2f) problems.Add(tag + "the Gameplay row leaves the safe area");
+
+                        // region name row: the name (even on two lines) stays inside its row and left of the Endless button
+                        Text headerText = header.GetComponent<Text>();
+                        if (headerText.preferredHeight > tb.height + 1f) problems.Add(tag + "the region name (" + Mathf.RoundToInt(headerText.preferredHeight) + " high) does not fit its row (" + Mathf.RoundToInt(tb.height) + ")");
+                        if (hb.xMax > eb.xMin - 4f) problems.Add(tag + "the region name runs under the Endless button");
+                        if (hb.center.x >= eb.center.x) problems.Add(tag + "the region name must be on the left, the Endless button on the right");
+                        if (eb.yMin < tb.yMin - 1f || eb.yMax > tb.yMax + 1f || eb.xMax > tb.xMax + 1f) problems.Add(tag + "the Endless button leaves the region name row");
+
+                        // Endless button: wider than the old 136 x 136, two glyphs side by side, one accessibility label
+                        if (eb.height < UiKit.MinTouchPx - 1f) problems.Add(tag + "the Endless button is below 48 dp");
+                        if (eb.width < 137f || eb.width < eb.height + 20f) problems.Add(tag + "the Endless button must be wider than the old 136 square (" + Mathf.RoundToInt(eb.width) + "x" + Mathf.RoundToInt(eb.height) + ")");
+                        RectTransform infinity = FindRt(MetaController.EndlessGlyphName, endless), stopwatch = FindRt(MetaController.TimeAttackGlyphName, endless);
+                        if (infinity == null || stopwatch == null || infinity.GetComponent<Image>().sprite != Glyphs.Infinity || stopwatch.GetComponent<Image>().sprite != TimedIcons.Stopwatch)
+                            problems.Add(tag + "the Endless button must carry the infinity glyph and the stopwatch glyph");
+                        else
                         {
-                            if (boxes[i].xMin < boxes[i - 1].xMax + UiKit.MinSpacingPx - 1f) problems.Add(tag + names[i - 1] + " and " + names[i] + " are closer than 8 dp");
-                            if (boxes[i].center.x <= boxes[i - 1].center.x) problems.Add(tag + "buttons are not in the order Relaxed to Insane");
+                            Rect ib2 = CanvasBox(infinity), sb2 = CanvasBox(stopwatch);
+                            if (ib2.Overlaps(sb2)) problems.Add(tag + "the two glyphs of the Endless button overlap");
+                            if (Mathf.Abs(ib2.center.y - sb2.center.y) > 1f || ib2.center.x >= sb2.center.x) problems.Add(tag + "the glyphs must sit side by side, infinity left, stopwatch right");
+                            if (ib2.xMin < eb.xMin - 0.5f || sb2.xMax > eb.xMax + 0.5f || ib2.yMin < eb.yMin - 0.5f || ib2.yMax > eb.yMax + 0.5f) problems.Add(tag + "a glyph leaves the Endless button");
+                            if (Mathf.Abs(ib2.width - ib2.height) > 0.5f || Mathf.Abs(sb2.width - sb2.height) > 0.5f || !infinity.GetComponent<Image>().preserveAspect || !stopwatch.GetComponent<Image>().preserveAspect)
+                                problems.Add(tag + "the glyphs of the Endless button must not be stretched");
                         }
-                        float rowCentre = rb.center.x, used = (left + right) * 0.5f;
-                        if (Mathf.Abs(rowCentre - used) > 4f) problems.Add(tag + "the buttons are not centred in the row");
+                        A11yLabel endlessLabel = endless.GetComponent<A11yLabel>();
+                        if (endlessLabel == null || endlessLabel.Text != "Endless and Time Attack") problems.Add(tag + "the Endless button needs the accessibility label \"Endless and Time Attack\"");
+
+                        // the five settings
+                        var boxes = new List<Rect>();
+                        var nameBoxes = new List<Rect>();
+                        float left = float.MaxValue, right = float.MinValue, selectedIcon = 0f, biggestOther = 0f;
+                        for (int i = 0; i < names.Length; i++)
+                        {
+                            RectTransform b = FindRt("Gameplay" + names[i], row);
+                            if (b == null) { problems.Add(tag + "button " + names[i] + " missing"); continue; }
+                            Rect bb = CanvasBox(b);
+                            boxes.Add(bb);
+                            left = Mathf.Min(left, bb.xMin);
+                            right = Mathf.Max(right, bb.xMax);
+                            if (b.GetComponent<Button>() == null) problems.Add(tag + names[i] + " slot is not a button");
+                            if (bb.width < UiKit.MinTouchPx - 1f || bb.height < UiKit.MinTouchPx - 1f) problems.Add(tag + names[i] + " below 48 dp");
+                            if (bb.xMin < rb.xMin - 1f || bb.xMax > rb.xMax + 1f || bb.yMin < rb.yMin - 1f || bb.yMax > rb.yMax + 1f) problems.Add(tag + names[i] + " leaves the row");
+                            Image plate = b.GetComponent<Image>();
+                            if (plate != null && (plate.sprite != null || plate.color.a > 0.05f)) problems.Add(tag + names[i] + " must have no button plate (no green or yellow plate any more)");
+                            Transform iconT = b.Find(MetaController.GameplayIconName), labelT = b.Find(MetaController.GameplayLabelName);
+                            if (iconT == null || labelT == null) { problems.Add(tag + names[i] + " needs an icon and a name"); continue; }
+                            if (b.Find(MetaController.GameplayRingName) != null) problems.Add(tag + names[i] + " must have no white ring any more (Final Change 3)");
+                            Image icon = iconT.GetComponent<Image>();
+                            Text label = labelT.GetComponent<Text>();
+                            bool on = i == GameSettings.Difficulty;   // the selected one is the bigger icon with the bold white name (no ring since Final Change 3)
+                            if (b.Find("Check") != null) problems.Add(tag + names[i] + " must not have a tick mark (Bug List 8 item 2a)");
+
+                            // icon: present, never stretched, clearly larger than the old 88 px; the selected one is full strength, the others slightly faded
+                            if (icon.sprite == null) problems.Add(tag + names[i] + " has no icon (fallback glyph missing)");
+                            Rect ib = CanvasBox(icon.rectTransform);
+                            if (Mathf.Abs(ib.width - ib.height) > 0.5f || !icon.preserveAspect) problems.Add(tag + names[i] + " icon must not be stretched");
+                            if (ib.width < 100f) problems.Add(tag + names[i] + " icon must be clearly larger than the old 88 px (" + Mathf.RoundToInt(ib.width) + ")");
+                            if (ib.xMin < bb.xMin - UiKit.MinSpacingPx || ib.xMax > bb.xMax + UiKit.MinSpacingPx || ib.yMax > bb.yMax + 0.5f) problems.Add(tag + names[i] + " icon leaves its slot");
+                            if (on)
+                            {
+                                selectedIcon = ib.width;
+                                if (icon.color.a < 0.99f) problems.Add(tag + names[i] + " is selected: its icon must not be faded");
+                                if (Mathf.Abs(ib.width - MetaController.GameplaySelectedIconPx) > 1f) problems.Add(tag + names[i] + " the selected icon must fill the old ring box (" + Mathf.RoundToInt(ib.width) + " vs " + MetaController.GameplaySelectedIconPx + ")");
+                                if (label.fontStyle != FontStyle.Bold) problems.Add(tag + names[i] + " is selected: its name must be bold");
+                                if (label.color.r < 0.99f || label.color.g < 0.99f || label.color.b < 0.99f || label.color.a < 0.99f) problems.Add(tag + names[i] + " is selected: its name must be white");
+                            }
+                            else
+                            {
+                                biggestOther = Mathf.Max(biggestOther, ib.width);
+                                if (icon.color.a > 0.9f || icon.color.a < 0.5f) problems.Add(tag + names[i] + " is not selected: its icon must be slightly faded (alpha " + icon.color.a.ToString("F2") + ")");
+                                if (label.fontStyle == FontStyle.Bold) problems.Add(tag + names[i] + " is not selected: its name must not be bold");
+                            }
+
+                            // name: 16 sp, outlined (it sits on the art without a plate), under the icon and the ring
+                            if (label.text != names[i]) problems.Add(tag + names[i] + " name text is \"" + label.text + "\"");
+                            if (label.fontSize < UiKit.MinBodyTextPx - 1f) problems.Add(tag + names[i] + " name below 16 sp");
+                            var outline = label.GetComponent<Outline>();
+                            if (outline == null || !outline.enabled || outline.effectColor.a < 0.5f) problems.Add(tag + names[i] + " name needs an outline over the art (CUX-5)");
+                            Rect lb = CanvasBox(label.rectTransform);
+                            if (lb.yMax > ib.yMin + 1f) problems.Add(tag + names[i] + " name must sit under its icon");
+                            if (label.preferredHeight > lb.height + 6f) problems.Add(tag + names[i] + " name is taller than its line");
+                            if (lb.yMin < bb.yMin - 0.5f) problems.Add(tag + names[i] + " name leaves the row");
+                            float half = label.preferredWidth * 0.5f;   // the glyphs are centred on the slot and may be a little wider than it (no plate to stay inside)
+                            nameBoxes.Add(new Rect(lb.center.x - half, lb.yMin, 2f * half, lb.height));
+
+                            // accessibility text: name, speed rule, reward bonus, "selected"
+                            A11yLabel al = b.GetComponent<A11yLabel>();
+                            string said = al != null ? al.Text : "";
+                            if (!said.StartsWith(names[i])) problems.Add(tag + names[i] + " accessibility text must start with the name: \"" + said + "\"");
+                            if (!said.Contains("speed plus " + SimConfig.DifficultyStepPercent[i] + " percent every 30 seconds, up to plus " + SimConfig.TopSpeedUpPercent(i) + " percent")) problems.Add(tag + names[i] + " accessibility text lacks the speed rule: \"" + said + "\"");
+                            if (!said.Contains("crowns and coins plus " + SimConfig.RewardBonusPercent(i) + " percent")) problems.Add(tag + names[i] + " accessibility text lacks the reward bonus: \"" + said + "\"");
+                            if (said.Contains("selected") != on) problems.Add(tag + names[i] + " accessibility text must say \"selected\" exactly when it is: \"" + said + "\"");
+                            if (said != MetaController.GameplayA11yText(i, on)) problems.Add(tag + names[i] + " accessibility text differs from GameplayA11yText");
+                        }
+                        if (boxes.Count == names.Length)
+                        {
+                            for (int i = 1; i < boxes.Count; i++)
+                            {
+                                if (boxes[i].xMin < boxes[i - 1].xMax + UiKit.MinSpacingPx - 1f) problems.Add(tag + names[i - 1] + " and " + names[i] + " are closer than 8 dp");
+                                if (boxes[i].center.x <= boxes[i - 1].center.x) problems.Add(tag + "buttons are not in the order Relaxed to Insane");
+                            }
+                            float rowCentre = rb.center.x, used = (left + right) * 0.5f;
+                            if (Mathf.Abs(rowCentre - used) > 4f) problems.Add(tag + "the buttons are not centred in the row");
+                        }
+                        if (nameBoxes.Count == names.Length)
+                        {
+                            for (int i = 1; i < nameBoxes.Count; i++)
+                                if (nameBoxes[i].xMin < nameBoxes[i - 1].xMax + 6f) problems.Add(tag + "the names " + names[i - 1] + " and " + names[i] + " touch or overlap");
+                            if (nameBoxes[0].xMin < safeLeft - 2f || nameBoxes[nameBoxes.Count - 1].xMax > safeRight + 2f) problems.Add(tag + "a name leaves the safe area");
+                        }
+                        if (selectedIcon < biggestOther + 12f) problems.Add(tag + "the selected icon (" + Mathf.RoundToInt(selectedIcon) + ") must be clearly larger than the others (" + Mathf.RoundToInt(biggestOther) + ")");
+
+                        // picking a setting stores it and moves ring, size, fade and bold name
+                        RectTransform hard = FindRt("GameplayHard", row), relaxed = FindRt("GameplayRelaxed", row);
+                        if (hard == null || relaxed == null) continue;
+                        hard.GetComponent<Button>().onClick.Invoke();
+                        if (GameSettings.Difficulty != 3) problems.Add(tag + "tapping Hard did not store the setting");
+                        RectTransform hardIcon = hard.Find(MetaController.GameplayIconName) as RectTransform, relaxedIcon = relaxed.Find(MetaController.GameplayIconName) as RectTransform;
+                        if (hardIcon != null && relaxedIcon != null && hardIcon.rect.width < relaxedIcon.rect.width + 12f) problems.Add(tag + "the larger icon did not move to Hard");
+                        if (hard.Find(MetaController.GameplayLabelName).GetComponent<Text>().fontStyle != FontStyle.Bold || relaxed.Find(MetaController.GameplayLabelName).GetComponent<Text>().fontStyle == FontStyle.Bold) problems.Add(tag + "the bold name did not move to Hard");
+                        if (!hard.GetComponent<A11yLabel>().Text.Contains("selected") || relaxed.GetComponent<A11yLabel>().Text.Contains("selected")) problems.Add(tag + "the accessibility text did not move \"selected\" to Hard");
+                        if (GameSession.Cfg.ScrollStepPercent != SimConfig.DifficultyStepPercent[3]) problems.Add(tag + "Hard must set a speed-up step of " + SimConfig.DifficultyStepPercent[3] + " percent, got " + GameSession.Cfg.ScrollStepPercent);
+                        float hardSlotW = CanvasBox(hard).width;
+                        if (boxes.Count == names.Length && Mathf.Abs(hardSlotW - boxes[3].width) > 0.5f) problems.Add(tag + "choosing a setting must not change the slot widths");
+
+                        // the one Endless button keeps its action: the Endless popup with START and Time Attack
+                        if (!popupChecked)
+                        {
+                            popupChecked = true;
+                            endless.GetComponent<Button>().onClick.Invoke();
+                            yield return null;
+                            if (FindRt("START") == null || FindRt(MetaController.TimeAttackButtonName) == null) problems.Add(tag + "the Endless button must open the Endless popup with START and Time Attack");
+                        }
                     }
-                    if (marked != 1) problems.Add(tag + marked + " buttons are marked selected, expected 1");
-                    FindRt("GameplayHard", row).GetComponent<Button>().onClick.Invoke();
-                    if (GameSettings.Difficulty != 3) problems.Add(tag + "tapping Hard did not store the setting");
-                    if (!FindRt("GameplayHard", row).GetComponent<Outline>().enabled || FindRt("GameplayRelaxed", row).GetComponent<Outline>().enabled) problems.Add(tag + "the selected mark did not move to Hard");
-                    if (GameSession.Cfg.ScrollStepPercent != 40) problems.Add(tag + "Hard must set a speed-up step of 40 percent, got " + GameSession.Cfg.ScrollStepPercent);
                 }
                 GameSettings.Difficulty = 0;
                 GameSession.ApplyDifficulty();
                 Restore(holder);
                 Report(problems);
+            }
+        }
+
+        /// <summary>The number of filled stars under a level node (S0..S2 at full strength), or -1 when the node shows no stars (locked).</summary>
+        static int NodeStars(Transform node)
+        {
+            if (node.Find("S0") == null) return -1;
+            int n = 0;
+            for (int s = 0; s < 3; s++)
+            {
+                Transform t = node.Find("S" + s);
+                if (t != null && t.GetComponent<Image>().color.a > 0.9f) n++;
+            }
+            return n;
+        }
+
+        static string PillValue(string pillName)
+        {
+            RectTransform pill = FindRt(pillName);
+            Transform value = pill != null ? pill.Find("Value") : null;
+            return value != null ? value.GetComponent<Text>().text : null;
+        }
+
+        /// <summary>
+        /// Final Change 1 (owner 2026-11-22): stars, locks and the current level are kept PER Gameplay setting, so every setting has its own path through a region. Tapping a
+        /// setting on the level screen redraws the WHOLE path in place: the stars under every tile, locked / open / current, both progress pills (levels of 25, stars of 75) and
+        /// the scroll position; the wallet star pill keeps the sum over all settings; the gem badge reads "collected" once the level is cleared in ANY setting. The level popup
+        /// shows the stars of the selected setting, "25 percent" only when THIS setting has 3 stars, and a locked level names the setting. The region lock popup names the rule.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator SwitchingTheGameplaySettingRedrawsStarsLocksAndPills()
+        {
+            RegionDef r1 = GameSession.Repo.GetRegionByIndex(1), r2 = GameSession.Repo.GetRegionByIndex(2);
+            var levels = GameSession.Repo.LevelsOf(r1.Id);
+            // Relaxed: levels 1..6 cleared (2, 3, 2, 3, 2, 3 stars = 15), level 7 is the current one. Hard: levels 1..4 cleared with 1 star each (4), level 5 is the current one.
+            for (int i = 1; i <= 6; i++)
+                GameSession.Progress.ApplyRun("lvl_001_" + i.ToString("D2"), new RunOutcome { Completed = true, StarMask = i % 2 == 0 ? 7 : 3, Score = 100 * i, CoinsCollected = 30, Mode = 0 });
+            for (int i = 1; i <= 4; i++)
+                GameSession.Progress.ApplyRun("lvl_001_" + i.ToString("D2"), new RunOutcome { Completed = true, StarMask = 1, Score = 100 * i, CoinsCollected = 30, Mode = 3 });
+            int total = r1.Levels.Count;
+            bool starArt = GameSession.Art != null && GameSession.Art.StarFilled != null && GameSession.Art.StarEmpty != null;
+            bool gemArt = GameSession.Art != null && GameSession.Art.GemIcon != null;
+
+            GameSettings.Difficulty = 0;
+            yield return Load("Meta");
+            var meta = Object.FindFirstObjectByType<MetaController>();
+            var holder = new RenderTexture[1];
+            try
+            {
+                UiKit.SafeAreaNormalized = () => FullSafe;
+                meta.ShowLevels(r1);
+                yield return ApplyAspect(Aspects[0], holder);
+                meta.ShowLevels(r1);   // again on the 9:16 canvas, so the path is laid out and scrolled for the size that is measured
+                yield return null;
+                yield return null;
+                Canvas.ForceUpdateCanvases();
+
+                // ---- Relaxed ----
+                Assert.AreEqual("6/" + total, PillValue("LevelsPill"), "flag pill: levels cleared on Relaxed");
+                Assert.AreEqual("15/" + total * 3, PillValue("RegionStarsPill"), "star pill: stars on Relaxed");
+                Assert.AreEqual("19", PillValue("StarsPill"), "wallet star pill: all settings added up (15 Relaxed + 4 Hard)");
+                RectTransform n2 = FindRt("Level2"), n5 = FindRt("Level5"), n7 = FindRt("Level7"), n8 = FindRt("Level8");
+                Assert.IsNotNull(n2); Assert.IsNotNull(n5); Assert.IsNotNull(n7); Assert.IsNotNull(n8);
+                if (starArt) Assert.AreEqual(3, NodeStars(n2), "Relaxed: level 2 shows its 3 Relaxed stars");
+                StringAssert.Contains("3 of 3 stars on Relaxed", n2.GetComponent<A11yLabel>().Text);
+                Assert.IsNotNull(n7.Find("Num"), "Relaxed: level 7 is open");
+                Assert.AreEqual(1.15f, n7.localScale.x, 0.01f, "Relaxed: level 7 is the current level (bigger node)");
+                StringAssert.Contains("current level", n7.GetComponent<A11yLabel>().Text);
+                Assert.IsNull(n8.Find("Num"), "Relaxed: level 8 is locked");
+                Assert.AreEqual(-1, NodeStars(n8), "a locked level shows no stars");
+                StringAssert.Contains("locked on Relaxed", n8.GetComponent<A11yLabel>().Text);
+                Rect vpBox = CanvasBox(FindRt("PathViewport"));
+                Assert.IsTrue(vpBox.Contains(CanvasBox(n7).center), "Relaxed: the path is scrolled to its current level 7");
+
+                // ---- tap Hard: the whole path follows, in place ----
+                FindRt("GameplayHard").GetComponent<Button>().onClick.Invoke();
+                yield return null;
+                yield return null;
+                Assert.AreEqual(3, GameSettings.Difficulty);
+                Assert.AreEqual("Levels", meta.CurrentScreen, "the level screen stays open");
+                Assert.AreEqual("4/" + total, PillValue("LevelsPill"), "flag pill: levels cleared on Hard");
+                Assert.AreEqual("4/" + total * 3, PillValue("RegionStarsPill"), "star pill: stars on Hard");
+                Assert.AreEqual("19", PillValue("StarsPill"), "the wallet star pill does not depend on the selected setting");
+                int nodes = 0;
+                foreach (Button b in FindRt("PathContent").GetComponentsInChildren<Button>(false)) if (b.name.StartsWith("Level")) nodes++;
+                Assert.AreEqual(total, nodes, "one visible node per level after the redraw (the old nodes are gone)");
+                n2 = FindRt("Level2"); n5 = FindRt("Level5"); n7 = FindRt("Level7");
+                RectTransform n6 = FindRt("Level6");
+                if (starArt) Assert.AreEqual(1, NodeStars(n2), "Hard: level 2 shows its 1 Hard star, not the 3 of Relaxed");
+                StringAssert.Contains("1 of 3 stars on Hard", n2.GetComponent<A11yLabel>().Text);
+                Assert.IsNotNull(n5.Find("Num"), "Hard: level 5 is open (level 4 is cleared on Hard)");
+                Assert.AreEqual(1.15f, n5.localScale.x, 0.01f, "Hard: level 5 is the current level");
+                if (starArt) Assert.AreEqual(0, NodeStars(n5), "Hard: level 5 has no Hard star yet");
+                Assert.IsNull(n6.Find("Num"), "Hard: level 6 is locked although it is cleared on Relaxed");
+                Assert.IsNull(n7.Find("Num"), "Hard: level 7 is locked");
+                Assert.AreEqual(1f, n7.localScale.x, 0.01f, "Hard: level 7 is no longer the current level");
+                if (gemArt)
+                {
+                    Transform gem = n5.Find(MetaController.GemBadgeName);
+                    Assert.IsNotNull(gem, "level 5 is a gem level: the badge shows on the open tile");
+                    StringAssert.Contains("collected", gem.GetComponent<A11yLabel>().Text, "gems are paid once per level: collected because level 5 is cleared on Relaxed");
+                }
+                vpBox = CanvasBox(FindRt("PathViewport"));
+                Assert.IsTrue(vpBox.Contains(CanvasBox(n5).center), "Hard: the path is scrolled to its current level 5");
+                Assert.AreEqual(1f, FindRt("PathContent").GetComponent<CanvasGroup>().alpha, 0.001f, "the path stays visible while it is redrawn");
+
+                // ---- level popup follows the setting ----
+                meta.OnLevelTapped(levels[1]);   // level 2: 1 star on Hard, 3 on Relaxed
+                yield return null;
+                RectTransform panel = FindRt("Panel");
+                Assert.IsNotNull(panel, "level popup on Hard");
+                if (starArt)
+                {
+                    int filled = 0;
+                    for (int s = 0; s < 3; s++) if (panel.Find("Star" + s).GetComponent<Image>().color.a > 0.9f) filled++;
+                    Assert.AreEqual(1, filled, "the popup shows the stars of the selected setting (Hard: 1)");
+                }
+                Assert.AreEqual("100%", FindRt(CrownInfoUi.SecondValueName, panel).GetComponent<Text>().text, "Hard has 1 star: a clear still pays in full");
+                meta.OnLevelTapped(levels[6]);   // level 7 is locked on Hard
+                yield return null;
+                Assert.AreEqual("Clear level 6 on Hard first.", FindRt("Body").GetComponent<Text>().text, "the lock message names the setting");
+
+                // ---- back to Relaxed ----
+                meta.ShowLevels(r1);
+                yield return null;
+                yield return null;
+                FindRt("GameplayRelaxed").GetComponent<Button>().onClick.Invoke();
+                yield return null;
+                Assert.AreEqual("6/" + total, PillValue("LevelsPill"), "back on Relaxed");
+                Assert.AreEqual("15/" + total * 3, PillValue("RegionStarsPill"), "back on Relaxed");
+                Assert.IsNotNull(FindRt("Level7").Find("Num"), "Relaxed again: level 7 is open");
+                meta.OnLevelTapped(levels[1]);   // level 2 has 3 stars on Relaxed: a replay pays 25 percent
+                yield return null;
+                Assert.AreEqual(CoinPayoutRules.ReplayPercent + "%", FindRt(CrownInfoUi.SecondValueName, FindRt("Panel")).GetComponent<Text>().text, "3 stars in THIS setting: the replay percent");
+
+                // ---- region lock popup: all levels on ONE setting ----
+                meta.ShowMap();
+                yield return null;
+                yield return null;
+                meta.OnRegionTapped(r2);
+                yield return null;
+                StringAssert.StartsWith("Clear all " + total + " levels of " + r1.Name + " on one gameplay setting to open " + r2.Name + ".", FindRt("Body").GetComponent<Text>().text);
+            }
+            finally
+            {
+                GameSettings.Difficulty = 0;
+                GameSession.ApplyDifficulty();
+                Restore(holder);
             }
         }
 
@@ -1523,7 +1779,11 @@ namespace FluffyClimbers.Tests
             Report(problems);
         }
 
-        /// <summary>Audit gap 5 (doc 46): the medal badge on a level node is the medal of the CURRENT Gameplay mode, not the best over all five, and it follows a mode change in place.</summary>
+        /// <summary>
+        /// Audit gap 5 (doc 46): the medal badge on a level node is the medal of the CURRENT Gameplay mode, not the best over all five, and it follows a mode change in place
+        /// (a tap on a setting of the level screen, no new screen). Since Final Change 1 every setting has its own path, so levels 1 and 2 are cleared on Relaxed AND on Hard:
+        /// level 3 is open in both, the medal run exists on Relaxed only.
+        /// </summary>
         [UnityTest]
         public IEnumerator LevelNodeMedalFollowsTheGameplayMode()
         {
@@ -1535,29 +1795,39 @@ namespace FluffyClimbers.Tests
             try
             {
                 RegionDef r1 = GameSession.Repo.GetRegionByIndex(1);
-                for (int i = 1; i <= 2; i++)
-                    GameSession.Progress.ApplyRun("lvl_001_0" + i, new RunOutcome { Completed = true, StarMask = 1, Score = 100, CoinsCollected = 10 });
+                foreach (int mode in new[] { 0, 3 })
+                    for (int i = 1; i <= 2; i++)
+                        GameSession.Progress.ApplyRun("lvl_001_0" + i, new RunOutcome { Completed = true, StarMask = 1, Score = 100, CoinsCollected = 10, Mode = mode });
                 GameSession.Progress.RecordRun(TimedRun("lvl_001_03", r1.Id, 30, 1800));   // Relaxed (mode 0) only: 1.00 plat/s against a 0.90 target
                 Assert.AreNotEqual(MedalLevel.None, GameSession.Progress.Medal("lvl_001_03", 0), "the Relaxed run earned a medal");
                 Assert.AreEqual(MedalLevel.None, GameSession.Progress.Medal("lvl_001_03", 3), "nothing in Hard yet");
+                GameSettings.Difficulty = 0;
                 yield return Load("Meta");
                 var meta = Object.FindFirstObjectByType<MetaController>();
-                GameSettings.Difficulty = 0;
                 meta.ShowLevels(r1);
+                yield return null;
                 yield return null;
                 Transform node = FindRt("Level3");
                 Assert.IsNotNull(node, "level 3 node");
+                Assert.IsNotNull(node.Find("Num"), "level 3 is open on Relaxed");
                 Assert.IsNotNull(node.Find(MetaController.MedalBadgeName), "Relaxed shows the Relaxed medal");
-                GameSettings.Difficulty = 3;
-                meta.ShowLevels(r1);
+                FindRt("GameplayHard").GetComponent<Button>().onClick.Invoke();   // in place: the level screen redraws its nodes for Hard
+                yield return null;
+                Assert.AreEqual(3, GameSettings.Difficulty, "the tap selected Hard");
+                node = FindRt("Level3");
+                Assert.IsNotNull(node, "level 3 node after the change");
+                Assert.IsNotNull(node.Find("Num"), "level 3 is open on Hard too (levels 1 and 2 are cleared on Hard)");
+                Assert.IsNull(node.Find(MetaController.MedalBadgeName), "Hard has no medal: the best over all modes is NOT shown");
+                FindRt("GameplayRelaxed").GetComponent<Button>().onClick.Invoke();
                 yield return null;
                 node = FindRt("Level3");
-                Assert.IsNull(node.Find(MetaController.MedalBadgeName), "Hard has no medal: the best over all modes is NOT shown");
+                Assert.IsNotNull(node.Find(MetaController.MedalBadgeName), "back on Relaxed the Relaxed medal shows again");
             }
             finally
             {
                 MedalTargets.Source = savedTargets;
                 GameSettings.Difficulty = 0;
+                GameSession.ApplyDifficulty();
             }
         }
 
@@ -1670,10 +1940,23 @@ namespace FluffyClimbers.Tests
         [UnityTest]
         public IEnumerator FreeHeroPowersAloneSurvive130PercentTextAndLeftHandedLayout() { return HeroOnlyAudit(130, true); }
 
+        /// <summary>A Rare or Elite hero has ONE free power: one button on its own, still laid out cleanly.</summary>
+        [UnityTest]
+        public IEnumerator ASingleFreeHeroPowerFormsOneButton() { return HeroOnlyAudit(100, false, RareTestHero()); }
+
+        [UnityTest]
+        public IEnumerator ASingleFreeHeroPowerSurvives130PercentTextAndLeftHandedLayout() { return HeroOnlyAudit(130, true, RareTestHero()); }
+
         static CharacterSpec LegendaryTestHero()
         {
-            // a Legendary hero with the 4 powers its tier rule gives (no Legendary row exists yet, so it is built from the rule)
+            // a Legendary hero with the 2 powers its tier rule gives since owner Final Change 2 (default combination: Safety Net + Double Jump; built from the rule, not a row)
             return new CharacterSpec { Id = "test_legendary", Name = "Test Legendary", Rarity = CharacterRarity.Legendary, Powers = TierRules.PowersFor("momo", CharacterRarity.Legendary) };
+        }
+
+        static CharacterSpec RareTestHero()
+        {
+            // a Rare hero with the ONE power of its tier (default combination: Wide Platforms)
+            return new CharacterSpec { Id = "test_rare", Name = "Test Rare", Rarity = CharacterRarity.Rare, Powers = TierRules.PowersFor("momo", CharacterRarity.Rare) };
         }
 
         /// <summary>The merged run buttons: at least 48 dp, labelled, same alpha, at least 8 dp from each other and from the pads, inside the safe area, on the side of their type
@@ -1735,7 +2018,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(9, bar.ButtonCount, "all nine types are bought: one merged button each, no separate hero buttons");
             Assert.AreEqual(4, bar.LeftCount, "left group: Double Jump, Rocket, Flight, Glide Cape");
             Assert.AreEqual(5, bar.RightCount, "right group: Shield, Wall Stick, Slow Time, Wide Platforms, Safety Net");
-            Assert.AreEqual(4, rc.Session.Hero.Count, "a Legendary hero has four free hero powers");
+            Assert.AreEqual(2, rc.Session.Hero.Count, "a Legendary hero has two free hero powers (owner Final Change 2)");
             int free = 0;
             for (int i = 0; i < bar.ButtonCount; i++)
             {
@@ -1743,7 +2026,7 @@ namespace FluffyClimbers.Tests
                 Assert.AreEqual(rc.Session.Hero.IndexOf(bar.ButtonType(i)) >= 0, bar.ButtonHasFree(i), "FREE only on the hero's own types");
                 if (bar.ButtonHasFree(i)) free++;
             }
-            Assert.AreEqual(4, free, "the four hero powers are merged into four of the nine buttons");
+            Assert.AreEqual(2, free, "the two hero powers are merged into two of the nine buttons");
             Assert.IsFalse(bar.Visible, "hidden during the intro");
             rc.Hud.SkipIntro();
             int frame = 0;
@@ -1762,7 +2045,7 @@ namespace FluffyClimbers.Tests
 
             // free first, then bought: the first tap on a type that has a free hero power takes no unit and starts its cooldown; the second tap takes one bought unit
             int idx = -1;
-            for (int i = 0; i < bar.ButtonCount; i++) if (bar.ButtonHasFree(i)) { idx = i; break; }
+            for (int i = 0; i < bar.ButtonCount; i++) if (bar.ButtonHasFree(i) && bar.ButtonType(i) != PowerUp.SafetyNet) { idx = i; break; }   // a timed power: an armed Safety Net refuses the second tap
             PowerUp first = bar.ButtonType(idx);
             int heroIdx = rc.Session.Hero.IndexOf(first);
             Assert.GreaterOrEqual(heroIdx, 0);
@@ -1780,14 +2063,15 @@ namespace FluffyClimbers.Tests
             Report(problems);
         }
 
-        IEnumerator HeroOnlyAudit(int textPercent, bool leftHanded)
+        IEnumerator HeroOnlyAudit(int textPercent, bool leftHanded, CharacterSpec hero = null)
         {
             GameSettings.TextPercent = textPercent;
             GameSettings.LeftHanded = leftHanded;
             GameSettings.ReducedMotion = leftHanded;
             for (int i = 1; i <= 2; i++)
                 GameSession.Progress.ApplyRun("lvl_001_0" + i, new RunOutcome { Completed = true, StarMask = 1, Score = 100, CoinsCollected = 10 });
-            RunController.HeroOverride = LegendaryTestHero();
+            hero = hero ?? LegendaryTestHero();
+            RunController.HeroOverride = hero;
             GameSession.CurrentLevelId = "lvl_001_03";
             yield return Load("Run");
             var rc = Object.FindFirstObjectByType<RunController>();
@@ -1796,7 +2080,8 @@ namespace FluffyClimbers.Tests
             int want = 0;
             foreach (PowerUp t in PowerUps.Implemented)
                 if (rc.Session.Hero.IndexOf(t) >= 0 || rc.Session.OwnedAtStart(t)) want++;
-            Assert.GreaterOrEqual(want, 4, "the four hero powers each have a button");
+            Assert.GreaterOrEqual(want, hero.Powers.Length, "every hero power has a button");
+            Assert.AreEqual(hero.Powers.Length, rc.Session.Hero.Count, "Rare and Elite have one free power, a Legendary two");
             Assert.AreEqual(want, bar.ButtonCount, "one button per type: bought or free");
             for (int i = 0; i < bar.ButtonCount; i++)
                 Assert.AreEqual(rc.Session.OwnedAtStart(bar.ButtonType(i)), bar.ButtonHasBought(i), "the bought count only on bought types: " + bar.ButtonType(i));
@@ -1979,7 +2264,7 @@ namespace FluffyClimbers.Tests
             }
             yield return CheckScreen("shop-heroes-none-popup", () => { meta.ShowShop(ShopScreen.TabCharacter, ShopScreen.HeroesSection); meta.CurrentShop.TapHeroBuy(CharacterRarity.Rare); }, problems);
             yield return CheckScreen("shop-heroes-none-popup-legendary", () => { meta.ShowShop(ShopScreen.TabCharacter, ShopScreen.HeroesSection); meta.CurrentShop.TapHeroBuy(CharacterRarity.Legendary); }, problems);
-            yield return CheckScreen("shop-heroes-confirm-popup", () => { meta.ShowShop(ShopScreen.TabCharacter, ShopScreen.HeroesSection); meta.CurrentShop.TapHeroBuy(CharacterRarity.Uncommon); }, problems);
+            yield return CheckScreen("shop-heroes-confirm-popup", () => { GameSession.Progress.AddCoins(HeroPurchase.CoinPrice(CharacterRarity.Uncommon)); meta.ShowShop(ShopScreen.TabCharacter, ShopScreen.HeroesSection); meta.CurrentShop.TapHeroBuy(CharacterRarity.Uncommon); }, problems);   // coins for the card first (24,000 since Final Change 1), else the not-enough-coins popup shows
             yield return CheckScreen("shop-heroes-reveal", () =>
             {
                 GameSession.Progress.AddCoins(HeroPurchase.CoinPrice(CharacterRarity.Uncommon));
@@ -1987,13 +2272,13 @@ namespace FluffyClimbers.Tests
                 meta.CurrentShop.TapHeroBuy(CharacterRarity.Uncommon);
                 ClickByName("Buy for");
             }, problems);
-            yield return CheckScreen("treasure-confirm", () => { GameSession.Progress.AddGems(3000); meta.ShowTreasureChests(); meta.CurrentTreasure.TapBuy(ChestKind.Golden, 10); }, problems);
-            yield return CheckScreen("treasure-reveal-single", () => { GameSession.Progress.AddGems(100); meta.ShowTreasureChests(); meta.CurrentTreasure.OpenNow(ChestKind.Iron, 1); meta.CurrentTreasure.Reveal.Skip(); }, problems);
-            yield return CheckScreen("treasure-reveal-ten", () => { GameSession.Progress.AddGems(3000); meta.ShowTreasureChests(); meta.CurrentTreasure.OpenNow(ChestKind.Golden, 10); meta.CurrentTreasure.Reveal.Skip(); }, problems);
+            yield return CheckScreen("treasure-confirm", () => { GameSession.Progress.AddGems(ChestRolls.Price(ChestKind.Golden, 10)); meta.ShowTreasureChests(); meta.CurrentTreasure.TapBuy(ChestKind.Golden, 10); }, problems);
+            yield return CheckScreen("treasure-reveal-single", () => { GameSession.Progress.AddGems(ChestRolls.Price(ChestKind.Iron, 1)); meta.ShowTreasureChests(); meta.CurrentTreasure.OpenNow(ChestKind.Iron, 1); meta.CurrentTreasure.Reveal.Skip(); }, problems);
+            yield return CheckScreen("treasure-reveal-ten", () => { GameSession.Progress.AddGems(ChestRolls.Price(ChestKind.Golden, 10)); meta.ShowTreasureChests(); meta.CurrentTreasure.OpenNow(ChestKind.Golden, 10); meta.CurrentTreasure.Reveal.Skip(); }, problems);
             // Bug List 5 F3: the chests hold a hero card too. The "i" popup of each chest, the Open 1 reveal with a hero row, the Open 10 reveal with a list of hero rows
             yield return CheckScreen("treasure-info-iron", () => { meta.ShowShop(ShopScreen.TabVip, ShopScreen.VipChestsSection); meta.CurrentTreasure.ShowInfo(ChestKind.Iron); }, problems);
             yield return CheckScreen("treasure-info-gold", () => { meta.ShowShop(ShopScreen.TabVip, ShopScreen.VipChestsSection); meta.CurrentTreasure.ShowInfo(ChestKind.Golden); }, problems);
-            yield return CheckScreen("treasure-reveal-iron-ten", () => { GameSession.Progress.AddGems(1000); meta.ShowTreasureChests(); meta.CurrentTreasure.OpenNow(ChestKind.Iron, 10); meta.CurrentTreasure.Reveal.Skip(); }, problems);
+            yield return CheckScreen("treasure-reveal-iron-ten", () => { GameSession.Progress.AddGems(ChestRolls.Price(ChestKind.Iron, 10)); meta.ShowTreasureChests(); meta.CurrentTreasure.OpenNow(ChestKind.Iron, 10); meta.CurrentTreasure.Reveal.Skip(); }, problems);
             yield return CheckScreen("shop-tab-bundles", () => meta.ShowShop(ShopScreen.TabBundles), problems);
             yield return CheckScreen("shop-gems-notbuyable-popup", () => { meta.ShowShop(); meta.CurrentShop.TapGemPack(3); }, problems);
 
@@ -2040,13 +2325,13 @@ namespace FluffyClimbers.Tests
                 sample.HeroIds.Add("forestgirl"); sample.HeroIds.Add("forestgirl");
                 meta.CurrentRewards.ShowClaimed(sample);
             }, problems);
-            // ready states of the redesign: yellow region-goal cards with the green Claim button (the last Levels goal also shows the region hero's face), Claim All, and a claimed (green, check, open chest) look
+            // ready states of the redesign: yellow region-goal cards with the green Claim button, Claim All, and a claimed (green, check, open chest) look
             for (int lvl = 10; lvl <= 15; lvl++) GameSession.Progress.ApplyRun("lvl_001_" + lvl.ToString("00"), new RunOutcome { Completed = true, StarMask = 7, Score = 100, CoinsCollected = 10 });
-            GameSession.Progress.AddPlaySeconds(100 * 60);
+            GameSession.Progress.AddPlaySeconds(120 * 60);
             yield return CheckScreen("rewards-main-ready", () => { meta.ShowRewards(RewardTab.Main); meta.CurrentRewards.SelectRegion(1); }, problems);
             yield return CheckScreen("rewards-weekly-ready", () => meta.ShowRewards(RewardTab.Weekly), problems);
             yield return CheckScreen("rewards-daily-ready", () => meta.ShowRewards(RewardTab.Daily), problems);
-            yield return CheckScreen("rewards-daily-claimed", () => { meta.ShowRewards(RewardTab.Daily); GameSession.Progress.TryClaimReward(RewardTab.Daily, "dp_40"); meta.ShowRewards(RewardTab.Daily); }, problems);
+            yield return CheckScreen("rewards-daily-claimed", () => { meta.ShowRewards(RewardTab.Daily); GameSession.Progress.TryClaimReward(RewardTab.Daily, "dp2_100"); meta.ShowRewards(RewardTab.Daily); }, problems);
             // Daily free power-up card (owner 2026-11-17): ad ready, ad not ready (dimmed), then claimed today.
             yield return CheckScreen("rewards-daily-ad-powerup-ready", () => { Services.Ads = new StubAdService { Immediate = true }; meta.ShowRewards(RewardTab.Daily); Assert.IsNotNull(FindRt(RewardsScreen.AdPowerUpCardName), "the card is on the Daily tab"); }, problems);
             yield return CheckScreen("rewards-daily-ad-powerup-not-ready", () => { Services.Ads = new StubAdService { Immediate = true, Ready = false }; meta.ShowRewards(RewardTab.Daily); }, problems);
@@ -2056,12 +2341,12 @@ namespace FluffyClimbers.Tests
             yield return CheckScreen("rewards-main-claimed", () =>
             {
                 // region 1: the first goals of two groups claimed (green check cards), the rest still ready or open; the circle keeps its dot while something is left
-                GameSession.Progress.TryClaimRegionGoal("g_1_levels_1");
-                GameSession.Progress.TryClaimRegionGoal("g_1_stars_1");
+                GameSession.Progress.TryClaimRegionGoal("g2_1_clear_5");
+                GameSession.Progress.TryClaimRegionGoal("g2_1_stars_25");
                 meta.ShowRewards(RewardTab.Main);
                 meta.CurrentRewards.SelectRegion(1);
             }, problems);
-            yield return CheckScreen("rewards-weekly-claimed", () => { GameSession.Progress.TryClaimReward(RewardTab.Weekly, "w_play100"); meta.ShowRewards(RewardTab.Weekly); }, problems);   // compact cards: claimed look
+            yield return CheckScreen("rewards-weekly-claimed", () => { GameSession.Progress.TryClaimReward(RewardTab.Weekly, "w2_play120"); meta.ShowRewards(RewardTab.Weekly); }, problems);   // compact cards: claimed look
             Report(problems);
         }
 
@@ -2723,6 +3008,370 @@ namespace FluffyClimbers.Tests
             yield return CheckScreen("timer-offer-info", () => { TimerOfferState(); meta.ShowMenu(); ClickByName("BundleOffer"); ClickByName("BundleInfo"); }, problems);
             Report(problems);
         }
+
+        // ---- special level types (owner Final Change 1, 2026-11-22): tile badge, level popup, run intro, One Life (no revive), No Power-ups (no buttons), Keep Moving (ring + cue) ----
+        // Region 1 placement: L6 No Wall Touch, L9 One Life, L14 No Power-ups, L16 Keep Moving, L21 Chase, L24 Combo Climb.
+
+        [UnityTest]
+        public IEnumerator SpecialLevelTilesAndPopupsFitEveryAspect() { return SpecialLevelMetaAudit(100); }
+
+        [UnityTest]
+        public IEnumerator SpecialLevelTilesAndPopupsSurvive130PercentText() { return SpecialLevelMetaAudit(130); }
+
+        IEnumerator SpecialLevelMetaAudit(int textPercent)
+        {
+            GameSettings.TextPercent = textPercent;
+            int mode = GameSettings.Difficulty;
+            for (int i = 1; i <= 23; i++)   // levels 1 to 24 are open on the selected setting (24 is the last special level; 25 stays locked so no region unlock pops up)
+                GameSession.Progress.ApplyRun("lvl_001_" + i.ToString("D2"), new RunOutcome { Completed = true, StarMask = 7, Score = 100, CoinsCollected = 10, Mode = mode });
+            // A medal on two two-digit tiles (16 carries the special badge, 20 the gem badge): the medal is the top left corner pip and must stay clear of the number at 130 percent text.
+            string[] medalLevels = { "lvl_001_16", "lvl_001_20" };
+            foreach (string id in medalLevels)
+            {
+                RunRecord fast = TimedRun(id, GameSession.Repo.GetRegionByIndex(1).Id, 120, 3600);   // 2.0 plat/s: above the bronze line of every setting
+                fast.Mode = mode;
+                GameSession.Progress.RecordRun(fast);
+                Assert.AreNotEqual(MedalLevel.None, GameSession.Progress.Medal(id, mode), id + ": the fast run earned a medal (medal targets are loaded)");
+            }
+            yield return Load("Meta");
+            var meta = Object.FindFirstObjectByType<MetaController>();
+            RegionDef r1 = GameSession.Repo.GetRegionByIndex(1);
+            var levels = GameSession.Repo.LevelsOf(r1.Id);
+            var problems = new List<string>();
+            yield return CheckScreen("levels-special-badges", () => meta.ShowLevels(r1), problems);
+
+            // Tiles: a badge on exactly the six special levels, never next to a gem badge, labelled, a corner pip to the right of the level number and clear of the medal and
+            // the stars (CUX-3, CUX-6). The gem badge of the gem levels follows the same corner rule.
+            meta.ShowLevels(r1);
+            yield return null;
+            yield return null;   // the path is laid out one frame after the screen opens
+            Canvas.ForceUpdateCanvases();
+            Rect pathView = CanvasBox(FindRt("PathViewport"));
+            int badges = 0, gemBadges = 0, medalBadges = 0;
+            foreach (LevelDef level in levels)
+            {
+                if (level.Index > 24) continue;
+                RectTransform node = FindRt("Level" + level.Index);
+                Assert.IsNotNull(node, "level node " + level.Index);
+                Transform badge = node.Find(MetaController.SpecialBadgeName);
+                SpecialLevelType type = level.SpecialType;
+                Transform medalPip = node.Find(MetaController.MedalBadgeName);
+                if (medalPip != null)
+                {
+                    // the mirrored corner pip (MetaController.CornerPipPositionLeft): left of the number's own box, inside the height of the tile, inside the scroll view
+                    medalBadges++;
+                    Rect tile = CanvasBox(node), mb = CanvasBox((RectTransform)medalPip);
+                    Text num = node.Find("Num") != null ? node.Find("Num").GetComponent<Text>() : null;
+                    if (num != null)
+                    {
+                        float numberLeft = tile.center.x - num.preferredWidth * node.localScale.x * 0.5f;
+                        Assert.LessOrEqual(mb.xMax, numberLeft + 1f, "level " + level.Index + ": the medal ends left of the level number (number starts " + numberLeft.ToString("F0") + ", medal ends " + mb.xMax.ToString("F0") + ")");
+                    }
+                    Assert.IsTrue(mb.yMax <= tile.yMax + 1f && mb.yMin >= tile.yMin - 1f, "level " + level.Index + ": the medal stays inside the height of the tile (the stars of the next row are above it)");
+                    Assert.IsTrue(mb.xMin >= pathView.xMin - 1f && mb.xMax <= pathView.xMax + 1f, "level " + level.Index + ": the medal is inside the path view");
+                }
+                Transform pip = badge != null ? badge : node.Find(MetaController.GemBadgeName);
+                if (pip != null)
+                {
+                    // the corner pip rule (MetaController.CornerPipPosition): right of the number's own box at this text size, inside the height of the tile, inside the scroll view
+                    Rect tile = CanvasBox(node), pb = CanvasBox((RectTransform)pip);
+                    Text num = node.Find("Num") != null ? node.Find("Num").GetComponent<Text>() : null;
+                    if (num != null)
+                    {
+                        float numberRight = tile.center.x + num.preferredWidth * node.localScale.x * 0.5f;
+                        Assert.GreaterOrEqual(pb.xMin, numberRight - 1f, "level " + level.Index + ": the " + pip.name + " starts right of the level number (number ends " + numberRight.ToString("F0") + ", badge starts " + pb.xMin.ToString("F0") + ")");
+                    }
+                    Assert.IsTrue(pb.yMax <= tile.yMax + 1f && pb.yMin >= tile.yMin - 1f, "level " + level.Index + ": the " + pip.name + " stays inside the height of the tile (the stars of the next row are above it)");
+                    Assert.IsTrue(pb.xMin >= pathView.xMin - 1f && pb.xMax <= pathView.xMax + 1f, "level " + level.Index + ": the " + pip.name + " is inside the path view");
+                    if (badge == null) gemBadges++;
+                }
+                if (type == SpecialLevelType.None) { Assert.IsNull(badge, "level " + level.Index + " is a Regular Run: no special badge"); continue; }
+                badges++;
+                Assert.IsNotNull(badge, "level " + level.Index + " is a " + SpecialLevels.Name(type) + " level: badge on the tile");
+                Assert.IsNull(node.Find(MetaController.GemBadgeName), "a special level is never a gem level");
+                string spoken = badge.GetComponent<A11yLabel>().Text;
+                StringAssert.Contains(SpecialLevels.Name(type), spoken);
+                StringAssert.Contains(SpecialLevels.RuleText(type), spoken);
+                StringAssert.Contains(SpecialLevels.Name(type), node.GetComponent<A11yLabel>().Text, "the tile itself names the type too");
+                Assert.AreEqual(SpecialLevels.Glyph(type), badge.Find("Glyph").GetComponent<Text>().text, "the type's own glyph (never colour alone)");
+                Rect bb = CanvasBox((RectTransform)badge);
+                Transform medal = node.Find(MetaController.MedalBadgeName);
+                if (medal != null) Assert.IsFalse(CanvasBox((RectTransform)medal).Overlaps(bb), "level " + level.Index + ": badge over the medal");
+                for (int s = 0; s < 3; s++)
+                {
+                    Transform star = node.Find("S" + s);
+                    if (star != null) Assert.IsFalse(CanvasBox((RectTransform)star).Overlaps(bb), "level " + level.Index + ": badge over star " + s);
+                }
+            }
+            Assert.AreEqual(SpecialLevels.Count, badges, "one tile per special type in the region");
+            Assert.AreEqual(medalLevels.Length, medalBadges, "the two-digit tiles 16 and 20 show their medal");
+            if (GameSession.Art != null && GameSession.Art.GemIcon != null) Assert.AreEqual(4, gemBadges, "the open gem levels 5, 10, 15 and 20 carry the gem badge");
+
+            // Popups: the type name is the second line of the title, its one-sentence rule sits between the goal and the stars; nothing overlaps on any aspect.
+            foreach (LevelDef level in levels)
+            {
+                SpecialLevelType type = level.SpecialType;
+                if (type == SpecialLevelType.None) continue;
+                LevelDef l = level;
+                yield return CheckScreen("level-popup-special-" + type, () => { meta.ShowLevels(r1); meta.OnLevelTapped(l); }, problems);
+                RectTransform panel = FindRt("Popup").Find("Panel") as RectTransform;
+                Text titleText = panel.Find("Title").GetComponent<Text>(), ruleText = panel.Find("Rule").GetComponent<Text>();
+                Assert.AreEqual("Level " + l.Index + "\n" + SpecialLevels.Name(type), titleText.text, "the title names the level and its special type");
+                Assert.AreEqual(MetaController.SpecialPopupTitleFont, titleText.fontSize, "the two-line title keeps one fixed size at every text scale");
+                Assert.GreaterOrEqual(titleText.fontSize, UiKit.MinBodyTextPx - 1f);
+                LevelSpec spec = LevelSpecFactory.Build(l, r1);
+                Assert.AreEqual(RunSession.GoalRule(spec), ruleText.text);
+                if (type != SpecialLevelType.ComboClimb) Assert.AreEqual(SpecialLevels.RuleText(type), ruleText.text);
+                Assert.AreEqual(RunSession.DescribeGoal(spec), panel.Find("Goal").GetComponent<Text>().text);
+                Canvas.ForceUpdateCanvases();
+                // stacked top to bottom with real gaps: the boxes of title, goal, rule and stars do not intersect, and each text fits the height of its own box
+                Rect titleBox = CanvasBox(titleText.rectTransform), goalBox = CanvasBox((RectTransform)panel.Find("Goal")), ruleBox = CanvasBox(ruleText.rectTransform), starBox = CanvasBox((RectTransform)panel.Find("Star0"));
+                Assert.IsTrue(titleBox.yMin >= goalBox.yMax - 1f, type + ": the goal line starts below the title box");
+                Assert.IsTrue(goalBox.yMin >= ruleBox.yMax + 1f, type + ": the rule starts below the goal line");
+                Assert.IsTrue(ruleBox.yMin >= starBox.yMax + 1f, type + ": the stars start below the rule");
+                Assert.LessOrEqual(titleText.preferredHeight, titleBox.height + 1f, type + ": the two title lines fit the title box");
+                Assert.LessOrEqual(panel.Find("Goal").GetComponent<Text>().preferredHeight, goalBox.height + 1f, type + ": the goal fits its line (one line at this text size)");
+                Assert.LessOrEqual(ruleText.preferredHeight, ruleBox.height + 6f, type + ": the rule fits its two-line box");
+            }
+            meta.ShowLevels(r1);
+            meta.OnLevelTapped(levels[0]);
+            yield return null;
+            RectTransform plain = FindRt("Popup").Find("Panel") as RectTransform;
+            Assert.AreEqual("Level " + levels[0].Index, plain.Find("Title").GetComponent<Text>().text, "a Regular Run keeps the plain title");
+            Assert.IsNull(plain.Find("Rule"), "a Regular Run has no rule line");
+            Report(problems);
+        }
+
+        /// <summary>
+        /// Puts the hero of a running session onto a plain platform a few rows up, as if he had just landed there after his first jump (test helper for the Keep Moving timer:
+        /// a plain platform cannot throw, drop or carry him, and the danger line is a full kill distance below, so only the timer can end the run in the next 3 seconds).
+        /// </summary>
+        static int StandOnAPlainPlatform(RunSession s)
+        {
+            Platform[] ps = s.Data.Platforms;
+            for (int i = 1; i < ps.Length; i++)
+            {
+                if (ps[i].Kind != PlatformKind.Normal || ps[i].Row < 3) continue;
+                s.State.X = ps[i].X; s.State.Y = ps[i].Y; s.State.Vx = Fx.Zero; s.State.Vy = Fx.Zero;
+                s.State.Grounded = true; s.State.GroundId = i; s.State.BestGroundId = i; s.State.Row = ps[i].Row;
+                s.State.MaxY = ps[i].Y; s.State.KillY = ps[i].Y - s.Cfg.KillDistance;
+                s.State.StartTick = s.State.Tick; s.State.StandTicks = 0;
+                return i;
+            }
+            return -1;
+        }
+
+        static bool HasReviveButton(RectTransform overlay)
+        {
+            foreach (Button b in overlay.GetComponentsInChildren<Button>(false))
+                if (b.name.IndexOf("revive", System.StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            return false;
+        }
+
+        static IEnumerator FallUntilFailedPopup(RunController rc)
+        {
+            rc.Session.State.Grounded = false;
+            rc.Session.State.Y = Fx.FromInt(-200);   // far below the danger line
+            for (int f = 0; f < 120 && !rc.Hud.OverlayOpen; f++) yield return null;
+            Assert.IsTrue(rc.Hud.OverlayOpen, "the failed popup opens");
+        }
+
+        [UnityTest]
+        public IEnumerator OneLifeLevelOffersNoReviveAndKeepsTheOneTapRetry() { return OneLifeAudit(100, false); }
+
+        [UnityTest]
+        public IEnumerator OneLifeLevelSurvives130PercentTextAndLeftHandedLayout() { return OneLifeAudit(130, true); }
+
+        IEnumerator OneLifeAudit(int textPercent, bool leftHanded)
+        {
+            GameSettings.TextPercent = textPercent;
+            GameSettings.LeftHanded = leftHanded;
+            GameSettings.ReducedMotion = leftHanded;
+            GameSession.Progress.AddGems(500);   // gems are not the reason: the level has no revive at all
+            GrantAllPowerUps(2);                 // the player owns every power-up, the Safety Net included
+            GameSession.CurrentLevelId = "lvl_001_09";
+            yield return Load("Run");
+            var rc = Object.FindFirstObjectByType<RunController>();
+            Assert.AreEqual(SpecialLevelType.OneLife, rc.Session.SpecialType);
+            var problems = new List<string>();
+            yield return CheckScreen("run-intro-one-life", () => { }, problems);
+            RectTransform intro = FindRt("Intro");
+            Assert.AreEqual("One Life", intro.Find("Special").GetComponent<Text>().text, "the intro names the level type");
+            Assert.AreEqual("No revive, no Safety Net: one fall ends the run.", intro.Find("Rule").GetComponent<Text>().text);
+            Assert.AreEqual(SpecialLevels.RuleText(SpecialLevelType.OneLife), intro.Find("Rule").GetComponent<Text>().text);
+            // Owner 2026-11-22: the Safety Net is off on a One Life level: no button for it (a button that does nothing is never shown), every other owned power-up keeps its button.
+            Assert.AreEqual(PowerUps.Implemented.Length - 1, rc.Hud.Powers.ButtonCount, "every owned type but the Safety Net");
+            foreach (RectTransform rt in Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                Assert.AreNotEqual("Power" + PowerUp.SafetyNet, rt.name, "no Safety Net button on a One Life level");
+            rc.Hud.SkipIntro();
+            yield return null;
+            rc.Input.LatchPower(PowerUp.SafetyNet);   // a stray activation reaches nothing
+            rc.Input.LatchPower(PowerUp.Shield);      // the other power-ups work
+            for (int f = 0; f < 10; f++) yield return null;
+            Assert.IsFalse(rc.Session.State.SafetyNetArmed, "the Safety Net cannot be armed");
+            Assert.Greater(rc.Session.State.ShieldTicks, 0, "the Shield works on a One Life level");
+            Assert.AreEqual(2, rc.Session.PowerStock(PowerUp.SafetyNet), "no Safety Net unit was taken");
+            yield return CheckScreen("run-one-life-hud", () => { }, problems);
+            int gemsBefore = GameSession.Progress.Gems;
+            yield return FallUntilFailedPopup(rc);
+            RectTransform overlay = FindRt("Overlay");
+            Assert.IsFalse(rc.Session.CanRevive);
+            Assert.IsFalse(HasReviveButton(overlay), "One Life: no ad revive and no gem revive button");
+            Assert.IsNotNull(FindRt("Try again", overlay), "Retry stays one tap away (CUX-7)");
+            Assert.AreEqual("One Life: no revive and no Safety Net.", FindRt("Reason", overlay).GetComponent<Text>().text);
+            Assert.AreEqual(0, rc.Session.State.SafetyNetCatches, "one fall ended the run: no rescue");
+            Assert.AreEqual(gemsBefore, GameSession.Progress.Gems);
+            yield return CheckScreen("run-one-life-failed", () => rc.Hud.ShowFailed(rc.Session, 500, true), problems);
+            Assert.IsFalse(HasReviveButton(FindRt("Overlay")), "also with an ad ready");
+            rc.Hud.CloseOverlay();
+
+            // a plain level right after it does offer both revives again
+            GameSession.CurrentLevelId = "lvl_001_08";
+            yield return Load("Run");
+            rc = Object.FindFirstObjectByType<RunController>();
+            rc.Hud.SkipIntro();
+            yield return null;
+            yield return FallUntilFailedPopup(rc);
+            Assert.IsTrue(HasReviveButton(FindRt("Overlay")), "a Regular Run keeps its revive");
+            Assert.IsNull(FindRt("Reason", FindRt("Overlay")), "no reason line on a plain fall");
+            Report(problems);
+        }
+
+        [UnityTest]
+        public IEnumerator NoPowerUpsLevelShowsNoPowerButtonsAndUsesNoUnit() { return NoPowerUpsAudit(100, false); }
+
+        [UnityTest]
+        public IEnumerator NoPowerUpsLevelSurvives130PercentTextAndLeftHandedLayout() { return NoPowerUpsAudit(130, true); }
+
+        IEnumerator NoPowerUpsAudit(int textPercent, bool leftHanded)
+        {
+            GameSettings.TextPercent = textPercent;
+            GameSettings.LeftHanded = leftHanded;
+            GameSettings.ReducedMotion = leftHanded;
+            GrantAllPowerUps(3);
+            RunController.HeroOverride = LegendaryTestHero();   // a hero WITH free powers: they are off here too
+            GameSession.CurrentLevelId = "lvl_001_14";
+            yield return Load("Run");
+            var rc = Object.FindFirstObjectByType<RunController>();
+            Assert.AreEqual(SpecialLevelType.NoPowerUps, rc.Session.SpecialType);
+            Assert.IsTrue(rc.Session.PowersOff);
+            Assert.IsNull(rc.Session.Hero, "the hero's own power is off on this level");
+            Assert.AreEqual(0, rc.Hud.Powers.ButtonCount, "no power button at all: neither bought nor hero");
+            var problems = new List<string>();
+            yield return CheckScreen("run-intro-no-powerups", () => { }, problems);
+            RectTransform intro = FindRt("Intro");
+            Assert.AreEqual("No Power-ups", intro.Find("Special").GetComponent<Text>().text);
+            Assert.AreEqual(SpecialLevels.RuleText(SpecialLevelType.NoPowerUps), intro.Find("Rule").GetComponent<Text>().text);
+            rc.Hud.SkipIntro();
+            int frame = 0;
+            rc.Input.ScriptedMove = () => SimInput.Right;
+            rc.Input.ScriptedJump = () => frame % 45 == 0;
+            for (frame = 1; frame <= 40; frame++) yield return null;
+            // even a latched activation (a stray key, an automation script) reaches nothing
+            foreach (PowerUp t in PowerUps.Implemented) rc.Input.LatchPower(t);
+            for (frame = 41; frame <= 80; frame++) yield return null;
+            Assert.AreEqual(0, rc.Session.State.PwUsed, "no activation reaches the simulation");
+            // a power-up bought in the shop during the run does not bring a button either
+            GameSession.Progress.GrantPowerUp("pw_flight", 2);
+            for (frame = 81; frame <= 100; frame++) yield return null;
+            Assert.AreEqual(0, rc.Hud.Powers.ButtonCount);
+            foreach (RectTransform rt in Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                Assert.IsFalse(rt.name.StartsWith("Power") && rt.GetComponent<Button>() != null, "a power button exists: " + rt.name);
+            yield return CheckScreen("run-no-powerups-hud", () => { }, problems);
+            rc.Session.SettlePowerUps(GameSession.Progress);
+            Assert.AreEqual(5, GameSession.Progress.PowerUpCount("pw_flight"), "no unit was used (3 granted + 2 bought)");
+            Assert.AreEqual(3, GameSession.Progress.PowerUpCount("pw_shield"));
+            Report(problems);
+        }
+
+        [UnityTest]
+        public IEnumerator KeepMovingLevelShowsTheRingAndTheMoveCueForTheLastTwoSeconds() { return KeepMovingAudit(100, false); }
+
+        [UnityTest]
+        public IEnumerator KeepMovingLevelSurvives130PercentTextLeftHandedAndReducedMotion() { return KeepMovingAudit(130, true); }
+
+        IEnumerator KeepMovingAudit(int textPercent, bool leftHanded)
+        {
+            GameSettings.TextPercent = textPercent;
+            GameSettings.LeftHanded = leftHanded;
+            GameSettings.ReducedMotion = leftHanded;
+            GameSession.Progress.AddGems(500);
+            GameSession.Progress.GrantPowerUp("pw_safety_net", 1);
+            GameSession.CurrentLevelId = "lvl_001_16";
+            yield return Load("Run");
+            var rc = Object.FindFirstObjectByType<RunController>();
+            Assert.AreEqual(SpecialLevelType.KeepMoving, rc.Session.SpecialType);
+            var problems = new List<string>();
+            yield return CheckScreen("run-intro-keep-moving", () => { }, problems);
+            Assert.AreEqual("Keep Moving", FindRt("Intro").Find("Special").GetComponent<Text>().text);
+            Assert.AreEqual("Over 3 seconds on one platform ends the run.", FindRt("Intro").Find("Rule").GetComponent<Text>().text);
+            rc.Hud.SkipIntro();
+            // Owner 2026-11-22: the Safety Net stays available here (it rescues real falls) but never rescues the timeout.
+            Assert.AreEqual(1, rc.Hud.Powers.ButtonCount, "the owned Safety Net has its button on a Keep Moving level");
+            yield return null;
+            rc.Input.LatchPower(PowerUp.SafetyNet);
+            for (int f = 0; f < 5; f++) yield return null;
+            Assert.IsTrue(rc.Session.State.SafetyNetArmed, "the net is armed");
+            RectTransform banner = null;
+            foreach (RectTransform rt in Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include, FindObjectsSortMode.None)) if (rt.name == RunHud.KeepMovingBannerName) banner = rt;
+            Assert.IsNotNull(banner, "the cue banner is built once");
+            Assert.IsFalse(banner.gameObject.activeSelf, "hidden until the warning");
+
+            // waiting on the start platform never starts the timer
+            for (int f = 0; f < 240; f++) yield return null;
+            Assert.IsFalse(rc.Session.Over, "no timer before the first jump");
+            Assert.IsFalse(rc.View.KeepMovingRingShown);
+            Assert.IsFalse(banner.gameObject.activeSelf);
+
+            // standing on a platform after the first jump: the ring and the cue appear for the last 2 seconds only
+            int frame = 0;
+            Assert.Greater(StandOnAPlainPlatform(rc.Session), 0);
+            int warnFrames = 0, firstLeft = -1;
+            float firstDiameter = 0f, lastDiameter = 0f;
+            for (frame = 1; frame <= 400 && !rc.Session.Over; frame++)
+            {
+                yield return null;
+                SimState st = rc.Session.State;
+                bool warn = rc.Session.Sim.KeepMovingWarning(in st) && !rc.Session.Over;
+                if (!rc.Session.Over) Assert.AreEqual(warn, rc.View.KeepMovingRingShown, "ring follows the warning at frame " + frame);
+                if (!warn) continue;
+                if (warnFrames == 0) { firstLeft = rc.Session.Sim.KeepMovingTicksLeft(in st); firstDiameter = rc.View.KeepMovingRingDiameter; }
+                warnFrames++;
+                lastDiameter = rc.View.KeepMovingRingDiameter;
+                Assert.IsTrue(banner.gameObject.activeSelf, "the text cue shows with the ring (never the ring alone)");
+                StringAssert.StartsWith("MOVE!", banner.GetComponentInChildren<Text>().text);
+                if (warnFrames == 30)
+                {
+                    rc.enabled = false;   // freeze the run for the layout audit
+                    yield return CheckScreen("run-keep-moving-warning", () => { }, problems);
+                    rc.enabled = true;
+                }
+            }
+            Assert.IsTrue(firstLeft > 100 && firstLeft <= rc.Session.Cfg.KeepMovingWarnTicks, "the warning starts 2 seconds before the end (ticks left " + firstLeft + ")");
+            Assert.Greater(warnFrames, 60);
+            if (GameSettings.ReducedMotion)
+            {
+                Assert.AreEqual(RunView.KeepMovingRingStill, firstDiameter, 0.01f, "reduced motion: a still ring");
+                Assert.AreEqual(RunView.KeepMovingRingStill, lastDiameter, 0.01f);
+            }
+            else
+            {
+                Assert.Greater(firstDiameter, lastDiameter + 0.5f, "the ring closes in on the hero as the time runs out");
+                Assert.LessOrEqual(firstDiameter, RunView.KeepMovingRingMax + 0.01f);
+                Assert.GreaterOrEqual(lastDiameter, RunView.KeepMovingRingMin - 0.01f);
+            }
+            Assert.IsTrue(rc.Session.State.Dead, "more than 3 seconds on one platform ends the run, also with an armed Safety Net");
+            Assert.IsTrue(rc.Session.KeepMovingTimedOut);
+            Assert.AreEqual(0, rc.Session.State.SafetyNetCatches, "the Safety Net does not rescue the timeout");
+            for (int f = 0; f < 60 && !rc.Hud.OverlayOpen; f++) yield return null;
+            RectTransform overlay = FindRt("Overlay");
+            Assert.IsNotNull(overlay);
+            Assert.IsTrue(HasReviveButton(overlay), "Keep Moving allows a revive");
+            Assert.AreEqual(rc.Session.FailReason, FindRt("Reason", overlay).GetComponent<Text>().text);
+            Assert.IsFalse(rc.View.KeepMovingRingShown, "no ring once the run is over");
+            yield return CheckScreen("run-keep-moving-failed", () => rc.Hud.ShowFailed(rc.Session, 500, true), problems);
+            Report(problems);
+        }
     }
 
     /// <summary>CUX-1: the run loop stays inside its frame budget and does not allocate per frame, on the hardest content.</summary>
@@ -2807,6 +3456,42 @@ namespace FluffyClimbers.Tests
             Assert.AreNotEqual(first, rc.Hud.TimerText.text, "the timer ran");
             Assert.LessOrEqual(perFrame, AllocBudget, "managed allocation per frame with the timed HUD (CUX-1)");
             PlayerPrefs.DeleteAll();
+        }
+
+        /// <summary>
+        /// CUX-1 (owner Final Change 1, 2026-11-22): the Keep Moving countdown (ring on the hero, "MOVE!" cue) costs no per-frame allocation while it counts down. The hero stands on a
+        /// plain platform as after a landing; the 100 measured frames lie inside the 2 second warning (the cue text changes once in them, from a cached string).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator KeepMovingCountdownDoesNotAllocate()
+        {
+            GameSession.CurrentLevelId = "lvl_001_16";
+            var op = SceneManager.LoadSceneAsync("Run");
+            while (!op.isDone) yield return null;
+            yield return null;
+            var rc = Object.FindFirstObjectByType<RunController>();
+            Assert.IsTrue(rc.Session.Sim.KeepMoving);
+            rc.Hud.SkipIntro();
+            for (int f = 0; f < 60; f++) yield return null;
+            RunSession s = rc.Session;
+            Platform[] ps = s.Data.Platforms;
+            int on = -1;
+            for (int i = 1; i < ps.Length && on < 0; i++) if (ps[i].Kind == PlatformKind.Normal && ps[i].Row >= 3) on = i;
+            Assert.Greater(on, 0);
+            s.State.X = ps[on].X; s.State.Y = ps[on].Y; s.State.Vx = Fx.Zero; s.State.Vy = Fx.Zero;
+            s.State.Grounded = true; s.State.GroundId = on; s.State.BestGroundId = on; s.State.Row = ps[on].Row;
+            s.State.MaxY = ps[on].Y; s.State.KillY = ps[on].Y - s.Cfg.KillDistance;
+            s.State.StartTick = s.State.Tick; s.State.StandTicks = 0;
+            for (int f = 0; f < 70; f++) yield return null;   // into the warning: the ring and the cue are on screen
+            Assert.IsTrue(rc.View.KeepMovingRingShown, "the countdown ring is drawn");
+            System.GC.Collect();
+            long before = System.GC.GetAllocatedBytesForCurrentThread();
+            const int measured = 100;
+            for (int k = 0; k < measured; k++) yield return null;
+            double perFrame = (System.GC.GetAllocatedBytesForCurrentThread() - before) / (double)measured;
+            Assert.IsFalse(s.Over, "still inside the 3 seconds");
+            Assert.IsTrue(rc.View.KeepMovingRingShown);
+            Assert.LessOrEqual(perFrame, AllocBudget, "managed allocation per frame with the Keep Moving countdown (CUX-1)");
         }
 
         const double AllocBudget = 1024.0;

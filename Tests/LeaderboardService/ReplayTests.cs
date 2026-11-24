@@ -257,6 +257,37 @@ namespace FluffyClimbers.LeaderboardService.Tests
         }
 
         [Fact]
+        public void ARolledHeroPowerReplaysFromTheVariantAndAnotherVariantsPowerIsNotFree()
+        {
+            // owner Final Change 2: the roll of a copy carries its hero power(s); the server derives them from (hero id, variant) alone
+            const string id = "momo_r";
+            CharacterSpec hero = Harness.Hero(id);
+            int v = HeroRolls.Compose(id, 0, HeroRolls.ComboCount(id) - 1);   // the table row's stats with the LAST combination of the Rare list
+            PowerUp p = HeroRolls.PowersFor(id, v)[0];
+            Assert.NotEqual(hero.Powers[0], p);
+            RunSession s = Harness.NewLevelSession("lvl_001_03", 2, 617, id, v);
+            Assert.NotNull(s.Hero);
+            Assert.True(s.HeroFreeAvailable(p));
+            Assert.False(s.HeroFreeAvailable(hero.Powers[0]));
+            int[] trace = Harness.BotTrace(s, s.State);
+            bool used = false;
+            for (int i = 0; i < trace.Length && !s.Over; i++)
+            {
+                int input = trace[i];
+                if (!used && i > 100 && (input & SimInput.Jump) != 0) { input |= PowerUps.HeroInputBit(p); used = true; }
+                s.Step(input);
+            }
+            Assert.True(used);
+            RunSubmission sub = Harness.Upload(s, Kinds.Level, 617, v);
+            ReplayResult r = Harness.Replayer.Replay(sub, Harness.Lim);
+            AssertReplayEquals(s, sub, r);
+            Assert.Equal(0, r.BoughtUnits[(int)p]);   // free hero use of the rolled power
+            RunSubmission wrong = Harness.Upload(s, Kinds.Level, 617, 0);   // the same inputs claimed with the default combination: that power is not the hero's, so it cannot be free
+            ReplayResult rw = Harness.Replayer.Replay(wrong, Harness.Lim);
+            Assert.True(!rw.Ok || rw.BoughtUnits[(int)p] > 0 || RunReplayer.CompareClaim(wrong, rw) != null, "the power of another variant is not a free hero power");
+        }
+
+        [Fact]
         public void TheRolledHeroVariantIsPartOfTheRun()
         {
             string id = Harness.FirstRollableHero();
@@ -278,11 +309,20 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.Equal("unknown_hero", Harness.Replayer.Replay(nobody, Harness.Lim).Error);
 
             // a generated variant (HeroVariants.Rows is empty until the hero generator ran: this part only runs once variants exist)
-            string withVariants = Harness.HeroWithPool(2);
+            // a variant whose Jump, Speed or Control differs from the table row (Wall alone does not change a run on this level); the rolled hero lists differ in the walls first, so search every rollable hero
+            string withVariants = null; int v = -1;
+            foreach (CharacterSpec h in CharacterDefs.All)
+            {
+                if (!HeroRolls.IsRollable(h.Id)) continue;
+                CharacterStats r0 = HeroRolls.StatsFor(h, 0);
+                for (int i = 1; i < HeroRolls.StatPoolSize(h.Id) && v < 0; i++)
+                {
+                    CharacterStats c = HeroRolls.StatsFor(h, i);
+                    if (c.LaunchTenths != r0.LaunchTenths || c.MaxSpeed != r0.MaxSpeed || c.Control != r0.Control) { withVariants = h.Id; v = i; }
+                }
+                if (v >= 0) break;
+            }
             if (withVariants == null) return;
-            CharacterSpec vs = Harness.Hero(withVariants);
-            CharacterStats row0 = HeroRolls.StatsFor(vs, 0);
-            int v = Enumerable.Range(1, HeroRolls.PoolSize(withVariants) - 1).First(i => { CharacterStats c = HeroRolls.StatsFor(vs, i); return c.LaunchTenths != row0.LaunchTenths || c.MaxSpeed != row0.MaxSpeed || c.Control != row0.Control || c.WallBoostHundredths != row0.WallBoostHundredths; });
             RunSession s = Harness.NewLevelSession("lvl_001_02", 2, 808, withVariants, v);
             Harness.Play(s, Harness.BotTrace(s, s.State));
             RunSubmission sub = Harness.Upload(s, Kinds.Level, 808, v);
@@ -345,13 +385,45 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.Contains("Cfg.GemSpotPermille = GameSettings.DifficultyGemPermille[d];", session);
             Assert.Contains("Cfg.ScrollStepCapPercent = SimConfig.TopSpeedUpPercent(d);", session);
             Assert.Contains("DifficultyStepPercent = FluffyClimbers.Simulation.SimConfig.DifficultyStepPercent", settings);
+            // owner Final Change 1 (2026-11-22): the step every 30 s, 8 steps, the tables 10/20/30/40/50 and 80/160/240/320/400; ApplyDifficulty sets nothing else
+            // (the interval and the step count are the SimConfig defaults on both sides)
+            Assert.DoesNotContain("Cfg.ScrollStepSeconds =", session);
+            Assert.DoesNotContain("Cfg.ScrollStepMaxSteps =", session);
+            int[] steps = { 10, 20, 30, 40, 50 }, tops = { 80, 160, 240, 320, 400 };
             for (int m = 0; m < 5; m++)
             {
                 SimConfig a = RunReplayer.ConfigFor(m), b = Harness.ClientCfg(m, null);
                 Assert.Equal(b.ScrollStepPercent, a.ScrollStepPercent);
                 Assert.Equal(b.GemSpotPermille, a.GemSpotPermille);
                 Assert.Equal(b.ScrollStepCapPercent, a.ScrollStepCapPercent);
+                Assert.Equal(b.ScrollStepSeconds, a.ScrollStepSeconds);
+                Assert.Equal(b.ScrollStepMaxSteps, a.ScrollStepMaxSteps);
+                Assert.Equal(steps[m], a.ScrollStepPercent);
+                Assert.Equal(tops[m], a.ScrollStepCapPercent);
+                Assert.Equal(30, a.ScrollStepSeconds);
+                Assert.Equal(8, a.ScrollStepMaxSteps);
             }
+        }
+
+        [Fact]
+        public void TheRulesVersionIsThreeOnTheClientAndTheServerRefusesOlderVersions()
+        {
+            // owner Final Change 1 (2026-11-22): the speed steps and the crown bonus changed, so a client of the old rules must be told to update (HTTP 426)
+            string client = System.IO.File.ReadAllText(System.IO.Path.Combine(Harness.Root, "Assets", "_Game", "Leaderboard", "LeaderboardConfig.cs"));
+            Assert.Contains("public const int SimVersion = " + Harness.ClientSimVersion + ";", client);
+            Assert.Equal(3, Harness.ClientSimVersion);
+            Assert.True(new Limits().SimVersionAllowed(Harness.ClientSimVersion));
+            Assert.False(new Limits().SimVersionAllowed(1));
+            Assert.False(new Limits().SimVersionAllowed(2), "Final Change 2 (hero bands, powers, region penalty) changed the replay: version 2 runs cannot be replayed");
+            string cfg = System.IO.File.ReadAllText(System.IO.Path.Combine(Harness.Root, "Tools", "leaderboard_service", "config.default.json"));
+            Assert.Contains("\"simVersions\": [3]", cfg);
+
+            RunSession s = Harness.NewLevelSession("lvl_001_01", 2, 9);
+            Harness.Play(s, Harness.BotTrace(s, s.State));
+            RunSubmission old = Harness.Upload(s, Kinds.Level, 9);
+            Assert.True(Harness.Replayer.Replay(old, Harness.Lim).Ok);
+            old.SimVersion = 2;
+            Assert.Equal("unsupported_version", Harness.Replayer.Replay(old, Harness.Lim).Error);
         }
     }
 }

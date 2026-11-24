@@ -346,3 +346,21 @@ The level 15 target is Momo's own value of the tier measured with the same fast 
 **Validity.** Every pool entry passed the same measured Forgiveness Index gate as a table row (section 4), over all shipped levels (125). So two players with the same hero see slightly different numbers, never a stronger or weaker hero. Everything counts on the boards: the leaderboard service replays a run with the variant the player holds (the first variant used per hero is stored in `players/{uid}.heroVariants`, `Planning/LEADERBOARD-DESIGN.md` section 5.6).
 
 **Pipeline.** `Tests/Simulation/hero_gen/variants.csv` (columns id,variant,launchTenths,speed,control,wall,fi15,mean75,maxdev,attempt) is written by `HeroVariantGeneratorTests` (`HERO_VAR=1`, engine `HeroVariantEngine.cs`, Momo's per-layout reference cached in `FI_REFERENCE_VAR.csv` with a fingerprint of the levels); `python Tools/hero_table_gen.py` turns it into `Assets/_Game/Economy/HeroVariants.cs` (never hand-edit; `--check` covers both generated files). Checked again by `HeroVariantTests`. Roll storage: `Economy/ProgressService.HeroRolls.cs`.
+
+
+## 12. Region penalty (owner Final Change 2, 2026-11-23)
+
+**Rule.** A non-Common hero played away from its HOME region (the region of its line's Common hero: Momo R1, Capi R2, Otto R3, Bonbon R4, Bao R5; the other 20 lines use their own Common's region) loses part of its stat gain over that Common hero on all four physics numbers. Campaign levels use the level's region; Endless and Time Attack use the region they are started from. Common heroes and the home region are never penalised.
+
+| Tier | Points off the gain | Plays like | Powers away from home |
+|---|---|---|---|
+| Uncommon | -5 | Common | none to lose |
+| Rare | -3 | Uncommon | its single power is off |
+| Elite | -7 | Uncommon | its single power is off |
+| Legendary | -8 | Rare | ONE of its two powers is off |
+
+**Formula** (integer, `Economy/HeroRegionPenalty.cs`): per stat `stat' = stat - round(commonStat * points / 100)`, round half up, never below the Common value of the line (a stat already below Common is left as it is). Launch is in tenths. Speed and Control are whole numbers, so a small cut on a small stat can round to 0 (Speed 9 loses 0 at 5 points); that is the accepted rounding. Because the cut is in points of the Common stat, a Rare at +6..+10 percent plays at +3..+7 (the Uncommon band), an Elite at +10..+14 plays at +3..+7, a Legendary at +14..+18 plays at +6..+10 (the Rare band): the penalised FI sits in the lower tier's band by construction (`HeroRegionPenaltyTests.APenalisedHeroLandsInTheBandOfTheLowerTierByConstruction`); it is not re-measured.
+
+**Legendary power.** The disabled power is drawn ONCE per run from the run seed and the hero id (`HeroRegionPenalty.DisabledPowerIndex`: FNV-1a of the id mixed with the seed, a splitmix32 finaliser, no global RNG): the layout attempt seed for levels, the tower seed for Endless and Time Attack. The run screen intro names it ("Slow Time is off"). The hero's one free use per run is unchanged.
+
+**Where it runs.** Client: `GameSession.BuildRunCfg(playRegion)` (stats) and `RunSession.ApplyHeroPowers` (powers). Server: `RunReplayer.Replay` (`ApplyHeroIn`) calls the same pure functions with the submission's region and seed, so a replay equals the live run (`RegionPenaltyReplayTests`). Level and Endless popups show a penalty icon (`PenaltyUi`, painted sprite `Resources/Art/Ui/icon_penalty` when it exists, code-drawn warning triangle otherwise) next to PLAY / START with the short message, tap for the full text.

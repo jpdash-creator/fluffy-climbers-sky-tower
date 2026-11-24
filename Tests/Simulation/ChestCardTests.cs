@@ -33,7 +33,7 @@ namespace FluffyClimbers.Simulation.Tests
             Hero("l1", CharacterRarity.Legendary, 0, "base1"), Hero("l2", CharacterRarity.Legendary, 0, "base2"), Hero("l3", CharacterRarity.Legendary, 0, "base3"),
         };
 
-        const double AvgPowerUpGems = 525.0 / 9.0;   // 3 x 75 + 6 x 50 over the nine implemented types (Bug List 4: Magnet replaced by Safety Net, Glide Cape, Wide Platforms)
+        const double AvgPowerUpGems = 1300.0 / 9.0;   // 3 x 100 + 4 x 150 + 2 x 200 over the nine implemented types = 144.44 (owner Final Change 1, 2026-11-22; was 525 / 9)
 
         [Fact]
         public void TheOddsAreTheOwnersNumbers()
@@ -150,15 +150,15 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void TheCardGemTableIsTheHeroCoinPriceOver20AndExpectedValuesFollow()
         {
-            Assert.Equal(new[] { 100, 250, 600, 1600, 4000 }, HeroPurchase.Tiers.Select(r => ChestRolls.CardGems(r)).ToArray());   // 2,000 / 5,000 / 12,000 / 32,000 / 80,000 coins over 20
+            Assert.Equal(new[] { 400, 1200, 3600, 10000, 25000 }, HeroPurchase.Tiers.Select(r => ChestRolls.CardGems(r)).ToArray());   // 8,000 / 24,000 / 72,000 / 200,000 / 500,000 coins over 20 (owner Final Change 1, 2026-11-22)
             foreach (CharacterRarity r in HeroPurchase.Tiers) Assert.Equal(HeroPurchase.CoinPrice(r) / ChestRolls.CoinsPerGem, ChestRolls.CardGems(r));
-            Assert.Equal(BundleCards.TierGems[0], ChestRolls.CardGems(CharacterRarity.Uncommon));
-            Assert.Equal(BundleCards.TierGems[1], ChestRolls.CardGems(CharacterRarity.Rare));
-            Assert.Equal(BundleCards.TierGems[2], ChestRolls.CardGems(CharacterRarity.Epic));
+            for (int i = 0; i < BundleCards.Tiers.Length; i++) Assert.Equal(BundleCards.TierGems[i], ChestRolls.CardGems(BundleCards.Tiers[i]));   // chests and bundles value a card identically (Common, Uncommon, Rare)
+            Assert.Equal(400, ChestRolls.CommonCardGems);
             Assert.Equal(ChestRolls.CommonCardGems, ChestRolls.CardGems(CharacterRarity.Common));
+            Assert.Equal(HeroPurchase.CoinPrice(CharacterRarity.Common) / ChestRolls.CoinsPerGem, ChestRolls.CommonCardGems);
             Assert.True(ChestRolls.CardGems(CharacterRarity.Common) < ChestRolls.CardGems(CharacterRarity.Uncommon));
-            Assert.Equal(245.0, ChestRolls.ExpectedCardGems(ChestKind.Iron), 6);    // 0.5 x 100 + 0.3 x 250 + 0.2 x 600
-            Assert.Equal(1240.0, ChestRolls.ExpectedCardGems(ChestKind.Golden), 6); // 0.6 x 600 + 0.3 x 1,600 + 0.1 x 4,000
+            Assert.Equal(1280.0, ChestRolls.ExpectedCardGems(ChestKind.Iron), 6);   // 0.5 x 400 + 0.3 x 1,200 + 0.2 x 3,600
+            Assert.Equal(7660.0, ChestRolls.ExpectedCardGems(ChestKind.Golden), 6); // 0.6 x 3,600 + 0.3 x 10,000 + 0.1 x 25,000
         }
 
         [Theory]
@@ -169,7 +169,7 @@ namespace FluffyClimbers.Simulation.Tests
             double w = ChestRolls.WorthMultiplier(kind, AvgPowerUpGems);
             Assert.InRange(w, ChestRolls.WorthMin, ChestRolls.WorthMax);
             double price = ChestRolls.Price(kind, 1), cards = ChestRolls.ExpectedCardGems(kind), n = ChestRolls.PowerUpCount(kind);
-            double low = (ChestRolls.MinCoins(kind) / 20.0 + n * 50.0 + cards) / price, high = (ChestRolls.MaxCoins(kind) / 20.0 + n * 75.0 + cards) / price;
+            double low = (ChestRolls.MinCoins(kind) / 20.0 + n * 100.0 + cards) / price, high = (ChestRolls.MaxCoins(kind) / 20.0 + n * 200.0 + cards) / price;   // cheapest and dearest power-ups: 100 and 200 gems
             Assert.InRange(low, ChestRolls.WorthMin, ChestRolls.WorthMax);
             Assert.InRange(high, ChestRolls.WorthMin, ChestRolls.WorthMax);
             Assert.Equal(10 * ChestRolls.Price(kind, 1), ChestRolls.Price(kind, 10));
@@ -177,22 +177,25 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void WorthTagsAre3Point5And5Point3()
+        public void WorthTagsAre3Point7And5Point5()
         {
-            Assert.Equal("Worth x3.5", ChestRolls.WorthText(ChestKind.Iron, AvgPowerUpGems));   // (50 + 58.3 + 245) / 100 = 3.533
-            Assert.Equal("Worth x5.3", ChestRolls.WorthText(ChestKind.Golden, AvgPowerUpGems)); // (180 + 175 + 1,240) / 300 = 5.32
-            Assert.InRange(ChestRolls.WorthMultiplier(ChestKind.Iron, AvgPowerUpGems), 3.46, 3.58);
-            Assert.InRange(ChestRolls.WorthMultiplier(ChestKind.Golden, AvgPowerUpGems), 5.30, 5.38);
+            Assert.Equal("Worth x3.7", ChestRolls.WorthText(ChestKind.Iron, AvgPowerUpGems));   // (50 + 144.44 + 1,280) / 400 = 3.686
+            Assert.Equal("Worth x5.5", ChestRolls.WorthText(ChestKind.Golden, AvgPowerUpGems)); // (180 + 433.33 + 7,660) / 1,500 = 5.516
+            Assert.InRange(ChestRolls.WorthMultiplier(ChestKind.Iron, AvgPowerUpGems), 3.68, 3.69);
+            Assert.InRange(ChestRolls.WorthMultiplier(ChestKind.Golden, AvgPowerUpGems), 5.51, 5.52);
         }
 
         [Fact]
-        public void PricesAreUnchanged()
+        public void PricesAre400And1500GemsAndOpenTenIsTenTimes()
         {
-            Assert.Equal(100, ChestRolls.Price(ChestKind.Iron, 1));
-            Assert.Equal(1000, ChestRolls.Price(ChestKind.Iron, 10));
-            Assert.Equal(300, ChestRolls.Price(ChestKind.Golden, 1));
-            Assert.Equal(3000, ChestRolls.Price(ChestKind.Golden, 10));
+            // owner Final Change 1 (2026-11-22): Iron 100 -> 400, Gold 300 -> 1,500; contents and odds unchanged
+            Assert.Equal(400, ChestRolls.Price(ChestKind.Iron, 1));
+            Assert.Equal(4000, ChestRolls.Price(ChestKind.Iron, 10));
+            Assert.Equal(1500, ChestRolls.Price(ChestKind.Golden, 1));
+            Assert.Equal(15000, ChestRolls.Price(ChestKind.Golden, 10));
             Assert.Equal(0, ChestRolls.Price(ChestKind.Iron, 5));
+            Assert.Equal(new[] { 1, 3 }, new[] { ChestRolls.IronPowerUps, ChestRolls.GoldenPowerUps });
+            Assert.Equal(new[] { 800, 1200, 3000, 4200 }, new[] { ChestRolls.IronMinCoins, ChestRolls.IronMaxCoins, ChestRolls.GoldenMinCoins, ChestRolls.GoldenMaxCoins });
         }
     }
 }

@@ -24,11 +24,11 @@ namespace FluffyClimbers.Economy
         public static readonly CharacterRarity[] Tiers = { CharacterRarity.Common, CharacterRarity.Uncommon, CharacterRarity.Rare, CharacterRarity.Epic, CharacterRarity.Legendary };
 
         /// <summary>
-        /// THE ONE TABLE: coin price of one hero card per tier, same order as <see cref="Tiers"/>: Common 2,000, Uncommon 5,000, Rare 12,000, Epic (Elite) 32,000, Legendary 80,000
-        /// (owner 2026-11-13; before: 3,000 / 6,000 / 14,000 / 30,000, Common not sold). Gem value of a card = price / 20 (chest and bundle worth numbers).
+        /// THE ONE TABLE: coin price of one hero card per tier, same order as <see cref="Tiers"/>: Common 8,000, Uncommon 24,000, Rare 72,000, Epic (Elite) 200,000, Legendary 500,000
+        /// (owner Final Change 1, 2026-11-22; before: 2,000 / 5,000 / 12,000 / 32,000 / 80,000). Gem value of a card = price / 20 = 400 / 1,200 / 3,600 / 10,000 / 25,000 (chest and bundle worth numbers).
         /// The owner may change the numbers here only.
         /// </summary>
-        public static readonly int[] Prices = { 2000, 5000, 12000, 32000, 80000 };
+        public static readonly int[] Prices = { 8000, 24000, 72000, 200000, 500000 };
 
         /// <summary>Coin price of a hero card of this rarity, 0 when the rarity is not sold.</summary>
         public static int CoinPrice(CharacterRarity rarity)
@@ -87,8 +87,8 @@ namespace FluffyClimbers.Economy
                 }
                 return lines;
             }
-            lines.Add(r.PowerCount + (r.PowerCount == 1 ? " hero power" : " hero powers") + ", each free once per run");
-            lines.Add(TierRules.JumpBandText(rarity) + " over the default hero, Speed, Control and Wall Bounce set by limits");
+            lines.Add(r.PowerCount == 0 ? "No hero power" : (r.PowerCount == 1 ? "1 hero power, rolled per card, free once per run" : r.PowerCount + " hero powers, rolled per card, free once per run (shared)"));
+            lines.Add(TierRules.JumpBandText(rarity) + " over the Common hero of the line (Jump, Speed, Control, Wall Bounce)");
             int slot = (int)rarity;   // owner 2026-11-13: milestone bonus on the first clear of levels 5/10/15/20/25 (CoinPayoutRules tables)
             lines.Add("Milestone bonus +" + FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusCoins(slot) + " coins +" + FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusGemsByRarity[System.Math.Min(slot, FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusGemsByRarity.Length - 1)] + " gems");
             return lines;

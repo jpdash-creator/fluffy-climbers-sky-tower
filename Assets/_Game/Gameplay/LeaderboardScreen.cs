@@ -11,8 +11,8 @@ namespace FluffyClimbers.Gameplay
     /// <summary>
     /// The weekly crown leaderboard screen (Planning/LEADERBOARD-DESIGN.md, owner decisions 2026-11-12; redone 2026-11-13 with the painted kit <c>lb_*</c>, Bug List 1).
     /// Over the full-screen picture <c>leaderboard_bg</c>: a top row (Back, the week timer pill, the round Prizes button), then the painted frame with the ribbon title, three tabs (Overall, Regions, Endless),
-    /// the top 100 as pooled painted row plates (rank 1 gold, 2 silver, 3 bronze, the own row from 4 light green, everyone else grey; medal or badge with the rank number, round avatar, name, big crown and crowns) and, when the player
-    /// is not among the 100, a pinned own card ("#348") at the bottom of the list. Bug List 7 (2026-11-17): the list always opens at the top and 9 rows are visible at once; the own row is gold/silver/bronze for ranks 1 to 3, light green in place for ranks 4 to 8 and PINNED (light green, bottom of the viewport) from rank 9 on while its real row is off screen (see <see cref="LeaderboardPin"/>).
+    /// the top 100 as pooled painted row plates (plain by default: the own row light green, everyone else grey, with a plain rank number; gold, silver and bronze plates with medals ONLY for the top 3 players who reached the board's entry limit, see <see cref="LeaderboardPlates"/>, owner Final Change 2; round avatar, name, big crown and crowns) and, when the player
+    /// is not among the 100, a pinned own card ("#348") at the bottom of the list. Bug List 7 (2026-11-17): the list always opens at the top and 9 rows are visible at once; the own row is gold/silver/bronze only when it is one of the top 3 AND at the limit, light green in place otherwise (ranks 1 to 8) and PINNED (light green, bottom of the viewport) from rank 9 on while its real row is off screen (see <see cref="LeaderboardPin"/>).
     /// A guest or signed-out player sees a sign-in card, a player without consent the consent card, a switched-off feature a "coming soon" card (inside the frame).
     /// Layout is measured (HeroSheetScreen pattern): a fitter rebuilds it when the screen shape changes. Only about a screenful of row objects exists; scrolling re-binds them (cached strings, no allocation);
     /// the only per-frame work is one compare of the remaining whole seconds for the timer. No sprite is scaled non-uniformly: the stadium plates slice only their rounded caps (scaled with the row height), the frame
@@ -410,6 +410,20 @@ namespace FluffyClimbers.Gameplay
 
         string MyPid { get { return LeaderboardHub.MyWeek != null ? (LeaderboardHub.MyWeek.Pid ?? "") : ""; } }
 
+        /// <summary>
+        /// The entry limit of the shown board: the player's standing carries the CURRENT limit (GET /my-week); the board document keeps the limit it was built with. 0 = not known yet, then no row is coloured
+        /// (a row is plain until the limit is known and reached).
+        /// </summary>
+        long BoardLimit
+        {
+            get
+            {
+                BoardRank r = MyRank;
+                if (r != null && r.EntryLimit > 0) return r.EntryLimit;
+                return data != null ? data.Limit : 0L;
+            }
+        }
+
         BoardRank MyRank { get { return LeaderboardHub.MyWeek != null ? LeaderboardHub.MyWeek.RankOf(LbBoards.All[board]) : null; } }
 
         /// <summary>Finds the own row in the loaded board and decides whether the pinned card is needed (the player is not among the loaded rows but has a rank or crowns).</summary>
@@ -644,7 +658,7 @@ namespace FluffyClimbers.Gameplay
                 r.Rt.offsetMin = new Vector2(PadSide, y - RowH);
                 r.Rt.offsetMax = new Vector2(-PadSide, y);
                 bool isMe = idx == ownIdx;
-                Bind(r, e.Rank, rankText[idx], nameText[idx], crownText[idx], e.Avatar, initialText[idx], isMe);
+                Bind(r, LeaderboardPin.MedalPlace(e.Rank, e.Crowns, BoardLimit), rankText[idx], nameText[idx], crownText[idx], e.Avatar, initialText[idx], isMe);
                 if (isMe) r.Rt.SetAsLastSibling();   // the glow outline is drawn over the neighbouring rows
             }
         }
@@ -803,9 +817,9 @@ namespace FluffyClimbers.Gameplay
             rt.sizeDelta = size;
         }
 
-        void Bind(Row r, int rank, string rankStr, string name, string crowns, string avatarUrl, string initial, bool me)
+        void Bind(Row r, int medalPlace, string rankStr, string name, string crowns, string avatarUrl, string initial, bool me)
         {
-            int plate = LeaderboardPin.PlateIndex(rank, me, r.Pinned);
+            int plate = LeaderboardPin.PlateIndex(medalPlace, me, r.Pinned);
             if (r.PlateIdx != plate)
             {
                 r.PlateIdx = plate;
@@ -988,8 +1002,8 @@ namespace FluffyClimbers.Gameplay
             BoardRank rank = MyRankFor(id);
             long limit = rank != null ? rank.EntryLimit : 0;
             string note = limit > 0
-                ? "Top 10 are paid at the end of the week. Reach " + limit.ToString("N0", CultureInfo.InvariantCulture) + " crowns to qualify; ranks 1 to 3 need " + (limit * 3 / 2).ToString("N0", CultureInfo.InvariantCulture) + "."
-                : "Top 10 are paid at the end of the week once you reach the entry limit of the board.";
+                ? "Top 10 are paid at the end of the week. Reach " + limit.ToString("N0", CultureInfo.InvariantCulture) + " crowns to qualify; ranks 1 to 3 need " + (limit * 3 / 2).ToString("N0", CultureInfo.InvariantCulture) + ". Only the top 3 players at the limit get the gold, silver and bronze plates."
+                : "Top 10 are paid at the end of the week once you reach the entry limit of the board. Rows stay plain until a player reaches it.";
             float y = 0f;
             float slack = RewardsScreen.LineH(44);
             Text nt = UiKit.AddText(pc, "PrizeNote", note, 44, Ink, TextAnchor.UpperCenter);

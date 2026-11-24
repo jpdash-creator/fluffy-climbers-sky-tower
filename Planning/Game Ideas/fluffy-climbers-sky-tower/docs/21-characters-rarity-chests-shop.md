@@ -14,8 +14,8 @@ Extends docs/20.
 - **Characters are Coming Soon in the shop and in chests** (switched off in code, doc 22).
 
 ## Chests (gems only; open 1 or 10) - current numbers
-- **Iron Chest**: 100 gems (open 10: 1,000). Contains 1 power-up and 400 to 600 coins.
-- **Gold Chest**: 300 gems (open 10: 3,000). Contains 3 power-ups and 1,000 to 1,400 coins.
+- **Iron Chest**: 400 gems since 2026-11-22 (open 10: 4,000); 1 power-up, 800 to 1,200 coins and 1 hero card. (At the time of this doc: 100 gems, 1 power-up and 400 to 600 coins.)
+- **Gold Chest**: 1,500 gems since 2026-11-22 (open 10: 15,000); 3 power-ups, 3,000 to 4,200 coins and 1 hero card. (At the time of this doc: 300 gems, 3 power-ups and 1,000 to 1,400 coins.)
 - Each power-up is one of the 7 types with equal chance. No characters until they launch. No chests are earned from play (doc 22). Average value and return: doc 27 section 10.
 - (The first version of this file listed 3 power-ups and 800 to 1,000 coins for Iron, 6 power-ups and 2,500 to 3,000 coins for Golden; replaced by doc 22.)
 

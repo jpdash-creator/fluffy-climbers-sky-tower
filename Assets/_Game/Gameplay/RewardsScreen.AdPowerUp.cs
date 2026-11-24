@@ -9,11 +9,15 @@ namespace FluffyClimbers.Gameplay
     /// "Daily free power-up" (owner 2026-11-17; docs/33): one card at the top of the Daily tab, under the scene header. Once per local day (the same day as the Daily rewards) the player can
     /// watch a rewarded ad (placement <see cref="AdPlacements.DailyPowerUp"/>) and gets ONE unit of a seeded-random implemented power-up (ProgressService.ClaimDailyAdPowerUp, saved at once).
     /// The button shows the Ads icon (accessibility label "Watch an ad"); it is dimmed while no ad is loaded (a tap says so) and reads "Claimed" once today's unit was taken (nothing to tap until tomorrow).
+    /// The card is sized to its text (CUX-3): the title and the hint are measured at the real width of the text column and the card grows with them, so at 130 percent text on a
+    /// narrow notched screen (where the hint needs three lines) nothing spills under the card into the row below (the first group heading).
     /// </summary>
     public sealed partial class RewardsScreen
     {
         public const string AdPowerUpCardName = "DailyAdPowerUpCard";
         public const string AdPowerUpButtonName = "DailyAdPowerUpButton";
+        /// <summary>The hint lines the card can show: the two states and the two messages a tap can put there. The card has room for the longest of them.</summary>
+        const string AdHintOpen = "Watch an ad for 1 random power-up.", AdHintClaimed = "Claimed today. A new one tomorrow.", AdHintNoReward = "No reward. Watch the whole ad to get it.";
 
         Text adPowerUpBody;
         bool adPowerUpBusy;
@@ -26,10 +30,8 @@ namespace FluffyClimbers.Gameplay
             float line = LineH(BodyPx);
             float btnW = 300f;
             float btnH = Mathf.Max(ClaimButtonH, UiKit.MinTouchRef);
-            float textH = CardPadY * 2f + line * 2f + 6f + line * 2f + 6f + 40f;   // title (up to two lines) and the hint (up to two lines) at 130 percent text, plus slack (tall glyph rows measured 18 px over)
-            float h = Mathf.Max(textH, btnH + CardPadY * 2f + 8f);
+            float textW = ButtonCardTextWidth(btnW);
             RectTransform card = UiKit.Rect(content, AdPowerUpCardName);
-            FixedHeight(card, h);
             Image plate = Plate(card, "Plate", "plate_cream", StateTint(claimed ? CardState.Done : CardState.Ready), CardCorner);
             UiKit.Stretch(plate.rectTransform);
 
@@ -38,15 +40,22 @@ namespace FluffyClimbers.Gameplay
             BestFit(title, false);
             var trt = title.rectTransform;
             trt.anchorMin = new Vector2(0f, 1f); trt.anchorMax = new Vector2(1f, 1f); trt.pivot = new Vector2(0.5f, 1f);
-            trt.offsetMin = new Vector2(CardPadX, -(CardPadY + line * 2f)); trt.offsetMax = new Vector2(-(btnW + CardPadX * 2f), -CardPadY);
 
-            string hint = claimed ? "Claimed today. A new one tomorrow." : "Watch an ad for 1 random power-up.";
+            string hint = claimed ? AdHintClaimed : AdHintOpen;
             adPowerUpBody = UiKit.AddText(card, "Hint", hint, BodyPx, UiKit.PanelInk, TextAnchor.UpperLeft);
             UiKit.OnPanel(adPowerUpBody);
             BestFit(adPowerUpBody, true);
             var brt = adPowerUpBody.rectTransform;
             brt.anchorMin = new Vector2(0f, 1f); brt.anchorMax = new Vector2(1f, 1f); brt.pivot = new Vector2(0.5f, 1f);
-            brt.offsetMin = new Vector2(CardPadX, -(CardPadY + line * 2f + 6f + line * 2f)); brt.offsetMax = new Vector2(-(btnW + CardPadX * 2f), -(CardPadY + line * 2f + 6f));
+            // The card is sized by RewardCardFit at its REAL width (the list has no width yet while it is built): the hint box holds the wrapped hint at its full size (two lines at least)
+            // and the messages a tap can swap in; the card = padding + title + gap + hint + the slack of before (tall glyph rows measured 18 px over), or the button when that is more.
+            var fit = card.gameObject.AddComponent<RewardCardFit>();
+            fit.Mode = RewardCardFit.Kind.ButtonCard; fit.Card = card; fit.Title = title; fit.Body = adPowerUpBody; fit.BtnW = btnW; fit.BodyMinLines = 2f; fit.TailExtra = 46f;
+            fit.MinH = btnH + CardPadY * 2f + 8f;
+            if (!claimed) fit.Alts = new[] { RunHud.AdNotReadyText, AdHintNoReward };
+            FixedHeight(card, 0f);
+            fit.Row = card.GetComponent<LayoutElement>();
+            FitButtonCard(fit, ListCardWidth());
 
             string label = claimed ? "Claimed" : "";   // the Ads icon replaces the "Watch Ad" text (owner 2026-11-17)
             string a11y = claimed ? "Free power-up, claimed today" : (adReady ? "Watch an ad for a free power-up" : "Watch an ad for a free power-up, not ready yet");
@@ -103,7 +112,7 @@ namespace FluffyClimbers.Gameplay
                 if (root == null) return;   // left the screen while the ad was up
                 if (!granted)
                 {
-                    if (adPowerUpBody != null) adPowerUpBody.text = "No reward. Watch the whole ad to get it.";
+                    if (adPowerUpBody != null) adPowerUpBody.text = AdHintNoReward;
                     return;
                 }
                 string pid = progress.ClaimDailyAdPowerUp();

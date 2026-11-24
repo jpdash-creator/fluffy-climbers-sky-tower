@@ -75,14 +75,29 @@ namespace FluffyClimbers.Tests
         [Test, Category("CriticalUX")]
         public void OnlyTheOwnRowIsLightGreenFromRankFour()
         {
+            // the argument is the MEDAL PLACE (1 to 3 for the top three players at the entry limit, 0 = plain; owner Final Change 2)
             Assert.AreEqual(0, LeaderboardPin.PlateIndex(1, false, false));
             Assert.AreEqual(1, LeaderboardPin.PlateIndex(2, true, false));
             Assert.AreEqual(2, LeaderboardPin.PlateIndex(3, false, false));
-            Assert.AreEqual(3, LeaderboardPin.PlateIndex(4, true, false), "own rank 4 to 8: light green in place");
-            Assert.AreEqual(3, LeaderboardPin.PlateIndex(8, true, false));
-            Assert.AreEqual(4, LeaderboardPin.PlateIndex(5, false, false), "others: light blue/grey");
-            Assert.AreEqual(4, LeaderboardPin.PlateIndex(123, false, false));
+            Assert.AreEqual(3, LeaderboardPin.PlateIndex(0, true, false), "own row without a medal: light green in place");
+            Assert.AreEqual(4, LeaderboardPin.PlateIndex(0, false, false), "others without a medal: light blue/grey");
             Assert.AreEqual(3, LeaderboardPin.PlateIndex(0, true, true), "the pinned card is light green");
+            Assert.AreEqual(3, LeaderboardPin.PlateIndex(2, true, true), "the pinned card never takes a medal plate");
+        }
+
+        [Test, Category("CriticalUX")]
+        public void MedalsGoOnlyToTheTopThreeWhoReachedTheEntryLimit()
+        {
+            const long limit = 100000;
+            Assert.AreEqual(0, LeaderboardPin.MedalPlace(1, 99999, limit), "rank 1 below the limit stays plain");
+            Assert.AreEqual(1, LeaderboardPin.MedalPlace(1, 100000, limit), "exactly at the limit counts");
+            Assert.AreEqual(3, LeaderboardPin.MedalPlace(3, 150000, limit));
+            Assert.AreEqual(0, LeaderboardPin.MedalPlace(4, 900000, limit), "rank 4 never gets a medal");
+            Assert.AreEqual(0, LeaderboardPin.MedalPlace(1, 900000, 0), "an unknown limit colours nothing");
+            Assert.AreEqual(0, LeaderboardPin.MedalPlace(0, 900000, limit), "unknown rank, no medal");
+            Assert.AreEqual(0, LeaderboardPin.PlateIndex(LeaderboardPin.MedalPlace(1, 120000, limit), false, false), "gold");
+            Assert.AreEqual(4, LeaderboardPin.PlateIndex(LeaderboardPin.MedalPlace(3, 90000, limit), false, false), "rank 3 below the limit: grey");
+            Assert.AreEqual(3, LeaderboardPin.PlateIndex(LeaderboardPin.MedalPlace(3, 90000, limit), true, false), "own rank 3 below the limit: plain own green");
         }
 
         [Test]

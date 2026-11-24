@@ -169,6 +169,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(1000L, low.Total);
             Assert.AreEqual(low.Total, low.LineSum());
             Assert.Less(low.Difference, 0L);
+            Assert.AreEqual("Not counted on the board", low.Groups[low.Groups.Count - 1].Lines[0].Label, "unverified local runs get an honest label, not \"Other\"");
         }
 
         [Test]
@@ -198,6 +199,57 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(5L, r.Difference, "the unreadable slot is the difference");
             Assert.AreEqual("lvl_999_01", r.Groups[0].Lines[0].Label);
             Assert.AreEqual("Setting 7", r.Groups[1].Lines[0].Setting);
+        }
+
+        // ---------------- Endless and Time Attack: the three best runs of the week (owner 2026-11-22) ----------------
+
+        [Test]
+        public void MyWeekCarriesTheCountedRunsOfAnEndlessSlotAndALevelSlotHasNone()
+        {
+            const string json = "{\"weekKey\":\"2026-11-09\",\"totals\":{\"overall\":7100,\"levels\":600,\"endless\":6500},"
+                + "\"slots\":[{\"slotId\":\"c.lvl_001_06.1\",\"crown\":600,\"floors\":80,\"mode\":1,\"runs\":null},"
+                + "{\"slotId\":\"e.region_001_meadow_springs.4\",\"crown\":6500,\"floors\":300,\"mode\":4,\"runs\":[{\"crown\":3000,\"floors\":300,\"score\":480,\"at\":7},{\"crown\":2000,\"floors\":200},{\"crown\":1500,\"floors\":150},{\"crown\":9,\"floors\":1}]},"
+                + "{\"slotId\":\"t.region_001_meadow_springs.4\",\"crown\":250,\"floors\":30,\"mode\":4}]}";   // an answer of a service from before the rule: no run list
+            MyWeekData d = LbJson.ParseMyWeek(json);
+            Assert.AreEqual(3, d.Slots.Count);
+            Assert.IsNull(d.Slots[0].Runs, "a level slot is its single best run");
+            Assert.AreEqual(3, d.Slots[1].Runs.Count, "at most three runs are read");
+            Assert.AreEqual(3000L, d.Slots[1].Runs[0].Crown);
+            Assert.AreEqual(300, d.Slots[1].Runs[0].Floors);
+            Assert.AreEqual(480, d.Slots[1].Runs[0].Score);
+            Assert.AreEqual(7L, d.Slots[1].Runs[0].At);
+            Assert.AreEqual(6500L, d.Slots[1].Crown, "the slot's crown is the sum the service sent");
+            Assert.IsNull(d.Slots[2].Runs);
+
+            BreakdownResult en = LeaderboardBreakdown.Build(d.Slots, LbBoards.Endless, repo, d.Totals[2] + 250);
+            Assert.AreEqual(6750L, en.Total);
+            Assert.AreEqual(en.Total, en.LineSum(), "the lines add up exactly to the tab total");
+            Assert.AreEqual(0L, en.Difference);
+            BreakdownLine endless = en.Groups[0].Lines[0], attack = en.Groups[1].Lines[0];
+            Assert.AreEqual(6500L, endless.Crown, "ONE line per region and setting: the sum");
+            CollectionAssert.AreEqual(new long[] { 3000, 2000, 1500 }, endless.Runs);
+            Assert.AreEqual("3,000 + 2,000 + 1,500", LeaderboardScreen.RunsText(endless), "the runs as the popup writes them under the line");
+            Assert.AreEqual("Endless - " + meadow + "  Insane  6,500", LeaderboardScreen.LineText(endless));
+            Assert.IsNull(attack.Runs, "no run list: the line is only its number");
+            Assert.AreEqual("", LeaderboardScreen.RunsText(attack));
+        }
+
+        [Test]
+        public void RunsThatDoNotAddUpToTheSlotAreNotListedAndASingleRunNeedsNoDetail()
+        {
+            var wrong = new LbSlot { SlotId = "e.region_001_meadow_springs.2", Crown = 900, Mode = 2, Runs = new List<LbSlotRun> { new LbSlotRun { Crown = 500 }, new LbSlotRun { Crown = 300 } } };
+            var single = new LbSlot { SlotId = "t.region_001_meadow_springs.2", Crown = 700, Mode = 2, Runs = new List<LbSlotRun> { new LbSlotRun { Crown = 700 } } };
+            var level = new LbSlot { SlotId = "c.lvl_001_06.1", Crown = 400, Mode = 1, Runs = new List<LbSlotRun> { new LbSlotRun { Crown = 400 } } };
+            var unsorted = new LbSlot { SlotId = "e.region_002_mushroom_grove.2", Crown = 600, Mode = 2, Runs = new List<LbSlotRun> { new LbSlotRun { Crown = 100 }, new LbSlotRun { Crown = 300 }, new LbSlotRun { Crown = 200 } } };
+            BreakdownResult r = LeaderboardBreakdown.Build(new List<LbSlot> { wrong, single, level, unsorted }, LbBoards.Overall, repo);
+            Assert.AreEqual(2600L, r.Total);
+            Assert.AreEqual(r.Total, r.LineSum());
+            BreakdownGroup endless = r.Groups.Find(g => g.Header == "Endless"), attack = r.Groups.Find(g => g.Header == "Time Attack"), levels = r.Groups.Find(g => g.Section == BreakdownGroup.SectionLevels);
+            Assert.IsNull(endless.Lines[0].Runs, "a list that does not explain the number is not shown");
+            CollectionAssert.AreEqual(new long[] { 300, 200, 100 }, endless.Lines[1].Runs, "best first");
+            CollectionAssert.AreEqual(new long[] { 700 }, attack.Lines[0].Runs);
+            Assert.AreEqual("", LeaderboardScreen.RunsText(attack.Lines[0]), "one run: the line itself is the run");
+            Assert.IsNull(levels.Lines[0].Runs, "a level line never lists runs");
         }
 
         // ---------------- request and hub ----------------

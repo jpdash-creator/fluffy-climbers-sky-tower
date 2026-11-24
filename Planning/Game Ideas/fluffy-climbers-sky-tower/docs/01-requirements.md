@@ -8,7 +8,7 @@ Priority: **P0** = launch blocker, **P1** = needed for soft launch, **P2** = pos
 - FR-G1 Three always-visible on-screen buttons: Left and Right (bottom-left), Jump (bottom-right); the left-handed option swaps the sides. Jump height scales with horizontal speed. *(Update 2026-10-19: replaces the original touch zones, which the owner could not understand on device.)*
 - FR-G2 Wall bounce that preserves momentum; ceiling-free vertical tower.
 - FR-G3 Combo system: a jump that passes 2 or more floors starts or extends a combo; the combo ends on a landing without enough height (no timer). Floor = platform row index.
-- FR-G4 Auto-scroll: after the first jump the screen scrolls up (platforms and background slide down) and the speed steps up every 5 s; falling below the bottom edge of the screen = fail. No hazard comes from below (doc 08, scroll model). *(Update 2026-10-20: replaces the earlier rising-danger wording.)*
+- FR-G4 Auto-scroll: after the first jump the screen scrolls up (platforms and background slide down) and the speed steps up every 30 s by the Gameplay setting (10 / 20 / 30 / 40 / 50 percent of the start speed, 8 steps; owner 2026-11-22, was every 5 s); falling below the bottom edge of the screen = fail. No hazard comes from below (doc 08, scroll model). *(Update 2026-10-20: replaces the earlier rising-danger wording.)*
 - FR-G5 Platforms: normal, narrow, moving, crumbling, bouncy, icy/slippery, one-way; per-region special platforms.
 - FR-G6 Pickups: stars (3 per level), gems (rarity tiers), power-up orbs. Coins are no longer collected in a level; they are paid at the end (economy v2, doc 08). *(Update 2026-10-20.)*
 - FR-G7 Hazards: per-region (wind, falling rocks, lava, lasers, ghosts, etc.).
@@ -33,7 +33,7 @@ Priority: **P0** = launch blocker, **P1** = needed for soft launch, **P2** = pos
 - FR-C7 *Removed 2026-11-01 (sets belonged to gear).*
 
 ### 1.4 Power-ups (P0/P1)
-- FR-U1 Consumable power-ups are bought with coins or gems (1,000 coins / 50 gems or 1,500 coins / 75 gems, doc 22 point 4.3), kept in stock and used from run buttons; a tap while active adds the full duration (doc 27 section 7).
+- FR-U1 Consumable power-ups are bought with coins or gems (since 2026-11-22: 2,000 / 3,000 / 4,000 coins, sold for coins; doc 27 section 0.3), kept in stock and used from run buttons; a tap while active adds the full duration (doc 27 section 7).
 - FR-U2 In-run power-up orbs grant brief free effects (no inventory used).
 - FR-U3 Permanent upgrades (e.g. longer magnet duration) bought with coins, capped, and disabled in Ranked leaderboard runs.
 - FR-U4 Leaderboard fairness: **Ranked** runs disallow consumables and upgrades. **Casual** runs allow them. Campaign runs are Casual by default and do not credit the milestone global boards unless played Ranked (doc 08 section 1).
@@ -41,7 +41,7 @@ Priority: **P0** = launch blocker, **P1** = needed for soft launch, **P2** = pos
 ### 1.5 Currencies and store (P0)
 - FR-S1 Coins (soft) and Gems (hard). **Fixed rate: 1 gem = 20 coins** (doc 22). Gems buy coins; coins never buy gems.
 - FR-S2 Gems purchasable via platform IAP (Google Play Billing, StoreKit 2) in **9 packs of 50 to 15,000 gems** ($0.79 to $119.99, owner table in doc 22 point 4.1; numbers in doc 27 section 6). Launch promo and first-purchase double exist in code but are OFF by default.
-- FR-S3 In-game shop with **5 tabs** (owner, doc 26): **Bundles, Chests, Power-ups, Coins, Gems**, plus a **Subscription** button (Weekly $1.49, Monthly $4.99). Characters are a Coming Soon card. Chest, bundle, subscription and coin-pack rules: docs 22 and 26; all numbers: [27-economy-tables-from-code.md](27-economy-tables-from-code.md). (The earlier 4-tab layout of doc 14 is superseded.)
+- FR-S3 In-game shop with **5 tabs** (owner, doc 26): **Bundles, Chests, Power-ups, Coins, Gems**, plus the **Subscription** plans (since 2026-11-22: Weekly Starter $1.99, Weekly Plus $4.99, Monthly Standard $6.99, Monthly Premium $14.99). Characters are a Coming Soon card. Chest, bundle, subscription and coin-pack rules: docs 22 and 26; all numbers: [27-economy-tables-from-code.md](27-economy-tables-from-code.md). (The earlier 4-tab layout of doc 14 is superseded.)
 - FR-S4 Server-authoritative balances. Purchases are receipt-validated server-side before gems are granted.
 - FR-S5 Restore purchases button (required by Apple). Handle pending, refunded and revoked transactions.
 - FR-S6 Display localized prices from the store.
@@ -59,7 +59,7 @@ Priority: **P0** = launch blocker, **P1** = needed for soft launch, **P2** = pos
 - FR-R2 Daily and weekly tasks as above; a daily challenge (one seed, one global board) is later.
 - FR-R3 Treasure chests: **Iron and Gold**, gems only, odds shown in the (i) text (doc 22 point 3); no pity counter in the shipped version; no earned chests.
 - FR-R4 Battle pass: *not built and not in the current owner docs (20 to 26); later.*
-- FR-R5 *Superseded (doc 26): the VIP became the **Subscription** (Weekly $1.49: 100 gems at once, then 10 gems and 500 coins a day for 7 days; Monthly $4.99: 200 gems at once, then 10 gems and 600 coins a day for 30 days, plus a free power-up every 5th claim). No VIP tiers, no stat bonuses.*
+- FR-R5 *Superseded (doc 26): the VIP became the **Subscription** (four plans since 2026-11-13; prices and contents of 2026-11-22 in doc 27 section 0.6: $1.99, $4.99, $6.99, $14.99). No VIP tiers, no stat bonuses.*
 - FR-R6 Achievements (platform achievements Game Center / Play Games).
 - FR-R7 Push notifications (opt-in): streak at risk, chest ready, new region, event start.
 

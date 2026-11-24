@@ -813,7 +813,7 @@ namespace FluffyClimbers.Gameplay
 
         /// <summary>
         /// The "i" popup of ONE bundle (owner Bug List 1 B4.a.vi): its contents as icons with amounts (coins, each power-up, the "?" hero card), the hero card line
-        /// (heroes from the player's open regions), the chance per rarity (Uncommon 70, Rare 20, Elite 10) and "Worth x2.1 for 340 gems" and a small italic joke about the name. Icons first, short text, all at least 16 sp.
+        /// (heroes from the player's open regions), the chance per rarity (Common 50, Uncommon 40, Rare 10) and "Worth x4.5 for 340 gems" and a small italic joke about the name. Icons first, short text, all at least 16 sp.
         /// <paramref name="price"/> = gems paid for this bundle (the list price, or the timer offer price). <paramref name="onDone"/> runs on OK and X (null = close the popup);
         /// the timer offer passes a callback that opens its offer again.
         /// </summary>
@@ -837,7 +837,7 @@ namespace FluffyClimbers.Gameplay
             float chipsH = ChipBlockHeight(ChipRows(def));
             float heroY = chipsY + chipsH + gap * 2f, heroH = def.HiddenCard ? Mathf.Max(80f, TextHeight(heroText, 40f, W - 100f)) : 0f;
             float chanceY = heroY + heroH + (def.HiddenCard ? gap : 0f);
-            float chanceH = def.HiddenCard ? TextHeight("Uncommon\n70%", 40f, colW) : 0f;
+            float chanceH = def.HiddenCard ? TextHeight("Uncommon\n40%", 40f, colW) : 0f;
             float worthY = chanceY + chanceH + (def.HiddenCard ? gap : 0f), worthH = WorthPillH();
             // the joke (small italic, wrapped) sits under the worth line; the panel grows by its measured height
             bool hasJoke = !string.IsNullOrEmpty(def.Joke);

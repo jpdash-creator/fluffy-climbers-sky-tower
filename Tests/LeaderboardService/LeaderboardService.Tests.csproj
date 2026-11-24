@@ -15,6 +15,7 @@
     <Compile Include="../../Assets/_Game/Gameplay/RunSession.cs" Link="Linked/RunSession.cs" />
     <Compile Include="../../Assets/_Game/Gameplay/RevivePolicy.cs" Link="Linked/RevivePolicy.cs" />
     <Compile Include="../../Assets/_Game/Economy/WeekKey.cs" Link="Linked/WeekKey.cs" />
+    <Compile Include="../../Assets/_Game/Economy/LeaderboardPlates.cs" Link="Linked/LeaderboardPlates.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,3 +1,4 @@
+using FluffyClimbers.Economy;
 using UnityEngine;
 
 namespace FluffyClimbers.Gameplay
@@ -143,7 +144,7 @@ namespace FluffyClimbers.Gameplay
             set { PlayerPrefs.SetInt(FirstPurchaseKey, value ? 1 : 0); PlayerPrefs.Save(); }
         }
 
-        /// <summary>Game difficulty (owner, Bug List 6 item 6): scroll speed grows by this percent every 5 seconds: 10, 20, 25, 40, 50 (SimConfig holds the integer table; chosen on the level screen).</summary>
+        /// <summary>Gameplay setting (owner Final Change 1, 2026-11-22): the scroll speed gains this percent of the start speed every 30 seconds, 8 times: 10, 20, 30, 40, 50 (SimConfig holds the integer table; chosen on the level screen).</summary>
         public static readonly int[] DifficultyStepPercent = FluffyClimbers.Simulation.SimConfig.DifficultyStepPercent;
         /// <summary>Chance in per mille that a gem spot (one per level row) holds a gem (owner 2026-10-25: halved; tuned values live in SimConfig).</summary>
         public static readonly int[] DifficultyGemPermille = FluffyClimbers.Simulation.SimConfig.DifficultyGemPermille;
@@ -152,44 +153,110 @@ namespace FluffyClimbers.Gameplay
         public static int Difficulty
         {
             get { return Mathf.Clamp(PlayerPrefs.GetInt(DifficultyKey, 0), 0, DifficultyNames.Length - 1); }
-            set { PlayerPrefs.SetInt(DifficultyKey, Mathf.Clamp(value, 0, DifficultyNames.Length - 1)); PlayerPrefs.Save(); }
+            set { PlayerPrefs.SetInt(DifficultyKey, Mathf.Clamp(value, 0, DifficultyNames.Length - 1)); PlayerPrefs.Save(); CaptureToSave(); }
         }
 
 
-        /// <summary>Highest speed-up the steps can reach on a difficulty: ScrollStepMaxSteps (8) steps of DifficultyStepPercent: 80, 160, 200, 320, 400 percent.</summary>
+        /// <summary>Highest speed-up the steps can reach on a Gameplay setting: ScrollStepMaxSteps (8) steps of DifficultyStepPercent: 80, 160, 240, 320, 400 percent.</summary>
         public static int MaxSpeedUpPercent(int level)
         {
-            return FluffyClimbers.Simulation.SimConfig.TopSpeedUpPercent(level);   // owner 2026-11-12: step x 8 = 80, 160, 200, 320, 400; no global cap
+            return FluffyClimbers.Simulation.SimConfig.TopSpeedUpPercent(level);   // step x 8 = 80, 160, 240, 320, 400; no global percent cap
         }
 
+        /// <summary>Seconds between two speed-up steps (30).</summary>
+        public const int SpeedStepSeconds = FluffyClimbers.Simulation.SimConfig.DefaultScrollStepSeconds;
+
+        /// <summary>Name plus the rule of a Gameplay setting: the step per 30 s and the top value, e.g. "Normal  (+30% every 30 s, up to +240%)".</summary>
         public static string DifficultyLabel(int level)
         {
-            return DifficultyNames[level] + "  (up to +" + MaxSpeedUpPercent(level) + "%)";
+            level = Mathf.Clamp(level, 0, DifficultyNames.Length - 1);
+            return DifficultyNames[level] + "  (+" + DifficultyStepPercent[level] + "% every " + SpeedStepSeconds + " s, up to +" + MaxSpeedUpPercent(level) + "%)";
         }
 
         public static readonly int[] TextPercents = { 100, 115, 130 };
 
-        public static bool Sound { get { return PlayerPrefs.GetInt(SoundKey, 1) == 1; } set { PlayerPrefs.SetInt(SoundKey, value ? 1 : 0); PlayerPrefs.Save(); AudioManager.Refresh(); } }
-        public static bool Music { get { return PlayerPrefs.GetInt(MusicKey, 1) == 1; } set { PlayerPrefs.SetInt(MusicKey, value ? 1 : 0); PlayerPrefs.Save(); AudioManager.Refresh(); } }
-        public static bool Haptics { get { return PlayerPrefs.GetInt(HapticsKey, 0) == 1; } set { PlayerPrefs.SetInt(HapticsKey, value ? 1 : 0); PlayerPrefs.Save(); } }
+        public static bool Sound { get { return PlayerPrefs.GetInt(SoundKey, 1) == 1; } set { PlayerPrefs.SetInt(SoundKey, value ? 1 : 0); PlayerPrefs.Save(); AudioManager.Refresh(); CaptureToSave(); } }
+        public static bool Music { get { return PlayerPrefs.GetInt(MusicKey, 1) == 1; } set { PlayerPrefs.SetInt(MusicKey, value ? 1 : 0); PlayerPrefs.Save(); AudioManager.Refresh(); CaptureToSave(); } }
+        public static bool Haptics { get { return PlayerPrefs.GetInt(HapticsKey, 0) == 1; } set { PlayerPrefs.SetInt(HapticsKey, value ? 1 : 0); PlayerPrefs.Save(); CaptureToSave(); } }
 
         /// <summary>No screen shake, squash, pulses or parallax scrolling (CUX-6).</summary>
-        public static bool ReducedMotion { get { return PlayerPrefs.GetInt(ReducedKey, 0) == 1; } set { PlayerPrefs.SetInt(ReducedKey, value ? 1 : 0); PlayerPrefs.Save(); } }
+        public static bool ReducedMotion { get { return PlayerPrefs.GetInt(ReducedKey, 0) == 1; } set { PlayerPrefs.SetInt(ReducedKey, value ? 1 : 0); PlayerPrefs.Save(); CaptureToSave(); } }
 
         /// <summary>Mirrors the run HUD so the pause button and wallet sit under the left thumb (CUX-4).</summary>
-        public static bool LeftHanded { get { return PlayerPrefs.GetInt(LeftKey, 0) == 1; } set { PlayerPrefs.SetInt(LeftKey, value ? 1 : 0); PlayerPrefs.Save(); } }
+        public static bool LeftHanded { get { return PlayerPrefs.GetInt(LeftKey, 0) == 1; } set { PlayerPrefs.SetInt(LeftKey, value ? 1 : 0); PlayerPrefs.Save(); CaptureToSave(); } }
 
         /// <summary>
         /// Pace Ghost (doc 46 section 5): a translucent marker at the floor height your best run had reached at this second of the clock. Default OFF (owner 2026-11-09);
         /// the toggle lives in Settings. Read once when the Run HUD is built, never per frame.
         /// </summary>
-        public static bool PaceGhost { get { return PlayerPrefs.GetInt(PaceGhostKey, 0) == 1; } set { PlayerPrefs.SetInt(PaceGhostKey, value ? 1 : 0); PlayerPrefs.Save(); } }
+        public static bool PaceGhost { get { return PlayerPrefs.GetInt(PaceGhostKey, 0) == 1; } set { PlayerPrefs.SetInt(PaceGhostKey, value ? 1 : 0); PlayerPrefs.Save(); CaptureToSave(); } }
 
         /// <summary>Accessibility text size: 100, 115 or 130 percent. Applied to every text built afterwards.</summary>
         public static int TextPercent
         {
             get { return PlayerPrefs.GetInt(TextKey, 100); }
-            set { PlayerPrefs.SetInt(TextKey, value); PlayerPrefs.Save(); ApplyTextScale(); }
+            set { PlayerPrefs.SetInt(TextKey, value); PlayerPrefs.Save(); ApplyTextScale(); CaptureToSave(); }
+        }
+
+        // ---------------- settings in the save (Final Change 3, owner 2026-11-23) ----------------
+
+        static bool applyingFromSave;
+
+        /// <summary>The player settings as they are now (dev and admin flags are never part of it).</summary>
+        public static SyncedSettings Snapshot()
+        {
+            return new SyncedSettings
+            {
+                Sound = Sound, Music = Music, Haptics = Haptics, ReducedMotion = ReducedMotion, LeftHanded = LeftHanded,
+                TextPercent = TextPercent, Difficulty = Difficulty, PaceGhost = PaceGhost, MenuMusic = MusicCatalog.Choice
+            };
+        }
+
+        /// <summary>
+        /// Called by every setting setter: copies the settings into the running save and asks for a (rate-limited) cloud upload. Does nothing without a save, while a cloud save is being applied,
+        /// or when nothing differs from what the save already holds.
+        /// </summary>
+        public static void CaptureToSave()
+        {
+            if (applyingFromSave) return;
+            ProgressService p = GameSession.Progress;
+            if (p == null) return;
+            SyncedSettings now = Snapshot();
+            if (p.Data.Settings != null && p.Data.Settings.SameAs(now)) return;
+            p.Data.Settings = now;
+            p.TouchQuiet();
+        }
+
+        /// <summary>Fills the save's settings once when it has none yet (no event, no dirty marker): the first upload then already carries them.</summary>
+        public static void EnsureInSave(ProgressService p)
+        {
+            if (p != null && p.Data.Settings == null) p.Data.Settings = Snapshot();
+        }
+
+        /// <summary>
+        /// Applies the settings of an ADOPTED cloud save to this device (a new or fresh device, or the player chose the cloud save). Never called on upload and never for a save that was
+        /// only compared. A null block (an older cloud save) changes nothing.
+        /// </summary>
+        public static void ApplyFromSave(SyncedSettings s)
+        {
+            if (s == null) return;
+            applyingFromSave = true;
+            try
+            {
+                PlayerPrefs.SetInt(SoundKey, s.Sound ? 1 : 0);
+                PlayerPrefs.SetInt(MusicKey, s.Music ? 1 : 0);
+                PlayerPrefs.SetInt(HapticsKey, s.Haptics ? 1 : 0);
+                PlayerPrefs.SetInt(ReducedKey, s.ReducedMotion ? 1 : 0);
+                PlayerPrefs.SetInt(LeftKey, s.LeftHanded ? 1 : 0);
+                PlayerPrefs.SetInt(TextKey, System.Array.IndexOf(TextPercents, s.TextPercent) >= 0 ? s.TextPercent : 100);
+                PlayerPrefs.SetInt(DifficultyKey, Mathf.Clamp(s.Difficulty, 0, DifficultyNames.Length - 1));
+                PlayerPrefs.SetInt(PaceGhostKey, s.PaceGhost ? 1 : 0);
+                MusicCatalog.SetChoiceQuiet(s.MenuMusic);
+                PlayerPrefs.Save();
+                ApplyTextScale();
+                AudioManager.Refresh();
+            }
+            finally { applyingFromSave = false; }
         }
 
         public static void ApplyTextScale() { UiKit.TextScale = Mathf.Clamp(TextPercent, 100, 130) / 100f; }

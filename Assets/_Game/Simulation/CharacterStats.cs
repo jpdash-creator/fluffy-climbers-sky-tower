@@ -96,7 +96,7 @@ namespace FluffyClimbers.Simulation
             var s = new StatSheet();
             s.Jump = launch * launch / (2.0 * g);
             s.Speed = speed;
-            s.Control = accel;
+            s.Control = Control;   // the whole number itself: the fixed-point accel is truncated (29 would read 28.95 and print 28.9); the derived values below keep using the real accel
             s.WallBounce = speed * Ratio(cfg.WallBoost);
             s.CoinFind = CoinFind;
             s.GemFind = GemFind;

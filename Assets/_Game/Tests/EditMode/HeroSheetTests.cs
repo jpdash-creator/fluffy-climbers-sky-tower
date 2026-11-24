@@ -25,9 +25,9 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual("Momo", d.Name);
             Assert.AreEqual("Common", d.RarityName);
             Assert.AreEqual("No special power", d.PowerText);
-            Assert.AreEqual("4.5", d.Stats[0, 1]);
+            Assert.AreEqual("4.6", d.Stats[0, 1]);   // Momo Common 19.2 / 9 / 29 / 77 since owner Final Change 2
             Assert.AreEqual("9", d.Stats[1, 1]);
-            Assert.AreEqual("30", d.Stats[2, 1]);
+            Assert.AreEqual("29", d.Stats[2, 1]);
             Assert.AreEqual("6.9", d.Stats[3, 1]);
             Assert.AreEqual("+0", d.Stats[4, 1]);
             Assert.AreEqual("+0", d.Stats[5, 1]);
@@ -167,12 +167,12 @@ namespace FluffyClimbers.Tests
         public void MomoKeepsTheBaselineMainStatsAndEveryCommonStaysInsideTheCommonBand()
         {
             CharacterStats m = CharacterDefs.Momo.Stats;
-            Assert.AreEqual(190, m.LaunchTenths); Assert.AreEqual(9, m.MaxSpeed); Assert.AreEqual(30, m.Control); Assert.AreEqual(77, m.WallBoostHundredths);
+            Assert.AreEqual(192, m.LaunchTenths); Assert.AreEqual(9, m.MaxSpeed); Assert.AreEqual(29, m.Control); Assert.AreEqual(77, m.WallBoostHundredths);   // the anchor of the Forgiveness Index (HeroIndex.MomoCommon)
             foreach (CharacterSpec c in CharacterDefs.All)
             {
                 if (c.IsMergeTier) continue;   // the tiers are checked row by row in TierRulesTests
-                // the Forgiveness Index rules (docs/44): a Common hero's Jump is 0 to 5 percent over the default, the other three stats sit inside the legal limits
-                Assert.IsNull(HeroIndex.Validate(0, new HeroPhysics(c.Stats.LaunchTenths, c.Stats.MaxSpeed, c.Stats.Control, c.Stats.WallBoostHundredths)), c.Id);
+                // the Forgiveness Index rules (docs/44): a Common hero is -3 to +3 percent of Momo on all four numbers, the other three stats sit inside the legal limits
+                Assert.IsNull(HeroIndex.ValidateBands(0, new HeroPhysics(c.Stats.LaunchTenths, c.Stats.MaxSpeed, c.Stats.Control, c.Stats.WallBoostHundredths), HeroIndex.MomoCommon), c.Id);
             }
         }
 

@@ -1,5 +1,7 @@
 # 13 - In-app purchases and ads: implementation plan
 
+> **2026-11-22 update (owner, Final Change 1):** four subscription plans at $1.99 (Weekly Starter), $4.99 (Weekly Plus), $6.99 (Monthly Standard) and $14.99 (Monthly Premium); the Play Console prices are an owner step (doc 48). Chests cost 400 gems (Iron) and 1,500 gems (Gold); power-ups 2,000 / 3,000 / 4,000 coins; a one-time Remove Ads ($2.99) exists since 2026-11-17. Current tables: doc 27 section 0 and doc 33. Older prices in this plan are history.
+
 > **2026-11-01 update (re-checked against the code, build v0.38.0.40):** the products, prices and ad placements in this plan now follow the shipped content and docs 22, 26 and 27. Product list: **9 gem packs** (`gem_packs.json`, SKUs `fluffyclimbers.gems.<amount>`, 50 to 15,000 gems, $0.79 to $119.99, INR prices, optional `.launch` promo variants, first-purchase double on the first five) and **2 subscriptions** (`subscriptions.json`: Weekly $1.49 / Rs 149 for 7 days, Monthly $4.99 / Rs 449 for 30 days). Coin packs, chests, bundles and power-ups are bought with gems, not money. Not in the product list any more: the old 6-pack ladder (80 to 10,500 gems), Remove Ads, VIP, battle pass, starter pack (planned later, doc 22 point 7). 1 gem = 20 coins (fixed); there is no gear. Billing stack, validation, restore, ads and phasing below stay valid.
 
 Status (2026-11-01): the shop screen exists (five tabs Bundles, Chests, Power-ups, Coins, Gems plus a Subscription button, doc 26). Gem packs and subscriptions are **test purchases in development builds** (`GrantTestGemPurchase`, SYSTEM_TEST switch); release builds show "Not available yet". There is no store SDK, no server and no analytics layer yet. Ads: Unity LevelPlay is integrated with an instant `TestRewardedAds` in dev builds and the real SDK on device; `AdConfig` still holds placeholder keys, so release builds have no ads. The only rewarded placement built is the **revive ad** (the free first revive of a run).
@@ -18,7 +20,7 @@ Recommendation: **Android / Google Play only at v1.0.** Today's builds are Andro
 | Item | Launch (P0) | Later | Notes |
 |---|---|---|---|
 | Gem packs (9 SKUs, consumable) | P0 | | 50 / 100 / 200 / 500 / 1,000 / 2,000 / 5,000 / 10,000 / 15,000 gems at $0.79 / 1.49 / 2.49 / 5.99 / 10.99 / 20.99 / 49.99 / 89.99 / 119.99 (promo prices about half, off). Final price points: open question Q4. |
-| Weekly / Monthly Subscription (auto-renewing) | P0 if the owner wants it at launch, else P1 | | $1.49 and $4.99; needs server or store entitlement, grace period and restore. Instant gems + daily claim are already built against a test purchase. |
+| Weekly / Monthly Subscription (auto-renewing) | P0 if the owner wants it at launch, else P1 | | $1.99 / $4.99 (weekly) and $6.99 / $14.99 (monthly) since 2026-11-22, four plans (was $1.49 and $4.99, two plans); needs server or store entitlement, grace period and restore. Instant gems + daily claim are already built against a test purchase. |
 | Rewarded ad: revive | **Built** (test ads) | | The first revive of a run is free by ad; the gem revive (5 then 10 gems, max 2 per run) stays. Never replaces one-tap retry (CUX-7). Max 1 ad revive per run. |
 | Rewarded ad: double run reward | Planned, not built | | Results screen, opt-in. |
 | Rewarded ad: daily power-up | Planned, not built | | Doc 22 point 8 (one random power-up a day, about 60.7 gems of value). |
@@ -287,7 +289,7 @@ Bump with `python Tools/version.py bump minor` before the first build of the wor
 1. Android / Google Play only at launch (iOS later)?
 2. Ads at launch (rewarded only, no interstitials), or IAP only first?
 3. Remove Ads is not in the owner docs 20 to 26: confirm it stays out. (If added, we propose it keeps the revive and double rewards without the video.)
-4. Are the nine gem price points final ($0.79 to $119.99, doc 22 4.1) and the two subscription prices ($1.49, $4.99)? Is a $119.99 pack acceptable at launch? Starter pack in v1.0 or later?
+4. Are the nine gem price points final ($0.79 to $119.99, doc 22 4.1) and the subscription prices (answered 2026-11-22: $1.99, $4.99, $6.99, $14.99 for the four plans)? Is a $119.99 pack acceptable at launch? Starter pack in v1.0 or later?
 5. Server at launch? Recommendation: no (client-only validation with a ledger), server before real revenue scales. Which backend (Firebase or PlayFab)?
 6. Mediation: Unity LevelPlay (less setup) or AppLovin MAX (more networks)?
 7. Who creates the Play developer account, merchant profile and tax info, and when can the closed-test clock start (it has a minimum duration)?

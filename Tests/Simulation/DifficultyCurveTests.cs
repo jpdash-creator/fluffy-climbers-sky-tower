@@ -305,13 +305,12 @@ namespace FluffyClimbers.Simulation.Tests
                     Assert.Equal(i + 1, idx);
                     string want = idx == 25 ? "highly_complex" : Target[idx - 1] < 30 ? "simple" : Target[idx - 1] < 55 ? "medium" : Target[idx - 1] < 75 ? "hard" : "complex";
                     Assert.True(ls[i].ClassName == want, ls[i].Id + " class " + ls[i].ClassName + " should be " + want);
-                    bool special = idx % 5 == 0 && idx <= 20;
+                    // Owner Final Change 1 (2026-11-22): the gem levels 5/10/15/20/25 are plain reach-floor levels; the six special types sit on the approved levels (SpecialLevelTests.Placement)
                     GoalType g = ls[i].Spec.Goal.Type;
-                    if (idx == 25) Assert.Equal(GoalType.ReachFloor, g);
-                    else if (idx == 5) Assert.Equal(GoalType.ReachFloor, g);   // Bug List 4 item 10: plain reach floor
-                    else if (special) Assert.True(g == GoalType.NoWallBounce || g == GoalType.FindHiddenGem || g == GoalType.Speedrun, ls[i].Id + " special goal");
-                    else Assert.Equal(GoalType.ReachFloor, g);
-                    if (special && idx > 5) Assert.NotEqual(ls[i - 5].Spec.Goal.Type, g);   // no two special neighbours repeat
+                    SpecialLevelType type = SpecialLevels.TypeOf(ls[i].Spec);
+                    GoalType want2 = type == SpecialLevelType.NoWallTouch ? GoalType.NoWallBounce : type == SpecialLevelType.ComboClimb ? GoalType.ComboChain : type == SpecialLevelType.Chase ? GoalType.BossChase : GoalType.ReachFloor;
+                    Assert.True(g == want2, ls[i].Id + " goal " + g);
+                    if (idx % 5 == 0) Assert.True(type == SpecialLevelType.None && g == GoalType.ReachFloor, ls[i].Id + " is a gem level: Regular Run");
                 }
             }
         }

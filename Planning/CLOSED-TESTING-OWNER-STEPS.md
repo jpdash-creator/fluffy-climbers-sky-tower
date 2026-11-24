@@ -24,10 +24,12 @@ Subscriptions (Monetize > Products > Subscriptions, one auto-renewing base plan 
 
 | # | Subscription ID | Base plan ID (suggested) | Period | USD | INR |
 |---|---|---|---|---|---|
-| 10 | `com.jdlabs.fluffyclimbers.sub.weekly` | `weekly-autorenew` | 1 week | 1.49 | 149 |
-| 11 | `com.jdlabs.fluffyclimbers.sub.weekly_plus` | `weekly-plus-autorenew` | 1 week | 2.99 | 299 |
-| 12 | `com.jdlabs.fluffyclimbers.sub.monthly` | `monthly-autorenew` | 1 month | 4.99 | 449 |
-| 13 | `com.jdlabs.fluffyclimbers.sub.monthly_premium` | `monthly-premium-autorenew` | 1 month | 9.99 | 899 |
+| 10 | `com.jdlabs.fluffyclimbers.sub.weekly` | `weekly-autorenew` | 1 week | 1.99 | set in the console |
+| 11 | `com.jdlabs.fluffyclimbers.sub.weekly_plus` | `weekly-plus-autorenew` | 1 week | 4.99 | set in the console |
+| 12 | `com.jdlabs.fluffyclimbers.sub.monthly` | `monthly-autorenew` | 1 month | 6.99 | set in the console |
+| 13 | `com.jdlabs.fluffyclimbers.sub.monthly_premium` | `monthly-premium-autorenew` | 1 month | 14.99 | set in the console |
+
+**Changed 2026-11-22 (owner, Final Change 1):** the four subscription prices above are new (they were 1.49 / 2.99 / 4.99 / 9.99 USD and 149 / 299 / 449 / 899 INR). If the products already exist in the Play Console, change their prices and benefit lines there before the Final Change 1 build goes to testers; the owner has not given INR prices for the new USD prices yet. The same build also needs the leaderboard steps of `Planning/LEADERBOARD-DEPLOY-LOG.md` (section "Pending owner steps (2026-11-22)") and the republished legal pages (`Planning/RELEASE-AAB-CHECKLIST.md`).
 
 Do NOT create `...bundle.starter`. Names, descriptions and benefit lines to paste: doc 48 sections 1 and 2. IDs are permanent and lowercase.
 

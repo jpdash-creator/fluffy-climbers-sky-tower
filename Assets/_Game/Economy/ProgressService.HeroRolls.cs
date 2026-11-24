@@ -147,6 +147,71 @@ namespace FluffyClimbers.Economy
         /// <summary>Stats of the first copy (see <see cref="StatsOf(CharacterSpec,int)"/>).</summary>
         public CharacterStats StatsOf(CharacterSpec c) { return StatsOf(c, 0); }
 
+        /// <summary>The hero powers of ONE copy (rolled with its stats, see <see cref="HeroRolls"/>): none for Common and Uncommon, one for Rare and Elite, two for Legendary. Shared array, never change it.</summary>
+        public PowerUp[] HeroPowers(string id, int copy)
+        {
+            return HeroRolls.PowersFor(id, HeroVariant(id, copy));
+        }
+
+        /// <summary>The hero as the chosen copy plays it: the spec with that copy's rolled stats and powers (the spec itself for a Common hero or the default roll). THE object the run applies the hero powers from.</summary>
+        public CharacterSpec RolledSpec(CharacterSpec c, int copy)
+        {
+            return c == null ? null : HeroRolls.Rolled(c, HeroVariant(c.Id, copy));
+        }
+
+        /// <summary>
+        /// One-time re-roll under the new hero rules (owner Final Change 2, 2026-11-23): every owned upper-tier copy gets a fresh roll (stats inside the new bands AND its power(s)); tier and line are kept, nothing is lost. The copies keep
+        /// their card position, so the chosen copy stays valid. The purchase ledger keeps one roll per bought copy: the entry of a copy follows it to its new roll (matched by the roll counter), an entry without a match is re-rolled too.
+        /// Stamps <see cref="SaveData.HeroRollRules"/>; runs on load and after a cloud save replaces the data. Idempotent.
+        /// </summary>
+        void MigrateHeroRolls()
+        {
+            if (Data.HeroRollRules >= SaveData.HeroRollRulesCurrent) return;
+            EnsureRollFields();
+            BundleSaveData b = BundleState;
+            bool anyRollable = false;
+            foreach (string k in Data.HeroCopyRolls.Keys) if (HeroRolls.IsRollable(k) && Data.HeroCopyRolls[k].Count > 0) { anyRollable = true; break; }
+            if (!anyRollable && Data.Ledger != null && Data.Ledger.Heroes != null)
+                foreach (KeyValuePair<string, LedgerHero> kv0 in Data.Ledger.Heroes) if (kv0.Value != null && HeroRolls.IsRollable(kv0.Key) && kv0.Value.Copies > 0) { anyRollable = true; break; }
+            if (anyRollable) EnsureBundleSeed(b);   // a fresh save has nothing to re-roll: the seed is then set by the first draw (with the injectable clock), not by this load
+            var moved = new Dictionary<string, int[]>();   // id + "#" + old counter -> { new roll, new counter }
+            var ids = new List<string>(Data.HeroCopyRolls.Keys);
+            foreach (string id in ids)
+            {
+                if (!HeroRolls.IsRollable(id)) continue;
+                List<int> rolls = Data.HeroCopyRolls[id], nos = Data.HeroCopyRollNos[id];
+                for (int i = 0; i < rolls.Count; i++)
+                {
+                    int oldNo = i < nos.Count ? nos[i] : -1;
+                    int counter = Data.HeroRollCount++;
+                    rolls[i] = HeroRolls.Pick(b.Seed, id, counter);
+                    while (nos.Count <= i) nos.Add(-1);
+                    nos[i] = counter;
+                    if (oldNo >= 0) moved[id + "#" + oldNo] = new[] { rolls[i], counter };
+                }
+                SyncLegacyRoll(id);
+            }
+            PurchaseLedger led = Data.Ledger;
+            if (led != null && led.Heroes != null)
+                foreach (KeyValuePair<string, LedgerHero> kv in led.Heroes)
+                {
+                    LedgerHero h = kv.Value;
+                    if (h == null || !HeroRolls.IsRollable(kv.Key) || h.Copies <= 0) continue;
+                    var nr = new List<int>(h.Copies);
+                    var nn = new List<int>(h.Copies);
+                    for (int j = 0; j < h.Copies; j++)
+                    {
+                        int oldV, oldNo;
+                        h.RollOf(j, out oldV, out oldNo);
+                        int[] to;
+                        if (oldNo >= 0 && moved.TryGetValue(kv.Key + "#" + oldNo, out to)) { nr.Add(to[0]); nn.Add(to[1]); }
+                        else { int counter = Data.HeroRollCount++; nr.Add(HeroRolls.Pick(b.Seed, kv.Key, counter)); nn.Add(counter); }
+                    }
+                    h.Rolls = nr; h.RollNos = nn; h.Roll = nr[0]; h.RollNo = nn[0];
+                }
+            Data.HeroRollRules = SaveData.HeroRollRulesCurrent;
+        }
+
         /// <summary>The numbers this player's copy of the hero shows on its sheet (null for a hero without shown stats).</summary>
         public ShownStats ShownOf(CharacterSpec c, int copy)
         {

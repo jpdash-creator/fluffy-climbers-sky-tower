@@ -61,9 +61,18 @@ namespace FluffyClimbers.Economy
 
     public struct RewardResult
     {
+        /// <summary>First clear of the level IN THE GAMEPLAY SETTING OF THIS RUN (Final Change 1, 2026-11-22: every setting has its own path). The reward-task replay cap reads it.</summary>
         public bool FirstClear;
+        /// <summary>First clear of the level in ANY setting: gems are paid once per level (fixed first-clear gems, hero milestone bonus, collectible gems).</summary>
+        public bool FirstClearEver;
         public int Stars;
-        public int PayoutCoins;      // end-of-level payout after region factor, star bonus and replay percent
+        /// <summary>Gameplay setting 0..4 the run was paid for (RunOutcome.Mode, clamped).</summary>
+        public int Mode;
+        /// <summary>Coin bonus percent of that setting (Relaxed 0, Easy 5, Normal 10, Hard 15, Insane 25; CoinPayoutRules.SettingBonusPercent).</summary>
+        public int SettingBonusPercent;
+        /// <summary>The coins the setting bonus added to <see cref="PayoutCoins"/> (rounded half up on the whole payout; 0 on Relaxed). Not part of PayoutCoins; part of <see cref="TotalCoins"/>. The hero bonus coins get no bonus.</summary>
+        public int SettingBonusCoins;
+        public int PayoutCoins;      // end-of-level payout after region factor, star bonus and replay percent, BEFORE the Gameplay setting bonus (SettingBonusCoins)
         public int StarBonusCoins;   // part of PayoutCoins that came from the star bonus
         public int ComboCoins;       // part of PayoutCoins that came from combo steps (5 each, region factor applied)
         public int PickupCoins;      // always 0 in economy v2 (kept for old callers)
@@ -74,7 +83,8 @@ namespace FluffyClimbers.Economy
         public int HeroBonusGems;    // the selected hero's milestone bonus gems (sure gems plus the seeded 50 percent extra one)
         public string UnlockedRegionId;
 
-        public int TotalCoins { get { return PayoutCoins + PickupCoins + HeroBonusCoins; } }
+        /// <summary>Everything the run paid in coins (the "+N" of the results screen; the x2 ad pays this once more): payout + setting bonus + pickups + hero bonus.</summary>
+        public int TotalCoins { get { return PayoutCoins + SettingBonusCoins + PickupCoins + HeroBonusCoins; } }
         public int TotalGems { get { return RewardGems + PickupGems + HiddenGemReward + HeroBonusGems; } }
     }
 
@@ -82,8 +92,10 @@ namespace FluffyClimbers.Economy
     /// Doc 08 section 7 reward rules, deterministic (rolls use the Simulation Rng seeded from the level seed and clear count,
     /// so a server can recompute them).
     /// Main Bug List 7 item 2 (2026-11-17): a failed run pays nothing; levels 5/10/15/20/25 pay FIXED gems (1/2/2/3/4) on the first clear, plus (seeded 50 percent chance per level) hold 2 or 3 COLLECTIBLE gems of value 1,
-    /// placed by LevelBuilder (<see cref="GemLevels.GemsInLevel"/>); only gems the completed run picked up pay, nothing for uncollected ones, a replay of a 3-star level drops none; the hidden gem
+    /// placed by LevelBuilder (<see cref="GemLevels.GemsInLevel"/>); only gems the completed run picked up pay, nothing for uncollected ones, a level cleared before drops none; the hidden gem
     /// of level 15 pays nothing. The selected hero adds its milestone bonus on first clears of levels 5/10/15/20/25 (<see cref="CoinPayoutRules.HeroBonusCoins"/>, <see cref="CoinPayoutRules.HeroBonusGems"/>).
+    /// Final Change 1 (2026-11-22): stars and clears are per Gameplay setting (RunOutcome.Mode). The reduced replay (25 percent) needs 3 stars in the setting of the run; the
+    /// Gameplay setting bonus (<see cref="CoinPayoutRules.ApplySettingBonus"/>) is added to the payout; every gem (fixed, hero bonus, collectible) pays on the first clear in ANY setting only.
     /// </summary>
     public static class RewardCalculator
     {
@@ -115,15 +127,20 @@ namespace FluffyClimbers.Economy
             var result = new RewardResult();
             if (!run.Completed) return result;
 
-            int clearsBefore = before == null ? 0 : before.Clears;
-            bool firstClear = clearsBefore == 0;
+            // Final Change 1 (owner 2026-11-22): stars and clears are per Gameplay setting. Coins judge "first clear" and "already 3 stars" in the setting of THIS run;
+            // gems stay once per level, so they ask for the first clear in ANY setting.
+            int mode = TimeRecords.ClampMode(run.Mode);
+            bool firstClear = before == null || before.ClearsIn(mode) == 0;
+            bool firstClearEver = before == null || !before.ClearedAny();
             int stars = run.Stars;
             result.FirstClear = firstClear;
+            result.FirstClearEver = firstClearEver;
             result.Stars = stars;
+            result.Mode = mode;
 
-            // Payout: (clear 56 + 48 per star + 4 per combo step) x region factor. Once the level already has 3 stars, replays pay 25 percent and
-            // drop no gems (owner rule); levels with fewer stars keep full coins.
-            int prevStars = before == null ? 0 : before.Stars;
+            // Payout: (clear 56 + 48 per star + 4 per combo step) x region factor. Once the level already has 3 stars IN THIS SETTING, replays pay 25 percent
+            // (owner rule); with fewer stars in this setting the coins stay full.
+            int prevStars = before == null ? 0 : before.StarsIn(mode);
             bool reducedReplay = CoinPayoutRules.IsReducedReplay(prevStars);
             int comboRaw = run.CoinsCollected < 0 ? 0 : run.CoinsCollected;
             long gross = CoinPayoutRules.Scale(CoinPayoutRules.BaseCoins(stars), region.CoinFactor);
@@ -139,13 +156,16 @@ namespace FluffyClimbers.Economy
             result.StarBonusCoins = (int)starPart;
             result.ComboCoins = (int)combo;
             result.PickupCoins = 0;
-            // Gems: the collectible gems the run took (a completed run only; the pickups are stripped from a replay of a 3-star level, and a reduced replay pays none anyway).
-            // Fixed first-clear gems below (no pickup needed); no gem for the hidden gem.
+            // Gameplay setting bonus on the level payout (after the region factor and the replay cut; the fixed hero milestone coins below get none).
+            result.SettingBonusPercent = CoinPayoutRules.SettingBonusPercent(mode);
+            result.SettingBonusCoins = CoinPayoutRules.ApplySettingBonus(result.PayoutCoins, mode) - result.PayoutCoins;
+            // Gems, ONCE PER LEVEL whatever the setting: the collectible gems the run took (the pickups are stripped from a level that was cleared before in any setting,
+            // so only the first clear can hold them). Fixed first-clear gems below (no pickup needed); no gem for the hidden gem.
             int held = GemsInLevel(level);
-            result.PickupGems = !reducedReplay && held > 0 && run.GemsCollected > 0 ? Math.Min(run.GemsCollected, held) : 0;   // anti-tamper: never more than the level holds
+            result.PickupGems = firstClearEver && held > 0 && run.GemsCollected > 0 ? Math.Min(run.GemsCollected, held) : 0;   // anti-tamper: never more than the level holds
             result.HiddenGemReward = 0;
             result.RewardGems = 0;
-            if (firstClear && IsMilestone(level))
+            if (firstClearEver && IsMilestone(level))
             {
                 result.RewardGems = GemLevels.FixedFirstClearGems(level.Index);
                 // The hero selected for the run adds its rarity bonus on the same first clears: fixed coins (no region factor) and gems with a seeded 50 percent extra one.
@@ -164,12 +184,18 @@ namespace FluffyClimbers.Economy
         public int Floors;
         public int BestBefore;
         public bool NewBest;
-        /// <summary>Coins before the daily cap (floors based, region factor applied).</summary>
+        /// <summary>Coins before the daily cap: floors and combo coins x region factor, then the Gameplay setting bonus (Final Change 1, 2026-11-22).</summary>
         public int FullRateCoins;
-        /// <summary>Part of FullRateCoins that came from combo landings (5 each, region factor applied).</summary>
+        /// <summary>Part of the coins that came from combo landings (5 each, region factor applied, before the setting bonus).</summary>
         public int ComboCoins;
-        /// <summary>Coins actually paid.</summary>
+        /// <summary>Coins actually paid (the setting bonus included, the daily cap applied).</summary>
         public int Coins;
+        /// <summary>Gameplay setting 0..4 the run was paid for.</summary>
+        public int Mode;
+        /// <summary>Coin bonus percent of that setting (Relaxed 0, Easy 5, Normal 10, Hard 15, Insane 25).</summary>
+        public int SettingBonusPercent;
+        /// <summary>The part of <see cref="Coins"/> (the coins actually paid, so after the daily cap) that the setting bonus added; 0 on Relaxed.</summary>
+        public int SettingBonusCoins;
         /// <summary>True when the daily full-rate runs were used up and the over-cap multiplier applied.</summary>
         public bool OverCap;
         /// <summary>Paying runs finished today including this one.</summary>
@@ -204,6 +230,15 @@ namespace FluffyClimbers.Economy
             long factor = (long)Math.Round(regionCoinFactor * 10000);
             long raw = RawCoins(floors) + (comboCoins < 0 ? 0 : comboCoins);
             return (int)((raw * factor + 5000) / 10000);
+        }
+
+        /// <summary>
+        /// Full-rate coins of an Endless or Time Attack run in a Gameplay setting (Final Change 1, owner 2026-11-22): the table above (floors and combo coins x region factor),
+        /// then the setting bonus (Relaxed 0, Easy 5, Normal 10, Hard 15, Insane 25 percent, half up). The daily-cap reduction comes after this.
+        /// </summary>
+        public static int FullRateCoins(int floors, int comboCoins, double regionCoinFactor, int mode)
+        {
+            return CoinPayoutRules.ApplySettingBonus(FullRateCoins(floors, comboCoins, regionCoinFactor), mode);
         }
 
         public static int OverCapCoins(int fullRateCoins, double overCapMultiplier)

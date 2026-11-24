@@ -109,12 +109,25 @@ namespace FluffyClimbers.Gameplay
             bool cloud = CloudSignedIn;
             OpenPopup("Reset progress?", ResetMessage(cloud), 1280f, 36, 640f);   // 36 px = the 16 sp body minimum (CUX-5); the box is taller than the usual 520 for the longer text
             PopupButton("Reset", ToyKit.Button(3), Color.white, 230f, DoReset);
+            // Development builds only (Final Change 3, "fresh start"): also wipes the purchases the normal reset keeps. Never shown in a release build.
+            if (GameSettings.DevBuild) PopupButton("Wipe ALL (dev)", ToyKit.Button(3), Color.white, 400f, DoResetEverything);
             PopupButton("Cancel", Btn(0), Color.white, 60f, ClosePopup);
+        }
+
+        void DoResetEverything()
+        {
+            progress.ResetEverything();
+            FinishReset();
         }
 
         void DoReset()
         {
             progress.ResetAll();
+            FinishReset();
+        }
+
+        void FinishReset()
+        {
             CharacterCatalog.Selected = CharacterCatalog.Momo;
             FluffyClimbers.Leaderboard.LeaderboardHub.OnProgressReset();   // caches dropped, the player's scores on the service deleted (queued in the save while offline)
             PushCloudSave();
@@ -370,7 +383,14 @@ namespace FluffyClimbers.Gameplay
                 if (GameSettings.GameJumpTest)
                     AdminButtons(c, ref y, true,
                         new AdminBtn("Open regions", 0, () => AdminSay("Regions unlocked: " + progress.AdminUnlockAllRegions()), "Unlock all regions"),
-                        new AdminBtn("Clear levels", 0, () => { int n = progress.AdminCompleteAllLevels(); RefreshWallet(); AdminSay("Levels cleared: " + n); }, "Clear all levels"),
+                        // Final Change 1: stars and clears are kept per Gameplay setting, so the tool clears the levels in the setting that is selected on the level screen
+                        new AdminBtn("Clear levels", 0, () =>
+                        {
+                            int mode = GameSettings.Difficulty;
+                            int n = progress.AdminCompleteAllLevels(mode);
+                            RefreshWallet();
+                            AdminSay("Levels cleared on " + GameSettings.DifficultyNames[Mathf.Clamp(mode, 0, GameSettings.DifficultyNames.Length - 1)] + ": " + n);
+                        }, "Clear all levels on the selected gameplay setting"),
                         MainRewardsBtn());
                 else AdminButtons(c, ref y, true, MainRewardsBtn());   // the Main rewards review tool works without the jump switch
             }

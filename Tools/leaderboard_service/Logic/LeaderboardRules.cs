@@ -19,7 +19,7 @@ namespace FluffyClimbers.LeaderboardService
     /// <summary>All limits and switches, loaded from Firestore config/leaderboard (falling back to config.default.json, then to these values). Nothing here is hardcoded in the Firestore rules.</summary>
     public sealed class Limits
     {
-        public int[] SimVersions = { 1 };
+        public int[] SimVersions = { 3 };   // 3 = owner Final Change 2 (2026-11-23): hero bands, per-copy powers, region penalty (2 = Final Change 1: speed steps every 30 s, bonus 0/5/10/15/25); older clients are told to update
         public int MaxRegion = 5;
         public long OverallEntryLimit = 250000, LevelsEntryLimit = 100000, EndlessEntryLimit = 150000;
         public int TopThreeFactorPercent = 150;

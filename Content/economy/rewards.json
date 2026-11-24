@@ -1,373 +1,617 @@
 {
-  "_doc": "docs/26 section 4 and docs/39. Kept identical to RewardCatalog.BuiltIn() by RewardsTests (Daily and Weekly). Rewards: gems, coins, powerups (random units), heroRegion (0 none, N = the Common hero of region N, -1 = random Common hero of an open region), heroOrCoins (with heroRegion -1: 50 percent the hero, otherwise these coins; the roll is deterministic and stored in the save). The Main tab region goals are NOT here: they come from RegionGoalTable (Economy/RegionGoals.cs).",
+  "_doc": "Owner Final Change 1 (2026-11-22), docs/26 section 4 and docs/39: Daily 30 tasks = 500 points with five coin gifts (4,000 coins a day), Weekly 40 tasks (15,800 coins, 50 gems, 3 power-ups). Kept identical to RewardCatalog.BuiltIn() (Economy/RewardTables.cs) by RewardsTests. Fields: group (general, levels, setting, endless, timeAttack, endlessTimeAttack, special), stat (the counter; name@N = Gameplay setting N or harder, 1 Easy .. 4 Insane), target, points (daily tasks), gems, coins, powerups (random units). No reward gives a hero. The Main tab region goals are NOT here: they come from RegionGoalTable (Economy/RegionGoals.cs).",
   "dailyActions": [
     {
-      "id": "d_login",
+      "id": "d2_login",
       "title": "Log in today",
+      "group": "general",
       "stat": "login",
       "target": 1,
-      "points": 5
+      "points": 10
     },
     {
-      "id": "d_play10",
+      "id": "d2_play10",
       "title": "Play for 10 minutes",
+      "group": "general",
       "stat": "playSec",
       "target": 600,
-      "points": 7
+      "points": 10
     },
     {
-      "id": "d_play25",
-      "title": "Play for 25 minutes",
+      "id": "d2_play30",
+      "title": "Play for 30 minutes",
+      "group": "general",
       "stat": "playSec",
-      "target": 1500,
-      "points": 11
-    },
-    {
-      "id": "d_play60",
-      "title": "Play for 60 minutes",
-      "stat": "playSec",
-      "target": 3600,
+      "target": 1800,
       "points": 15
     },
     {
-      "id": "d_level3",
-      "title": "Complete 3 levels",
-      "stat": "levels",
-      "target": 3,
-      "points": 6
+      "id": "d2_powerups2",
+      "title": "Use 2 power-ups",
+      "group": "general",
+      "stat": "powerups",
+      "target": 2,
+      "points": 10
     },
     {
-      "id": "d_level6",
-      "title": "Complete 6 levels",
+      "id": "d2_coins2000",
+      "title": "Earn 2,000 coins",
+      "group": "general",
+      "stat": "coinsEarned",
+      "target": 2000,
+      "points": 15
+    },
+    {
+      "id": "d2_levels3",
+      "title": "Clear 3 levels",
+      "group": "levels",
+      "stat": "levels",
+      "target": 3,
+      "points": 10
+    },
+    {
+      "id": "d2_levels6",
+      "title": "Clear 6 levels",
+      "group": "levels",
       "stat": "levels",
       "target": 6,
-      "points": 10
-    },
-    {
-      "id": "d_level10",
-      "title": "Complete 10 levels",
-      "stat": "levels",
-      "target": 10,
       "points": 15
     },
     {
-      "id": "d_combo10",
-      "title": "Make 10 combos",
-      "stat": "combos",
+      "id": "d2_levels10",
+      "title": "Clear 10 levels",
+      "group": "levels",
+      "stat": "levels",
       "target": 10,
-      "points": 8
+      "points": 25
     },
     {
-      "id": "d_combo30",
-      "title": "Make 30 combos",
-      "stat": "combos",
-      "target": 30,
-      "points": 14
-    },
-    {
-      "id": "d_stars9",
+      "id": "d2_stars9",
       "title": "Earn 9 stars",
+      "group": "levels",
       "stat": "starsEarned",
       "target": 9,
-      "points": 12
+      "points": 15
     },
     {
-      "id": "d_hard",
-      "title": "Clear a hard level",
-      "stat": "hardClear",
-      "target": 1,
-      "points": 12
-    },
-    {
-      "id": "d_pace2",
-      "title": "2 clears at 0.6 plat/s",
-      "stat": "paceClears",
+      "id": "d2_3star2",
+      "title": "Get 3 stars on 2 levels",
+      "group": "levels",
+      "stat": "stars3",
       "target": 2,
-      "points": 12
+      "points": 15
     },
     {
-      "id": "d_endless50",
-      "title": "Reach floor 50 in Endless",
-      "stat": "endlessFloor",
-      "target": 50,
-      "points": 6
-    },
-    {
-      "id": "d_endless100",
-      "title": "Reach floor 100 in Endless",
-      "stat": "endlessFloor",
-      "target": 100,
+      "id": "d2_combos20",
+      "title": "Make 20 combos",
+      "group": "levels",
+      "stat": "combos",
+      "target": 20,
       "points": 10
     },
     {
-      "id": "d_floor100",
-      "title": "Endless floor 100 in 3:00",
-      "stat": "floor100in3",
-      "target": 1,
-      "points": 14
-    },
-    {
-      "id": "d_endlessruns",
-      "title": "Finish 3 Endless runs",
-      "stat": "endlessRuns",
-      "target": 3,
-      "points": 8
-    },
-    {
-      "id": "d_powerups",
-      "title": "Use 3 power-ups",
-      "stat": "powerups",
-      "target": 3,
-      "points": 8
-    },
-    {
-      "id": "d_medal",
+      "id": "d2_medal",
       "title": "Earn a medal",
+      "group": "levels",
       "stat": "medals",
       "target": 1,
-      "points": 8
-    },
-    {
-      "id": "d_coins",
-      "title": "Earn 2,500 coins",
-      "stat": "coinsEarned",
-      "target": 2500,
       "points": 10
     },
     {
-      "id": "d_ta",
+      "id": "d2_settings2",
+      "title": "Clear a level on 2 different settings",
+      "group": "setting",
+      "stat": "settings",
+      "target": 2,
+      "points": 15
+    },
+    {
+      "id": "d2_easy_levels2",
+      "title": "Clear 2 levels on Easy or harder",
+      "group": "setting",
+      "stat": "levels@1",
+      "target": 2,
+      "points": 10
+    },
+    {
+      "id": "d2_normal_levels2",
+      "title": "Clear 2 levels on Normal or harder",
+      "group": "setting",
+      "stat": "levels@2",
+      "target": 2,
+      "points": 15
+    },
+    {
+      "id": "d2_hard_levels2",
+      "title": "Clear 2 levels on Hard or Insane",
+      "group": "setting",
+      "stat": "levels@3",
+      "target": 2,
+      "points": 20
+    },
+    {
+      "id": "d2_insane_level",
+      "title": "Clear a level on Insane",
+      "group": "setting",
+      "stat": "levels@4",
+      "target": 1,
+      "points": 25
+    },
+    {
+      "id": "d2_normal_stars6",
+      "title": "Earn 6 stars on Normal or harder",
+      "group": "setting",
+      "stat": "starsEarned@2",
+      "target": 6,
+      "points": 20
+    },
+    {
+      "id": "d2_hard_stars3",
+      "title": "Earn 3 stars on Hard or Insane",
+      "group": "setting",
+      "stat": "starsEarned@3",
+      "target": 3,
+      "points": 20
+    },
+    {
+      "id": "d2_normal_medal",
+      "title": "Earn a medal on Normal or harder",
+      "group": "setting",
+      "stat": "medals@2",
+      "target": 1,
+      "points": 20
+    },
+    {
+      "id": "d2_endlessruns2",
+      "title": "Finish 2 Endless runs",
+      "group": "endless",
+      "stat": "endlessRuns",
+      "target": 2,
+      "points": 10
+    },
+    {
+      "id": "d2_endless50",
+      "title": "Reach floor 50 in Endless",
+      "group": "endless",
+      "stat": "endlessFloor",
+      "target": 50,
+      "points": 10
+    },
+    {
+      "id": "d2_endless100",
+      "title": "Reach floor 100 in Endless",
+      "group": "endless",
+      "stat": "endlessFloor",
+      "target": 100,
+      "points": 25
+    },
+    {
+      "id": "d2_normal_endless50",
+      "title": "Reach floor 50 in Endless on Normal or harder",
+      "group": "endless",
+      "stat": "endlessFloor@2",
+      "target": 50,
+      "points": 20
+    },
+    {
+      "id": "d2_hard_endless50",
+      "title": "Reach floor 50 in Endless on Hard or Insane",
+      "group": "endless",
+      "stat": "endlessFloor@3",
+      "target": 50,
+      "points": 25
+    },
+    {
+      "id": "d2_ta_run",
+      "title": "Finish a Time Attack run",
+      "group": "timeAttack",
+      "stat": "taRuns",
+      "target": 1,
+      "points": 10
+    },
+    {
+      "id": "d2_ta60",
       "title": "Time Attack: 60 floors",
+      "group": "timeAttack",
       "stat": "taRun",
       "target": 60,
-      "points": 9
+      "points": 25
+    },
+    {
+      "id": "d2_special1",
+      "title": "Clear a special level",
+      "group": "special",
+      "stat": "special",
+      "target": 1,
+      "points": 20
+    },
+    {
+      "id": "d2_special2",
+      "title": "Clear 2 different special levels",
+      "group": "special",
+      "stat": "special",
+      "target": 2,
+      "points": 25
+    },
+    {
+      "id": "d2_normal_special",
+      "title": "Clear a special level on Normal or harder",
+      "group": "special",
+      "stat": "special@2",
+      "target": 1,
+      "points": 25
     }
   ],
   "dailyMilestones": [
     {
-      "id": "dp_40",
-      "title": "40 points",
-      "target": 40,
-      "coins": 200
+      "id": "dp2_100",
+      "title": "100 points",
+      "group": "general",
+      "target": 100,
+      "coins": 250
     },
     {
-      "id": "dp_80",
-      "title": "80 points",
-      "target": 80,
-      "coins": 400
-    },
-    {
-      "id": "dp_120",
-      "title": "120 points",
-      "target": 120,
-      "coins": 600
-    },
-    {
-      "id": "dp_160",
-      "title": "160 points",
-      "target": 160,
-      "coins": 800
-    },
-    {
-      "id": "dp_200",
+      "id": "dp2_200",
       "title": "200 points",
+      "group": "general",
       "target": 200,
-      "heroRegion": -1,
-      "heroOrCoins": 1000
+      "coins": 500
+    },
+    {
+      "id": "dp2_300",
+      "title": "300 points",
+      "group": "general",
+      "target": 300,
+      "coins": 750
+    },
+    {
+      "id": "dp2_400",
+      "title": "400 points",
+      "group": "general",
+      "target": 400,
+      "coins": 1000
+    },
+    {
+      "id": "dp2_500",
+      "title": "500 points",
+      "group": "general",
+      "target": 500,
+      "coins": 1500
     }
   ],
   "weekly": [
     {
-      "id": "w_login5",
+      "id": "w2_login5",
       "title": "Log in on 5 days",
+      "group": "general",
       "stat": "loginDays",
       "target": 5,
-      "coins": 150
+      "coins": 200
     },
     {
-      "id": "w_login7",
+      "id": "w2_login7",
       "title": "Log in every day",
+      "group": "general",
       "stat": "loginDays",
       "target": 7,
-      "coins": 150
-    },
-    {
-      "id": "w_play100",
-      "title": "Play for 100 minutes",
-      "stat": "playMin",
-      "target": 100,
-      "coins": 250
-    },
-    {
-      "id": "w_play250",
-      "title": "Play for 250 minutes",
-      "stat": "playMin",
-      "target": 250,
       "coins": 300
     },
     {
-      "id": "w_jumps8000",
-      "title": "Make 8,000 jumps",
-      "stat": "jumps",
-      "target": 8000,
-      "coins": 150
+      "id": "w2_play120",
+      "title": "Play for 120 minutes",
+      "group": "general",
+      "stat": "playMin",
+      "target": 120,
+      "coins": 300
     },
     {
-      "id": "w_powerups10",
+      "id": "w2_play300",
+      "title": "Play for 300 minutes",
+      "group": "general",
+      "stat": "playMin",
+      "target": 300,
+      "coins": 400
+    },
+    {
+      "id": "w2_powerups10",
       "title": "Use 10 power-ups",
+      "group": "general",
       "stat": "powerups",
       "target": 10,
-      "coins": 150,
-      "powerups": 2
-    },
-    {
-      "id": "w_powerups20",
-      "title": "Use 20 power-ups",
-      "stat": "powerups",
-      "target": 20,
-      "coins": 150,
-      "powerups": 1
-    },
-    {
-      "id": "w_stars20",
-      "title": "Earn 20 stars",
-      "stat": "starsEarned",
-      "target": 20,
-      "coins": 250
-    },
-    {
-      "id": "w_stars40",
-      "title": "Earn 40 stars",
-      "stat": "starsEarned",
-      "target": 40,
-      "gems": 4,
-      "coins": 200
-    },
-    {
-      "id": "w_levels20",
-      "title": "Complete 20 levels",
-      "stat": "levels",
-      "target": 20,
-      "coins": 250
-    },
-    {
-      "id": "w_levels40",
-      "title": "Complete 40 levels",
-      "stat": "levels",
-      "target": 40,
       "coins": 300
     },
     {
-      "id": "w_nowall2",
-      "title": "Clear the no-wall level 2 times",
-      "stat": "noWall",
-      "target": 2,
-      "coins": 200
+      "id": "w2_levels20",
+      "title": "Clear 20 levels",
+      "group": "levels",
+      "stat": "levels",
+      "target": 20,
+      "coins": 300
     },
     {
-      "id": "w_combos150",
+      "id": "w2_levels40",
+      "title": "Clear 40 levels",
+      "group": "levels",
+      "stat": "levels",
+      "target": 40,
+      "coins": 400
+    },
+    {
+      "id": "w2_stars30",
+      "title": "Earn 30 stars",
+      "group": "levels",
+      "stat": "starsEarned",
+      "target": 30,
+      "coins": 300
+    },
+    {
+      "id": "w2_stars60",
+      "title": "Earn 60 stars",
+      "group": "levels",
+      "stat": "starsEarned",
+      "target": 60,
+      "gems": 5,
+      "coins": 400
+    },
+    {
+      "id": "w2_3star10",
+      "title": "Get 3 stars on 10 levels",
+      "group": "levels",
+      "stat": "stars3",
+      "target": 10,
+      "coins": 400
+    },
+    {
+      "id": "w2_combos150",
       "title": "Make 150 combos",
+      "group": "levels",
       "stat": "combos",
       "target": 150,
       "coins": 300
     },
     {
-      "id": "w_combos300",
+      "id": "w2_combos300",
       "title": "Make 300 combos",
+      "group": "levels",
       "stat": "combos",
       "target": 300,
       "gems": 5,
-      "coins": 250
+      "coins": 400
     },
     {
-      "id": "w_endless100",
-      "title": "Reach floor 100 in Endless",
-      "stat": "endlessFloor",
-      "target": 100,
-      "coins": 200
-    },
-    {
-      "id": "w_endless150",
-      "title": "Reach floor 150 in Endless",
-      "stat": "endlessFloor",
-      "target": 150,
-      "gems": 4,
-      "coins": 200
-    },
-    {
-      "id": "w_endless200",
-      "title": "Reach floor 200 in Endless",
-      "stat": "endlessFloor",
-      "target": 200,
-      "gems": 6,
-      "coins": 250
-    },
-    {
-      "id": "w_endlessruns20",
-      "title": "Finish 20 Endless runs",
-      "stat": "endlessRuns",
-      "target": 20,
-      "gems": 5,
-      "coins": 250
-    },
-    {
-      "id": "w_pace3",
-      "title": "Best pace on 3 levels",
-      "stat": "bestPaceLevels",
-      "target": 3,
-      "gems": 4,
-      "coins": 200
-    },
-    {
-      "id": "w_medals8",
+      "id": "w2_medals8",
       "title": "Earn 8 medals",
+      "group": "levels",
       "stat": "medals",
       "target": 8,
-      "coins": 250,
-      "powerups": 1
+      "coins": 300
     },
     {
-      "id": "w_gold5",
+      "id": "w2_gold5",
       "title": "Earn 5 gold medals",
+      "group": "levels",
       "stat": "goldMedals",
       "target": 5,
       "gems": 5,
-      "coins": 250,
+      "coins": 400
+    },
+    {
+      "id": "w2_settings3",
+      "title": "Clear levels on 3 different settings",
+      "group": "setting",
+      "stat": "settings",
+      "target": 3,
+      "coins": 300
+    },
+    {
+      "id": "w2_settings5",
+      "title": "Clear a level on all 5 settings",
+      "group": "setting",
+      "stat": "settings",
+      "target": 5,
+      "coins": 400
+    },
+    {
+      "id": "w2_easy_levels15",
+      "title": "Clear 15 levels on Easy or harder",
+      "group": "setting",
+      "stat": "levels@1",
+      "target": 15,
+      "coins": 300
+    },
+    {
+      "id": "w2_normal_levels15",
+      "title": "Clear 15 levels on Normal or harder",
+      "group": "setting",
+      "stat": "levels@2",
+      "target": 15,
+      "coins": 400
+    },
+    {
+      "id": "w2_hard_levels10",
+      "title": "Clear 10 levels on Hard or Insane",
+      "group": "setting",
+      "stat": "levels@3",
+      "target": 10,
+      "coins": 500,
       "powerups": 1
     },
     {
-      "id": "w_gold10",
-      "title": "Earn 10 gold medals",
-      "stat": "goldMedals",
-      "target": 10,
-      "gems": 7,
-      "coins": 250
+      "id": "w2_insane_levels5",
+      "title": "Clear 5 levels on Insane",
+      "group": "setting",
+      "stat": "levels@4",
+      "target": 5,
+      "coins": 600,
+      "powerups": 1
     },
     {
-      "id": "w_ta100",
+      "id": "w2_normal_stars30",
+      "title": "Earn 30 stars on Normal or harder",
+      "group": "setting",
+      "stat": "starsEarned@2",
+      "target": 30,
+      "coins": 400
+    },
+    {
+      "id": "w2_hard_stars20",
+      "title": "Earn 20 stars on Hard or Insane",
+      "group": "setting",
+      "stat": "starsEarned@3",
+      "target": 20,
+      "gems": 5,
+      "coins": 500
+    },
+    {
+      "id": "w2_hard_medals5",
+      "title": "Earn 5 medals on Hard or Insane",
+      "group": "setting",
+      "stat": "medals@3",
+      "target": 5,
+      "gems": 5,
+      "coins": 500
+    },
+    {
+      "id": "w2_normal_gold3",
+      "title": "Earn 3 gold medals on Normal or harder",
+      "group": "setting",
+      "stat": "goldMedals@2",
+      "target": 3,
+      "gems": 5,
+      "coins": 500
+    },
+    {
+      "id": "w2_endlessruns15",
+      "title": "Finish 15 Endless runs",
+      "group": "endlessTimeAttack",
+      "stat": "endlessRuns",
+      "target": 15,
+      "coins": 300
+    },
+    {
+      "id": "w2_endless100",
+      "title": "Reach floor 100 in Endless",
+      "group": "endlessTimeAttack",
+      "stat": "endlessFloor",
+      "target": 100,
+      "coins": 300
+    },
+    {
+      "id": "w2_endless200",
+      "title": "Reach floor 200 in Endless",
+      "group": "endlessTimeAttack",
+      "stat": "endlessFloor",
+      "target": 200,
+      "gems": 5,
+      "coins": 400
+    },
+    {
+      "id": "w2_endless300",
+      "title": "Reach floor 300 in Endless",
+      "group": "endlessTimeAttack",
+      "stat": "endlessFloor",
+      "target": 300,
+      "gems": 5,
+      "coins": 500
+    },
+    {
+      "id": "w2_normal_endless150",
+      "title": "Reach floor 150 in Endless on Normal or harder",
+      "group": "endlessTimeAttack",
+      "stat": "endlessFloor@2",
+      "target": 150,
+      "coins": 400
+    },
+    {
+      "id": "w2_hard_endless150",
+      "title": "Reach floor 150 in Endless on Hard or Insane",
+      "group": "endlessTimeAttack",
+      "stat": "endlessFloor@3",
+      "target": 150,
+      "coins": 600,
+      "powerups": 1
+    },
+    {
+      "id": "w2_ta100",
       "title": "Time Attack: 100 floors",
+      "group": "endlessTimeAttack",
       "stat": "taFloors",
       "target": 100,
-      "coins": 200
+      "coins": 300
     },
     {
-      "id": "w_hard5",
-      "title": "Clear 5 hard levels",
-      "stat": "hardClear",
+      "id": "w2_taruns5",
+      "title": "Finish 5 Time Attack runs",
+      "group": "endlessTimeAttack",
+      "stat": "taRuns",
       "target": 5,
-      "gems": 4,
-      "coins": 200,
-      "heroRegion": -1,
-      "heroOrCoins": 1000
+      "coins": 300
     },
     {
-      "id": "w_hard10",
-      "title": "Clear 10 hard levels",
-      "stat": "hardClear",
-      "target": 10,
-      "gems": 6,
-      "coins": 200,
-      "heroRegion": -1,
-      "heroOrCoins": 1000
+      "id": "w2_special_nowall",
+      "title": "Clear the No Wall Touch level",
+      "group": "special",
+      "stat": "specialType.1",
+      "target": 1,
+      "coins": 400
+    },
+    {
+      "id": "w2_special_nopowerups",
+      "title": "Clear the No Power-ups level",
+      "group": "special",
+      "stat": "specialType.2",
+      "target": 1,
+      "coins": 400
+    },
+    {
+      "id": "w2_special_combo",
+      "title": "Clear the Combo Climb level",
+      "group": "special",
+      "stat": "specialType.3",
+      "target": 1,
+      "coins": 400
+    },
+    {
+      "id": "w2_special_chase",
+      "title": "Clear the Chase level",
+      "group": "special",
+      "stat": "specialType.4",
+      "target": 1,
+      "coins": 400
+    },
+    {
+      "id": "w2_special_onelife",
+      "title": "Clear the One Life level",
+      "group": "special",
+      "stat": "specialType.5",
+      "target": 1,
+      "coins": 400
+    },
+    {
+      "id": "w2_special_keepmoving",
+      "title": "Clear the Keep Moving level",
+      "group": "special",
+      "stat": "specialType.6",
+      "target": 1,
+      "coins": 400
+    },
+    {
+      "id": "w2_special_all6",
+      "title": "Clear all 6 special level types",
+      "group": "special",
+      "stat": "specialTypes",
+      "target": 6,
+      "gems": 5,
+      "coins": 600
+    },
+    {
+      "id": "w2_hard_special3",
+      "title": "Clear 3 special levels on Hard or Insane",
+      "group": "special",
+      "stat": "special@3",
+      "target": 3,
+      "gems": 5,
+      "coins": 600
     }
   ]
 }

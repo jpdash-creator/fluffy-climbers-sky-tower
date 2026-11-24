@@ -1,5 +1,7 @@
 # 14 - In-app store (Shop): requirements
 
+> **Final Change 1 (owner 2026-11-22): current prices.** Hero cards 8,000 / 24,000 / 72,000 / 200,000 / 500,000 coins (Common to Legendary); power-ups 2,000 coins (Wall Stick, Shield, Wide Platforms), 3,000 (Safety Net, Double Jump, Glide Cape, Slow Time), 4,000 (Flight, Rocket), gem value = coins / 20; Iron chest 400 gems, Gold chest 1,500 gems (open 10 = ten times), each with one hero card; bundles 200 to 1,000 gems; subscriptions $1.99 / $4.99 / $6.99 / $14.99. Tables: doc 27 section 0. Prices quoted in the requirement rows below are those of 2026-11-01 unless a row says otherwise.
+
 > **Corrected 2026-11-01 to match the code (build v0.38.0.40).** Authoritative now: **doc 27** (all economy numbers and tables), **doc 26** (shop look, 5 tabs, Bundles, Subscription, Rewards), **doc 22** (packs, chests, prices, revive) and **doc 20** (characters and chests, gear removed). Where this file differs, those win. This file keeps the shop shell, purchase flows, compliance and billing requirements. Requirement ids are kept; an id that no longer applies is marked "removed or superseded 2026-11-01 (see doc N)" and is not renumbered.
 > Owner rules applied: **1 gem = 20 coins (fixed)**; **no gear** (hats, shirts, pants, boots, gear chests, shards, wardrobe are gone); **no VIP tiers** (replaced by the Weekly and Monthly Subscription); **no battle pass** (not planned).
 > Everything described below as "Built" was checked against `Assets/_Game/Economy/*.cs`, `Gameplay/ShopScreen*.cs` and `Content/economy/*.json`.
@@ -108,9 +110,9 @@ All cross-checks (value per dollar, dollars per gem, time to afford) are in **do
 
 | ID | Original conflict | Status 2026-11-01 |
 |---|---|---|
-| C-1 | Coin packs live but no coin sink. | **Resolved:** power-ups (1,000 / 1,500 coins), bundle Refresh (100 coins) and later characters take coins. |
+| C-1 | Coin packs live but no coin sink. | **Resolved:** power-ups (2,000 / 3,000 / 4,000 coins since 2026-11-22), hero cards (8,000 to 500,000 coins) and bundle Refresh (100 coins) take coins. |
 | C-2 | 100 coins per gem anchor vs the owner tables. | **Resolved: rate fixed at 20 coins per gem** (doc 22). `remote_config.json` `coinsPerGem` is now 20 (RC 1, 2026-11-01). |
-| C-3 | Item prices set at $0.011 per gem. | **Resolved:** item gem prices (50 / 75) follow the 20:1 rate (1,000 / 1,500 coins). |
+| C-3 | Item prices set at $0.011 per gem. | **Resolved:** item gem values follow the 20:1 rate (since 2026-11-22: 100 / 150 / 200 gems for 2,000 / 3,000 / 4,000 coins). |
 | C-4 | No volume bonus between 50 and 100 gems. | **Resolved:** the new ladder improves at every step. |
 | C-5 | VIP gems undercut packs. | **Superseded:** VIP removed; the subscription is cheaper per gem than packs on purpose (doc 27 RC 6). |
 | C-6 | Free gem inflow vs packs. | Open: rewards, not pickups, are the faucet (doc 27 findings 1 and 2). |
@@ -137,7 +139,7 @@ The state machine of a real-money purchase (Idle, ProductsLoaded, StoreSheet, Va
 
 > Gear, Gear Chests, rarity frames, upgrade levels, preview and event gear are **removed 2026-11-01 (no gear)**. Chest specification: doc 22 point 3, doc 26 section 1, doc 27 section 10.
 
-Rules [CODE `Chests.cs`]: two chests, gems only, **Iron 100 gems (open 10: 1,000)**: 1 power-up + 400 to 600 coins. **Gold 300 gems (open 10: 3,000)**: 3 power-ups + 1,000 to 1,400 coins. Each power-up is one of the 7 types with equal chance. Characters switched off (`CharactersEnabled = false`; duplicate refund 25 percent of the character's gem price when on). No chests are earned from play.
+Rules since 2026-11-22 [CODE `ChestCards.cs`]: two chests, gems only, **Iron 400 gems (open 10: 4,000)**: 1 power-up + 800 to 1,200 coins + 1 hero card (Common 50 / Uncommon 30 / Rare 20 percent), worth x3.7. **Gold 1,500 gems (open 10: 15,000)**: 3 power-ups + 3,000 to 4,200 coins + 1 hero card (Rare 60 / Elite 30 / Legendary 10 percent), worth x5.5. A duplicate hero is another copy, no refund. The rest of this paragraph is the 2026-11-01 state (history): Iron 100 gems (open 10: 1,000): 1 power-up + 400 to 600 coins. Gold 300 gems (open 10: 3,000): 3 power-ups + 1,000 to 1,400 coins. Each power-up is one of the 7 types with equal chance. Characters switched off (`CharactersEnabled = false`; duplicate refund 25 percent of the character's gem price when on). No chests are earned from play.
 
 | ID | Requirement | Pri | Acceptance criteria | State |
 |---|---|---|---|---|
@@ -150,7 +152,7 @@ Rules [CODE `Chests.cs`]: two chests, gems only, **Iron 100 gems (open 10: 1,000
 
 ## 8. Tab "Power-ups" and Characters
 
-Power-up rules [CODE `PowerUpCatalog.cs`, doc 27 section 7]: 9 types are sold (Flight, Rocket, Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms, Slow Time); **1,000 coins / 50 gems** (Safety Net, Glide Cape, Wide Platforms, Shield, Wall Stick, Double Jump) or **1,500 coins / 75 gems** (Slow Time, Rocket, Flight); 5 units -10 percent, 10 or more -20 percent. No stock cap, no loadout, no carry cap (rework 2026-10-31); every owned type is available in a run; a tap while active adds the full duration. Spring Boots, Coin Doubler, Star Seeker, Safety Net are hidden rows (not implemented).
+Power-up rules [CODE `PowerUpCatalog.cs`, doc 27 section 7]: 9 types are sold (Flight, Rocket, Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms, Slow Time); since 2026-11-22 **2,000 coins / 100 gems** (Wall Stick, Shield, Wide Platforms), **3,000 / 150** (Safety Net, Double Jump, Glide Cape, Slow Time) or **4,000 / 200** (Flight, Rocket), sold for coins (before: 1,000 / 50 and 1,500 / 75); 5 units -10 percent, 10 or more -20 percent. No stock cap, no loadout, no carry cap (rework 2026-10-31); every owned type is available in a run; a tap while active adds the full duration. Spring Boots, Coin Doubler, Star Seeker, Safety Net are hidden rows (not implemented).
 
 | ID | Requirement | Pri | Acceptance criteria | State |
 |---|---|---|---|---|
@@ -171,7 +173,7 @@ Power-up rules [CODE `PowerUpCatalog.cs`, doc 27 section 7]: 9 types are sold (F
 
 ## 9. Subscription and Rewards (replace "VIP and Battle Pass")
 
-> VIP tiers, jump/gem/coin percentage bonuses and the battle pass are **removed or superseded 2026-11-01 (see doc 26 and doc 27 section 8)**. Subscription (doc 26 section 2): **Weekly Subscription $1.49 (Rs 149)**: 100 gems on purchase, then 7 daily claims of 10 gems + 500 coins. **Monthly Subscription $4.99 (Rs 449)**: 200 gems, then 30 daily claims of 10 gems + 600 coins, and one random power-up on every 5th claim. Claim once per local day; missed days are not stacked; buying while active extends the time. Test purchase in development builds with `SYSTEM_TEST`; release shows "Not available yet".
+> VIP tiers, jump/gem/coin percentage bonuses and the battle pass are **removed or superseded 2026-11-01 (see doc 26 and doc 27 section 8)**. Subscription (doc 26 section 2), four plans since 2026-11-13, prices and contents of 2026-11-22: **Weekly Starter $1.99** (100 gems, then 7 daily claims of 15 gems + 600 coins, 1 power-up), **Weekly Plus $4.99** (250 gems, 20 gems + 1,000 coins a day, 3 power-ups, 1 Iron chest), **Monthly Standard $6.99** (200 gems, then 30 daily claims of 15 gems + 600 coins, a power-up on every 5th claim), **Monthly Premium $14.99** (300 gems, 20 gems + 1,000 coins a day, a power-up on every 5th claim, 2 Gold chests). (History: Weekly $1.49 with 10 gems + 500 coins a day, Monthly $4.99 with 10 gems + 600 coins a day.) Claim once per local day; missed days are not stacked; buying while active extends the time. Test purchase in development builds with `SYSTEM_TEST`; release shows "Not available yet".
 
 | ID | Requirement | Pri | Acceptance criteria | State |
 |---|---|---|---|---|
@@ -200,7 +202,7 @@ Built [doc 26 section 3, doc 27 section 9]: **1,000 generated Bundles** priced i
 | ID | Requirement | Pri | Acceptance criteria | State |
 |---|---|---|---|---|
 | FR-SHOP-71 | Only gems buy coins. Coins never convert to gems. | P0 | No code path credits gems from coins. | Built |
-| FR-SHOP-72 | **Rate fixed: 1 gem = 20 coins** (doc 22 shared conventions). Coin packs pay 20, 20, 20, 20, 22.2, 22.7, 25 coins per gem; power-up prices are 1,000 coins = 50 gems and 1,500 coins = 75 gems. The old 100:1, 10:1 (list) and bonus-pack rules are void. | P0 | `ShopEconomyTests` (coins per gem never drop as packs grow). | Built |
+| FR-SHOP-72 | **Rate fixed: 1 gem = 20 coins** (doc 22 shared conventions). Coin packs pay 20, 20, 20, 20, 22.2, 22.7, 25 coins per gem; power-up prices follow it (since 2026-11-22: 2,000 coins = 100 gems, 3,000 = 150, 4,000 = 200). The old 100:1, 10:1 (list) and bonus-pack rules are void. | P0 | `ShopEconomyTests` (coins per gem never drop as packs grow). | Built |
 | FR-SHOP-73 | Gems and coins are integers, never negative, saturate at int max, thousands separator. | P0 | Wallet tests. | Built |
 | FR-SHOP-74 | Free and bought gems are one balance, no expiry; analytics distinguish the source. | P0 | Event param `source`. | Planned (no analytics layer yet) |
 

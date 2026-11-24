@@ -50,6 +50,12 @@ namespace FluffyClimbers.Editor.Build
             PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = x86 ? (AndroidArchitecture.ARM64 | AndroidArchitecture.X86_64) : AndroidArchitecture.ARM64;
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+            // The development APK is always signed with the debug key. The release AAB (AndroidReleaseBuild) switches the upload keystore on only for its own build;
+            // the v0.67.124 release commit left it switched on in ProjectSettings, and this build then failed with "Unable to sign the application; please provide passwords".
+            PlayerSettings.Android.useCustomKeystore = false;
+            // Same reason: the release build turns "Build App Bundle" on (an editor setting kept in Library). Left on, this build wrote an AAB under the .apk name
+            // (v0.68.126, 2026-11-23: "INSTALL_PARSE_FAILED" on the phone). The development build is always a plain APK.
+            EditorUserBuildSettings.buildAppBundle = false;
             var options = new BuildPlayerOptions
             {
                 scenes = new[] { "Assets/Scenes/Boot.unity", "Assets/Scenes/Meta.unity", "Assets/Scenes/Run.unity" },

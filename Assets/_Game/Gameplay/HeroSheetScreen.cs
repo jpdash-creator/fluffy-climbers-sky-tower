@@ -40,7 +40,8 @@ namespace FluffyClimbers.Gameplay
             if (copy < 0) copy = progress != null && CharacterCatalog.Selected == who ? CharacterCatalog.SelectedCopy : 0;
             CharacterStats stats = spec == null ? null : (progress != null ? progress.StatsOf(spec, copy) : spec.Stats);
             ShownStats shown = spec == null ? null : (progress != null ? progress.ShownOf(spec, copy) : spec.Shown);
-            return From(who.Name, spec != null ? spec.Rarity : CharacterRarity.Common, region, stats, spec != null ? spec.Powers : null, shown);
+            PowerUp[] powers = spec == null ? null : (progress != null && HeroRolls.IsRollable(spec.Id) ? progress.HeroPowers(spec.Id, copy) : spec.Powers);   // the power(s) rolled for THIS copy (owner Final Change 2)
+            return From(who.Name, spec != null ? spec.Rarity : CharacterRarity.Common, region, stats, powers, shown);
         }
 
         /// <summary>Any hero from raw values (the test fixture builds a fake Legendary this way).</summary>
@@ -78,7 +79,7 @@ namespace FluffyClimbers.Gameplay
                 if (i > 0) sb.Append(", ");
                 sb.Append(def != null ? def.Name : powers[i].ToString());
             }
-            sb.Append(". Each is free once per run, then from your stock.");
+            sb.Append(powers.Length > 1 ? ". One free use of either, once per run, then from your stock." : ". Free once per run, then from your stock.");
             return sb.ToString();
         }
     }

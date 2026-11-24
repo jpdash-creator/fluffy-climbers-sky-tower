@@ -22,11 +22,13 @@ namespace FluffyClimbers.Economy
     /// <summary>
     /// Owns the player's local progress: wallet, per-level results, region unlocks. Every mutation saves immediately.
     /// Rules (doc 01 FR-P5, FR-P6; doc 08):
-    ///  - Region 1 is always unlocked. Clearing the last level of a region unlocks the next region (if it is playable).
+    ///  - Region 1 is always unlocked. Clearing ALL levels of a region in ONE single Gameplay setting unlocks the next region (if it is playable), for every setting
+    ///    (Final Change 1, owner 2026-11-22).
     ///  - Or pay the region's gem skip price to unlock the NEXT locked region without clearing the previous one.
     ///  - Teaser regions can never be entered. Only regions with index &lt;= PlayableRegionLimit are playable in this build
     ///    (launch scope is 5 regions; the content still marks 6-20 live, so the limit lives here until the content is updated).
-    ///  - Inside a region, level N unlocks when level N-1 has been cleared (assumption, doc 02 is silent).
+    ///  - Inside a region every Gameplay setting has its own path: level N unlocks in a setting when level N-1 has been cleared in THAT setting.
+    ///  - Stars and clears are stored per Gameplay setting (LevelProgress.StarsIn/MaskIn/ClearsIn); old saves count as Relaxed. Gems are paid once per level.
     /// </summary>
     public sealed partial class ProgressService
     {
@@ -38,6 +40,8 @@ namespace FluffyClimbers.Economy
 
         /// <summary>Raised after any change to coins, gems or progress.</summary>
         public event Action Changed;
+        /// <summary>Raised by quiet saves (no game change): the cloud upload is wanted but rate-limited (Final Change 3, QuietUploadGate).</summary>
+        public event Action QuietChanged;
 
         public ProgressService(ContentRepository repo, ISaveStore store, int playableRegionLimit = 5)
         {
@@ -45,11 +49,31 @@ namespace FluffyClimbers.Economy
             this.store = store;
             PlayableRegionLimit = playableRegionLimit;
             Data = store.Load();
+            EnsureLevelFields();
             EnsureEndlessFields();
             EnsurePowerUpFields();
             EnsureChestFields();
             EnsureTimedFields();   // ProgressService.Records.cs
             MigrateCrownFormula();   // ProgressService.WeekCrowns.cs
+            MigrateHeroRolls();   // ProgressService.HeroRolls.cs
+        }
+
+        /// <summary>
+        /// Final Change 1 (owner 2026-11-22): stars and clears are stored per Gameplay setting. A save written before that has none of the per-setting arrays: ALL its stars,
+        /// star bits and clears go to Relaxed (mode 0), the other four settings start empty (LevelProgress.Normalize). Unlocked regions stay unlocked. Additive, no save version
+        /// bump; also repairs null fields and null entries. Idempotent; the next save writes the result.
+        /// </summary>
+        void EnsureLevelFields()
+        {
+            if (Data.Levels == null) Data.Levels = new System.Collections.Generic.Dictionary<string, LevelProgress>();
+            if (Data.UnlockedRegions == null) Data.UnlockedRegions = new System.Collections.Generic.List<string>();
+            System.Collections.Generic.List<string> dead = null;
+            foreach (var kv in Data.Levels)
+            {
+                if (kv.Value == null) { if (dead == null) dead = new System.Collections.Generic.List<string>(); dead.Add(kv.Key); continue; }
+                kv.Value.Normalize();   // changes the entry, never the dictionary
+            }
+            if (dead != null) foreach (string id in dead) Data.Levels.Remove(id);
         }
 
         /// <summary>Saves written before endless mode (or with null fields) get safe defaults.</summary>
@@ -303,8 +327,8 @@ namespace FluffyClimbers.Economy
         }
 
         /// <summary>
-        /// The region the player is working on (owner 2026-10-24: the home page follows it): the first region, in order, that can be entered and still has
-        /// a level that is not cleared; when everything playable is cleared, the last playable region.
+        /// The region the player is working on (owner 2026-10-24: the home page follows it): the first region, in order, that can be entered and is not complete
+        /// in any Gameplay setting yet (Final Change 1: complete = all its levels cleared in ONE setting); when every enterable region is complete, the last one.
         /// </summary>
         public RegionDef CurrentRegion()
         {
@@ -313,7 +337,7 @@ namespace FluffyClimbers.Economy
             {
                 if (!CanEnterRegion(r)) continue;
                 last = r;
-                foreach (LevelDef l in repo.LevelsOf(r.Id)) if (!IsLevelCleared(l.Id)) return r;
+                if (!IsRegionCompleteInAnySetting(r)) return r;
             }
             return last ?? repo.GetRegionByIndex(1);
         }
@@ -350,54 +374,136 @@ namespace FluffyClimbers.Economy
 
         // ---- levels ----
 
+        // Final Change 1 (owner 2026-11-22): stars, star bits and clears are stored PER GAMEPLAY SETTING (mode 0..4 = Relaxed .. Insane, TimeRecords.ClampMode), 3 stars x 25 levels x
+        // 5 settings = 375 per region. Every setting has its own path through a region; gems stay once per level. The legacy LevelProgress.Stars/StarMask/Clears are an aggregate
+        // for older builds only: no rule reads them.
+
+        /// <summary>The stored entry of a level (null when it has none). Read stars and clears through the per-setting methods below, or LevelProgress.StarsIn/MaskIn/ClearsIn.</summary>
         public LevelProgress GetProgress(string levelId)
         {
             LevelProgress p;
-            return Data.Levels.TryGetValue(levelId, out p) ? p : null;
+            return levelId != null && Data.Levels.TryGetValue(levelId, out p) ? p : null;
         }
 
+        /// <summary>Stars (0..3) of a level in one Gameplay setting.</summary>
+        public int StarsOf(string levelId, int mode)
+        {
+            LevelProgress p = GetProgress(levelId);
+            return p == null ? 0 : p.StarsIn(TimeRecords.ClampMode(mode));
+        }
+
+        /// <summary>Star bits of a level in one Gameplay setting (bit 0 = star 1 ...).</summary>
+        public int StarMaskOf(string levelId, int mode)
+        {
+            LevelProgress p = GetProgress(levelId);
+            return p == null ? 0 : p.MaskIn(TimeRecords.ClampMode(mode));
+        }
+
+        /// <summary>True when the level was cleared in THIS Gameplay setting (the path of a setting, the reduced replay, the level screen).</summary>
+        public bool IsLevelCleared(string levelId, int mode)
+        {
+            LevelProgress p = GetProgress(levelId);
+            return p != null && p.ClearedIn(TimeRecords.ClampMode(mode));
+        }
+
+        /// <summary>True when the level was cleared in ANY Gameplay setting (gems are once per level, the Google prompt, the save summary).</summary>
         public bool IsLevelCleared(string levelId)
         {
             LevelProgress p = GetProgress(levelId);
-            return p != null && p.Clears > 0;
+            return p != null && p.ClearedAny();
         }
 
-        public bool IsLevelUnlocked(LevelDef level)
+        /// <summary>
+        /// Own path per Gameplay setting: level 1 of an enterable region is open in every setting; level N is open in a setting only when level N-1 is cleared IN THAT SETTING.
+        /// The dev flag TestUnlockAll opens everything.
+        /// </summary>
+        public bool IsLevelUnlocked(LevelDef level, int mode)
         {
             RegionDef region = repo.GetRegion(level.Region);
             if (!CanEnterRegion(region)) return false;
             if (TestUnlockAll || level.Index <= 1) return true;
             string previousId = region.Levels[level.Index - 2];
-            return IsLevelCleared(previousId);
+            return IsLevelCleared(previousId, mode);
         }
 
-        public int TotalStars()
+        /// <summary>Levels of the region cleared in one Gameplay setting (the level screen pill, n of 25).</summary>
+        public int LevelsClearedInRegion(RegionDef region, int mode)
         {
-            int n = 0;
-            foreach (LevelProgress p in Data.Levels.Values) n += p.Stars;
-            return n;
-        }
-
-        public int StarsInRegion(RegionDef region)
-        {
+            if (region == null) return 0;
+            mode = TimeRecords.ClampMode(mode);
             int n = 0;
             foreach (string id in region.Levels)
             {
                 LevelProgress p = GetProgress(id);
-                if (p != null) n += p.Stars;
+                if (p != null && p.ClearedIn(mode)) n++;
+            }
+            return n;
+        }
+
+        /// <summary>The most levels of the region cleared in one single Gameplay setting (the "clear N levels" goals count the best setting).</summary>
+        public int BestLevelsClearedInRegion(RegionDef region)
+        {
+            int best = 0;
+            for (int m = 0; m < TimeRecords.ModeCount; m++) { int n = LevelsClearedInRegion(region, m); if (n > best) best = n; }
+            return best;
+        }
+
+        /// <summary>
+        /// True when ALL levels of the region are cleared in ONE single Gameplay setting (any of the five): the rule that opens the next region.
+        /// 12 levels on Relaxed plus 13 on Easy do not count.
+        /// </summary>
+        public bool IsRegionCompleteInAnySetting(RegionDef region)
+        {
+            if (region == null || region.Levels.Count == 0) return false;
+            for (int m = 0; m < TimeRecords.ModeCount; m++) if (LevelsClearedInRegion(region, m) == region.Levels.Count) return true;
+            return false;
+        }
+
+        /// <summary>Stars of every level in every Gameplay setting (the wallet star pill).</summary>
+        public int TotalStars()
+        {
+            int n = 0;
+            foreach (LevelProgress p in Data.Levels.Values) if (p != null) n += p.TotalStars();
+            return n;
+        }
+
+        /// <summary>Stars of the region in one Gameplay setting (the level screen pill, n of 75).</summary>
+        public int StarsInRegion(RegionDef region, int mode)
+        {
+            if (region == null) return 0;
+            mode = TimeRecords.ClampMode(mode);
+            int n = 0;
+            foreach (string id in region.Levels)
+            {
+                LevelProgress p = GetProgress(id);
+                if (p != null) n += p.StarsIn(mode);
+            }
+            return n;
+        }
+
+        /// <summary>Stars of the region over ALL Gameplay settings (the world map; at most 3 x levels x 5 = 375).</summary>
+        public int StarsInRegion(RegionDef region)
+        {
+            if (region == null) return 0;
+            int n = 0;
+            foreach (string id in region.Levels)
+            {
+                LevelProgress p = GetProgress(id);
+                if (p != null) n += p.TotalStars();
             }
             return n;
         }
 
         /// <summary>
-        /// Applies a finished run: pays rewards, records the best result, unlocks the next region after the last level.
-        /// A run that did not complete changes nothing. Throws if the level is locked (callers must not start locked levels).
+        /// Applies a finished run in its Gameplay setting (run.Mode): pays rewards, records the best result of that setting, and opens the next region once ALL levels of
+        /// this region are cleared in that one setting. A run that did not complete changes nothing. Throws if the level is locked in that setting (callers must not start locked levels).
         /// </summary>
         public RewardResult ApplyRun(string levelId, RunOutcome run)
         {
             LevelDef level = repo.GetLevel(levelId);
             RegionDef region = repo.GetRegion(level.Region);
-            if (!IsLevelUnlocked(level)) throw new InvalidOperationException("Level is locked: " + levelId);
+            int mode = TimeRecords.ClampMode(run.Mode);
+            if (!IsLevelUnlocked(level, mode)) throw new InvalidOperationException("Level is locked: " + levelId + " (setting " + mode + ")");
             if (!run.Completed) return new RewardResult();
 
             LevelProgress before = GetProgress(levelId);
@@ -409,9 +515,7 @@ namespace FluffyClimbers.Economy
             // rarity bonus on the first clear of levels 5/10/15/20/25 only; RewardCalculator.Compute adds it (RewardResult.HeroBonusCoins / HeroBonusGems, run.HeroId).
 
             LevelProgress p = before ?? new LevelProgress();
-            p.Clears++;
-            p.StarMask |= run.StarMask & 7;
-            p.Stars = new RunOutcome { StarMask = p.StarMask }.Stars;
+            p.AddClear(mode, run.StarMask);   // the clear and the stars of THIS setting only (the legacy aggregate fields follow)
             if (run.Score > p.BestScore) p.BestScore = run.Score;
             RecordCrown(p, run.Score, run.Mode, run.Floors, run.BestCombo, run.Chains);
             RecordWeekCrown(WeekKind.Level, levelId, run.Score, run.Mode, run.Floors, run.BestCombo, run.Chains);   // this week's crown (ProgressService.WeekCrowns.cs)
@@ -420,7 +524,9 @@ namespace FluffyClimbers.Economy
             Data.Coins = SaturatingAdd(Data.Coins, reward.TotalCoins);
             Data.Gems = SaturatingAdd(Data.Gems, reward.TotalGems);
 
-            if (level.Index == region.Levels.Count)
+            // The next region opens when all levels of this region are cleared in ONE single setting: the setting of this run is the only one this run can complete.
+            // Once open it is open for every setting; regions already in the unlock list stay.
+            if (LevelsClearedInRegion(region, mode) == region.Levels.Count)
             {
                 RegionDef next = repo.TryGetRegionByIndex(region.Index + 1);
                 if (next != null && IsRegionPlayable(next) && !IsRegionUnlocked(next))
@@ -496,8 +602,8 @@ namespace FluffyClimbers.Economy
             if (run == null || run.RegionId == null || run.Score <= 0) return false;
             if (run.Kind == RunKind.TimeAttack)
             {
-                // Time Attack (server slot t.<region>.<mode>): only this week's store, same crown function (owner 2026-11-16)
-                return RecordWeekCrown(WeekKind.TimeAttack, run.RegionId, run.Score, TimeRecords.ClampMode(run.Mode), run.Floors, run.BestCombo, run.Chains);
+                // Time Attack (server slot t.<region>.<mode>): only this week's store, same crown function (owner 2026-11-16); the three best runs of the week count (owner 2026-11-22)
+                return RecordWeekCrown(WeekKind.TimeAttack, run.RegionId, run.Score, TimeRecords.ClampMode(run.Mode), run.Floors, run.BestCombo, run.Chains, CrownRun.RunKey(run.LayoutSeed, run.Ticks));
             }
             if (run.Kind != RunKind.Endless) return false;
             EnsureEndlessFields();
@@ -517,7 +623,8 @@ namespace FluffyClimbers.Economy
                 arr[mode] = new CrownRun { Floors = run.Floors < 0 ? 0 : run.Floors, BestCombo = run.BestCombo < 0 ? 0 : run.BestCombo, BaseScore = run.Score, Chains = CrownRun.CopyChains(run.Chains) };
                 changed = true;
             }
-            if (RecordWeekCrown(WeekKind.Endless, run.RegionId, run.Score, mode, run.Floors, run.BestCombo, run.Chains)) changed = true;
+            // this week: the three best Endless runs of the region and setting count, added up (owner 2026-11-22; ProgressService.WeekCrowns.cs). The all-time best above is unchanged.
+            if (RecordWeekCrown(WeekKind.Endless, run.RegionId, run.Score, mode, run.Floors, run.BestCombo, run.Chains, CrownRun.RunKey(run.LayoutSeed, run.Ticks))) changed = true;
             return changed;
         }
 
@@ -571,25 +678,27 @@ namespace FluffyClimbers.Economy
         /// <summary>
         /// Applies a finished endless run (the player fell): saves the best floor, pays the floors based coins (EndlessRewards) with the
         /// daily cap rule of the remote config, and saves immediately. <paramref name="dayKey"/> is the UTC day, "yyyyMMdd".
-        /// The region must be enterable.
+        /// The region must be enterable. <paramref name="mode"/> is the Gameplay setting of the run (0..4): its coin bonus (0/5/10/15/25 percent) is added before the daily cap.
         /// </summary>
-        public EndlessReward ApplyEndlessRun(string regionId, int floors, string dayKey, int comboCoins = 0)
+        public EndlessReward ApplyEndlessRun(string regionId, int floors, string dayKey, int comboCoins = 0, int mode = 0)
         {
-            return PayEndlessRun(regionId, floors, dayKey, comboCoins, false);
+            return PayEndlessRun(regionId, floors, dayKey, comboCoins, false, mode);
         }
 
         /// <summary>
         /// Applies a finished 3:00 Time Attack run (doc 46 section 7): pays the normal endless coin table and counts as ONE paying run of the
         /// shared daily cap (past the cap it pays the reduced rate, 0 coins is fine; the record is set by RecordRun regardless). It does not touch
         /// the endless best floor and not the endless "reach floor N" reward stat (Time Attack has its own weekly goal).
+        /// <paramref name="mode"/> is the Gameplay setting of the run (0..4): its coin bonus is added before the daily cap, like Endless.
         /// </summary>
-        public EndlessReward ApplyTimeAttackRun(string regionId, int floors, string dayKey, int comboCoins = 0)
+        public EndlessReward ApplyTimeAttackRun(string regionId, int floors, string dayKey, int comboCoins = 0, int mode = 0)
         {
-            return PayEndlessRun(regionId, floors, dayKey, comboCoins, true);
+            return PayEndlessRun(regionId, floors, dayKey, comboCoins, true, mode);
         }
 
-        EndlessReward PayEndlessRun(string regionId, int floors, string dayKey, int comboCoins, bool timeAttack)
+        EndlessReward PayEndlessRun(string regionId, int floors, string dayKey, int comboCoins, bool timeAttack, int mode)
         {
+            mode = TimeRecords.ClampMode(mode);
             RegionDef region = repo.GetRegion(regionId);
             if (!CanEnterRegion(region)) throw new InvalidOperationException("Region is locked: " + regionId);
             if (floors < 0) floors = 0;
@@ -601,7 +710,12 @@ namespace FluffyClimbers.Economy
             result.NewBest = !timeAttack && floors > result.BestBefore;
             if (result.NewBest) Data.EndlessBest[regionId] = floors;
 
-            int full = EndlessRewards.FullRateCoins(floors, comboCoins, region.CoinFactor);
+            // Final Change 1 (owner 2026-11-22): the Gameplay setting bonus applies to the full-rate coins (floors and combo x region factor), BEFORE the daily-cap halving.
+            int plain = EndlessRewards.FullRateCoins(floors, comboCoins, region.CoinFactor);   // without the setting bonus
+            int full = EndlessRewards.FullRateCoins(floors, comboCoins, region.CoinFactor, mode);
+            int plainPaid = plain;   // what the run would have paid without the bonus (same cap rule): the difference is the bonus part of the paid coins
+            result.Mode = mode;
+            result.SettingBonusPercent = FluffyClimbers.Simulation.CoinPayoutRules.SettingBonusPercent(mode);
             result.FullRateCoins = full;
             result.ComboCoins = (int)(((long)(comboCoins < 0 ? 0 : comboCoins) * (long)Math.Round(region.CoinFactor * 10000) + 5000) / 10000);
             result.Coins = full;
@@ -613,7 +727,9 @@ namespace FluffyClimbers.Economy
                 {
                     result.OverCap = true;
                     result.Coins = EndlessRewards.OverCapCoins(full, eco.EndlessCoinOverCapMultiplier);
+                    plainPaid = EndlessRewards.OverCapCoins(plain, eco.EndlessCoinOverCapMultiplier);
                 }
+                result.SettingBonusCoins = result.Coins > plainPaid ? result.Coins - plainPaid : 0;
                 Data.EndlessRunsToday++;
                 result.RunsToday = Data.EndlessRunsToday;
                 Data.Coins = SaturatingAdd(Data.Coins, result.Coins);
@@ -622,7 +738,7 @@ namespace FluffyClimbers.Economy
             {
                 result.RunsToday = EndlessRunsOn(dayKey);
             }
-            TrackEndlessRun(region, timeAttack ? 0 : floors, result.Coins);   // Main goals: region coins, the daily and weekly endless floor (ProgressService.RegionGoals.cs)
+            TrackEndlessRun(region, floors, result.Coins, mode, timeAttack);   // reward statistics: region coins, the Endless floor and run tasks per setting (ProgressService.RegionGoals.cs)
             Commit();
             return result;
         }
@@ -631,8 +747,23 @@ namespace FluffyClimbers.Economy
         {
             ClampLedger();   // ProgressService.Ledger.cs: the ledger never holds more than the player still owns
             Data.LastPlayedUtc = SaveSync.NowText();   // docs/35: when this save last changed
+            if (Data.AccountMode == SaveSync.ModeGoogle) Data.CloudDirty = true;   // durable "upload pending": a kill before the debounced upload is caught at the next launch (Final Change 3)
             store.Save(Data);
             Changed?.Invoke();
         }
+
+        /// <summary>
+        /// Final Change 3: a quiet save (play time, bundle redraw or timer, leaderboard housekeeping, settings): writes the file, marks the cloud copy as behind (the durable CloudDirty marker) and
+        /// raises <see cref="QuietChanged"/>. It does NOT stamp LastPlayedUtc or raise Changed; AccountSync rate-limits the upload it asks for (QuietUploadGate, at most one per 60 s).
+        /// </summary>
+        void CommitQuiet()
+        {
+            if (Data.AccountMode == SaveSync.ModeGoogle) Data.CloudDirty = true;
+            store.Save(Data);
+            QuietChanged?.Invoke();
+        }
+
+        /// <summary>For callers outside the Economy assembly that save a quiet change (the settings): same as the internal quiet save.</summary>
+        public void TouchQuiet() { CommitQuiet(); }
     }
 }

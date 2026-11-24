@@ -13,8 +13,10 @@ namespace FluffyClimbers.Gameplay
     /// <summary>
     /// The Rewards screen (docs/26 section 4, "RewardsStyle"), tabs Main | Daily | Weekly in a footer with Back and Claim All.
     /// Main (Bug List 5 F1.a, docs/39): a PINNED scene header (scene_daily, like Daily) with a horizontally scrolling, snapping strip of all 30 region circles (1-5 playable, 6-30 "Coming Soon"),
-    /// then the goal cards of the SELECTED region (the same compact cards as Daily and Weekly; the endless tiers come last under an "Endless" divider). Claim All on Main claims the selected region's ready goals.
+    /// then the goal cards of the SELECTED region (the same compact cards as Daily and Weekly). Claim All on Main claims the selected region's ready goals.
     /// Daily and Weekly: a scene header with the reset timer and the points track (Daily, chests with thresholds) or the tasks done bar (Weekly), then the task cards.
+    /// Owner Final Change 1 (2026-11-22): every list is GROUPED under small headings in the order of the owner tables (General, Levels, Gameplay setting, Endless, Time Attack,
+    /// Special levels; Weekly has "Endless and Time Attack" as one group): ready cards first, then each group's heading with its open cards, then "Completed (N)" (RewardsScreen.Completed.cs).
     /// Cards (compact: 136 px, gap 10): cream (open), yellow with a big green Claim button as the reward plate (ready; the card itself claims too), green with a check (claimed); a dark reward plate at the right.
     /// A claim shows a SMALL ICON CARD (chips with amounts, hero faces, a green OK; closes after 4 s or on a tap), never a sentence.
     /// Files: this one (frame, tabs, claiming, the small reward card), RewardsScreen.Cards.cs (cards, plates, bars, hero faces), RewardsScreen.Headers.cs (Main region strip, scene headers, track).
@@ -274,7 +276,7 @@ namespace FluffyClimbers.Gameplay
             {
                 BuildSceneHeader(content, true);
                 BuildDailyAdPowerUpCard(content);   // owner 2026-11-17: one free power-up a day for watching an ad
-                AddCardsWithCompleted(content, defs.DailyActions, false);   // a finished daily action moves to "Completed (N)" at once
+                AddCardsWithCompleted(content, defs.DailyActions, false);   // grouped; a finished daily task moves to "Completed (N)" at once
             }
             else
             {
@@ -528,8 +530,6 @@ namespace FluffyClimbers.Gameplay
             if (e.Gems > 0) parts.Add(Num(e.Gems) + " gems");
             if (e.Coins > 0) parts.Add(Num(e.Coins) + " coins");
             if (e.PowerUps > 0) parts.Add(e.PowerUps + (e.PowerUps == 1 ? " power-up" : " power-ups"));
-            if (e.IsHeroOrCoins) parts.Add("a 50 percent chance of a Common hero, otherwise " + Num(e.HeroOrCoins) + " coins");
-            else if (e.GivesHero) parts.Add("a hero");
             return string.Join(" and ", parts.ToArray());
         }
     }

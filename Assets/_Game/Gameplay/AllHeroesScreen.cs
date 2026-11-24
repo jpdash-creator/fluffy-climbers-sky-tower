@@ -324,18 +324,10 @@ namespace FluffyClimbers.Gameplay
 
         static string PowerLines(AllHeroEntry e)
         {
-            PowerUp[] powers = e.Spec != null ? e.Spec.Powers : TierRules.PowersFor(e.LineId, e.Rarity);
-            if (powers == null || powers.Length == 0) return "No special power";
-            var sb = new StringBuilder("Powers: ");
-            PowerUpCatalog cat = PowerUpCatalog.BuiltIn();
-            for (int i = 0; i < powers.Length; i++)
-            {
-                PowerUpDef def = cat.Get(powers[i]);
-                if (i > 0) sb.Append(", ");
-                sb.Append(def != null ? def.Name : powers[i].ToString());
-            }
-            sb.Append("\nFree once per run, then owned stock");
-            return sb.ToString();
+            // owner Final Change 2: the power(s) are rolled per card (Rare and Elite one of six, Legendary two of six), so the catalog only says how many; the hero sheet names the ones a card has
+            int count = CharacterDefs.PowerCount[(int)e.Rarity];
+            if (count == 0) return "No special power";
+            return (count == 1 ? "1 power, rolled per card" : count + " powers, rolled per card") + "\nFree once per run, then owned stock";
         }
 
         void ShowInfo(AllHeroEntry e)

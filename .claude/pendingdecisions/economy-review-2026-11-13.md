@@ -1,5 +1,7 @@
 # Economy review 2026-11-13 (step by step, NOTHING IMPLEMENTED YET; owner chose "collect all steps, implement once")
 
+> **Superseded in part by Final Change 1 (owner 2026-11-22), see `decisions-2026-11-22-final-change-1.md`.** Still in force from this review: level coins 56 + 48 per star + 4 per combo step, 25 percent replay, no gem pickups on rows, the hero milestone bonus, region skip 500 gems, the chest card odds, four subscription plans. Replaced on 2026-11-22: hero card prices (now 8,000 / 24,000 / 72,000 / 200,000 / 500,000 coins), power-up prices (now 2,000 / 3,000 / 4,000 coins; this review left them unchanged), chest prices (Iron 400, Gold 1,500 gems), the bundle pool (redrawn, 200 to 1,000 gems, card Common 50 / Uncommon 40 / Rare 10), subscription prices and contents ($1.99 / $4.99 / $6.99 / $14.99; Premium has 2 Gold chests on days 1 and 16), the region coin factor (100 / 105 / 110 / 115 / 120 percent steps) and all three reward tabs (redrawn, no heroes: the hero-or-coins gifts and the Common hero gifts of this review are gone). The income check at the end of this file was run with the old prices and rewards and is history.
+
 Goal (owner): free engaged player (30 / 60 min a day) must feel gem scarcity; first 100-gem item in about 2 to 3 weeks; campaign + steady power-ups stays free; balanced (about 2 to 3 percent payers).
 
 ## Step 1 decisions: levels, Endless, Time Attack (DECIDED)

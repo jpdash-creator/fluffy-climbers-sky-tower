@@ -2,6 +2,16 @@
 
 **Status:** requirements + procedure + template. Written 2026-11-21 from a full study of how regions 1 to 5 were built (code, content, tests, art, OpenArt log) at commit `56c73b6`, build v0.67.117. No region is built by this document and no OpenArt credit was spent for it.
 
+> **Final Change 1 (owner 2026-11-22), one day after this document was written.** The main document (sections 1 to 11) is updated to it; the appendices still describe commit `56c73b6` and are marked as such. What changed for a region build:
+> 1. **Level types.** 25 levels = **14 Regular Run + 5 gem levels + 6 special levels**. Gem levels are 5, 10, 15, 20, 25 (plain reach-the-top goals with gems). The six special types (No Wall Touch, No Power-ups, Combo Climb, Chase, One Life, Keep Moving) get ONE level each, drawn from levels 3 to 24 without 5, 10, 15 and 20, never on a gem level; the owner approves the placement per region (sections 3.2 and 7). The old special goals on levels 10, 15 and 20 (no wall bounce, hidden gem, speedrun) are gone.
+> 2. **Region coin factor.** Steps instead of the 3 percent formula: region 1 = 100 percent, regions 2 to 5 = 105, 6 to 15 = 110, 16 to 25 = 115, 26 to 30 = 120. One table for the level clear coins and the Main reward coins (section 3.8).
+> 3. **Progress per Gameplay setting.** Stars and clears are stored per setting (375 stars per region); the next region opens when all 25 levels are cleared in one single setting (section 3.8).
+> 4. **Speed rule.** +10 / 20 / 30 / 40 / 50 percent of the start speed every 30 s, 8 steps; crown and coin bonus 0 / 5 / 10 / 15 / 25 percent (section 3.6).
+> 5. **Region goals.** 75 goals per region in five groups, no hero gifts, no grind multipliers; coins scale with the region coin factor only (section 3.9). Decision D11 is retired.
+> 6. **Leaderboard.** Endless and Time Attack slots count the top 3 runs of the week (section 3.14).
+> 7. **Shop prices** changed (doc 27 section 0); a region still needs no shop edit.
+> Owner decisions: `.claude/pendingdecisions/decisions-2026-11-22-final-change-1.md` (repo). Line numbers quoted below are from commit `56c73b6` and have moved.
+
 **Source of truth:** the code wins. Where an older doc or `CLAUDE.md` says something else, this document follows the code and lists the difference in section 10. File and line numbers are from commit `56c73b6`; re-check them with a search before editing, because lines move.
 
 **What this document is:**
@@ -37,13 +47,13 @@ These were asked and answered while this document was written. They are binding 
 | D2 | Mix limits | At least **3 helpful, 2 hard, 2 hazard**. Kinds 8 to 10 may be any type. Hazard-type kinds stay **at most one third of all options** of the region (section 3.4.3). |
 | D3 | Signature rule | **Never-kill stays for every signature**, whatever its theme (lava, blades, lasers, cannonballs): it may knock back, push, slow, lock a control for a short time or change gravity, never kill, never invert controls. Four signature types are allowed (section 3.4.2). |
 | D4 | Signature art | Every new region's signature gets its **own painted set** in every width the generator can place. A tint-only signature is not accepted for regions 6 to 30. |
-| D5 | Level skeleton | **Identical to regions 1 to 5**: 25 levels, the same rows, the same special goals, the same 5 to 100 difficulty curve within 3 points. A region that cannot reach the top scores is reported and needs the owner's sign-off as a recorded exception. |
+| D5 | Level skeleton | **Identical to regions 1 to 5**: 25 levels, the same rows, the same level types (14 Regular Run, 5 gem levels, 6 special types with one level each; owner 2026-11-22), the same 5 to 100 difficulty curve within 3 points. The placement of the six special levels differs per region and is approved by the owner. A region that cannot reach the top scores is reported and needs the owner's sign-off as a recorded exception. |
 | D6 | Heroes | **One starter hero line with 5 tiers** per region (Common, Uncommon, Rare, Elite, Legendary), revealed when the region opens. No extra hero lines. |
 | D7 | Hero gate | **Shipped heroes are frozen.** The new region's hero line is generated and gated on ALL levels including the new region. Shipped heroes and variants are re-measured for information, must still win every new level by bot, and any drift is reported to the owner. |
 | D8 | Art set | **Full set like regions 1 to 5**: tileset, far + mid + near backgrounds, props sheet, signature sheet, plus the width sheet, the special platform sheets and the hero. |
 | D9 | Region order | The current slot order of regions 6 to 30 is **final**; regions are built and opened **one after another in slot order**. |
 | D10 | Extra proofs | Mandatory for every region, on top of the existing gates: the **Gameplay-setting ladder**, **every hero on every level**, a **stars and gems reachable** proof (new tooling), and a **phone autoplay of all 25 levels**. |
-| D11 | Region goal scaling | The owner **sets the two multipliers per region** (grind goals and power-up goal) in the region sheet. Section 3.9 explains them in depth. No default is applied without the owner. |
+| D11 | Region goal scaling | **Retired 2026-11-22 (Final Change 1).** The redrawn 75 goals have no grind goals and no multipliers; only the coins scale, with the region coin factor (section 3.9). (Was: the owner sets two multipliers per region.) |
 | D12 | Delivery | Regions ship **inside the app build** (a new app version per region). Downloadable bundles are not part of this process. |
 | D13 | Map pages and pins | The six painted world-map pages, the marker of every region and the 30 pin medallions are **final**: a region build only checks them. |
 | D14 | Music | The existing CC0 track `region_N.ogg` is the region's music. **The owner listens to it in a run before release** and accepts it or asks for a replacement; its licence line is re-checked at the same time. |
@@ -58,7 +68,7 @@ A region is done when all twelve deliverables exist and every gate of section 6 
 
 | # | Deliverable | Where it lives | Section |
 |---|---|---|---|
-| 1 | Approved region sheet (identity, signature, 7 to 10 kinds with numbers, generics, hero, art plan, goal multipliers) | `docs/regions/region_NNN_<slug>.md` (a filled copy of section 7) | 5.1, 7 |
+| 1 | Approved region sheet (identity, signature, 7 to 10 kinds with numbers, generics, hero, art plan, special level placement) | `docs/regions/region_NNN_<slug>.md` (a filled copy of section 7) | 5.1, 7 |
 | 2 | Region definition and 25 level definitions with calibrated difficulty | `Content/regions/`, `Content/levels/`, `Content/config/difficulty_curve.json`, `Content/config/modules.json` | 3.2, 3.3, 5.3 |
 | 3 | Signature + new platform kinds + 2 generic kinds in the simulation, with their constants | `Assets/_Game/Simulation/` | 3.4, 5.2 |
 | 4 | Simulation tests of the region (per kind, placement, bot, endless, determinism, allocation) | `Tests/Simulation/Region<N>PlatformTests.cs` | 5.2, 6 |
@@ -66,7 +76,7 @@ A region is done when all twelve deliverables exist and every gate of section 6 
 | 6 | Art set, processed and QA'd, logged with credits | `Assets/Art/Regions/region_NNN_<slug>/`, `Content/assets/` | 3.11, 5.5 |
 | 7 | View wiring: catalog entry, per-kind poses and motion | `Assets/_Game/Gameplay/`, `Assets/Resources/ArtCatalog.asset` | 3.12, 5.6 |
 | 8 | Starter hero line (5 tiers): data, generated physics, variants, art | `Assets/_Game/Economy/`, `Tests/Simulation/hero_gen/`, `Assets/Resources/Characters/` | 3.10, 5.7 |
-| 9 | Economy: coin factor, region goals with the owner's multipliers, medal targets | `Assets/_Game/Economy/`, `Content/config/medal_targets.json` | 3.8, 3.9, 5.8 |
+| 9 | Economy: coin factor (step table), region goals (75, shared table), medal targets | `Assets/_Game/Economy/`, `Content/config/medal_targets.json` | 3.8, 3.9, 5.8 |
 | 10 | The region is open in the game: playable constants, map, level screen, endless, time attack | `GameSession`, `MetaController`, `RegionGoalTable` | 5.9 |
 | 11 | Leaderboard service redeployed with the region | `Tools/leaderboard_service` | 3.14, 5.10 |
 | 12 | Docs, version bump, build, phone test, owner acceptance | docs, `Tools/version.json` | 5.10, 6 |
@@ -97,7 +107,7 @@ What a region does NOT need (already there or shared): world-map art and markers
 
 ### 3.2 Level skeleton (identical in every region, decision D5)
 
-Every region has exactly **25 levels**, ids `lvl_NNN_01` to `lvl_NNN_25`. These columns are driven by the level index and are the same in all regions:
+Every region has exactly **25 levels**, ids `lvl_NNN_01` to `lvl_NNN_25`: **14 Regular Run levels, 5 gem levels (5, 10, 15, 20, 25) and 6 special levels** (owner Final Change 1, 2026-11-22). These columns are driven by the level index and are the same in all regions; the Goal column shows the Regular Run goal, and the six special levels of the region replace it as described under the table:
 
 | Level | Target score | Class | Rows (= `goal.value`) | Goal | Special rows share, first row to last row | Fixed first-clear gems | Can hold collectible gems |
 |---|---|---|---|---|---|---|---|
@@ -110,17 +120,17 @@ Every region has exactly **25 levels**, ids `lvl_NNN_01` to `lvl_NNN_25`. These 
 | 7 | 48 | medium | 90 | reachFloor | 20 to 40 | 0 | no |
 | 8 | 52 | medium | 90 | reachFloor | 20 to 40 | 0 | no |
 | 9 | 56 | hard | 90 | reachFloor | 25 to 45 | 0 | no |
-| 10 | 60 | hard | 90 | **noWallBounce** | 25 to 45 | 2 | yes |
+| 10 | 60 | hard | 90 | reachFloor (gem level) | 25 to 45 | 2 | yes |
 | 11 | 63 | hard | 105 | reachFloor | 25 to 45 | 0 | no |
 | 12 | 66 | hard | 105 | reachFloor | 30 to 50 | 0 | no |
 | 13 | 69 | hard | 105 | reachFloor | 30 to 50 | 0 | no |
 | 14 | 72 | hard | 105 | reachFloor | 30 to 50 | 0 | no |
-| 15 | 75 | complex | 105 | **findHiddenGem** | 35 to 55 | 2 | yes |
+| 15 | 75 | complex | 105 | reachFloor (gem level) | 35 to 55 | 2 | yes |
 | 16 | 77.5 | complex | 120 | reachFloor | 35 to 55 | 0 | no |
 | 17 | 80 | complex | 120 | reachFloor | 35 to 55 | 0 | no |
 | 18 | 82.5 | complex | 120 | reachFloor | 40 to 60 | 0 | no |
 | 19 | 85 | complex | 120 | reachFloor | 40 to 60 | 0 | no |
-| 20 | 87.5 | complex | 120 | **speedrun**, `timeSec` 100 | 40 to 60 | 3 | yes |
+| 20 | 87.5 | complex | 120 | reachFloor (gem level) | 40 to 60 | 3 | yes |
 | 21 | 90 | complex | 150 | reachFloor | 45 to 65 | 0 | no |
 | 22 | 92.5 | complex | 150 | reachFloor | 45 to 65 | 0 | no |
 | 23 | 95 | complex | 150 | reachFloor | 45 to 65 | 0 | no |
@@ -130,9 +140,22 @@ Every region has exactly **25 levels**, ids `lvl_NNN_01` to `lvl_NNN_25`. These 
 Rules behind the table:
 
 - **Rows per region:** 2,685. Platforms per row: 1.3 (130 platforms per 100 rows: the main "spine" platform plus row mates), with the stack rule (at most 4 platforms in any 3 u window).
-- **Goals:** level 10 fails on the first wall bounce in the air; level 15 ends when the hidden gem (placed at row `rows / 2`) is taken; level 20 must reach row 120 within 100 s; every other level ends on its top row. **The no-wall level must be level 10**: the reward code counts clears of level 10 for the no-wall goals (`ProgressService.RegionGoals.cs:63-69`, `ProgressService.Rewards.cs:334`).
+- **Special levels (owner 2026-11-22, Final Change 1).** Six types, exactly ONE level of each per region, the same in all five Gameplay settings, **drawn from levels 3 to 24 without 5, 10, 15 and 20** (so never a gem level; 25 is a gem level too):
+
+  | Type | How the level carries it | Rule |
+  |---|---|---|
+  | No Wall Touch | goal `noWallBounce`, value = rows of the level | touching a wall fails the goal |
+  | No Power-ups | `special: noPowerUps` on a `reachFloor` level | bought power-ups and the hero power are off |
+  | Combo Climb | goal `comboChain` value 3 count 3, `overrides.rows` = rows of the level | cleared with the combo jumps AND the top row; ladder under the top |
+  | Chase | goal `bossChase`, `overrides.ramp` true | danger line +4 percent per 25 floors (cap 60 percent) on top of the setting steps |
+  | One Life | `special: oneLife` | no revive and no Safety Net (its input is ignored, no button); other power-ups work |
+  | Keep Moving | `special: keepMoving` | more than 3 s on one platform always ends the run (a Safety Net rescues real falls only) |
+
+  Placement of regions 1 to 5 (reference): R1 L6 No Wall Touch, L9 One Life, L14 No Power-ups, L16 Keep Moving, L21 Chase, L24 Combo Climb; R2 L4 No Wall Touch, L7 One Life, L13 No Power-ups, L16 Combo Climb, L18 Keep Moving, L23 Chase; R3 L3 Chase, L6 One Life, L11 No Power-ups, L17 Combo Climb, L21 No Wall Touch, L23 Keep Moving; R4 L4 No Power-ups, L6 Keep Moving, L11 Combo Climb, L14 Chase, L19 No Wall Touch, L24 One Life; R5 L4 No Wall Touch, L6 Chase, L9 Keep Moving, L14 Combo Climb, L18 One Life, L24 No Power-ups. For a new region the builder proposes a placement (spread over the bands, no two special levels next to each other where it can be avoided, an easy type first) and the **[OWNER]** approves it in the region sheet. It is written to `SPECIAL_PLACEMENT` in `Tools/content_cli/migrate_levels_25.py`; the validator (`content.py`) checks the level files against it and that every type appears exactly once.
+- **Never test a level index for a special rule.** UI, rewards and the server ask `SpecialLevels.TypeOf` (`Assets/_Game/Simulation/SpecialLevels.cs`). A kind that can push the player into a wall is excluded on the No Wall Touch level by its goal type (`SpecialPlatforms.cs`), wherever that level sits.
+- **Goals:** every Regular Run and gem level ends on its top row. (History: until 2026-11-22 level 10 was the no-wall level, level 15 the hidden gem level and level 20 a speedrun of 120 rows in 100 s.)
 - **Class** is a content label from the target score (under 30 simple, under 55 medium, under 75 hard, else complex, level 25 highly complex). The simulation does not read it. The level screen shows a crown tile for `highly_complex`.
-- **A level JSON entry** holds only: `id`, `region`, `index`, `seed`, `class`, `difficulty`, `goal`, `rewards` (all zero). Rows, special share, gems, scroll and platform kinds come from code, keyed by the level index and the region's signature and offset.
+- **A level JSON entry** holds only: `id`, `region`, `index`, `seed`, `class`, `difficulty`, `goal`, `rewards` (all zero), plus on special levels the optional `special` rule id or `overrides` (`ramp`, `rows`). Rows, special share, gems, scroll and platform kinds come from code, keyed by the level index and the region's signature and offset.
 - **Seed:** `(N x 7919 + index x 104729 + 12345) % 2147483647`. Levels 1 to 15 of a region that already exists as a 15-level file **keep their ids and seeds**; levels 16 to 25 get formula seeds. Seeds must be unique over all levels. (Regions 16 to 29 carry seeds of the slot they had before the re-orders; keep them.)
 - **Attempt layouts:** attempt seed 0 is the base layout (golden hashes, tests). Every real attempt mixes the level seed with a fresh attempt seed, so each try plays a different layout with the same special-row count and difficulty band.
 - **The first 4 rows** of every level are a plain ladder; specials start at row 3 (level 1) or row 4 (later levels).
@@ -213,7 +236,7 @@ Mix rules for a new region:
 | After a launcher | no hazard and no launcher directly above a launcher | `Allowed` |
 | Hard kinds | never directly above a hard kind, a hazard or a launcher | `Allowed` |
 | Restricted rows | the last 3 rows and the hidden gem row plus and minus 2 take no hazard, launcher, hard kind or Vanishing | `Restricted` |
-| No-wall level 10 | kinds that push a player toward a wall are removed from the options (Surf Boost Wave, Pinwheel Gust today) | `Options` |
+| No Wall Touch level (goal `noWallBounce`; level 10 until 2026-11-22, now wherever the region places it) | kinds that push a player toward a wall are removed from the options (Surf Boost Wave, Pinwheel Gust today) | `Options` |
 | Pads | next gap at most 4.2 u, next edge-to-edge distance at most 3 u, never a pad after a pad | `LevelBuilder` |
 | Sticky | next gap at most 1.8 u | `StickyNextGapMax` |
 | Endless | per-row independent draw, no budgets, hazards from floor 100 | `EndlessTower.PickSpecial` |
@@ -239,15 +262,15 @@ The full list of code places one kind touches is in section 5.2.
 
 ### 3.5 Pickups
 
-- **3 stars per level**, on rows at 25, 55 and 85 percent of the level (below the row where the goal ends the run). Each is an edge spot or a high spot. A run's stars count only when the goal is met; the save keeps the union of collected stars. 75 stars per region.
+- **3 stars per level**, on rows at 25, 55 and 85 percent of the level (below the row where the goal ends the run). Each is an edge spot or a high spot. A run's stars count only when the goal is met; the save keeps the union of collected stars PER GAMEPLAY SETTING (since 2026-11-22): 75 stars per setting, 375 per region.
 - **Gem levels** are 5, 10, 15, 20, 25 in every region: fixed first-clear gems 1 / 2 / 2 / 3 / 4 (12 per region, no pickup needed) and, with a seeded 50 percent chance per level, 2 or 3 collectible gems of value 1 (0 to 15 per region, decided by the level seeds; regions 1 to 5 hold 2, 10, 8, 7 and 0). Nothing to configure.
-- **No row gems, no coin pickups.** The hidden gem of level 15 is the goal object and pays nothing.
+- **No row gems, no coin pickups.** (The hidden gem goal of level 15 is retired since 2026-11-22.) Gems pay once per level, on the first clear in any Gameplay setting.
 - Stars and gems are kept out of every platform slab and out of the travel of moving kinds. A new kind whose surface travels vertically adds its margin in `LevelBuilder.cs:830-850`.
 - **New requirement (D10):** a bot proof that all 3 stars and every collectible gem of every level can be collected (section 4, item P0-9).
 
 ### 3.6 Scroll, Gameplay settings, physics (shared, nothing per region)
 
-The danger line starts at the first jump, base speed from d (0.6 to 2.4 u/s), steps up every 5 s by the Gameplay setting (Relaxed 10, Easy 20, Normal 25, Hard 40, Insane 50 percent; at most 8 steps), campaign ceiling 4 u/s. Jump physics, wall bounce, combo, power-ups and the five Gameplay buttons are the same in every region. A region changes none of this.
+The danger line starts at the first jump at the level's start speed (from d, 0.6 to 2.4 u/s). Since 2026-11-22 (Final Change 1) it gains a percent OF THE START SPEED every 30 s by the Gameplay setting (Relaxed 10, Easy 20, Normal 30, Hard 40, Insane 50 percent, additive; at most 8 steps = top +80 / 160 / 240 / 320 / 400 percent after 4 minutes), ceiling 4 u/s on levels and in Endless. The HUD cue shows round steps and MAX once at the ceiling. The setting also gives the crown and coin bonus 0 / 5 / 10 / 15 / 25 percent. Jump physics, wall bounce, combo, power-ups and the five Gameplay settings are the same in every region. A region changes none of this.
 
 ### 3.7 Endless and Time Attack (free once the signature and kinds exist)
 
@@ -260,22 +283,41 @@ The danger line starts at the first jump, base speed from d (0.6 to 2.4 u/s), st
 
 | Item | Rule for region N | Region 6 | Region 30 | Where |
 |---|---|---|---|---|
-| Coin factor | `round(1 + 0.03 x (N - 1), 2)` | 1.15 | 1.87 | region JSON `coinFactor`; second copy `CoinPayoutRules.RegionFactorPercent` |
-| Level payout | `(56 + 48 x stars) x factor`, plus `4 x combo steps x factor`; 25 percent once the level had 3 stars | 230 for 3 stars | 374 | `CoinPayoutRules.cs`, `Rewards.cs` |
-| Perfect pass (75 stars, no combo) | 25 x the 3-star payout | 5,750 | 9,350 | derived |
+| Coin factor (owner 2026-11-22: steps, not a formula) | region 1 1.00; regions 2 to 5 1.05; 6 to 15 1.10; 16 to 25 1.15; 26 to 30 1.20. ONE table for level clear coins and Main reward coins | 1.10 | 1.20 | `CoinPayoutRules.RegionFactorPercentOf`; region JSON `coinFactor` (already written for all 30 regions; the validator and a test keep both equal) |
+| Level payout | `(56 + 48 x stars) x factor`, plus `4 x combo steps x factor`; 25 percent once the level has 3 stars in the setting of the run; then the Gameplay setting bonus 0 / 5 / 10 / 15 / 25 percent | 220 for 3 stars | 240 | `CoinPayoutRules.cs`, `Rewards.cs` |
+| Perfect pass in one setting (75 stars, no combo, Relaxed) | 25 x the 3-star payout | 5,500 | 6,000 | derived |
 | Gem skip price | 500 gems, only for the next locked region | 500 | 500 | region JSON `unlock.gemSkip` |
-| Unlock | clear the LAST level of region N - 1, or the gem skip. No star gate. | | | `ProgressService.cs:423-431, 338-349` |
+| Unlock (owner 2026-11-22) | clear ALL 25 levels of region N - 1 in ONE single Gameplay setting, or the gem skip. Then open for all settings. No star gate. | | | `ProgressService.cs` (`IsRegionCompleteInAnySetting`) |
 | Fixed gems | 12 per region | 12 | 12 | `GemLevels.cs` |
 | Region goal gems | 50 per region | 50 | 50 | `RegionGoals.cs` |
 | Endless coins | `(floors / 2 + 50 x (floors / 100) + combo coins) x factor`, 3 full-rate runs per UTC day then half | | | `Rewards.cs:185-207` |
-| Crowns | `(floors + sum of chain length squared) x 5 x (1 + setting percent)`; one best per slot per week; 135 slots per region (125 level, 5 endless, 5 time attack) | | | `CrownScore.cs` |
+| Crowns | `(floors + sum of chain length squared) x 5 x (1 + setting bonus 0 / 5 / 10 / 15 / 25 percent)`; 135 slots per region (125 level, 5 endless, 5 time attack); a level slot keeps one best per week, an Endless or Time Attack slot counts the sum of its 3 best runs of the week (owner 2026-11-22) | | | `CrownScore.cs`, `ProgressService.WeekCrowns.cs` |
 | Medals | per level and Gameplay setting: target = bot pace x 85 / 92 / 100 / 112 / 125 percent; Bronze, Silver, Gold at 55 / 70 / 85 percent of it | | | `TimeRecords.cs`, `Content/config/medal_targets.json` |
 
 **Medal targets must be calibrated for the region** (section 5.8). A level missing from `medal_targets.json` has target 0, nobody can earn a medal there, and the region's five Gold goals can never complete.
 
-Chests, bundles, shop hero cards and random hero gifts need no edit: a region's hero joins the pools when the player unlocks the region. Side effect to tell the owner: with N open regions each hero's share of a tier is 1 / N, so collecting 3 copies of one hero for a merge gets slower with every region.
+Chests, bundles and shop hero cards need no edit (no reward gives a hero since 2026-11-22): a region's hero joins the pools when the player unlocks the region. Side effect to tell the owner: with N open regions each hero's share of a tier is 1 / N, so collecting 3 copies of one hero for a merge gets slower with every region.
 
-### 3.9 Region goals, explained in depth (decision D11: the owner sets the two multipliers per region)
+### 3.9 Region goals (owner 2026-11-22, Final Change 1: 75 goals, one shared table, no multipliers)
+
+Each open region shows **75 goals** on the Rewards screen (Main tab), built for any region by one table (`RegionGoalTable` in `Assets/_Game/Economy/RegionGoals.cs`). The goals, targets, gems and power-ups are the same in every region; only the coins scale, with the region coin factor (each goal rounded to the nearest 10).
+
+| Group | Goals | Region 1 coins | Gems | Power-ups |
+|---|---|---|---|---|
+| Levels (clear 5 / 10 / 15 / 20 / 25 in the best single setting; 25 / 75 / 150 / 250 / 375 stars over all settings; 3 stars on 5 / 15 / 25 levels; gold medals on 10 / 25 levels) | 15 | 3,750 | 38 | 0 |
+| Gameplay setting (per setting: clear 10 levels, clear all 25, 40 stars, 75 stars, 10 medals) | 25 | 6,250 | 0 | 3 |
+| Endless (floors 100 to 5,000 in ten tiers; floor 200 on each setting) | 15 | 5,150 | 6 | 2 |
+| Time Attack (50 / 100 / 150 / 200 floors; 5 / 20 runs; 100 floors on Normal or harder, on Hard or Insane) | 8 | 1,650 | 0 | 0 |
+| Special levels (clear each of the six types; all six; one on all 5 settings; 3 stars on all six; all six on Normal or harder, on Hard or Insane, on Insane) | 12 | 2,400 | 6 | 0 |
+| **Total** | **75** | **19,200** | **50** | **5** |
+
+Regions 2 to 5 pay 20,320 coins (105 percent). Regions 6 to 15 pay 110 percent of the region 1 coins (21,230 with the per-goal rounding), 16 to 25 115 percent (22,220), 26 to 30 120 percent (23,040). Goal ids are `g2_<region>_<token>` and are permanent. The full goal table is in doc 39 section 0.4. **No goal gives a hero.** There is nothing for the owner to set per region: the region sheet no longer asks for goal multipliers.
+
+Requirements the reward code puts on the region's levels: exactly 25 levels, exactly one level of each of the six special types, gem levels 5 / 10 / 15 / 20 / 25, exactly 3 stars per level, every level and Gameplay setting solvable by the bot (else no medal target and the medal goals can never complete).
+
+#### History: the 49-goal table and the two multipliers (until 2026-11-22)
+
+The rest of this section describes the goals as they were when this document was first written. It is kept for the reasoning only; decision D11 is retired.
 
 Each open region shows its own list of **49 goals** on the Rewards screen (Main tab). They are not rows typed per region: one table in `Assets/_Game/Economy/RegionGoals.cs` builds them for any region. Goal ids are `g_<region>_<type>_<tier>` and are permanent.
 
@@ -322,7 +364,7 @@ Totals per region, the same in every region: 49 goals, **50 gems**, 2 hero gifts
 
 **In the build:** the owner writes both multipliers in the region sheet. The builder adds them as the next entries of `TargetPercent` and `PowerUpTargetPercent` (`RegionGoals.cs:65, 67`) and regenerates `Tests/Simulation/REWARDS_TABLES.md`, which then shows the region's exact targets for the owner to confirm.
 
-Requirements the reward code puts on the region's levels: exactly 25 levels, level 10 is the no-wall level, levels 5 / 10 / 15 / 20 / 25 exist, exactly 3 stars per level, every level and Gameplay setting solvable by the bot (else no medal target).
+(History.) Requirements the old reward code put on the region's levels: exactly 25 levels, level 10 is the no-wall level, levels 5 / 10 / 15 / 20 / 25 exist, exactly 3 stars per level, every level and Gameplay setting solvable by the bot (else no medal target). The current requirements are at the top of this section.
 
 ### 3.10 The region hero (decisions D6, D7)
 
@@ -410,8 +452,9 @@ What the game draws from this set today: the far background (run, level screen, 
 
 - The replay verifier (`Tools/leaderboard_service`, Cloud Run service `fluffy-leaderboard`) compiles the game's own Simulation, Content and Economy sources and loads the content manifest. **Any new region needs a redeploy from the release commit.**
 - Raise the region gate in three places: `Tools/leaderboard_service/config.default.json` `maxRegion`, `Logic/LeaderboardRules.cs` `MaxRegion`, and the live Firestore document `config/leaderboard` (the owner).
-- `BreakdownMerge.MaxSlots` (800 today) must be at least `135 x open regions`: **810 for six regions**.
-- **[OWNER]** reviews the entry limits (Overall 250,000, Regions 100,000, Endless 150,000 crowns) for every region, and decides whether `SimVersion` is bumped (it must be when old app versions would no longer replay identically).
+- `BreakdownMerge.MaxSlots` (800 today) must be at least `135 x open regions`: **810 for six regions**. Since 2026-11-22 an Endless or Time Attack slot holds up to 3 runs and the stored list also caps the runs in total at 800: check both bounds when a region is added.
+- Slot rule since 2026-11-22 (Final Change 1): a level slot keeps its best crown of the week; an Endless or Time Attack slot counts the sum of its three best runs (`Planning/LEADERBOARD-DESIGN.md`, last section). A new region adds its slots under the same rule; nothing per region to configure.
+- **[OWNER]** reviews the entry limits (Overall 250,000, Regions 100,000, Endless 150,000 crowns; they must be re-measured after Final Change 1 before the board is switched on) for every region, and decides whether `SimVersion` (2 since 2026-11-22) is bumped (it must be when old app versions would no longer replay identically).
 
 ### 3.15 Delivery, version, legal
 
@@ -429,7 +472,7 @@ The game is hardcoded to five regions in many places. Do this once, as its own c
 |---|---|---|---|
 | P0-1 | **One number for "open regions".** Derive `MetaController.ComingSoonFromRegion` (= playable + 1), `RegionGoalTable.PlayableRegions`, the `ProgressService` default and the leaderboard default from one constant, or list them in one checked place. | Three constants must move together; if one is forgotten the map says open and Rewards says Coming Soon, or an array index throws. | `GameSession.cs:43`, `MetaController.cs:1326`, `RegionGoals.cs:57`, `ProgressService.cs:42` |
 | P0-2 | **One number for "regions with 25 levels".** | Duplicated in four files; it is a prefix rule (regions migrate in slot order). | `ContentRepository.cs:25`, `content.py:99`, `migrate_levels_25.py:17`, `gen_content.py:80` |
-| P0-3 | **Arrays to formulas or data.** `CoinPayoutRules.RegionFactorPercent` = `100 + 3 x (N - 1)` (or read the region file); `TargetPercent` and `PowerUpTargetPercent` become per-region data filled from the region sheet (D11). | 5-entry arrays indexed by region. | `CoinPayoutRules.cs:31`, `RegionGoals.cs:65, 67` |
+| P0-3 | **Arrays to formulas or data.** DONE for the coin factor on 2026-11-22: `CoinPayoutRules.RegionFactorPercentOf` holds the owner's step table for all 30 regions (100 / 105 / 110 / 115 / 120) and the region files carry the same values. The goal multipliers (`TargetPercent`, `PowerUpTargetPercent`, D11) are retired with the redrawn goals; check `RegionGoals.cs` for any remaining 5-entry array before region 6. (Was: `RegionFactorPercent` = `100 + 3 x (N - 1)` and per-region multiplier data.) | 5-entry arrays indexed by region. | `CoinPayoutRules.cs:31`, `RegionGoals.cs:65, 67` |
 | P0-4 | **Art catalog builder:** region count from the folders, 3-digit padding (`r.ToString("D3")`), a slab colour pair per region from the region sheet, an extra-part hook that is not three hand-written cases. | `new RegionArt[5]`, `"region_00" + r` breaks at region 10. | `Assets/Editor/ArtCatalog/ArtCatalogBuilder.cs:32-33, 88, 96-193, 235-249` |
 | P0-5 | **Art scripts:** 3-digit padding in `slice_width_sheet.py`, `bake_specials.py`, `check_stacked.py`, `make_contact_sheet.py`; the flower test in the slicer is tuned to region 1's pink; `qa_art.py` must also walk the `*_widths` folders; one parametrised special-platform baker driven by a per-region table instead of a new hand-copied script per region. | `region_00%d`, per-region scripts. | `Tools/art_pipeline/`, `Tools/asset_cli/` |
 | P0-6 | **Asset manifest generator:** fix `REGION_ENV` (wrong region text for slots 16 to 29) and add the shipped recipes (width sheet, signature set, special sheets, hero tiers) as request classes. | Every generated prompt for regions 16 to 29 is wrong today; the catalog only knows the first recipe. | `Tools/asset_cli/gen_asset_manifest.py` |
@@ -457,7 +500,7 @@ Order matters: the simulation kinds must exist before the calibration, the calib
 
 1. Copy section 7 to `docs/regions/region_NNN_<slug>.md` and fill it from the starter sheet (section 8), the region JSON and doc 08.
 2. Propose the signature (type S1 to S4), the 7 to 10 kinds with all numbers, classes, families, widths, poses, placement rules, the 2 generics, whether the signature is listed twice, the hero, the art sheet plan with a credit estimate, and the effort per kind (doc 30 sections 3 to 7 show the format and real effort: 6 to 15 hours per kind, about 17.5 hours of shared work per region).
-3. **[OWNER]** approves the sheet, answers its open questions, and sets the two goal multipliers (section 3.9). No code before this approval.
+3. **[OWNER]** approves the sheet, answers its open questions, and approves the placement of the six special levels (section 3.2). No code before this approval.
 
 ### 5.2 Phase 2: simulation **[CODE]**
 
@@ -557,7 +600,7 @@ Order read from the code (not executed for this document); needs phase 3 finishe
 
 ### 5.8 Phase 8: economy, rewards, medals **[CODE] [DATA]**
 
-1. Region goals: the owner's two multipliers as the region's entries (section 3.9); the coin factor entry (item P0-3).
+1. Region goals: nothing per region since 2026-11-22 (the 75 goals come from the shared table, section 3.9); check that the region's coin factor is the step value of section 3.8 in the region JSON and in `CoinPayoutRules.RegionFactorPercentOf` (item P0-3).
 2. **Medal calibration:** `MEDAL_CAL=1 MEDAL_REGIONS=N dotnet test Tests/Simulation --filter MedalCalibrationTests.Calibrate`. Writes `Content/config/medal_targets.json`, the byte-equal copy `Assets/Resources/Content/medal_targets.json` and `Tests/Simulation/MEDAL_CALIBRATION.md`. About 10 to 20 minutes for one region (a one-region run took 11.5 minutes; all five took 96). Update the row counts in `MedalTargetFileTests`.
 3. Nothing to change: `rewards.json`, `bundles.json`, chest and bundle code, crown code, endless coin code, gem rules.
 4. Regenerate and read `ECONOMY_TABLES.md` and `REWARDS_TABLES.md`; update doc 27 from them.
@@ -607,7 +650,7 @@ Owner checkpoints (each a clear yes in chat):
 
 | # | Checkpoint | Phase |
 |---|---|---|
-| O1 | Region sheet: signature, kinds and numbers, generics, hero, art plan, the two goal multipliers | 5.1 |
+| O1 | Region sheet: signature, kinds and numbers, generics, hero, art plan, the placement of the six special levels | 5.1 |
 | O2 | Difficulty exception, if any | 5.3 |
 | O3 | Each OpenArt packet (exact batch, credits) | 5.5, 5.7 |
 | O4 | Art picks per sheet and per hero tier | 5.5, 5.7 |
@@ -637,7 +680,7 @@ Status: PROPOSAL | APPROVED <date> | AS BUILT v<version>
 | Palette (first colour tints the header) | <colour words> |
 | Environment sentence for art prompts [OWNER] | <one sentence: place, colours, landmarks> |
 | difficultyOffset (round(0.25 x (N-1) / 29, 4)) | |
-| coinFactor (round(1 + 0.03 x (N-1), 2)) | |
+| coinFactor (step table: 1.10 for regions 6 to 15, 1.15 for 16 to 25, 1.20 for 26 to 30) | |
 | Gem skip | 500 |
 | Unlock | clear lvl_<NNN-1>_25, or the gem skip |
 | Map page / marker, pin, music track | page K marker M / pin_<slug>.png / region_N.ogg "<track title>" |
@@ -672,7 +715,7 @@ One block per kind:
 | Painted widths (u) = widths the builder may emit | |
 | Gap rule to the rows above and below | |
 | Next-platform rule (launchers, locks) | |
-| Extra placement exclusions (no-wall level 10, beside ladders, adjacency) | |
+| Extra placement exclusions (the No Wall Touch level, beside ladders, adjacency) | |
 | Discoverable from | painted shape | own motion | pose frames: <list> |
 | Extra sprite parts (knob, stem, object) | |
 | Revive behaviour | |
@@ -682,7 +725,19 @@ One block per kind:
 | Risks | |
 
 ## 5. Level facts (fixed, do not change)
-25 levels, rows 60/75/90/105/120/150, L10 noWallBounce, L15 findHiddenGem, L20 speedrun 120 rows in 100 s, L25 reachFloor highly_complex, target scores 5 to 100 within 3.
+25 levels, rows 60/75/90/105/120/150, 14 Regular Run + 5 gem levels (5, 10, 15, 20, 25, plain reachFloor) + 6 special levels, L25 reachFloor highly_complex, target scores 5 to 100 within 3.
+
+Special level placement [OWNER] (one level per type, from levels 3 to 24 without 5, 10, 15, 20):
+
+| Type | Level |
+|---|---|
+| No Wall Touch | |
+| No Power-ups | |
+| Combo Climb | |
+| Chase | |
+| One Life | |
+| Keep Moving | |
+
 Difficulty exceptions signed by the owner: <none | level ids, measured score, date>.
 Re-seeded levels: <none | id, old seed, new seed, reason>.
 
@@ -699,9 +754,8 @@ Re-seeded levels: <none | id, old seed, new seed, reason>.
 ## 7. Region goals [OWNER]
 | Field | Value |
 |---|---|
-| Grind multiplier (jumps, combos, minutes, coins), percent | |
-| Power-up multiplier, percent | |
-| Resulting targets (from REWARDS_TABLES.md, confirmed by the owner) | |
+| Nothing to set since 2026-11-22: the 75 goals come from the shared table (section 3.9); coins x the region coin factor | n/a |
+| Region total from REWARDS_TABLES.md (coins, 50 gems, 5 power-ups), read back to the owner | |
 
 ## 8. Art plan
 | Packet | Assets | Calls x images | Credits | Status |
@@ -789,6 +843,8 @@ Notes for the starter sheets:
 
 ## 10. Where the docs and `CLAUDE.md` disagree with the code (code wins)
 
+(State of 2026-11-21. `CLAUDE.md` and docs 08, 22, 26, 27, 37, 39, 45, 46 were synced to Final Change 1 on 2026-11-22, which closed the rows on levels, level coins, gems, score, chest odds, region goals and the Endless button.)
+
 | Topic | Stale statement | Code today |
 |---|---|---|
 | Levels | "30 regions x 15 levels", "L5/L10 complex, L15 highly complex", "450 shipped levels" | regions 1 to 5 have 25 levels, 6 to 30 have 15 (500 entries); classes as in section 3.2 |
@@ -797,19 +853,19 @@ Notes for the starter sheets:
 | Level coins | 70 + 60 per star + 5 per combo step, replay 50 percent | 56 + 48 + 4, replay 25 percent (`CoinPayoutRules.cs`) |
 | Gems | rarity tiers on 2.7 to 3.2 percent of rows | no row gems; fixed 1 / 2 / 2 / 3 / 4 and seeded collectible gems on the gem levels |
 | Score | floors x 10 + combo squared x 5 | floors + sum of chain length squared; x5 only in the crown |
-| Chest odds | Iron 70 / 20 / 10, Gold 50 / 40 / 10, worth x1.8 / x1.9 | Iron 50 / 30 / 20 (C / U / R), Gold 60 / 30 / 10 (R / E / L), worth band 2 to 6 |
+| Chest odds | Iron 70 / 20 / 10, Gold 50 / 40 / 10, worth x1.8 / x1.9 | Iron 50 / 30 / 20 (C / U / R), Gold 60 / 30 / 10 (R / E / L), worth band 2 to 6 (since 2026-11-22: Iron 400 gems x3.7, Gold 1,500 gems x5.5) |
 | Special platforms | "regions 3 to 5 follow later", "values 8 to 21", "tinted until the T73 pieces exist" | all five regions built, values 8 to 42, all 35 kinds painted |
 | Region 4 hero | "R4 candy hero pending" | Bonbon (`candygirl`) ships with all tiers, variants and art |
 | Hero gate | "all 125 shipped levels" for every hero | true for the variants; the generated table rows were gated on the old 75 levels |
 | Hero powers | cooldown 30 / 22 / 15 / 10 s | one free use per run in total, then owned stock |
 | Run bonus | coins and gems paid at the end of every run | not paid since 2026-11-13; only the milestone bonus by rarity |
-| Region goals | 44 goals, 15 levels, no-wall level 7, extra heroes from goals (docs 39 to 43) | 49 goals, 25 levels, level 10, two hero gifts, extra lines inactive |
+| Region goals | 44 goals, 15 levels, no-wall level 7, extra heroes from goals (docs 39 to 43) | 49 goals, 25 levels, level 10, two hero gifts, extra lines inactive (since 2026-11-22: 75 goals, special levels by type, no hero gifts) |
 | Unlock | "star thresholds that unlock regions" (doc 45 section 5) | no star gate |
 | Endless button | "Endless pill at the bottom" | round button at the right of the region title |
 | Menu music | `loop.wav` | six menu tracks in `MusicCatalog` |
 | Versioning | `CLAUDE.md`: vMAJOR.MINOR.HOTFIX.BUILD | vMAJOR.MINOR.BUILD (`.claude/rules/versioning.md`) |
 | CUX-7 | the copy of the UX rules under the docs folder still says hazards telegraph | no code-drawn cues (repo root rules, 2026-11-01) |
-| Test counts | dotnet 97, about 20 s | 619 test attributes in `Tests/Simulation`, 984 in Unity (counted by search, not by a run) |
+| Test counts | dotnet 97, about 20 s | 619 test attributes in `Tests/Simulation`, 984 in Unity (counted by search, not by a run). Measured 2026-11-22 after Final Change 1: dotnet `Tests/Simulation` 832, `Tests/LeaderboardService` 75, Unity EditMode 973 (972 passed, 1 skipped) |
 | Delivery | "content is data + bundles, only assets and data are downloaded" | everything ships in the app; no Addressables groups exist |
 
 ---
@@ -818,22 +874,24 @@ Notes for the starter sheets:
 
 | # | Item | Needed when |
 |---|---|---|
-| L1 | The two goal multipliers of each region (D11) | each region sheet |
+| L1 | (Closed 2026-11-22: the goal multipliers are retired, D11.) The placement of the six special levels of each region | each region sheet |
 | L2 | Entry limits and sim version at each release (D15) | each release |
 | L3 | Teaser art requests for regions 21 to 30 in the asset manifest: still wanted, or replaced for good by the grey pin and padlock? | before region 21 |
 | L4 | Fizz Vent: the painted bubbles reach about 2 u above the slab, the low-gravity zone is 3.2 u high: taller art (a separate painted column sprite) or a lower zone. (The Sandcastle step is settled at 0.16 u; doc 30 section 13 still lists it as open.) | when region 4 art is next touched |
 | L5 | Regions 3 and 5 base tilesets marked "regenerate later" | open since 2026-10-19 |
 | L6 | Endless uses region 1's difficulty table for every region: keep, or one table per region | before the offset grows large (regions 15+) |
 | L7 | Should the level class change layouts again (authored chunks exist in code, no shipped level uses them) or stay a label | any time |
-| L8 | Speedrun time is one constant (100 s) for all regions by validator rule; a slow region may need its own time | first region whose bot time is far from 100 s |
+| L8 | (Closed 2026-11-22: the speedrun goal is retired.) | |
 | L9 | Hero pool dilution as regions open (1 / N share per tier) | when merges feel slow |
 | L10 | Unused shipped art (mid and near backgrounds, props, legacy map chunks) and APK size | before the app size becomes a store problem |
 | L11 | Whether unbuilt regions should stay `live` in content | with item P0-13 |
-| L12 | A wave, boss chase or combo chain goal in a later region (code and bot support exist, no shipped level uses them; D5 fixes the skeleton for now) | only if D5 is reopened |
+| L12 | A wave goal in a later region (code and bot support exist, no shipped level uses it). Boss chase and combo chain ship since 2026-11-22 as the Chase and Combo Climb special levels | only if D5 is reopened |
 
 ---
 
 # Appendices: regions 1 to 5 as built (reference)
+
+**Read this first (2026-11-22):** the appendices describe commit `56c73b6` (v0.67.117), BEFORE Final Change 1. They are not updated. Where they differ from sections 1 to 11 the main document and the code win. Known differences: the special goals of levels 10, 15 and 20 (now plain gem levels; six special level types instead), the coin factors 1.00 to 1.12 (now 1.00 / 1.05), the speed steps (now every 30 s), the crown bonus (now 0 / 5 / 10 / 15 / 25 percent), stars and clears (now per Gameplay setting), the unlock rule (now all 25 levels in one setting), the 49 region goals with hero gifts (now 75, no heroes), chest and bundle prices, the golden hashes and medal targets (regenerated), and the leaderboard slot rule for Endless and Time Attack.
 
 These appendices are the detailed study results the main document was written from. They describe commit `56c73b6` (v0.67.117). Legend: `Sim/` = `Assets/_Game/Simulation/`, `T/` = `Tests/Simulation/`; `file:line` numbers are from that commit; **[V]** = verified in a file, **[U]** or **UNVERIFIED** = inferred or not checked by a run; "(read, not run)" = read from the code, not executed. No test suite, Unity run or OpenArt tool was used to produce them.
 
@@ -1191,7 +1249,7 @@ Platform mix: not in the content files. It is the region's signature + `RegionPl
 | lvl_001_24 | 2533760 | complex | 0.905 | 0.905 | 0.905 | reachFloor 150 | 3.65 | 2.80 | 59 | 2.23 | 33.1 | 97.5 (97.5) | 1585/1588/1582/1589/1585 |
 | lvl_001_25 | 2638489 | highly_complex | 0.937 | 0.937 | 0.937 | reachFloor 150 | 3.61 | 2.67 | 59 | 2.29 | 32.6 | 100.0 (100.0) | 1620/1600/1604/1613/1613 |
 
-#### Region 2 `region_002_mushroom_grove` (difficultyOffset 0.0086, coinFactor 1.03, signature `mod_bounce_caps`)
+#### Region 2 `region_002_mushroom_grove` (difficultyOffset 0.0086, coinFactor 1.03 at this commit, 1.05 since 2026-11-22, signature `mod_bounce_caps`)
 
 | level id | seed | class | content d | d_eff = d+off(1-d) | builder d = max(d_eff, floor) | goal | measured: gap u | width u | special % | start scroll u/s | ok % | score (target) | medal pace milli plat/s R/E/N/H/I |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1221,7 +1279,7 @@ Platform mix: not in the content files. It is the region's signature + `RegionPl
 | lvl_002_24 | 2541679 | complex | 0.961 | 0.961 | 0.961 | reachFloor 150 | 3.67 | 2.68 | 53 | 2.33 | 33.6 | 97.5 (97.5) | 1740/1753/1752/1742/1749 |
 | lvl_002_25 | 2646408 | highly_complex | 1.000 | 1.000 | 1.000 | reachFloor 150 | 3.66 | 2.65 | 52 | 2.40 | 33.8 | 98.2 (100.0) | 1771/1782/1793/1778/1786 |
 
-#### Region 3 `region_003_sunny_beach` (difficultyOffset 0.0172, coinFactor 1.06, signature `mod_drifting_platforms`)
+#### Region 3 `region_003_sunny_beach` (difficultyOffset 0.0172, coinFactor 1.06 at this commit, 1.05 since 2026-11-22, signature `mod_drifting_platforms`)
 
 | level id | seed | class | content d | d_eff = d+off(1-d) | builder d = max(d_eff, floor) | goal | measured: gap u | width u | special % | start scroll u/s | ok % | score (target) | medal pace milli plat/s R/E/N/H/I |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1251,7 +1309,7 @@ Platform mix: not in the content files. It is the region's signature + `RegionPl
 | lvl_003_24 | 2549598 | complex | 1.000 | 1.000 | 1.000 | reachFloor 150 | 3.60 | 2.67 | 53 | 2.40 | 34.8 | 96.5 (97.5) | 1465/1472/1471/1467/1469 |
 | lvl_003_25 | 2654327 | highly_complex | 1.000 | 1.000 | 1.000 | reachFloor 150 | 3.60 | 2.60 | 53 | 2.40 | 33.2 | 99.4 (100.0) | 1458/1459/1480/1465/1477 |
 
-#### Region 4 `region_004_candy_canyon` (difficultyOffset 0.0259, coinFactor 1.09, signature `mod_sticky_gum`)
+#### Region 4 `region_004_candy_canyon` (difficultyOffset 0.0259, coinFactor 1.09 at this commit, 1.05 since 2026-11-22, signature `mod_sticky_gum`)
 
 | level id | seed | class | content d | d_eff = d+off(1-d) | builder d = max(d_eff, floor) | goal | measured: gap u | width u | special % | start scroll u/s | ok % | score (target) | medal pace milli plat/s R/E/N/H/I |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1281,7 +1339,7 @@ Platform mix: not in the content files. It is the region's signature + `RegionPl
 | lvl_004_24 | 2557517 | complex | 1.000 | 1.000 | 1.000 | reachFloor 150 | 3.57 | 2.70 | 53 | 2.40 | 36.6 | 93.7 (97.5) | 1560/1574/1564/1569/1566 |
 | lvl_004_25 | 2662246 | highly_complex | 1.000 | 1.000 | 1.000 | reachFloor 150 | 3.58 | 2.74 | 53 | 2.40 | 36.9 | 92.9 (100.0) | 1597/1599/1598/1610/1607 |
 
-#### Region 5 `region_005_bamboo_temple` (difficultyOffset 0.0345, coinFactor 1.12, signature `mod_swinging_gongs`)
+#### Region 5 `region_005_bamboo_temple` (difficultyOffset 0.0345, coinFactor 1.12 at this commit, 1.05 since 2026-11-22, signature `mod_swinging_gongs`)
 
 | level id | seed | class | content d | d_eff = d+off(1-d) | builder d = max(d_eff, floor) | goal | measured: gap u | width u | special % | start scroll u/s | ok % | score (target) | medal pace milli plat/s R/E/N/H/I |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -1379,7 +1437,7 @@ Seeds of regions 6 to 15 and 30 follow the formula with their own slot number. R
 | -> SignatureKind | BounceFlowers (1) | BounceCaps (2) | DriftingPlatforms (3) | StickyGum (4) | SwingingGongs (5) | **None (unknown id)** | **None** |
 | rules.difficultyOffset | 0.0 | 0.0086 | 0.0172 | 0.0259 | 0.0345 | 0.0431 | 0.1724 |
 | rules.hazards | [] | [] | [] | [] | [] | [] | [] |
-| coinFactor | 1.0 | 1.03 | 1.06 | 1.09 | 1.12 | 1.15 | 1.6 |
+| coinFactor (at this commit; since 2026-11-22 the step table 1.0 / 1.05 / 1.05 / 1.05 / 1.05 / 1.1 / 1.15 for the same columns) | 1.0 | 1.03 | 1.06 | 1.09 | 1.12 | 1.15 | 1.6 |
 | levels | `lvl_001_01`..`_25` (25) | `lvl_002_01`..`_25` | `lvl_003_01`..`_25` | `lvl_004_01`..`_25` | `lvl_005_01`..`_25` | `lvl_006_01`..`_15` (15) | `lvl_021_01`..`_15` (15) |
 | availableFrom | null | null | null | null | null | null | null |
 
@@ -2124,7 +2182,7 @@ Clean-run estimate for one new region with today's working recipes (no retries):
 | `Assets/_Game/Gameplay/MetaController.cs:1759-1760` | tile style from `class` (`highly_complex` = crown) |
 | `Assets/_Game/Economy/RegionGoals.cs:55-67` | `TotalRegions = 30`, `PlayableRegions = 5`, `LevelsPerRegion = 25`, `NoWallLevelIndex = 10`, `TargetPercent {100,125,150,180,220}`, `PowerUpTargetPercent {100,100,125,150,175}`; `:166` `IsPlayable` |
 | `Assets/_Game/Gameplay/RewardsScreen.cs:120` | clamp to `RegionGoalTable.PlayableRegions` |
-| `Assets/_Game/Simulation/CoinPayoutRules.cs:31` | `RegionFactorPercent = { 100, 103, 106, 109, 112 }` |
+| `Assets/_Game/Simulation/CoinPayoutRules.cs:31` | `RegionFactorPercent = { 100, 103, 106, 109, 112 }` (at this commit; since 2026-11-22 `RegionFactorPercentOf` covers all 30 regions with 100 / 105 / 110 / 115 / 120, so this entry is closed) |
 | `Assets/_Game/Simulation/LevelSpec.cs:17-25,31-42,54-64,126-144` | 5 signature kinds, 5 module ids, 5 platform sets |
 | `Assets/_Game/Simulation/SimConfig.cs:450,468` | region 1 content curve for the endless cycle; `LevelsPerRegion = 25` |
 | `Assets/_Game/Simulation/GemLevels.cs:20-33,49-52` | gem levels 5/10/15/20/25 and fixed gems 1/2/2/3/4 (index-driven, region independent) |
@@ -2447,7 +2505,7 @@ Per-region scaling (three arrays of length 5):
 |---|---|---|---|---|---|---|---|
 | `TargetPercent` | 100 | 125 | 150 | 180 | 220 | jumps, combos, play minutes, coins targets, then rounded by `Nice` | `RegionGoals.cs:65,168-188` |
 | `PowerUpTargetPercent` | 100 | 100 | 125 | 150 | 175 | power-up targets | `RegionGoals.cs:67` |
-| `CoinPercent` (= `CoinPayoutRules.RegionFactorPercent`) | 100 | 103 | 106 | 109 | 112 | every coin reward, rounded to 10 coins | `RegionGoals.cs:69,191-195` |
+| `CoinPercent` (= `CoinPayoutRules.RegionFactorPercent`; at this commit, since 2026-11-22 100 / 105 / 105 / 105 / 105) | 100 | 103 | 106 | 109 | 112 | every coin reward, rounded to 10 coins | `RegionGoals.cs:69,191-195` |
 
 Stars, levels, 3-star, hard, no-wall, gold and endless targets are the same in every region. Resulting scaled targets (from `Tests/Simulation/REWARDS_TABLES.md` and `docs/39`): jumps R1 400/1200/3000 ... R5 880/2600/6600; combos R5 20/90/220; minutes R5 35/100/260; coins R5 2200/7700/17600; power-ups R5 5/17/45.
 

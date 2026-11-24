@@ -93,6 +93,8 @@ namespace FluffyClimbers.Leaderboard
         public string WeekKey = "", Board = "";
         public List<BoardRow> Entries = new List<BoardRow>();
         public bool Final;
+        /// <summary>Entry limit the service used when it built the board (document field limitUsed), 0 = not in the document. Rows are coloured only for players at or above the limit (LeaderboardPlates).</summary>
+        public long Limit;
     }
 
     /// <summary>The player's own standing on one board (from GET /my-week).</summary>
@@ -117,11 +119,26 @@ namespace FluffyClimbers.Leaderboard
         public string Key { get { return WeekKey + "_" + Board; } }
     }
 
-    /// <summary>One slot of the week from GET /my-week?slots=1: the best crown of the week in one campaign level x Gameplay setting (<c>c.lvl_001_06.1</c>) or in a region x setting for Endless (<c>e.region_001_meadow_springs.4</c>) or Time Attack (<c>t....</c>).</summary>
+    /// <summary>One counted run of an Endless or Time Attack slot (owner 2026-11-22: the three best runs of the week count and are added up).</summary>
+    public sealed class LbSlotRun
+    {
+        public long Crown;
+        public int Floors, Score;
+        /// <summary>UTC Unix seconds of the run (0 = unknown).</summary>
+        public long At;
+    }
+
+    /// <summary>
+    /// One slot of the week from GET /my-week?slots=1: the best crown of the week in one campaign level x Gameplay setting (<c>c.lvl_001_06.1</c>), or, in a region x setting for Endless
+    /// (<c>e.region_001_meadow_springs.4</c>) and Time Attack (<c>t....</c>), the SUM of the three best runs of the week (<see cref="Runs"/>).
+    /// </summary>
     public sealed class LbSlot
     {
         public string SlotId = "", HeroId = "";
+        /// <summary>What the slot counts: the best crown of a level slot, the sum of <see cref="Runs"/> of an Endless / Time Attack slot.</summary>
         public long Crown;
+        /// <summary>Endless / Time Attack slots: the up to three counted runs, best first (their crowns add up to <see cref="Crown"/>). Null for a level slot and when the answer carried no run list. Additive (owner 2026-11-22).</summary>
+        public List<LbSlotRun> Runs;
         public int Floors, Mode;
         /// <summary>Base score the crown was made from (floors + chain squares), 0 = unknown. Additive (owner 2026-11-17).</summary>
         public int Score;
@@ -263,7 +280,18 @@ namespace FluffyClimbers.Leaderboard
                 {
                     string sid = Str(sl["slotId"]);
                     if (sid.Length == 0) continue;
-                    d.Slots.Add(new LbSlot { SlotId = sid, Crown = Long(sl["crown"]), Floors = (int)Long(sl["floors"]), HeroId = Str(sl["heroId"]), Mode = (int)Long(sl["mode"]), Score = (int)Long(sl["score"]), At = Long(sl["at"]), Verified = true });
+                    var slot = new LbSlot { SlotId = sid, Crown = Long(sl["crown"]), Floors = (int)Long(sl["floors"]), HeroId = Str(sl["heroId"]), Mode = (int)Long(sl["mode"]), Score = (int)Long(sl["score"]), At = Long(sl["at"]), Verified = true };
+                    JArray runs = sl["runs"] as JArray;   // Endless / Time Attack: the counted runs whose crowns add up to the slot's crown
+                    if (runs != null && runs.Count > 0)
+                    {
+                        slot.Runs = new List<LbSlotRun>(runs.Count);
+                        foreach (JToken run in runs)
+                        {
+                            if (slot.Runs.Count >= BreakdownMerge.TopRuns) break;
+                            slot.Runs.Add(new LbSlotRun { Crown = Long(run["crown"]), Floors = (int)Long(run["floors"]), Score = (int)Long(run["score"]), At = Long(run["at"]) });
+                        }
+                    }
+                    d.Slots.Add(slot);
                 }
             }
             JObject bd = o["breakdown"] as JObject;
@@ -298,6 +326,7 @@ namespace FluffyClimbers.Leaderboard
             JObject fields = doc != null ? doc["fields"] as JObject : null;
             if (fields == null) return data;
             data.Final = Bool(fields["final"] != null ? fields["final"]["booleanValue"] : null);
+            data.Limit = Long(Typed(fields["limitUsed"]));
             JArray values = fields["entries"] != null && fields["entries"]["arrayValue"] != null ? fields["entries"]["arrayValue"]["values"] as JArray : null;
             if (values == null) return data;
             foreach (JToken v in values)

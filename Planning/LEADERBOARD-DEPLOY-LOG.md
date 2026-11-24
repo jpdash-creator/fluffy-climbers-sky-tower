@@ -33,8 +33,23 @@ Result: revision `fluffy-leaderboard-00001-zhn`, 100 percent traffic, URL https:
 Not done: Cloud Scheduler tick (needs LB_ADMIN_KEY secret), `config/leaderboard` seeding (defaults come from config.default.json), real-token test, Firebase Auth Play Games provider, client work.
 Redeploy after ANY simulation, generator, hero table or manifest change (same commit as the release).
 
+## Pending owner steps (2026-11-22): Final Change 1. Nothing was deployed for it.
+The release that carries Final Change 1 needs all of these, in this order, before the leaderboard is used with it (the closed-testing release AAB has the leaderboard ON):
+1. **Redeploy** one new Cloud Run revision of `fluffy-leaderboard` from the release commit (same command as step 6). It carries: the new speed rule (steps every 30 s), the crown bonus 0 / 5 / 10 / 15 / 25 percent, the special levels (regenerated level files, golden hashes and content manifest), the top 3 rule for Endless and Time Attack slots (`SlotDoc.runs`, `SlotMath`), the new answers of `/submit-run` and `/my-week`, and rules version 2. It also carries the two pending revisions of 2026-11-17 below. No new env, secret, composite index or rule.
+2. **Firestore `config/leaderboard`:** set `simVersions` to `[2]` (the defaults in `LeaderboardRules.cs` and `config.default.json` already say 2). Version 1 apps then get HTTP 426 (update the app).
+3. **Old weekly data cannot be converted** (the crown formula inputs changed): delete the open week's `weeks/*` documents, or switch at a Monday 00:00 UTC.
+4. **Re-measure the three entry limits** (Overall 250,000, Levels 100,000, Endless 150,000; ranks 1 to 3 need 1.5 x) with the new rules and write them to the code defaults, `config.default.json` and `config/leaderboard` before `leaderboard.enabled` is switched on for players.
+5. Run `dotnet test Tests/LeaderboardService` on the release commit first (it includes `TopRunsTests`).
+Details: `Planning/LEADERBOARD-DESIGN.md`, last section.
+
 ## Pending redeploy (2026-11-17): POST /delete-my-entries
 New endpoint for Settings > Reset progress (see LEADERBOARD-DESIGN.md, last section). Needs a new Cloud Run revision of `fluffy-leaderboard` (same command as step 6). No Firestore rules, indexes, env or secret change. Until deployed the app keeps the wipe queued (`leaderboardWipePending`) and retries.
 
 ## Pending redeploy (2026-11-17): POST /sync-breakdown and breakdown deletion
 New endpoint `POST /sync-breakdown`, `breakdown` field in `GET /my-week?slots=1`, and `/delete-my-entries` now also removes `weeks/*/breakdowns/{uid}`: one new Cloud Run revision of `fluffy-leaderboard` (same command as step 6; the shared `BreakdownMerge.cs` and `LeaderboardSave.cs` are linked from Assets/_Game/Economy). ALSO deploy the Firestore TTL policy: `firebase deploy --only firestore:indexes` (new fieldOverride `breakdowns.expireAt` ttl). No rules change, no composite index, no env or secret change. Same revision also carries the earlier `/delete-my-entries` change.
+
+## Pending owner steps (2026-11-23): Final Change 2. Nothing was deployed for it.
+Applies on top of the Final Change 1 steps above (do them once, from the release commit that carries both):
+1. **Redeploy** the Cloud Run service from the release commit: the hero tables (`HeroTable.cs`, `HeroVariants.cs`, `HeroRolls.cs`), per-copy powers and the region penalty are compiled into it, and a replay needs the SAME tables the phone used (a variant index means another stat set after the hero rebuild).
+2. **Firestore `config/leaderboard`:** set `simVersions` to `[3]` (code default, `config.default.json` and `LeaderboardConfig.SimVersion` already say 3). Version 2 apps get HTTP 426 and their queued runs are dropped by the phone (final answer).
+3. Read `Planning/LEADERBOARD-REVIEW-2026-11-23.md` (findings and the entry-limit recommendation) before `leaderboard.enabled` is switched on.

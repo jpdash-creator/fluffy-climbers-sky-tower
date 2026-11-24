@@ -117,46 +117,4 @@ namespace FluffyClimbers.Simulation.Tests
             return mean;
         }
     }
-
-    /// <summary>The FI reference: Momo's five Ladder Final tiers on all 75 levels with the FAST probe. Set HERO_REF=1. Writes Tests/Simulation/FI_REFERENCE_FAST.csv (mean per level over HERO_LAYOUTS layouts).</summary>
-    [Trait("Category", "HeroFi")]
-    public class HeroFiReferenceTests
-    {
-        private readonly ITestOutputHelper output;
-        public HeroFiReferenceTests(ITestOutputHelper output) { this.output = output; }
-
-        /// <summary>Momo's Ladder Final (measured on level 15 of Region 1 with the full probe: FI 1.000, 1.002, 1.040, 1.012, 1.048).</summary>
-        public static readonly PhysicsKey[] LadderFinal =
-        {
-            new PhysicsKey(190, 9, 30, 77),    // Common
-            new PhysicsKey(209, 9, 34, 82),    // Uncommon
-            new PhysicsKey(216, 9, 38, 88),    // Rare
-            new PhysicsKey(219, 10, 41, 94),   // Elite
-            new PhysicsKey(228, 11, 41, 100),  // Legendary
-        };
-
-        [Fact]
-        public void BuildReference()
-        {
-            if (Environment.GetEnvironmentVariable("HERO_REF") != "1") return;
-            int layouts = int.Parse(Environment.GetEnvironmentVariable("HERO_LAYOUTS") ?? "24");
-            var sw = Stopwatch.StartNew();
-            List<LoadedLevel> ls = HeroFi.Levels();
-            double[][] ok = HeroFi.OkLevels(LadderFinal, Enumerable.Range(0, ls.Count).ToArray(), layouts);
-            output.WriteLine("reference probe: " + sw.Elapsed.TotalSeconds.ToString("F1") + " s for 5 tiers x 75 levels x " + layouts + " layouts");
-            var csv = new StringBuilder("level,common_ok,uncommon_ok,rare_ok,elite_ok,legendary_ok\n");
-            for (int li = 0; li < ls.Count; li++)
-            {
-                csv.Append(ls[li].Id);
-                for (int t = 0; t < 5; t++) csv.Append(',').Append(ok[t][li].ToString("F4", CultureInfo.InvariantCulture));
-                csv.Append('\n');
-            }
-            File.WriteAllText(Path.Combine(ContentLoader.FindRoot(), "Tests", "Simulation", "FI_REFERENCE_FAST.csv"), csv.ToString());
-            double[] meanFi = new double[5];
-            for (int t = 0; t < 5; t++) { double s = 0; for (int li = 0; li < ls.Count; li++) s += ok[t][li] / ok[0][li]; meanFi[t] = s / ls.Count; }
-            output.WriteLine("mean FI over 75 levels: " + string.Join(" / ", meanFi.Select(x => x.ToString("F3", CultureInfo.InvariantCulture))));
-            int l15 = ls.FindIndex(l => l.Id == "lvl_001_15");
-            output.WriteLine("level 15 of region 1 FI: " + string.Join(" / ", Enumerable.Range(0, 5).Select(t => (ok[t][l15] / ok[0][l15]).ToString("F3", CultureInfo.InvariantCulture))));
-        }
-    }
 }

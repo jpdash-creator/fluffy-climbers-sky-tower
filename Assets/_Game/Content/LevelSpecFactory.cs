@@ -53,6 +53,14 @@ namespace FluffyClimbers.Content
             {
                 if (level.Overrides.FixedChunks != null) spec.FixedChunks = level.Overrides.FixedChunks.ToArray();
                 if (level.Overrides.Ramp.HasValue) spec.Ramp = level.Overrides.Ramp.Value;
+                if (level.Overrides.Rows.HasValue) spec.Rows = level.Overrides.Rows.Value;
+            }
+
+            // Special level rule (owner Final Change 1, 2026-11-22). No silent default: an id the game does not know is a content error.
+            if (!string.IsNullOrEmpty(level.Special))
+            {
+                spec.Special = SpecialLevels.RuleFromId(level.Special);
+                if (spec.Special == SpecialLevelType.None) throw new ContentException(level.Id, "Unknown special level rule '" + level.Special + "'.");
             }
             return spec;
         }

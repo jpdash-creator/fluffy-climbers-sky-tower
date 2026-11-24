@@ -512,12 +512,16 @@ namespace FluffyClimbers.Tests
                     Transform row = LbRowOfRank(s, rank);
                     if (row == null && rank > 8) break;   // rows are 156 reference px tall since 2026-11-14: the list binds only the rows that can be seen
                     Assert.IsNotNull(row, "row " + rank + " is bound");
-                    string plate = rank == 1 ? "lb_row_gold" : rank == 2 ? "lb_row_silver" : rank == 3 ? "lb_row_bronze" : "lb_row_grey";   // Bug List 7: green is only the own row
-                    string badge = rank == 1 ? "lb_medal_gold" : rank == 2 ? "lb_medal_silver" : rank == 3 ? "lb_medal_bronze" : rank <= 10 ? "lb_badge_green" : "lb_badge_grey";
+                    // owner Final Change 2 (2026-11-23): gold, silver and bronze only for the top 3 players who REACHED the board's entry limit; every other row is plain grey (green is only the own row)
+                    BoardRank lbRank = LeaderboardHub.MyWeek != null ? LeaderboardHub.MyWeek.RankOf(LbBoards.All[0]) : null;
+                    long lbLimit = lbRank != null && lbRank.EntryLimit > 0 ? lbRank.EntryLimit : s.Data.Limit;
+                    int medalPlace = LeaderboardPin.MedalPlace(rank, s.Data.Entries[rank - 1].Crowns, lbLimit);
+                    string plate = medalPlace == 1 ? "lb_row_gold" : medalPlace == 2 ? "lb_row_silver" : medalPlace == 3 ? "lb_row_bronze" : "lb_row_grey";
+                    string badge = medalPlace == 1 ? "lb_medal_gold" : medalPlace == 2 ? "lb_medal_silver" : medalPlace == 3 ? "lb_medal_bronze" : rank <= 10 ? "lb_badge_green" : "lb_badge_grey";
                     Assert.AreEqual(plate, row.Find("Plate").GetComponent<Image>().sprite.name, "plate of rank " + rank);
                     Transform medalTf = row.Find("Medal");
-                    if (rank <= 3) Assert.AreEqual(badge, medalTf.GetComponent<Image>().sprite.name, "medal of rank " + rank);
-                    else Assert.IsFalse(medalTf.gameObject.activeSelf, "rank " + rank + " is a plain number (Bug List 4: medals only for ranks 1 to 3)");
+                    if (medalPlace > 0) Assert.AreEqual(badge, medalTf.GetComponent<Image>().sprite.name, "medal of rank " + rank);
+                    else Assert.IsFalse(medalTf.gameObject.activeSelf, "rank " + rank + " is a plain number (medals only for the top 3 at the entry limit)");
                     Text num = row.Find("RankText").GetComponent<Text>();
                     Assert.IsTrue(num.gameObject.activeInHierarchy && num.text == rank.ToString(), "the rank number is always drawn (on the medal for ranks 1 to 3)");
                     Assert.AreEqual("lb_icon_crown", row.Find("CrownIcon").GetComponent<Image>().sprite.name);

@@ -11,7 +11,7 @@ namespace FluffyClimbers.Gameplay
     /// <summary>
     /// The Treasure Shop page (docs/22 point 3, docs/26 section 1; reworked by Bug List 5 F3 to match the Bundles: coins + power-ups + exactly one hero card, a "Worth x.." tag and an "i" popup).
     /// It is the "Chests" section of the shop's VIP page, built inside <see cref="ShopChrome"/>: two cards, IRON CHEST (blue) and GOLD CHEST (gold). Each card has a top row with the 48 dp "i"
-    /// button, the chest name and the italic "Worth x1.8" tag (top right, no star, the name's font); under it the chest picture on the left and, on the right, icon chips (coins range,
+    /// button, the chest name and the italic "Worth x3.7" tag (top right, no star, the name's font); under it the chest picture on the left and, on the right, icon chips (coins range,
     /// power-ups, the hero card as the "?" hero icon) above the buttons Open 1 (green) and Open 10 (yellow) with the gem price. Opening asks first (every price is above 50 gems), plays a
     /// reveal of about 1.2 s that a tap skips (reduced motion shows the result at once) and ends on a Collect button. The reveal is compact and icon-first: small hero rows, icon chips.
     /// Too few gems offers the smallest gem pack that covers the shortfall. Gems only. Menu screen only: no per-frame code except the reveal animation.
@@ -92,7 +92,7 @@ namespace FluffyClimbers.Gameplay
             return Num(ChestRolls.MinCoins(kind)) + " to " + Num(ChestRolls.MaxCoins(kind)) + " coins, " + pu + (pu == 1 ? " power-up" : " power-ups") + ", 1 hero card";
         }
 
-        /// <summary>The worth tag of a chest, for example "Worth x1.8" (see <see cref="ChestRolls.Worth"/>).</summary>
+        /// <summary>The worth tag of a chest, for example "Worth x3.7" (see <see cref="ChestRolls.Worth"/>).</summary>
         public static string WorthText(ChestKind kind) { return ChestRolls.WorthLabel(kind); }
 
         /// <summary>
@@ -224,7 +224,7 @@ namespace FluffyClimbers.Gameplay
             Color titleCol = gold ? new Color(0.33f, 0.14f, 0.02f) : new Color(0.82f, 0.93f, 1f);
             Color baseCol = gold ? new Color(0.20f, 0.08f, 0.02f) : Color.white;
 
-            // top row: the "i" (top left), the name, and the italic "Worth x1.8" (top right, no star, the name's font)
+            // top row: the "i" (top left), the name, and the italic "Worth x3.7" (top right, no star, the name's font)
             AddInfoButton(card, "ChestInfo", new Vector2(0f, 1f), new Vector2(6f, -TextTop), "About the " + ChestName(kind), baseCol, () => ShowInfo(kind));
             Text name = UiKit.AddText(card, "Name", ChestName(kind).ToUpperInvariant(), 44, titleCol, TextAnchor.MiddleLeft, true);
             if (gold) name.GetComponent<Outline>().enabled = false;
@@ -308,7 +308,7 @@ namespace FluffyClimbers.Gameplay
 
         /// <summary>
         /// The "i" popup of one chest: icon chips (coins, power-ups, the "?" hero card), a short hero line ("Only heroes of your open regions") with the chance per rarity (Iron 50/30/20,
-        /// Gold 60/30/10) and "Worth x1.8 for 100 gems". Icons first, short text, all at least 16 sp.
+        /// Gold 60/30/10) and "Worth x3.7 for 400 gems". Icons first, short text, all at least 16 sp.
         /// </summary>
         public void ShowInfo(ChestKind kind)
         {
@@ -320,7 +320,7 @@ namespace FluffyClimbers.Gameplay
             string worthLine = WorthText(kind) + " for " + Num(ChestRolls.Price(kind, 1)) + " gems";
             float chipsH = 2f * popupChipH + gap;
             float heroY = chipsY + chipsH + gap * 2f, heroH = Mathf.Max(80f, BundlesScreen.TextHeight(heroText, 40f, W - 100f));
-            float chanceY = heroY + heroH + gap, chanceH = BundlesScreen.TextHeight("Uncommon\n70%", 40f, colW);
+            float chanceY = heroY + heroH + gap, chanceH = BundlesScreen.TextHeight("Uncommon\n30%", 40f, colW);
             float worthY = chanceY + chanceH + gap, worthH = BundlesScreen.WorthPillH();
             string foot = "Same hero twice? You keep both.";
             float footY = worthY + worthH + gap, footH = BundlesScreen.TextHeight(foot, 40f, W);

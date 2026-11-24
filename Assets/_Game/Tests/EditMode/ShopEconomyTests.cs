@@ -125,19 +125,27 @@ namespace FluffyClimbers.Tests
         // ---- 4.3 power-up gem prices ----
 
         [Test]
-        public void PowerUpGemPricesAre50And75()
+        public void PowerUpGemPricesAre100And150And200()
         {
+            // owner Final Change 1 (2026-11-22): gem price = coins / 20 (before: 1,000 / 50 and 1,500 / 75)
             PowerUpCatalog c = PowerUpCatalog.BuiltIn();
-            foreach (PowerUp t in new[] { PowerUp.SafetyNet, PowerUp.Glide, PowerUp.WidePlatforms, PowerUp.Shield, PowerUp.WallStick, PowerUp.DoubleJump })
+            foreach (PowerUp t in new[] { PowerUp.WallStick, PowerUp.Shield, PowerUp.WidePlatforms })
             {
-                Assert.AreEqual(1000, c.Get(t).CoinPrice, t.ToString());
-                Assert.AreEqual(50, c.Get(t).GemPrice, t.ToString());
+                Assert.AreEqual(2000, c.Get(t).CoinPrice, t.ToString());
+                Assert.AreEqual(100, c.Get(t).GemPrice, t.ToString());
             }
-            foreach (PowerUp t in new[] { PowerUp.SlowTime, PowerUp.Rocket, PowerUp.Flight })
+            foreach (PowerUp t in new[] { PowerUp.SafetyNet, PowerUp.DoubleJump, PowerUp.Glide, PowerUp.SlowTime })
             {
-                Assert.AreEqual(1500, c.Get(t).CoinPrice, t.ToString());
-                Assert.AreEqual(75, c.Get(t).GemPrice, t.ToString());
+                Assert.AreEqual(3000, c.Get(t).CoinPrice, t.ToString());
+                Assert.AreEqual(150, c.Get(t).GemPrice, t.ToString());
             }
+            foreach (PowerUp t in new[] { PowerUp.Rocket, PowerUp.Flight })
+            {
+                Assert.AreEqual(4000, c.Get(t).CoinPrice, t.ToString());
+                Assert.AreEqual(200, c.Get(t).GemPrice, t.ToString());
+            }
+            Assert.AreEqual(9, c.Implemented.Count, "every implemented power-up is in one of the three price groups");
+            Assert.AreEqual(1300.0 / 9.0, ChestRolls.AveragePowerUpGems(c), 1e-9, "a random power-up is worth 144.44 gems");
         }
 
         [Test]

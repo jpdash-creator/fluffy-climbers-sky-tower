@@ -11,6 +11,6 @@ Replaces docs 17, 18 and 19. Gear, pants, boots, hats, the inventory screen, the
 Unchanged: coin shop, stock, 3-slot loadout in the level popup, HUD buttons. Only the power-up section that was on the character screen is gone.
 
 ## Chests (replace the inventory tab)
-- The second tab of the bottom bar is "Chests" and opens the shop's Chests tab. Gems only: Iron 100 / 1000 (open 10), Golden 300 / 3000.
+- The second tab of the bottom bar is "Chests" and opens the shop's Chests tab. Gems only: Iron 400 / 4,000 (open 10), Gold 1,500 / 15,000 since 2026-11-22 (Final Change 1; at the time of this doc Iron 100 / 1000, Golden 300 / 3000).
 - Contents: Iron 3 power-ups and up to 1000 coins; Golden 6 power-ups and up to 3000 coins. No gear.
 - Old saves with gear fields load fine; the fields are ignored.

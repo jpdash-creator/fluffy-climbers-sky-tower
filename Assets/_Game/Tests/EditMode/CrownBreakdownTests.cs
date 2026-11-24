@@ -49,7 +49,7 @@ namespace FluffyClimbers.Tests
                 Assert.AreEqual(25, b.ChainSquares);
                 Assert.AreEqual((long)BaseOf(37, 5) * CrownBreakdown.Factor, b.BeforeBonus, "x5 before the setting bonus");
                 Assert.AreEqual(b.FloorPoints + b.ComboPoints, b.BaseScore, "the two parts are the whole base score");
-                Assert.AreEqual(SimConfig.DifficultyStepPercent[mode], b.BonusPercent, "the bonus is the setting percent of the code");
+                Assert.AreEqual(SimConfig.DifficultyRewardPercent[mode], b.BonusPercent, "the bonus is the reward percent of the setting (0/5/10/15/25)");
                 Assert.AreEqual(svc.BestCrown("lvl_001_01", mode), b.Crown, "the calculated crown is the stored crown");
                 Assert.AreEqual(CrownScore.FromScore(b.BaseScore, mode), b.Crown);
             }
@@ -78,7 +78,9 @@ namespace FluffyClimbers.Tests
             CrownBreakdown b = CrownBreakdown.From(svc.BestCrownRun("lvl_001_01", 3), 3);
             Assert.IsFalse(b.HasRun);
             Assert.AreEqual(0, b.Crown);
-            Assert.AreEqual(SimConfig.DifficultyStepPercent[3], b.BonusPercent, "the bonus is shown even without a run");
+            Assert.AreEqual(SimConfig.DifficultyRewardPercent[3], b.BonusPercent, "the bonus is shown even without a run");
+            Assert.AreEqual(15, b.BonusPercent);
+            Assert.AreEqual(0, CrownBreakdown.From(svc.BestCrownRun("lvl_001_01", 0), 0).BonusPercent, "Relaxed has no bonus (the pop-up shows +0%)");
         }
 
         [Test]
@@ -106,32 +108,32 @@ namespace FluffyClimbers.Tests
         public void ACrownWithoutItsRunStillShowsAsStoredWhenTheBreakdownIsGivenOnlyTheCrown()
         {
             // CrownBreakdown keeps its fallback for a stored crown without a run (used by the formula pop-up code paths, independent of the weekly store)
-            CrownBreakdown noRun = CrownBreakdown.From(null, 3, 1400);
+            CrownBreakdown noRun = CrownBreakdown.From(null, 3, 1150);
             Assert.IsTrue(noRun.HasRun);
             Assert.IsFalse(noRun.PartsKnown);
-            Assert.AreEqual(1400, noRun.Crown, "the stored crown is shown as it is");
-            Assert.AreEqual(200, noRun.BaseScore, "the base score is recovered from the crown (200 x 5 x 1.4 = 1400)");
+            Assert.AreEqual(1150, noRun.Crown, "the stored crown is shown as it is");
+            Assert.AreEqual(200, noRun.BaseScore, "the base score is recovered from the crown (200 x 5 x 1.15 = 1150)");
             Assert.AreEqual(CrownScore.FromScore(noRun.BaseScore, 3), noRun.Crown);
-            CrownBreakdown skipped = CrownBreakdown.From(null, 3, 1500);   // a crown no base score can make: shown as stored, base unknown
+            CrownBreakdown skipped = CrownBreakdown.From(null, 3, 1500);   // a crown no base score can make (260 gives 1495, 261 gives 1501): shown as stored, base unknown
             Assert.IsTrue(skipped.HasRun);
             Assert.AreEqual(1500, skipped.Crown);
             Assert.AreEqual(0, skipped.BaseScore);
         }
 
         [Test]
-        public void TheOwnerExampleGives17880AndTheChainListIsKeptForThePopup()
+        public void TheOwnerExampleGives14900AndTheChainListIsKeptForThePopup()
         {
             var svc = NewService();
-            // floors 80, one chain of 48, Insane (bonus 50 percent): (80 + 2304) x 5 x 1.5 = 17,880
+            // floors 80, one chain of 48, Insane (bonus 25 percent since 2026-11-22): (80 + 2304) x 5 x 1.25 = 14,900
             svc.ApplyRun("lvl_001_01", new RunOutcome { Completed = true, StarMask = 1, Score = 80 + 48 * 48, Floors = 80, BestCombo = 48, Mode = 4, Chains = new[] { 48 } });
-            Assert.AreEqual(17880, svc.BestCrown("lvl_001_01", 4));
+            Assert.AreEqual(14900, svc.BestCrown("lvl_001_01", 4));
             CrownBreakdown b = CrownBreakdown.From(svc.BestCrownRun("lvl_001_01", 4), 4);
             Assert.AreEqual(80, b.FloorPoints);
             Assert.AreEqual(2304, b.ChainSquares);
             CollectionAssert.AreEqual(new[] { 48 }, b.Chains);
             Assert.AreEqual(2384, b.BaseScore);
             Assert.AreEqual(11920L, b.BeforeBonus);
-            Assert.AreEqual(50, b.BonusPercent);
+            Assert.AreEqual(25, b.BonusPercent);
             // several chains: 5, 10, 20 -> 25 + 100 + 400 = 525; floors 80
             var svc2 = NewService();
             svc2.ApplyRun("lvl_001_01", new RunOutcome { Completed = true, StarMask = 1, Score = 80 + 525, Floors = 80, BestCombo = 20, Mode = 0, Chains = new[] { 5, 10, 20 } });
@@ -139,7 +141,8 @@ namespace FluffyClimbers.Tests
             CollectionAssert.AreEqual(new[] { 5, 10, 20 }, c.Chains);
             Assert.AreEqual(525, c.ChainSquares);
             Assert.AreEqual(CrownScore.FromFloorsChains(80, new[] { 5, 10, 20 }, 0), c.Crown);
-            Assert.AreEqual(3328, c.Crown, "605 x 5 x 1.10 = 3327.5 -> 3328");
+            Assert.AreEqual(3025, c.Crown, "605 x 5 x 1.00 = 3025 (Relaxed has no bonus)");
+            Assert.AreEqual(3328, CrownScore.FromFloorsChains(80, new[] { 5, 10, 20 }, 2), "Normal: 605 x 5 x 1.10 = 3327.5 -> 3328 (half up)");
         }
 
         [Test]

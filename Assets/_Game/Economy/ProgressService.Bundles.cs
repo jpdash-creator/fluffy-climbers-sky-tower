@@ -106,7 +106,7 @@ namespace FluffyClimbers.Economy
                 result = DrawBundleOffers(b, null);
                 b.Offers.Clear();
                 foreach (BundleDef d in result) b.Offers.Add(d.Id);
-                store.Save(Data);   // quiet save: reading must not raise Changed
+                CommitQuiet();   // quiet save: reading must not raise Changed (rate-limited cloud upload, Final Change 3)
             }
             return result;
         }
@@ -339,7 +339,7 @@ namespace FluffyClimbers.Economy
                 if (bundleUnsavedSec >= BundleSaveEverySec)
                 {
                     bundleUnsavedSec = 0.0;
-                    store.Save(Data);
+                    CommitQuiet();
                 }
             }
         }

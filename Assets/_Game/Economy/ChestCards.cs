@@ -18,9 +18,10 @@ namespace FluffyClimbers.Economy
     public static partial class ChestRolls
     {
         public const int IronPowerUps = 1, GoldenPowerUps = 3;
-        /// <summary>Coin ranges and power-up counts are unchanged since Bug List 5 F3. With the 2026-11-13 odds and card values the worth is about x3.5 (Iron) and x5.3 (Gold); the owner accepts richer chests.</summary>
+        /// <summary>Coin ranges and power-up counts are unchanged since Bug List 5 F3. With the Final Change 1 prices (2026-11-22) the worth is about x3.7 (Iron) and x5.5 (Gold).</summary>
         public const int IronMinCoins = 800, IronMaxCoins = 1200, GoldenMinCoins = 3000, GoldenMaxCoins = 4200;
-        public const int IronPrice = 100, IronPriceTen = 1000, GoldenPrice = 300, GoldenPriceTen = 3000;
+        /// <summary>Gem prices (owner Final Change 1, 2026-11-22: Iron 400, Gold 1,500; before 100 and 300). Open 10 = ten times the single price, no discount.</summary>
+        public const int IronPrice = 400, IronPriceTen = 4000, GoldenPrice = 1500, GoldenPriceTen = 15000;
         /// <summary>The shop rate used in every worth number: 20 coins are worth 1 gem (same as bundles).</summary>
         public const int CoinsPerGem = 20;
         /// <summary>The worth must stay inside this band (was 1.5 to 2.5; raised by the owner 2026-11-13 with the richer odds and the new hero card prices).</summary>
@@ -34,10 +35,11 @@ namespace FluffyClimbers.Economy
         public static readonly int[] GoldenWeights = { 60, 30, 10 };
 
         /// <summary>
-        /// THE ONE TABLE for the gem value of a hero card in a worth number = its Heroes shop coin price / 20 (<see cref="HeroPurchase.Prices"/>, owner 2026-11-13): Common 100,
-        /// Uncommon 250, Rare 600, Elite 1,600, Legendary 4,000 gems. Uncommon, Rare, Elite are also <see cref="BundleCards.TierGems"/>, so chests and bundles value a card identically.
+        /// THE ONE TABLE for the gem value of a hero card in a worth number = its Heroes shop coin price / 20 (<see cref="HeroPurchase.Prices"/>, owner Final Change 1, 2026-11-22): Common 400,
+        /// Uncommon 1,200, Rare 3,600, Elite 10,000, Legendary 25,000 gems. Common, Uncommon, Rare are also <see cref="BundleCards.TierGems"/>, so chests and bundles value a card identically.
+        /// The Common value is kept as a constant too (8,000 coins / 20); a test keeps it equal to the shop price over 20.
         /// </summary>
-        public const int CommonCardGems = 100;
+        public const int CommonCardGems = 400;
 
         public static CharacterRarity[] Tiers(ChestKind kind) { return kind == ChestKind.Iron ? IronTiers : GoldenTiers; }
         public static int[] Weights(ChestKind kind) { return kind == ChestKind.Iron ? IronWeights : GoldenWeights; }
@@ -56,7 +58,7 @@ namespace FluffyClimbers.Economy
             return tierIndex >= 0 && tierIndex < w.Length ? w[tierIndex] : 0;
         }
 
-        /// <summary>Expected gem value of the hero card of one chest: sum of chance x card gems. Iron 245, Gold 1,240.</summary>
+        /// <summary>Expected gem value of the hero card of one chest: sum of chance x card gems. Iron 1,280 (0.5 x 400 + 0.3 x 1,200 + 0.2 x 3,600), Gold 7,660 (0.6 x 3,600 + 0.3 x 10,000 + 0.1 x 25,000).</summary>
         public static double ExpectedCardGems(ChestKind kind)
         {
             CharacterRarity[] t = Tiers(kind);
@@ -79,7 +81,7 @@ namespace FluffyClimbers.Economy
 
         /// <summary>
         /// Worth multiplier of ONE chest at its Open 1 price (Open 10 is ten of them for ten times the gems, so the same): (average coins / 20 + power-ups x the average gem price of one
-        /// random power-up + expected hero card gems) / gems paid. <paramref name="avgPowerUpGems"/> is the mean gem price of the implemented power-up types (58.33 today).
+        /// random power-up + expected hero card gems) / gems paid. <paramref name="avgPowerUpGems"/> is the mean gem price of the implemented power-up types (144.44 today).
         /// </summary>
         public static double WorthMultiplier(ChestKind kind, double avgPowerUpGems)
         {
@@ -87,7 +89,7 @@ namespace FluffyClimbers.Economy
             return (coins + PowerUpCount(kind) * avgPowerUpGems + ExpectedCardGems(kind)) / Price(kind, 1);
         }
 
-        /// <summary>"Worth x1.8" (one decimal, invariant culture): the tag on the chest card, the same words as a bundle.</summary>
+        /// <summary>"Worth x3.7" (one decimal, invariant culture): the tag on the chest card, the same words as a bundle.</summary>
         public static string WorthText(ChestKind kind, double avgPowerUpGems)
         {
             return "Worth x" + WorthMultiplier(kind, avgPowerUpGems).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
@@ -111,24 +113,14 @@ namespace FluffyClimbers.Economy
             return t[t.Length - 1];
         }
 
-        static bool Open(System.Func<int, bool> regionOpen, int region)
-        {
-            return regionOpen == null || region <= 1 || regionOpen(region);
-        }
-
         /// <summary>
-        /// The heroes of exactly this rarity a chest can give, in id order. Common: the base hero of each open region. Uncommon and up: the bundle pool (merge tiers of open regions).
+        /// The heroes of exactly this rarity a chest can give, in id order. Common: the base hero of each open region. Uncommon and up: the merge tiers of open regions.
+        /// The one pool of every hero card (chest, bundle, Heroes shop) is <see cref="BundleCards.Pool(CharacterRarity, IList{CharacterSpec}, System.Func{int, bool})"/> (it holds the Common rule too since Final Change 1).
         /// <paramref name="regionOpen"/> gets the region index (2 and up); null = every region is open.
         /// </summary>
         public static List<CharacterSpec> Pool(CharacterRarity rarity, IList<CharacterSpec> all, System.Func<int, bool> regionOpen)
         {
-            if (rarity != CharacterRarity.Common) return BundleCards.Pool(rarity, all, regionOpen);
-            var list = new List<CharacterSpec>(6);
-            if (all == null) return list;
-            foreach (CharacterSpec c in all)
-                if (c != null && c.IsRegionHero && !c.IsMergeTier && Open(regionOpen, c.Region)) list.Add(c);
-            list.Sort((x, y) => string.CompareOrdinal(x.Id, y.Id));
-            return list;
+            return BundleCards.Pool(rarity, all, regionOpen);
         }
 
         static readonly CharacterRarity[] Ladder = { CharacterRarity.Common, CharacterRarity.Uncommon, CharacterRarity.Rare, CharacterRarity.Epic, CharacterRarity.Legendary };

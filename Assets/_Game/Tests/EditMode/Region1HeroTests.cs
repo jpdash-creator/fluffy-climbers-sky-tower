@@ -202,12 +202,12 @@ namespace FluffyClimbers.Tests
         [Test]
         public void TheRegion1CommonHeroFollowsTheForgivenessIndexRules()
         {
-            // docs/44: every Common hero is a generated, measured draw inside the Common band (Jump 0 to 5 percent over 19.0)
+            // docs/44: every Common hero is a generated, measured draw inside the Common band (-3 to +3 percent of Momo on all four numbers)
             foreach (string line in Lines)
             {
                 CharacterStats s = CharacterDefs.Get(line).Stats;
                 Assert.IsNull(s.Validate(), line);
-                Assert.IsNull(HeroIndex.Validate(0, new HeroPhysics(s.LaunchTenths, s.MaxSpeed, s.Control, s.WallBoostHundredths)), line);
+                Assert.IsNull(HeroIndex.ValidateBands(0, new HeroPhysics(s.LaunchTenths, s.MaxSpeed, s.Control, s.WallBoostHundredths), HeroIndex.MomoCommon), line);
             }
         }
 
@@ -231,7 +231,7 @@ namespace FluffyClimbers.Tests
                     foreach (CharacterRarity t in tiers)
                         CollectionAssert.Contains(seen, line + Suffix[System.Array.IndexOf(Ladder, t)], kind + " can give " + line + " " + t);
             }
-            // bundle hero cards (Uncommon, Rare, Elite)
+            // bundle hero cards (Common, Uncommon, Rare since Final Change 1, 2026-11-22; never Elite or Legendary)
             var cards = new HashSet<string>();
             ulong b = 5;
             for (int i = 0; i < 6000; i++)
@@ -240,7 +240,8 @@ namespace FluffyClimbers.Tests
                 Assert.IsTrue(region1Lines.Contains(c.LineId), c.Id);
                 cards.Add(c.Id);
             }
-            foreach (string line in Lines) foreach (int i in new[] { 1, 2, 3 }) CollectionAssert.Contains(cards, line + Suffix[i]);
+            foreach (string line in Lines) foreach (int i in new[] { 0, 1, 2 }) CollectionAssert.Contains(cards, line + Suffix[i]);
+            foreach (string line in Lines) foreach (int i in new[] { 3, 4 }) CollectionAssert.DoesNotContain(cards, line + Suffix[i]);
             // with regions 2 and 3 open the pool grows by their ACTIVE lines only, never by regions 4 and 5 or by an inactive hero
             var wider = new HashSet<string>();
             ulong w = 9;

@@ -25,7 +25,7 @@ namespace FluffyClimbers.Tests
             store = new MemorySaveStore();
         }
 
-        ProgressService NewService(int coins = 100000, int seed = 12345)
+        ProgressService NewService(int coins = 1000000, int seed = 12345)
         {
             var svc = new ProgressService(repo, store, 5);
             svc.Data.Coins = coins;
@@ -44,13 +44,16 @@ namespace FluffyClimbers.Tests
         [Test]
         public void ThePriceTableIsTheOwnerTable()
         {
-            // coins only (owner Bug List Shop 2a); prices of 2026-11-13: Common 2,000 (now sold), Uncommon 5,000, Rare 12,000, Elite 32,000, Legendary 80,000
-            Assert.AreEqual(2000, HeroPurchase.CoinPrice(CharacterRarity.Common));
-            Assert.AreEqual(5000, HeroPurchase.CoinPrice(CharacterRarity.Uncommon));
-            Assert.AreEqual(12000, HeroPurchase.CoinPrice(CharacterRarity.Rare));
-            Assert.AreEqual(32000, HeroPurchase.CoinPrice(CharacterRarity.Epic));
-            Assert.AreEqual(80000, HeroPurchase.CoinPrice(CharacterRarity.Legendary));
+            // coins only (owner Bug List Shop 2a); prices of Final Change 1 (owner 2026-11-22): Common 8,000, Uncommon 24,000, Rare 72,000, Elite 200,000, Legendary 500,000
+            // (before: 2,000 / 5,000 / 12,000 / 32,000 / 80,000)
+            Assert.AreEqual(8000, HeroPurchase.CoinPrice(CharacterRarity.Common));
+            Assert.AreEqual(24000, HeroPurchase.CoinPrice(CharacterRarity.Uncommon));
+            Assert.AreEqual(72000, HeroPurchase.CoinPrice(CharacterRarity.Rare));
+            Assert.AreEqual(200000, HeroPurchase.CoinPrice(CharacterRarity.Epic));
+            Assert.AreEqual(500000, HeroPurchase.CoinPrice(CharacterRarity.Legendary));
             Assert.AreEqual(HeroPurchase.Tiers.Length, HeroPurchase.Prices.Length);
+            // the card gem value used in every worth number = price / 20
+            CollectionAssert.AreEqual(new[] { 400, 1200, 3600, 10000, 25000 }, HeroPurchase.Tiers.Select(r => ChestRolls.CardGems(r)).ToArray());
         }
 
         [Test]
@@ -69,8 +72,8 @@ namespace FluffyClimbers.Tests
                 TierRule rule = TierRules.RuleFor(r);
                 List<string> lines = HeroPurchase.InfoLines(r);
                 Assert.AreEqual(3, lines.Count);
-                StringAssert.Contains(rule.PowerCount.ToString(), lines[0]);
-                StringAssert.Contains("once per run", lines[0]);   // Bug List 4: one free use per run, no separate cooldown
+                if (rule.PowerCount == 0) StringAssert.Contains("No hero power", lines[0]);   // owner Final Change 2: Uncommon has no power, Rare and Elite one, Legendary two
+                else { StringAssert.Contains(rule.PowerCount.ToString(), lines[0]); StringAssert.Contains("once per run", lines[0]); }   // Bug List 4: one free use per run, no separate cooldown
                 StringAssert.Contains(TierRules.JumpBandText(r), lines[1]);
                 StringAssert.Contains("Milestone bonus +" + FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusCoins((int)r) + " coins", lines[2]);   // owner 2026-11-13: the hero bonus by rarity replaced the run bonus range
                 StringAssert.Contains(FluffyClimbers.Simulation.CoinPayoutRules.HeroBonusGemsByRarity[(int)r] + " gems", lines[2]);
@@ -117,12 +120,12 @@ namespace FluffyClimbers.Tests
         [Test]
         public void BuyingPaysTheCoinsAndAddsExactlyOneCopyOfAnOpenUncommonHero()
         {
-            ProgressService svc = NewService(10000);
+            ProgressService svc = NewService(30000);
             int before = svc.Copies("momo_u");
             CharacterSpec hero;
             Assert.AreEqual(HeroBuyResult.Ok, svc.TryBuyHero(CharacterRarity.Uncommon, out hero));
             CollectionAssert.Contains(new[] { "momo_u" }, hero.Id, "only region 1 is open: Momo is its only active line, never an inactive hero");
-            Assert.AreEqual(10000 - 5000, svc.Coins);
+            Assert.AreEqual(30000 - 24000, svc.Coins);
             Assert.AreEqual(777, svc.Gems, "no gem option: gems untouched");
             Assert.AreEqual(before + 1, svc.Copies("momo_u"), "exactly one copy");
             Assert.AreEqual(1, svc.Data.Bundles.HeroBuys);
@@ -133,11 +136,11 @@ namespace FluffyClimbers.Tests
         {
             foreach (CharacterRarity r in HeroPurchase.Tiers)
             {
-                ProgressService svc = NewService(100000);
+                ProgressService svc = NewService(1000000);
                 if (svc.HeroBuyPool(r).Count == 0) continue;
                 CharacterSpec hero;
                 Assert.AreEqual(HeroBuyResult.Ok, svc.TryBuyHero(r, out hero));
-                Assert.AreEqual(100000 - HeroPurchase.CoinPrice(r), svc.Coins);
+                Assert.AreEqual(1000000 - HeroPurchase.CoinPrice(r), svc.Coins);
                 Assert.AreEqual(777, svc.Gems);
             }
         }
@@ -145,11 +148,11 @@ namespace FluffyClimbers.Tests
         [Test]
         public void TheStateIsSavedImmediately()
         {
-            ProgressService svc = NewService(10000);
+            ProgressService svc = NewService(30000);
             CharacterSpec hero;
             svc.TryBuyHero(CharacterRarity.Uncommon, out hero);
             SaveData saved = store.Load();
-            Assert.AreEqual(5000, saved.Coins);
+            Assert.AreEqual(6000, saved.Coins);
             Assert.AreEqual(1, saved.Bundles.HeroBuys);
             int copies;
             Assert.IsTrue(saved.Copies.TryGetValue(hero.Id, out copies));
@@ -159,7 +162,7 @@ namespace FluffyClimbers.Tests
         [Test]
         public void OnlyHeroesOfOpenRegionsCanBeBought()
         {
-            ProgressService svc = NewService(1000000);
+            ProgressService svc = NewService(2000000);   // 40 Uncommon cards at 24,000 coins below
             Assert.AreEqual(1, svc.HeroBuyPool(CharacterRarity.Uncommon).Count, "Region 1: Momo only (the other lines are inactive)");
             foreach (CharacterRarity r in new[] { CharacterRarity.Rare, CharacterRarity.Epic, CharacterRarity.Legendary })
                 Assert.AreEqual(1, svc.HeroBuyPool(r).Count, r + ": one active hero in Region 1, none from the closed regions");
@@ -197,12 +200,12 @@ namespace FluffyClimbers.Tests
         [Test]
         public void TooFewCoinsIsRefusedWithNothingChanged()
         {
-            ProgressService svc = NewService(4999);
+            ProgressService svc = NewService(23999);
             string before = Snapshot(svc);
             CharacterSpec hero;
             Assert.AreEqual(HeroBuyResult.NotEnoughCoins, svc.TryBuyHero(CharacterRarity.Uncommon, out hero));
             Assert.IsNull(hero);
-            Assert.AreEqual(4999, svc.Coins);
+            Assert.AreEqual(23999, svc.Coins);
             Assert.AreEqual(777, svc.Gems, "gems cannot pay for a hero");
             Assert.AreEqual(before, Snapshot(svc));
         }
@@ -218,15 +221,15 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void ACommonCardCostsTwoThousandCoinsAndGivesAnOpenRegionBaseHero()
+        public void ACommonCardCostsEightThousandCoinsAndGivesAnOpenRegionBaseHero()
         {
             ProgressService svc = NewService(10000);
             CharacterSpec hero;
             Assert.AreEqual(HeroBuyResult.Ok, svc.TryBuyHero(CharacterRarity.Common, out hero));
-            Assert.AreEqual(8000, svc.Coins);
+            Assert.AreEqual(2000, svc.Coins);
             Assert.AreEqual("momo", hero.Id, "only region 1 is open: Momo is the one Common hero");
             Assert.AreEqual(CharacterRarity.Common, hero.Rarity);
-            svc.Data.Coins = 1999;
+            svc.Data.Coins = 7999;
             Assert.AreEqual(HeroBuyResult.NotEnoughCoins, svc.TryBuyHero(CharacterRarity.Common, out hero));
         }
 
@@ -251,10 +254,10 @@ namespace FluffyClimbers.Tests
         [Test]
         public void TheBuyCounterSurvivesASaveRoundTrip()
         {
-            ProgressService a = NewService(10000);
+            ProgressService a = NewService(50000);
             CharacterSpec hero;
-            a.TryBuyHero(CharacterRarity.Uncommon, out hero);
-            a.TryBuyHero(CharacterRarity.Uncommon, out hero);
+            Assert.AreEqual(HeroBuyResult.Ok, a.TryBuyHero(CharacterRarity.Uncommon, out hero));
+            Assert.AreEqual(HeroBuyResult.Ok, a.TryBuyHero(CharacterRarity.Uncommon, out hero));
             Assert.AreEqual(2, store.Load().Bundles.HeroBuys);
             Assert.AreEqual(12345, store.Load().Bundles.Seed);
         }

@@ -37,6 +37,9 @@ namespace FluffyClimbers.LeaderboardService.Tests
         public static RunReplayer Replayer { get { return new RunReplayer(Repo); } }
         public static readonly Limits Lim = new Limits();
 
+        /// <summary>The rules version the client sends (LeaderboardConfig.SimVersion in the Leaderboard assembly, not linkable here; ReplayTests pins the source line). 3 since owner Final Change 2 (2026-11-23; 2 was Final Change 1).</summary>
+        public const int ClientSimVersion = 3;
+
         /// <summary>The config the GAME builds for a run: GameSession.ApplyDifficulty on the shared config, cloned, then the hero's stats (GameSession.BuildRunCfg). Written out here independently of RunReplayer.ConfigFor.</summary>
         public static SimConfig ClientCfg(int mode, CharacterStats stats)
         {
@@ -54,20 +57,21 @@ namespace FluffyClimbers.LeaderboardService.Tests
         public static RunSession NewLevelSession(string levelId, int mode, int seed, string heroId = "momo", int variant = 0, bool stripGems = false)
         {
             CharacterSpec h = Hero(heroId);
-            var s = new RunSession(Repo, ClientCfg(mode, HeroRolls.StatsFor(h, variant)), levelId, stripGems, seed);
+            // region penalty (owner Final Change 2): the client builds the config with the penalty of the level's region, exactly like GameSession.BuildRunCfg(playRegion)
+            var s = new RunSession(Repo, ClientCfg(mode, HeroRegionPenalty.StatsIn(h, HeroRolls.StatsFor(h, variant), Repo.GetRegion(Repo.GetLevel(levelId).Region).Index)), levelId, stripGems, seed);
             s.Mode = mode;
             s.HeroId = heroId;
-            s.ApplyHeroPowers(h);
+            s.ApplyHeroPowers(HeroRolls.Rolled(h, variant));   // the chosen copy's rolled power(s), like RunController.BeginRun
             return s;
         }
 
         public static RunSession NewEndlessSession(string regionId, int mode, int seed, bool timeAttack, string heroId = "momo", int variant = 0)
         {
             CharacterSpec h = Hero(heroId);
-            var s = new RunSession(Repo, ClientCfg(mode, HeroRolls.StatsFor(h, variant)), Repo.GetRegion(regionId), seed, timeAttack);
+            var s = new RunSession(Repo, ClientCfg(mode, HeroRegionPenalty.StatsIn(h, HeroRolls.StatsFor(h, variant), Repo.GetRegion(regionId).Index)), Repo.GetRegion(regionId), seed, timeAttack);
             s.Mode = mode;
             s.HeroId = heroId;
-            s.ApplyHeroPowers(h);
+            s.ApplyHeroPowers(HeroRolls.Rolled(h, variant));   // the chosen copy's rolled power(s), like RunController.BeginRun
             return s;
         }
 
@@ -93,7 +97,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
             RunRecord rec = s.BuildRunRecord("0.59.1");
             return new RunSubmission
             {
-                SimVersion = 1, GameVersion = "0.59.1", Kind = kind, LevelId = s.Level != null ? s.Level.Id : null, RegionId = s.IsEndless ? s.Region.Id : null,
+                SimVersion = ClientSimVersion, GameVersion = "0.59.1", Kind = kind, LevelId = s.Level != null ? s.Level.Id : null, RegionId = s.IsEndless ? s.Region.Id : null,
                 Mode = s.Mode, Seed = seed, HeroId = s.HeroId, HeroVariant = variant,
                 InputsB64 = Convert.ToBase64String(rec.Inputs), ReviveAt = rec.ReviveAt, RunId = Guid.NewGuid().ToString("N"),
                 Claimed = new ClaimedResult { Floors = rec.Floors, Ticks = rec.Ticks, Score = s.State.Score, Crown = CrownScore.FromScore(s.State.Score, s.Mode) }

@@ -1,8 +1,10 @@
 # 15 - Power-ups, chests, subscription, characters: requirements (gear removed)
 
+> **Final Change 1 (owner 2026-11-22): current numbers.** Power-ups 2,000 coins (Wall Stick, Shield, Wide Platforms), 3,000 (Safety Net, Double Jump, Glide Cape, Slow Time), 4,000 (Flight, Rocket); gem value = coins / 20. Chests Iron 400 gems and Gold 1,500 gems, one hero card each. Four subscription plans at $1.99 / $4.99 / $6.99 / $14.99. Hero cards 8,000 to 500,000 coins. Special levels "No Power-ups" switch bought power-ups and the hero power off for that level (doc 45 section 4b). Tables: doc 27 section 0. Prices in the rows below are those of 2026-11-01 (history).
+
 > **Corrected 2026-11-01 to match the code (build v0.38.0.40).** Authoritative now: **doc 27** (economy tables), **doc 26** (shop, Bundles, Subscription, Rewards), **doc 22** (chests, prices, revive, characters), **doc 21** and **doc 20** (characters and chests; gear removed 2026-10-24). Where this file differs, those win. The filename keeps "gear" only so links do not break; **there is no gear** (hats, shirts, pants, boots, gear chests, style shards, wardrobe layering, inventory gear tab).
 > Requirement ids are kept. An id that no longer applies is marked "removed or superseded 2026-11-01 (see doc N)" and is not renumbered.
-> Rules applied: **1 gem = 20 coins (fixed)**; power-ups are 1,000 coins / 50 gems or 1,500 coins / 75 gems; **no VIP tiers** (Weekly and Monthly Subscription instead); **no loadout, no carry cap, no stock cap** (rework 2026-10-31); **7 power-ups are implemented**; chests are **Iron and Gold**; characters are **2 Commons** and the character shop is "coming soon".
+> Rules applied on 2026-11-01: **1 gem = 20 coins (fixed)**; power-ups were 1,000 coins and 1,500 coins then (2,000 / 3,000 / 4,000 since 2026-11-22); **no VIP tiers** (Weekly and Monthly Subscription instead); **no loadout, no carry cap, no stock cap** (rework 2026-10-31); **7 power-ups are implemented**; chests are **Iron and Gold**; characters are **2 Commons** and the character shop is "coming soon".
 
 Legend. Priority **P0/P1/P2**. Tags: **[OWNER]**, **[CODE]** read from the code, **[ASSUMPTION]**, **(verify)**. State: **Built**, **Planned**, **Removed**.
 
@@ -21,7 +23,7 @@ Legend. Priority **P0/P1/P2**. Tags: **[OWNER]**, **[CODE]** read from the code,
 | O-7 | Rate: 1 gem = 20 coins, fixed. | Applied everywhere (doc 22 conventions). |
 | O-8 | No gear anywhere. | Applied (owner 2026-11-01). |
 | D-1 | Power-ups are owned stock, picked as a 3-slot loadout. | **Superseded 2026-10-31:** stock has no cap, there is **no loadout**; every owned type shows a round button in the run (`PowerUpBar`); a tap while active adds the full duration. |
-| D-2 | Chests sold in tiers for gems or coins, pity, duplicates to shards, earned chests. | **Superseded (doc 22 point 3):** gems only, Iron 100 / Gold 300 gems, open 1 or 10; no pity, no shards, **no earned chests**. |
+| D-2 | Chests sold in tiers for gems or coins, pity, duplicates to shards, earned chests. | **Superseded (doc 22 point 3):** gems only, Iron 400 / Gold 1,500 gems since 2026-11-22 (100 / 300 before), open 1 or 10; no pity, no shards, **no earned chests**. |
 | D-3 | Gear layered on the character. | **Removed.** |
 | D-4 | VIP six subscription tiers. | **Superseded** by the Subscription (doc 26). |
 | D-5 | 4 characters per region, 20 in total, abilities. | **Not planned as written.** Characters have rarity and powers per doc 21 (Uncommon 1 power, Rare 1, Epic 2, Legendary 3; cooldown 30/22/15/10 s); data model exists, no Uncommon+ character exists yet. |
@@ -32,7 +34,7 @@ Legend. Priority **P0/P1/P2**. Tags: **[OWNER]**, **[CODE]** read from the code,
 | ID | Conflict | Status |
 |---|---|---|
 | X-1 | Cosmetics-only rule vs consumables and abilities. | Kept: Ranked is neutral (no power-ups, no character powers). Ranked is not built yet. |
-| X-2 | Doc 08 prices assume 100 coins per gem. | **Resolved: rate fixed at 20 coins per gem**; prices 1,000 / 50 and 1,500 / 75 (doc 22 4.3). |
+| X-2 | Doc 08 prices assume 100 coins per gem. | **Resolved: rate fixed at 20 coins per gem**; power-up prices follow it (2,000 / 3,000 / 4,000 coins = 100 / 150 / 200 gems since 2026-11-22; doc 22 4.3). |
 | X-3 | Coin Doubler priced like other consumables. | Coin Doubler is a hidden, unimplemented row (120 coins in the table). It is not sold. |
 | X-4 | Shield overlap with Safety Net. | Shield is a pure 60 s gong block (doc 24 P1); Safety Net not built. |
 | X-5 | One VIP vs six tiers. | **Resolved:** neither; Subscription (weekly, monthly). |
@@ -167,8 +169,12 @@ Each power-up is one of the 7 types with equal chance (1 in 7); the same type ca
 
 | Plan | Price | Length | On purchase | Daily claim | Free power-ups |
 |---|---|---|---|---|---|
-| Weekly Subscription | $1.49 (Rs 149) | 7 days | 100 gems | 10 gems + 500 coins | none |
-| Monthly Subscription | $4.99 (Rs 449) | 30 days | 200 gems | 10 gems + 600 coins | 1 random on every 5th claim (6 in 30 days) |
+| Weekly Starter | $1.99 | 7 days | 100 gems | 15 gems + 600 coins | 1 on claim 4 |
+| Weekly Plus | $4.99 | 7 days | 250 gems | 20 gems + 1,000 coins | every 2nd claim (3), plus 1 Iron chest |
+| Monthly Standard | $6.99 | 30 days | 200 gems | 15 gems + 600 coins | 1 random on every 5th claim (6 in 30 days) |
+| Monthly Premium | $14.99 | 30 days | 300 gems | 20 gems + 1,000 coins | every 5th claim (6), plus 2 Gold chests |
+
+(Table of Final Change 1, 2026-11-22. Until 2026-11-13 there were two plans: Weekly $1.49 with 10 gems + 500 coins a day and Monthly $4.99 with 10 gems + 600 coins a day.)
 
 Value: weekly 345 GE (2.5 times its price), monthly 1,400 GE without and 1,764 with the power-ups (3.1 and 3.9 times); doc 27 section 8.
 

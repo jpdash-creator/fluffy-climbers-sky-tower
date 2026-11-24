@@ -56,16 +56,20 @@ namespace FluffyClimbers.Simulation.Tests
                 int idx = ll.Spec.LevelIndex;
                 Assert.Equal(ExpectedRows(idx), ll.Spec.RowsFor());
                 GoalType g = ll.Spec.Goal.Type;
-                Assert.True(g != GoalType.SurviveWave && g != GoalType.BossChase && g != GoalType.CollectCoins, ll.Id + " uses " + g);
-                // Bug List 4 item 10: level 5 is a plain reach-floor 75; special goals at 10 (no wall bounce), 15 (hidden gem), 20 (speedrun); everything else reaches the top
-                if (idx == 10) Assert.Equal(GoalType.NoWallBounce, g);
-                else if (idx == 15) Assert.Equal(GoalType.FindHiddenGem, g);
-                else if (idx == 20) Assert.Equal(GoalType.Speedrun, g);
+                Assert.True(g != GoalType.SurviveWave && g != GoalType.CollectCoins && g != GoalType.FindHiddenGem && g != GoalType.Speedrun, ll.Id + " uses " + g);
+                // Owner Final Change 1 (2026-11-22): the gem levels 5/10/15/20/25 and every Regular Run reach the top; the special goals are No Wall Touch (noWallBounce),
+                // Combo Climb (comboChain 3 x 3 with its ladder) and Chase (bossChase with the row ramp), one level each per region (SpecialLevelTests pins the places).
+                SpecialLevelType type = SpecialLevels.TypeOf(ll.Spec);
+                if (type == SpecialLevelType.NoWallTouch) Assert.Equal(GoalType.NoWallBounce, g);
+                else if (type == SpecialLevelType.ComboClimb) Assert.Equal(GoalType.ComboChain, g);
+                else if (type == SpecialLevelType.Chase) Assert.Equal(GoalType.BossChase, g);
                 else Assert.Equal(GoalType.ReachFloor, g);
-                Assert.Equal(ExpectedRows(idx), ll.Spec.Goal.Value);
-                if (idx == 5) { Assert.Equal(75, ll.Spec.Goal.Value); Assert.Equal(0, ll.Spec.Goal.Count); Assert.Equal(0, ll.Spec.Goal.TimeSec); Assert.Equal(-1, LevelBuilder.Build(cfg, ll.Spec).LadderStartRow); }
+                if (g != GoalType.ComboChain) Assert.Equal(ExpectedRows(idx), ll.Spec.Goal.Value);
+                else Assert.Equal(ExpectedRows(idx), ll.Spec.Rows);
+                if (idx % 5 == 0) { Assert.Equal(GoalType.ReachFloor, g); Assert.Equal(0, ll.Spec.Goal.Count); Assert.Equal(0, ll.Spec.Goal.TimeSec); }
+                if (g != GoalType.ComboChain) Assert.Equal(-1, LevelBuilder.Build(cfg, ll.Spec).LadderStartRow);
                 Assert.Empty(ll.Spec.FixedChunks);
-                Assert.False(ll.Spec.Ramp);
+                Assert.Equal(type == SpecialLevelType.Chase, ll.Spec.Ramp);
                 LevelData d = LevelBuilder.Build(cfg, ll.Spec);
                 Assert.Equal(ExpectedRows(idx), d.Rows);
             }

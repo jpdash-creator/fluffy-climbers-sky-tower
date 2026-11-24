@@ -105,7 +105,8 @@ namespace FluffyClimbers.Gameplay
             StartTicket ticket = GameSession.FixedAttemptSeed == 0 ? TakeTicket("level", levelId) : null;   // a QA seed override is never ranked
             GameSession.AttemptSeed = ticket != null ? ticket.Seed : GameSession.NewAttemptSeed();
             CurrentTicket = ticket;
-            BeginRun(new RunSession(GameSession.Repo, GameSession.BuildRunCfg(), levelId, GameSession.Progress != null && GameSession.Progress.IsLevelCleared(levelId), GameSession.AttemptSeed));
+            // Strip-gems flag: the gems of a level are paid once, so a level cleared in ANY Gameplay setting holds none on a replay (IsLevelCleared without a setting = any setting).
+            BeginRun(new RunSession(GameSession.Repo, GameSession.BuildRunCfg(GameSession.RegionIndexOfLevel(levelId)), levelId, GameSession.Progress != null && GameSession.Progress.IsLevelCleared(levelId), GameSession.AttemptSeed));
             Debug.Log("Run layout: " + Session.LayoutInfo);
         }
 
@@ -119,7 +120,7 @@ namespace FluffyClimbers.Gameplay
             StartTicket ticket = TakeTicket("endless", regionId);
             GameSession.EndlessSeed = ticket != null ? ticket.Seed : GameSession.NewEndlessSeed();
             CurrentTicket = ticket;
-            BeginRun(new RunSession(GameSession.Repo, GameSession.BuildRunCfg(), GameSession.Repo.GetRegion(regionId), GameSession.EndlessSeed));
+            BeginRun(new RunSession(GameSession.Repo, GameSession.BuildRunCfg(GameSession.RegionIndexOf(regionId)), GameSession.Repo.GetRegion(regionId), GameSession.EndlessSeed));
         }
 
         /// <summary>The 3:00 Time Attack (doc 46 section 7): a new tower of the region, a countdown from the first jump, no revive; the score is the floors reached.</summary>
@@ -132,7 +133,7 @@ namespace FluffyClimbers.Gameplay
             StartTicket ticket = TakeTicket("timeattack", regionId);
             GameSession.EndlessSeed = ticket != null ? ticket.Seed : GameSession.NewEndlessSeed();
             CurrentTicket = ticket;
-            BeginRun(new RunSession(GameSession.Repo, GameSession.BuildRunCfg(), GameSession.Repo.GetRegion(regionId), GameSession.EndlessSeed, true));
+            BeginRun(new RunSession(GameSession.Repo, GameSession.BuildRunCfg(GameSession.RegionIndexOf(regionId)), GameSession.Repo.GetRegion(regionId), GameSession.EndlessSeed, true));
         }
 
         void BeginRun(RunSession session)
@@ -149,7 +150,7 @@ namespace FluffyClimbers.Gameplay
             // one roll per copy (owner 2026-11-17): the run plays, and the leaderboard replays, the roll of the CHOSEN copy (GameSession.BuildRunCfg uses the same copy)
             Session.HeroVariant = runHero != null && GameSession.Progress != null && runHero.Id == CharacterCatalog.Selected.Id ? GameSession.Progress.HeroVariant(runHero.Id, CharacterCatalog.SelectedCopy) : 0;
             if (GameSession.Progress != null) Session.ApplyStock(GameSession.Progress.BuildRunStock());   // before the HUD is built: it makes one button per owned type
-            Session.ApplyHeroPowers(HeroOverride ?? CharacterCatalog.Selected.Info);   // the chosen hero's free powers (none for Common heroes); before the HUD is built too
+            Session.ApplyHeroPowers(HeroRolls.Rolled(HeroOverride ?? CharacterCatalog.Selected.Info, Session.HeroVariant));   // the chosen COPY's free powers (rolled with its stats, owner Final Change 2; none for Common and Uncommon heroes); before the HUD is built too
             acc = 0f;
             endHandled = false;
             Paused = false;
@@ -292,12 +293,12 @@ namespace FluffyClimbers.Gameplay
                 RunRecord levelRecord = Session.BuildRunRecord(Application.version);
                 RecordResult levelRecorded = GameSession.Progress.RecordRun(levelRecord);   // doc 46: best Pace and Time per level and mode, medal (a revived run sets nothing)
                 LeaderboardRunGlue.Upload(levelRecord, Session.State.Score, CurrentTicket, GameSession.Progress);   // a completed level only; the fresh record, not the stored best
-                LevelDef nextForTicket = GameSession.NextLevel(Session.Level);
+                LevelDef nextForTicket = GameSession.NextLevel(Session.Level, Session.Mode);   // the next level on the path of the setting this run was played in (null when it is not open there)
                 if (nextForTicket != null && LeaderboardHub.WantsTicket) LeaderboardHub.Prefetch("level", nextForTicket.Id, GameSettings.Difficulty);   // "Next level" finds its ticket ready
                 GameSession.LastResult = new RunResult { LevelId = Session.Level.Id, Completed = true, Reward = reward, Stars = reward.Stars, Score = Session.State.Score, Floors = levelRecord.Floors, Ticks = levelRecord.Ticks, PaceNumerator = levelRecord.Floors, PaceDenominator = levelRecord.Ticks, Revived = levelRecord.Revived, Record = levelRecorded };
                 doubleCoinsUsed = false;
                 bool offerDouble = ProgressService.DoubleCoinsAmount(reward) > 0 && AdGate.IsRewardedReady(AdPlacements.DoubleReward);   // hidden when no ad is ready
-                Hud.ShowResults(Session, reward, GameSession.NextLevel(Session.Level) != null && GameSession.Progress.IsLevelUnlocked(GameSession.NextLevel(Session.Level)), offerDouble);
+                Hud.ShowResults(Session, reward, nextForTicket != null, offerDouble);   // "Next level" only when the next level is open in the setting of this run
             }
             else
             {
@@ -436,7 +437,7 @@ namespace FluffyClimbers.Gameplay
 
         void PlayNext()
         {
-            LevelDef next = GameSession.NextLevel(Session.Level);
+            LevelDef next = GameSession.NextLevel(Session.Level, Session.Mode);   // per-setting path (Final Change 1): the next level must be open in the setting of this run
             if (next == null) { ExitToMeta(); return; }
             StartRun(next.Id);
         }

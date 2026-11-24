@@ -94,6 +94,8 @@ namespace FluffyClimbers.Gameplay
             var lines = HeroPurchase.InfoLines(rarity);
             string region = "Only heroes from your open regions are offered.";
             string avail = "Offered now: " + now + (now == 1 ? " hero" : " heroes") + ".";
+            string away = AwayLine(rarity);   // the home region rule, one short line (empty for Common)
+            if (away.Length > 0) lines.Add(away);
             if (host.NewOverlay == null)
             {
                 host.OpenPopup(rname + " heroes", string.Join("\n", lines.ToArray()) + "\n" + region + "\n" + avail, 1180f);
@@ -102,14 +104,13 @@ namespace FluffyClimbers.Gameplay
             }
             RectTransform overlay = host.NewOverlay();
             const float panelW = 860f, W = 740f, gap = 14f;
-            float y = 228f;   // below the popup title box (BuildPopupFrame: 130 px tall at -52, grows with 130 percent text); the bundle info starts at 215
-            float iconY = y;
-            y += 140f + gap;
+            // below the title box: it is 130 px tall at -52 and grows with the text scale (the old layout put the icon at 228 and was clear at 130 percent), so keep a gap
+            float bodyTop = 240f + Mathf.Max(0f, UiKit.TextScale - 1f) * 60f;
+            // content (hero icon, lines, region, offered) is laid out from y = 0 inside a scroll viewport
+            float y = 140f + gap;
             float[] h = new float[lines.Count];
-            float linesH = 0f;
-            for (int i = 0; i < lines.Count; i++) { h[i] = BundlesScreen.TextHeight(lines[i], 40f, W); linesH += h[i] + gap; }
             float linesY = y;
-            y += linesH;
+            for (int i = 0; i < lines.Count; i++) { h[i] = BundlesScreen.TextHeight(lines[i], 40f, W); y += h[i] + gap; }
             float regionH = BundlesScreen.TextHeight(region, 40f, W);
             float regionY = y;
             y += regionH + gap;
@@ -117,19 +118,62 @@ namespace FluffyClimbers.Gameplay
             float availY = y;
             y += availH + gap;
             float buttonReserve = 50f + Mathf.Max(170f, UiKit.MinTouchRef) + gap;
-            float panelH = Mathf.Max(1000f, y + buttonReserve);
+            // The panel is as tall as its content, at most what fits the safe area with its title and X (a mirrored margin so a notch or home bar never pushes it out);
+            // a taller content scrolls inside the panel (the title, the X and OK stay put).
+            Vector2 canvas = UiKit.CanvasSizeRef();
+            float topInset = UiKit.TopInsetRef();
+            float botInset = Mathf.Max(0f, canvas.y - UiKit.SafeSizeRef().y - topInset);
+            float maxPanel = Mathf.Max(700f, canvas.y - 2f * Mathf.Max(topInset, botInset) - 60f);
+            float panelH = Mathf.Min(maxPanel, Mathf.Max(1000f, bodyTop + y + buttonReserve));
             RectTransform panel = UiKit.BuildPopupFrame(overlay, rname + " heroes", art, new Vector2(panelW, panelH), host.CloseOverlay);
             panel.name = "HeroTierInfo";
-            BundlesScreen.AddHeroCardIcon(panel, new Vector2(0.5f, 1f), new Vector2(0f, -iconY), 140f);
+            RectTransform vp = UiKit.Rect(panel, "Viewport");
+            vp.anchorMin = Vector2.zero;
+            vp.anchorMax = Vector2.one;
+            vp.offsetMin = new Vector2(30f, buttonReserve);
+            vp.offsetMax = new Vector2(-30f, -bodyTop);
+            vp.gameObject.AddComponent<RectMask2D>();
+            RectTransform content = UiKit.Rect(vp, "Content");
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = new Vector2(0f, y);
+            if (y > panelH - bodyTop - buttonReserve + 0.5f)
+            {
+                Image catcher = vp.gameObject.AddComponent<Image>();   // a transparent surface so a drag anywhere in the viewport scrolls
+                catcher.color = new Color(0f, 0f, 0f, 0f);
+                var sr = vp.gameObject.AddComponent<ScrollRect>();
+                sr.viewport = vp;
+                sr.content = content;
+                sr.horizontal = false;
+                sr.vertical = true;
+                sr.movementType = ScrollRect.MovementType.Clamped;
+                sr.scrollSensitivity = 40f;
+            }
+            BundlesScreen.AddHeroCardIcon(content, new Vector2(0.5f, 1f), new Vector2(0f, 0f), 140f);
             float cy = linesY;
             for (int i = 0; i < lines.Count; i++)
             {
-                HeroInfoText(panel, "Line" + i, lines[i], cy, h[i], W, false, UiKit.PanelInk);
+                HeroInfoText(content, "Line" + i, lines[i], cy, h[i], W, false, UiKit.PanelInk);
                 cy += h[i] + gap;
             }
-            HeroInfoText(panel, "Regions", region, regionY, regionH, W, false, UiKit.PanelInk);
-            HeroInfoText(panel, "Offered", avail, availY, availH, W, true, BundlesScreen.RarityInk(rarity));
+            HeroInfoText(content, "Regions", region, regionY, regionH, W, false, UiKit.PanelInk);
+            HeroInfoText(content, "Offered", avail, availY, availH, W, true, BundlesScreen.RarityInk(rarity));
             ToyKit.PopupAction(panel, "OK", ToyKit.Button(1), Color.white, 50f, host.CloseOverlay);
+        }
+
+        /// <summary>The home region rule of a tier in one line (docs/44 section 12): points off the stat gain away from the home region, and the power that goes off. Empty for Common.</summary>
+        static string AwayLine(CharacterRarity rarity)
+        {
+            int pts = HeroRegionPenalty.Points(rarity);
+            if (pts <= 0) return "";
+            string s = "Away from its home region: stat gain -" + pts + " points";
+            TierRule rule = TierRules.RuleFor(rarity);
+            int powers = rule == null ? 0 : rule.PowerCount;
+            if (powers == 1) s += ", hero power off";
+            else if (powers >= 2) s += ", one of the two powers off";
+            return s;
         }
 
         static Text HeroInfoText(RectTransform panel, string name, string text, float y, float h, float w, bool bold, Color color)
@@ -230,7 +274,7 @@ namespace FluffyClimbers.Gameplay
             }
             const float dollH = 480f, dollTop = 190f, gap = 12f, panelW = 860f;
             float nameY = dollTop + dollH + gap, nameH = BundlesScreen.TextHeight(plain, 50f, 780f);
-            float paidY = nameY + nameH + gap, paidH = BundlesScreen.TextHeight("Paid 80,000 coins", 40f, 780f);
+            float paidY = nameY + nameH + gap, paidH = BundlesScreen.TextHeight("Paid 500,000 coins", 40f, 780f);
             float buttonReserve = 50f + Mathf.Max(170f, UiKit.MinTouchRef) + gap;
             float panelH = Mathf.Max(1300f, paidY + paidH + buttonReserve);
             RectTransform overlay = host.NewOverlay();

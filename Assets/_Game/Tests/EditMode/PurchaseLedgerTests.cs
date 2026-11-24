@@ -54,7 +54,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(ShopResult.Ok, svc.GrantTestGemPurchase(pack));   // the purchase path of a gem pack (GrantWithRecord)
             int packGems = svc.Gems;
             Assert.Greater(packGems, 0);
-            svc.AddCoins(5000);   // earned
+            svc.AddCoins(10000);  // earned (two Flights cost 8,000 coins since Final Change 1)
             svc.AddGems(300);     // earned
             svc.GrantPowerUp(PowerUpId(svc), 3);   // earned
             Assert.AreEqual(PowerUpBuyResult.Ok, svc.TryBuyPowerUp(PowerUpId(svc), PowerUpCurrency.Coins, 2));   // shop: 2 units for coins

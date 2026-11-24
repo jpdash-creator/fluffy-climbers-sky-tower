@@ -24,11 +24,37 @@ namespace FluffyClimbers.Simulation
             return starsBefore >= 3;
         }
 
+        /// <summary>Regions of the map (the region coin factor table has one entry for each).</summary>
+        public const int RegionCount = 30;
+
         /// <summary>
-        /// The region coin factor of regions 1 to 5 in percent (owner 2026-11-10): ONE factor for the level payout (region JSON coinFactor 1.00 to 1.12) and for the
-        /// main-goal coin rewards (RegionGoalTable.ScaledCoins). A test keeps it equal to the shipped region files.
+        /// The region coin factor in percent (owner Final Change 1, 2026-11-22): region 1 = 100, regions 2 to 5 = 105, 6 to 15 = 110, 16 to 25 = 115, 26 to 30 = 120.
+        /// ONE table for the level clear coins (the region JSON coinFactor 1.00 to 1.20) and for the Main reward coins (RegionGoalTable.ScaledCoins). Any other region index gives 100.
         /// </summary>
-        public static readonly int[] RegionFactorPercent = { 100, 103, 106, 109, 112 };
+        public static int RegionFactorPercentOf(int region)
+        {
+            if (region <= 1 || region > RegionCount) return 100;
+            if (region <= 5) return 105;
+            if (region <= 15) return 110;
+            if (region <= 25) return 115;
+            return 120;
+        }
+
+        /// <summary>The same table as an array for all 30 regions, index = region - 1. A test keeps it equal to the shipped region files (Content/regions, coinFactor).</summary>
+        public static readonly int[] RegionFactorPercent = BuildRegionFactorPercent();
+
+        static int[] BuildRegionFactorPercent()
+        {
+            var t = new int[RegionCount];
+            for (int r = 1; r <= RegionCount; r++) t[r - 1] = RegionFactorPercentOf(r);
+            return t;
+        }
+
+        /// <summary>The region coin factor as the number the region JSON holds (1.0, 1.05, 1.1, 1.15, 1.2).</summary>
+        public static double RegionFactor(int region)
+        {
+            return RegionFactorPercentOf(region) / 100.0;
+        }
 
         /// <summary>Clear payout before the region factor: 56 + 48 per star.</summary>
         public static int BaseCoins(int stars)
@@ -57,6 +83,25 @@ namespace FluffyClimbers.Simulation
             long gross = Scale(BaseCoins(stars), regionCoinFactor) + Scale(ComboCoins(simComboCoins), regionCoinFactor);
             if (reducedReplay) gross = gross * ReplayPercent / 100;
             return (int)gross;
+        }
+
+        // ---- Gameplay setting coin bonus (owner Final Change 1, 2026-11-22) ----
+
+        /// <summary>Coin bonus percent of a Gameplay setting (Relaxed 0, Easy 5, Normal 10, Hard 15, Insane 25): the same table as the crown bonus.</summary>
+        public static int SettingBonusPercent(int mode)
+        {
+            return SimConfig.RewardBonusPercent(mode);
+        }
+
+        /// <summary>
+        /// Run coins with the Gameplay setting bonus: coins x (100 + percent) / 100, rounded half up. Applied to ALL run coins (level clear payout after the region factor and the
+        /// replay cut, Endless coins, Time Attack coins) before the x2 ad; never to the fixed hero milestone bonus.
+        /// </summary>
+        public static int ApplySettingBonus(long coins, int mode)
+        {
+            if (coins <= 0) return 0;
+            long v = (coins * (100 + SettingBonusPercent(mode)) + 50) / 100;
+            return v > int.MaxValue ? int.MaxValue : (int)v;
         }
 
         // ---- level gems (owner 2026-11-16, Bug List 4 item 9) ----

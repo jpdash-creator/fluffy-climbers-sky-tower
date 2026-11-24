@@ -307,6 +307,71 @@ namespace FluffyClimbers.Tests
             Assert.IsFalse(progress.EnqueueLeaderboardRun(huge), "a very long run is not kept in the save");
         }
 
+        static QueuedRun RegionRun(string kind, string region, long crown, int mode = 3)
+        {
+            return new QueuedRun
+            {
+                RunId = Guid.NewGuid().ToString("N"), Ticket = "T-" + region, Kind = kind, RegionId = region, Mode = mode, Seed = 77, HeroId = "momo", GameVersion = "0.59.1",
+                InputsB64 = "AQID", Floors = 30, Ticks = 1800, Score = 400, Crown = crown, ExpiresAtUnix = long.MaxValue / 4
+            };
+        }
+
+        [Test]
+        public void AnEndlessOrTimeAttackSlotKeepsItsThreeBestRunsInTheQueue()
+        {
+            GoLive();   // no handler: offline, so everything waits in the queue
+            const string region = "region_001_meadow_springs";
+            // owner 2026-11-22: the three best runs of the week count, so a LOWER run must wait next to a higher one of the same slot
+            Assert.IsTrue(progress.EnqueueLeaderboardRun(RegionRun("endless", region, 900)));
+            Assert.IsTrue(progress.EnqueueLeaderboardRun(RegionRun("endless", region, 500)), "a lower run of the slot still counts: it is queued too");
+            Assert.IsTrue(progress.EnqueueLeaderboardRun(RegionRun("endless", region, 700)));
+            Assert.AreEqual(3, progress.LeaderboardQueue.Count);
+            Assert.IsFalse(progress.EnqueueLeaderboardRun(RegionRun("endless", region, 400)), "a fourth run below the three waiting ones could never count");
+            Assert.IsFalse(progress.EnqueueLeaderboardRun(RegionRun("endless", region, 500)), "equal to the lowest of the three: nothing to gain");
+            Assert.IsTrue(progress.EnqueueLeaderboardRun(RegionRun("endless", region, 600)), "a better run takes the place of the lowest waiting one");
+            var crowns = new List<long>();
+            foreach (QueuedRun q in progress.LeaderboardQueue) if (q.Kind == "endless" && q.RegionId == region && q.Mode == 3) crowns.Add(q.Crown);
+            crowns.Sort();
+            CollectionAssert.AreEqual(new long[] { 600, 700, 900 }, crowns);
+
+            // Time Attack, another setting and another region are their own slots, each with its own three
+            Assert.IsTrue(progress.EnqueueLeaderboardRun(RegionRun("timeattack", region, 100)));
+            Assert.IsTrue(progress.EnqueueLeaderboardRun(RegionRun("endless", region, 100, 1)));
+            Assert.IsTrue(progress.EnqueueLeaderboardRun(RegionRun("endless", "region_002_mushroom_grove", 100)));
+            Assert.AreEqual(6, progress.LeaderboardQueue.Count);
+
+            // the very same run is never queued twice
+            QueuedRun once = RegionRun("timeattack", region, 300);
+            Assert.IsTrue(progress.EnqueueLeaderboardRun(once));
+            Assert.IsFalse(progress.EnqueueLeaderboardRun(once), "the same run id");
+            Assert.AreEqual(7, progress.LeaderboardQueue.Count);
+
+            // a level slot still keeps only its best queued run
+            Assert.IsTrue(progress.EnqueueLeaderboardRun(Run("lvl_001_05", 800)));
+            Assert.IsFalse(progress.EnqueueLeaderboardRun(Run("lvl_001_05", 300)), "levels: only a better run");
+            Assert.IsTrue(progress.EnqueueLeaderboardRun(Run("lvl_001_05", 801)));
+            Assert.AreEqual(8, progress.LeaderboardQueue.Count);
+
+            // still bounded: the oldest runs go first, whatever their slot
+            for (int i = 0; i < 10; i++) Assert.IsTrue(progress.EnqueueLeaderboardRun(RegionRun("endless", "region_003_x" + i, 50 + i)));
+            Assert.AreEqual(ProgressService.LeaderboardMaxQueue, progress.LeaderboardQueue.Count);
+            Assert.AreEqual(ProgressService.LeaderboardMaxQueue, new ProgressService(repo, store, 5).LeaderboardQueue.Count, "persisted");
+        }
+
+        [Test]
+        public void ThreeEndlessRunsOfOneSlotAreAllSentAndTheRegionTravelsInTheBody()
+        {
+            GoLive();
+            net.Handler = (m, u, b) => Json("{\"accepted\":true,\"counted\":true,\"improved\":true}");
+            foreach (long crown in new long[] { 900, 500, 700 }) LeaderboardHub.Submit(RegionRun("endless", "region_001_meadow_springs", crown));
+            Assert.AreEqual(3, net.CountOf("POST https://lb.test/submit-run"), "every run that can count is uploaded, also below a higher run of the same slot");
+            StringAssert.Contains("\"crown\":500", net.Bodies[1]);
+            StringAssert.Contains("\"regionId\":\"region_001_meadow_springs\"", net.Bodies[1]);
+            StringAssert.Contains("\"kind\":\"endless\"", net.Bodies[1]);
+            StringAssert.DoesNotContain("levelId", net.Bodies[1]);
+            Assert.AreEqual(0, progress.LeaderboardQueue.Count);
+        }
+
         [Test]
         public void ANewIdTokenIsFetchedOnceAfterA401()
         {
@@ -383,7 +448,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(LeaderboardConfig.SimVersion, q.SimVersion);
             Assert.AreEqual(Convert.ToBase64String(rec.Inputs), q.InputsB64);
             CollectionAssert.AreEqual(new[] { 300, 900 }, q.ReviveAt);
-            Assert.AreEqual(7500, q.Crown, "crown = score x 5 x (1 + 50 percent) on Insane");
+            Assert.AreEqual(6250, q.Crown, "crown = score x 5 x (1 + 25 percent) on Insane");
             Assert.AreEqual(41, q.Floors);
             Assert.AreEqual(2500, q.Ticks);
 

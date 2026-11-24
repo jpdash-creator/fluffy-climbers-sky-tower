@@ -207,22 +207,15 @@ namespace FluffyClimbers.Gameplay
             }
         }
 
-        /// <summary>Scroll speed relative to the level's base speed: 100 + the step-ups after the first jump (+ the boss ramp), as Sim.Step computes it.</summary>
+        /// <summary>
+        /// Scroll speed relative to the run's start speed in percent (100 = the start speed), read from the simulation itself (Sim.ScrollSpeedUpPercent = the speed Sim.Step
+        /// applies): the Gameplay setting's steps (at most ScrollStepMaxSteps), the row ramp of a ramp level or the Endless cycle, and the ScrollMaxSpeed ceiling.
+        /// 0 before the first jump. This is the MEASURED value for the report (it can be odd at the ceiling); the HUD shows only the setting's round steps.
+        /// </summary>
         public static int ScrollPercentAt(Sim sim, SimState s)
         {
             if (s.StartTick < 0) return 0;
-            SimConfig cfg = sim.Cfg;
-            int steps = (s.Tick - s.StartTick) / (cfg.ScrollStepSeconds * SimConfig.TicksPerSecond);
-            int pct = sim.CampaignRamp ? 0 : steps * cfg.ScrollStepPercent;
-            if (pct > cfg.ScrollStepCapPercent) pct = cfg.ScrollStepCapPercent;
-            int total = 100 + pct;
-            if (sim.CampaignRamp)
-            {
-                int ramp = cfg.RampPercentAt(s.Row);
-                if (ramp > cfg.CampaignRampCapPercent) ramp = cfg.CampaignRampCapPercent;
-                total = total * (100 + ramp) / 100;
-            }
-            return total;
+            return 100 + sim.ScrollSpeedUpPercent(in s);
         }
 
         static int CountHazards(Sim sim, SimState s)

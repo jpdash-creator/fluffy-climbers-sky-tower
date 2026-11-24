@@ -292,6 +292,18 @@ namespace FluffyClimbers.Simulation
         public SignatureKind Signature;
         /// <summary>Campaign scroll ramp (BossChase): scroll speed grows with the row, clamped to SimConfig.CampaignRampCapPercent.</summary>
         public bool Ramp;
+        /// <summary>
+        /// Rule of a special level that is not a goal (owner Final Change 1, 2026-11-22; level JSON field "special"): NoPowerUps, OneLife or KeepMoving, None otherwise.
+        /// The goal-based special types (No Wall Touch, Combo Climb, Chase) are NOT stored here; ask <see cref="SpecialLevels.TypeOf(LevelSpec)"/> for the type of a level.
+        /// The rule never changes the layout (the builder does not read it); the simulation enforces it (Sim.NoPowerUps / OneLife / KeepMoving).
+        /// </summary>
+        public SpecialLevelType Special;
+        /// <summary>No Power-ups level: the simulation ignores every power-up and hero-power input bit.</summary>
+        public bool NoPowerUps { get { return !Endless && Special == SpecialLevelType.NoPowerUps; } }
+        /// <summary>One Life level: Sim.Revive refuses and the Safety Net is off, one fall ends the run.</summary>
+        public bool OneLife { get { return !Endless && Special == SpecialLevelType.OneLife; } }
+        /// <summary>Keep Moving level: more than SimConfig.KeepMovingLimitTicks on one platform ends the run.</summary>
+        public bool KeepMoving { get { return !Endless && Special == SpecialLevelType.KeepMoving; } }
         /// <summary>Authored chunk ids (chunk_complex_a ...) spliced into the level, empty for none.</summary>
         public string[] FixedChunks = new string[0];
         /// <summary>Explicit platform rows above the start; 0 = derive with RowsFor().</summary>

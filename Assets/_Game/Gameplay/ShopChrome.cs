@@ -143,6 +143,10 @@ namespace FluffyClimbers.Gameplay
             }
         }
 
+        /// <summary>
+        /// The number of the wallet star pill on every screen: the stars of ALL five Gameplay settings in all playable regions added up (stars are kept per setting since
+        /// Final Change 1, owner 2026-11-22; <see cref="ProgressService.StarsInRegion(RegionDef)"/> without a setting sums the settings, at most 375 per region).
+        /// </summary>
         public static int TotalStars(ProgressService progress)
         {
             int stars = 0;

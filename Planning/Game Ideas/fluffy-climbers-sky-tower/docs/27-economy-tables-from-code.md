@@ -1,10 +1,101 @@
-# 27. Economy tables from the code (build v0.38.0.40, written 2026-11-01)
+# 27. Economy tables from the code (written 2026-11-01 at build v0.38.0.40; current numbers of Final Change 1, 2026-11-22, in section 0)
 
 Status: **this file is the economy reference.** It was written by reading the game code and content in `E:\Code\fluffy-climbers-sky-tower` (not the older docs) and by running `dotnet test Tests/Simulation` for the economy tests (19 passed). Where docs 05, 08, 13, 14, 15 differ, this file and docs 22 and 26 win. Doc 20 (2026-10-24) already removed gear from the game; this pass removes the remaining gear text and data from the docs.
 
 Owner rules applied: **1 gem = 20 coins (fixed)**, **no gear**. No game code was changed by this document. Code facts that contradict the docs are listed in section 3 and 18.
 
 Legend: **[CODE]** read from code or shipped content, **[DOC]** stated by an owner doc (22, 26) and matched by code, **[ASSUMPTION]** my default until soft-launch data exists, **(verify)** store or law dependent. GE = gem-equivalent (1 gem, or 20 coins). PU = power-up unit.
+
+> **Final Change 1 (owner 2026-11-22).** Section 0 below holds the current numbers, read from the code and content of that day. It wins over every older table in sections 1 to 18. The tables for power-ups (7.2), subscriptions (8), chests (10) and the coin rules (4.1, 4.4, 5.3) were rewritten in place; tables still marked "history" keep the numbers of 2026-11-01 for the reasoning only.
+
+## 0. Current numbers (Final Change 1, 2026-11-22) [CODE]
+
+Rate card: 1 gem = 20 coins; $ ref = $0.011 per gem (the rate the worth numbers use).
+
+### 0.1 Level coins, region coin factor, Gameplay setting bonus
+
+| Rule | Value | Source |
+|---|---|---|
+| Level payout | (56 + 48 per star + 4 per combo step) x region coin factor: 0 / 1 / 2 / 3 stars = 56 / 104 / 152 / 200 coins in region 1, 210 for 3 stars in regions 2 to 5 | `CoinPayoutRules` |
+| Region coin factor (level coins AND Main reward coins) | region 1 100 percent; regions 2 to 5 105; 6 to 15 110; 16 to 25 115; 26 to 30 120 | `CoinPayoutRules.RegionFactorPercentOf`, region JSON `coinFactor` |
+| Gameplay setting bonus on run coins and crowns | Relaxed 0, Easy 5, Normal 10, Hard 15, Insane 25 percent. Applied to all run coins (level clear after the region factor and the replay cut, Endless, Time Attack) before the x2 ad; never to the fixed hero milestone bonus | `SimConfig.DifficultyRewardPercent`, `CoinPayoutRules.ApplySettingBonus` |
+| Replay | 25 percent of the coins and no gems once the level has 3 stars in the setting of the run | `CoinPayoutRules.ReplayPercent` |
+| Stars | 3 per level per setting: 75 per setting, 375 per region over the five settings | `LevelProgress` |
+| One 3-star pass of a region (25 levels, no combo), Relaxed | region 1 5,000 coins; regions 2 to 5 5,250 each; 5 regions 26,000 | `Tests/Simulation/ECONOMY_TABLES.md` |
+| The same pass on Easy / Normal / Hard / Insane, region 1 | 5,250 / 5,500 / 5,750 / 6,250 coins | computed |
+| Gems in play | none on rows. Levels 5 / 10 / 15 / 20 / 25 pay fixed 1 / 2 / 2 / 3 / 4 gems on the first clear in any setting (12 per region) and hold 2 or 3 collectible gems with a seeded 50 percent chance | `GemLevels` |
+| Hero milestone bonus (first clear of the five gem levels, any setting) | Common +50 coins; Uncommon +100 +1 gem; Rare +200 +2; Elite +300 +3; Legendary +500 +5; upper tiers 50 percent one more gem | `CoinPayoutRules` |
+| Endless and Time Attack coins | floors / 2 + 50 per full 100 floors, x region factor, x setting bonus; 3 full-rate runs a day, then half | `EndlessRewards` |
+
+### 0.2 Heroes (coins only)
+
+| Tier | Coins | Gem value in every worth number (coins / 20) |
+|---|---|---|
+| Common | 8,000 | 400 |
+| Uncommon | 24,000 | 1,200 |
+| Rare | 72,000 | 3,600 |
+| Elite | 200,000 | 10,000 |
+| Legendary | 500,000 | 25,000 |
+
+Source: `HeroPurchase.Prices`, `ChestRolls.CardGems`. Before: 2,000 / 5,000 / 12,000 / 32,000 / 80,000. No reward gives a hero any more; hero cards come from the Heroes shop, chests and bundles (also the chests of a subscription and the chests and bundles of a leaderboard prize).
+
+### 0.3 Power-ups
+
+| Power-ups | Coins | Gems (coins / 20) |
+|---|---|---|
+| Wall Stick, Shield, Wide Platforms | 2,000 | 100 |
+| Safety Net, Double Jump, Glide Cape, Slow Time | 3,000 | 150 |
+| Flight, Rocket | 4,000 | 200 |
+| Average of the 9 (value of one random power-up) | 2,889 | 144.44 |
+
+### 0.4 Chests (gems only; contents and odds unchanged)
+
+| Chest | Price | Open 10 | Contents | Hero card odds | Expected value (gems) | Worth |
+|---|---|---|---|---|---|---|
+| Iron | 400 | 4,000 | 1 power-up + 800 to 1,200 coins + 1 hero card | Common 50 / Uncommon 30 / Rare 20 | 144.4 + 50 + 1,280 = 1,474 | x3.69, shown "Worth x3.7" |
+| Gold | 1,500 | 15,000 | 3 power-ups + 3,000 to 4,200 coins + 1 hero card | Rare 60 / Elite 30 / Legendary 10 | 433.3 + 180 + 7,660 = 8,273 | x5.52, shown "Worth x5.5" |
+
+Test band 2 to 6 (`ChestTests.WorthIsBetween2And6ForEveryChest`, `ChestCardTests`).
+
+### 0.5 Bundles
+
+2,000 bundles, 200 to 1,000 gems (average 610), one hidden card Common 50 / Uncommon 40 / Rare 10 percent (expected 1,040 gems), worth 3.03x to 5.97x, average 4.54x, pool version 5. Details: `37-bundles.md`.
+
+### 0.6 Subscriptions (list prices; the Play Console prices are an owner step)
+
+| Item | Weekly Starter | Weekly Plus | Monthly Standard | Monthly Premium |
+|---|---|---|---|---|
+| Id | `weekly` | `weekly_plus` | `monthly` | `monthly_premium` |
+| Price | $1.99 | $4.99 | $6.99 | $14.99 |
+| Length | 7 days | 7 days | 30 days | 30 days |
+| Instant on purchase | 100 gems | 250 gems | 200 gems | 300 gems |
+| Daily claim | 15 gems + 600 coins | 20 gems + 1,000 coins | 15 gems + 600 coins | 20 gems + 1,000 coins |
+| Free power-up (random type) | 1, on claim 4 | every 2nd claim (3) | every 5th claim (6) | every 5th claim (6) |
+| Chests | none | 1 Iron on claim 1 | none | 1 Gold on claims 1 and 16 (2) |
+| Gems (instant + daily) | 205 | 390 | 650 | 900 |
+| Coins | 4,200 | 7,000 | 18,000 | 30,000 |
+| Gem equivalent (power-up 144.44, Iron 400, Gold 1,500) | 559.4 | 1,573.3 | 2,416.7 | 6,266.7 |
+| Worth = GE x $0.011 / price | **3.1x** | **3.5x** | **3.8x** | **4.6x** |
+| GE per $ | 281 | 315 | 346 | 418 |
+
+Every plan must be worth 3.0 to 6.0 (`SubscriptionCatalog.WorthMin/WorthMax`, tested). Before: $1.49 / $2.99 / $4.99 / $9.99.
+
+### 0.7 Rewards (redrawn from scratch; no heroes anywhere)
+
+| Tab | Tasks | Coins | Gems | Power-ups | Notes |
+|---|---|---|---|---|---|
+| Daily | 30 tasks = 500 points | 4,000 a day (track 250 / 500 / 750 / 1,000 / 1,500 at 100 / 200 / 300 / 400 / 500 points) | 0 | 1 a day by rewarded ad | resets every day |
+| Weekly | 40 tasks | 15,800 | 50 | 3 | resets Monday |
+| Main, region 1 | 75 goals | 19,200 | 50 | 5 | once per region |
+| Main, regions 2 to 5 (each) | 75 goals | 20,320 | 50 | 5 | region 1 coins x 105 percent, each goal rounded to 10; five regions 100,480 coins, 250 gems, 25 power-ups |
+
+A perfect week of Daily + Weekly = 43,800 coins, 50 gems, 3 power-ups plus 7 ad power-ups. Ids are a second generation: `d2_*` (daily tasks), `dp2_100` to `dp2_500` (daily gifts), `w2_*` (weekly tasks), `g2_<region>_<token>` (Main goals); old ids are never reused. The reward code no longer knows heroes; hero cards still come from the Heroes shop, chests, bundles, subscriptions (their chests) and the weekly leaderboard prizes. The task tables are in `39-rewards-economy.md` section 0, `Tests/Simulation/REWARDS_TABLES.md` (generated) and `.claude/pendingdecisions/decisions-2026-11-22-final-change-1.md` (repo).
+
+### 0.8 Unchanged by Final Change 1
+
+Gem packs (section 6.1), coin packs (4.3), revive 5 then 10 gems, region skip 500 gems, Bundle Refresh, Remove Ads $2.99, the ad placements.
+
+---
 
 Sources read: `Assets/_Game/Economy/*.cs` (Rewards, ShopCatalog, PowerUpCatalog, Chests, SubscriptionCatalog, RewardCatalog, Bundles, Characters, ProgressService*), `Simulation/CoinPayoutRules.cs`, `SimConfig.cs`, `Gameplay/RunSession.cs`, `Gameplay/Ads/*`, `Content/economy/*.json` (gem_packs, coin_packs, powerups, subscriptions, bundles, rewards), `Content/regions/*.json`, `Content/config/remote_config.json`, `Tests/Simulation/ECONOMY_TABLES.md` (regenerated by the tests), `Tools/content_cli/gen_bundles.py`, docs 20 to 26.
 
@@ -37,7 +128,7 @@ Assumptions used everywhere (change them here and the tables follow):
 
 ---
 
-## 2. Findings in one page
+## 2. Findings in one page (history: written 2026-11-01 with the prices of that day; section 0 has the current numbers)
 
 1. **Rewards, not play, are the gem faucet.** Gem pickups give about 260 gems over the whole 5-region campaign at 60 percent pickup (413 at 100 percent). The Main rewards give 580 gems, the Daily rewards up to 45 gems **every day**, the Weekly rewards 160 gems a week (since 2026-11-13: Main 250, Daily 0, Weekly 50; see section 11). A player who finishes every daily and weekly task earns about **68 gems a day (2,040 a month, $22 at ref)** plus 1,500+ coins a day and one random power-up a day.
 2. **The daily random power-up alone is worth 60.7 gems ($0.67) a day**, 1,821 gems a month. It is the biggest single free item (doc 22 open item 2).
@@ -52,7 +143,7 @@ Assumptions used everywhere (change them here and the tables follow):
 
 ---
 
-## 3. What the old docs said vs what the code does
+## 3. What the old docs said vs what the code does (state of 2026-11-01; the column "Code and content now" is superseded by section 0 for level payout, replay, gem pickups, region skip, chests, power-up and hero prices, subscriptions, bundles and rewards)
 
 | Area | Older docs (05, 08, 13, 14, 15, my first doc 16) | Code and content now | Source |
 |---|---|---|---|
@@ -86,14 +177,14 @@ Assumptions used everywhere (change them here and the tables follow):
 
 | Rule | Value |
 |---|---|
-| Level payout | (70 + 60 x stars) x region factor + 5 per combo step x region factor |
-| Region factor | 1.00, 1.03, 1.06, 1.09, 1.12 (regions 1 to 5) |
-| Replay | 50 percent of the payout once the level has 3 stars, and no gems; below 3 stars full coins and gems |
+| Level payout | (56 + 48 x stars) x region factor + 4 per combo step x region factor (since 2026-11-13; was 70 + 60 + 5), then the Gameplay setting bonus 0 / 5 / 10 / 15 / 25 percent (since 2026-11-22) |
+| Region factor | 1.00 for region 1, 1.05 for regions 2 to 5, 1.10 for 6 to 15, 1.15 for 16 to 25, 1.20 for 26 to 30 (since 2026-11-22; was 1.00, 1.03, 1.06, 1.09, 1.12 for regions 1 to 5) |
+| Replay | 25 percent of the payout once the level has 3 stars in the setting of the run, and no gems (since 2026-11-13; was 50); below 3 stars full coins |
 | Failed run | pays nothing |
-| Endless | floors / 2 + 50 per full 100 floors, times region factor; 3 paying runs a day at full rate, then half |
+| Endless and Time Attack | floors / 2 + 50 per full 100 floors, times region factor, then the setting bonus; 3 paying runs a day at full rate, then half |
 | Coins to gems | not possible (gems buy coins only) |
 
-### 4.2 Coin sources
+### 4.2 Coin sources (history: the 15-level regions and the 70 + 60 payout of 2026-11-01; current totals in section 0.1)
 
 | Source | Gems | Coins | GE | $ best | $ ref | $ small |
 |---|---|---|---|---|---|---|
@@ -127,12 +218,13 @@ Dollar columns = the gem price of the pack at the three gem rates. The coin pack
 
 ### 4.4 Coin sinks [CODE]
 
-| Sink | Gems | Coins | GE | $ best | $ ref | $ small | Levels of 3-star income (250 coins) |
+| Sink | Gems | Coins | GE | $ best | $ ref | $ small | Levels of 3-star income (200 coins, region 1, Relaxed) |
 |---|---|---|---|---|---|---|---|
-| Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 4.0 |
-| Flight, Rocket, Slow Time | 75 | 1,500 | 75 | 0.60 | 0.82 | 1.19 | 6.0 |
-| Bundle Refresh | 5 | 100 | 5 | 0.04 | 0.05 | 0.08 | 0.4 |
-| Characters (when they launch) | 150-1,500 gems | - | - | - | - | - | not built |
+| Wall Stick, Shield, Wide Platforms | 100 | 2,000 | 100 | 0.80 | 1.10 | 1.58 | 10.0 |
+| Safety Net, Double Jump, Glide Cape, Slow Time | 150 | 3,000 | 150 | 1.20 | 1.65 | 2.37 | 15.0 |
+| Flight, Rocket | 200 | 4,000 | 200 | 1.60 | 2.20 | 3.16 | 20.0 |
+| Bundle Refresh | 5 | 100 | 5 | 0.04 | 0.05 | 0.08 | 0.5 |
+| Hero cards (Heroes shop, coins only) | 400 / 1,200 / 3,600 / 10,000 / 25,000 | 8,000 / 24,000 / 72,000 / 200,000 / 500,000 | same as gems | 3.20 to 200 | 4.40 to 274.75 | 6.32 to 395 | 40 / 120 / 360 / 1,000 / 2,500 |
 | Gear, VIP tiers, chest coins | removed or not sold | | | | | | |
 
 ---
@@ -145,14 +237,14 @@ Dollar columns = the gem price of the pack at the three gem rates. The coin pack
 |---|---|
 | Gem value per pickup | 1 / 2 / 5 / 10 at 70 / 22 / 7 / 1 percent (average 1.59) |
 | Gem spots | 2.7 / 2.7 / 2.9 / 3.0 / 3.2 percent of rows by difficulty (Relaxed to Insane) |
-| Milestone gems (first clear) | L5, L10: a roll of 1 to 3 gems (L10 guarantees 1); L15: 5 guaranteed + 2 bonus (double gem); hidden gem up to 2 on L8 AND on the FindHiddenGem level (L15), both can hold the double gem (owner 2026-11-10, `GemLevels`); main-goal coin rewards use the same region coin factor as the level payout (100 / 103 / 106 / 109 / 112 percent) |
+| Milestone gems (first clear) | L5, L10: a roll of 1 to 3 gems (L10 guarantees 1); L15: 5 guaranteed + 2 bonus (double gem); hidden gem up to 2 on L8 AND on the FindHiddenGem level (L15), both can hold the double gem (owner 2026-11-10, `GemLevels`); main-goal coin rewards use the same region coin factor as the level payout (history: 100 / 103 / 106 / 109 / 112 percent; since 2026-11-22 100 for region 1 and 105 for regions 2 to 5) |
 | **Gem levels restored (2026-11-17, Main Bug List 7 item 2, supersedes the 2026-11-16 row below)** | Levels 5/10/15/20/25 of every region pay FIXED first-clear gems 1/2/2/3/4 (`GemLevels.FixedFirstClearGems`, `RewardResult.RewardGems`, no pickup needed, first clear only; 12 per region). On top, each of those levels holds 2 or 3 collectible gems of value 1 with a seeded 50 percent chance (`GemLevels.GemsInLevel`, level 25 too); only picked gems pay (clamped to what the level holds), none on a replay of a 3-star level. The level tile badge and level pop-up show the fixed gems on every milestone level. Hero milestone bonus unchanged. |
 | **Collectible gems (2026-11-16, Bug List 4 item 9, replaces the milestone gems and the hidden extra gem)** | Levels 5, 10, 15, 20: a seeded 50 percent chance (per level seed) that the level holds 2 gems of 1 gem each; level 25: always 4 (`GemLevels.GemsInLevel`). Only gems the run picks up pay, nothing for uncollected ones, none on a replay of a 3-star level. The hero milestone bonus is unchanged. The old fixed 1, 1, 2, 2, 3 first-clear gems and the lines above are history. Level 5 is a plain "reach floor 75" (no combo chain, no ladder). |
 | Failed run | gems lost; kept on revive |
 | Replay of a 3-star level | no gems |
 | Endless | no gems yet (thresholds 250/500/1,000 floors are specified but not built) |
 
-### 5.2 Gem sources
+### 5.2 Gem sources (history of 2026-11-01; now: 12 fixed gems per region plus collectible gems, Weekly 50 gems, Main 50 gems per region, Daily 0)
 
 | Source | Gems | Coins | PU units | GE | $ best | $ ref | $ small |
 |---|---|---|---|---|---|---|---|
@@ -170,16 +262,16 @@ Dollar columns = the gem price of the pack at the three gem rates. The coin pack
 | Sink | Gems | Coins | GE | $ best | $ ref | $ small |
 |---|---|---|---|---|---|---|
 | Revive 1 / 2 (free by ad once) | 5 / 10 | 100 / 200 | 5 / 10 | 0.04 / 0.08 | 0.05 / 0.11 | 0.08 / 0.16 |
-| Skip to region 2 / 3 / 4 / 5 | 100 / 116 / 133 / 150 | 2,000 / 2,320 / 2,660 / 3,000 | same | 0.80-1.20 | 1.10-1.65 | 1.58-2.37 |
-| Iron chest x1 / x10 | 100 / 1,000 | 2,000 / 20,000 | same | 0.80 / 8.00 | 1.10 / 10.99 | 1.58 / 15.80 |
-| Gold chest x1 / x10 | 300 / 3,000 | 6,000 / 60,000 | same | 2.40 / 24.00 | 3.30 / 32.97 | 4.74 / 47.40 |
-| Power-ups | 50 / 75 | 1,000 / 1,500 | same | 0.40 / 0.60 | 0.55 / 0.82 | 0.79 / 1.19 |
-| Bundles | 200 to 500 | 4,000 to 10,000 | same | 1.60-4.00 | 2.20-5.50 | 3.16-7.90 |
+| Skip to region 2 / 3 / 4 / 5 | 500 each (since 2026-11-13) | 10,000 | same | 4.00 | 5.50 | 7.90 |
+| Iron chest x1 / x10 (since 2026-11-22) | 400 / 4,000 | 8,000 / 80,000 | same | 3.20 / 32.00 | 4.40 / 43.96 | 6.32 / 63.20 |
+| Gold chest x1 / x10 (since 2026-11-22) | 1,500 / 15,000 | 30,000 / 300,000 | same | 12.00 / 120.00 | 16.49 / 164.85 | 23.70 / 237.00 |
+| Power-ups (gem value; the shop sells them for coins) | 100 / 150 / 200 | 2,000 / 3,000 / 4,000 | same | 0.80 / 1.20 / 1.60 | 1.10 / 1.65 / 2.20 | 1.58 / 2.37 / 3.16 |
+| Bundles (since 2026-11-22) | 200 to 1,000 | 4,000 to 20,000 | same | 1.60-8.00 | 2.20-10.99 | 3.16-15.80 |
 | Bundle Refresh | 5 | 100 | 5 | 0.04 | 0.05 | 0.08 |
 | Coin packs | 50 to 4,000 | 1,000 to 100,000 | same | 0.40-32.00 | 0.55-43.96 | 0.79-63.20 |
-| Characters (not built) | 150 / 300 / 700 / 1,500 (owner list for Uncommon to Legendary) | | | | | |
+| Hero cards | coins only, see section 0.2 | | | | | |
 
-### 5.4 Free gems per hour and what they buy
+### 5.4 Free gems per hour and what they buy (history of 2026-11-01)
 
 At 60 percent pickup the campaign pays about **61 gems per hour** of first-clear play (260 gems / 4.28 h). A region (about 51 to 54 gems, 41 to 56 minutes) buys one 50-gem power-up, or half an Iron chest, or roughly a region skip (100 to 150 gems) in 2 to 3 regions.
 
@@ -187,7 +279,7 @@ At 60 percent pickup the campaign pays about **61 gems per hour** of first-clear
 
 ## 6. Money ($)
 
-The game sells **9 gem packs and 2 subscriptions**; there is no starter pack, battle pass, Remove Ads or money bundle in the code.
+The game sells **9 gem packs, 4 subscription plans and the one-time Remove Ads ($2.99, since 2026-11-17)**; there is no starter pack, battle pass or money bundle in the code.
 
 ### 6.1 Gem packs [CODE], list prices (promo and first-purchase double are OFF)
 
@@ -207,7 +299,7 @@ Badges: Popular on the 100 pack, Best value on the 1,000 pack. The first-purchas
 
 ### 6.2 Subscriptions [CODE, DOC 26]
 
-See section 8 for what they pay. Prices: Weekly **$1.49 (Rs 149)** for 7 days, Monthly **$4.99 (Rs 449)** for 30 days. Test purchase only (dev builds); release shows "Not available yet" until billing exists.
+See section 8 for what they pay. List prices since 2026-11-22 (Final Change 1): Weekly Starter **$1.99**, Weekly Plus **$4.99** (7 days), Monthly Standard **$6.99**, Monthly Premium **$14.99** (30 days). The real store prices are set in the Play Console (owner step, doc 48). History: Weekly $1.49 and Monthly $4.99 (two plans, 2026-11-01), then $1.49 / $2.99 / $4.99 / $9.99 (four plans, 2026-11-13).
 
 ---
 
@@ -215,76 +307,82 @@ See section 8 for what they pay. Prices: Weekly **$1.49 (Rs 149)** for 7 days, M
 
 ### 7.1 Rules [CODE]
 
-- 7 types are sold; stock per type, no cap, no carry cap, no loadout limit in code (rework 2026-10-31); a tap while a power-up is active **adds** its full duration.
+- 9 types are sold (for coins only since 2026-11-10; the gem column is the value at 20 coins per gem); stock per type, no cap, no carry cap, no loadout limit in code (rework 2026-10-31); a tap while a power-up is active **adds** its full duration.
 - Bundle discount when buying several: 5 units -10 percent, 10 or more -20 percent (rounded half up).
-- (Owner 2026-11-12: no neutral Ranked mode; power-ups, revives and rolled hero stats all count on the weekly boards.) The random power-ups of chests, rewards and bundles pick the 7 types with equal chance.
-- Not implemented (hidden): Spring Boots, Coin Doubler, Star Seeker, Safety Net.
+- (Owner 2026-11-12: no neutral Ranked mode; power-ups, revives and rolled hero stats all count on the weekly boards.) The random power-ups of chests, rewards and subscriptions pick the 9 types with equal chance.
+- Not implemented (hidden): Spring Boots, Coin Doubler, Star Seeker.
 
-### 7.2 Price table
+### 7.2 Price table (Final Change 1, 2026-11-22; `Content/economy/powerups.json`)
 
 | Power-up | Effect | Duration | Gems | Coins | GE | $ best | $ ref | $ small | Gems per second of effect |
 |---|---|---|---|---|---|---|---|---|---|
-| Flight | rise and steer, gongs harmless | 10 s | 75 | 1,500 | 75 | 0.60 | 0.82 | 1.19 | 7.50 |
-| Rocket | auto-climb 20 floors | about 4 s | 75 | 1,500 | 75 | 0.60 | 0.82 | 1.19 | 18.75 |
-| Double Jump | one extra air jump per air phase | 20 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 2.50 |
-| Wall Stick | hold on walls up to 1.5 s | 20 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 2.50 |
-| Shield | gongs harmless | 20 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 2.50 |
-| Safety Net | first fall jumps you up 3 floors, once per run | not timed | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | n/a |
-| Glide Cape | after every jump the whole game runs at half speed until you land | 20 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 2.50 |
-| Wide Platforms | platforms 20 percent wider | 20 s | 50 | 1,000 | 50 | 0.40 | 0.55 | 0.79 | 2.50 |
-| Slow Time | danger zone 50 percent slower | 30 s | 75 | 1,500 | 75 | 0.60 | 0.82 | 1.19 | 2.50 |
-| Average of the 9 | | | 58.3 | 1,167 | 58.3 | 0.47 | 0.64 | 0.92 | |
+| Flight | rise and steer, gongs harmless | 10 s | 200 | 4,000 | 200 | 1.60 | 2.20 | 3.16 | 20.00 |
+| Rocket | auto-climb 20 floors | about 4 s | 200 | 4,000 | 200 | 1.60 | 2.20 | 3.16 | 50.00 |
+| Double Jump | one extra air jump per air phase | 20 s | 150 | 3,000 | 150 | 1.20 | 1.65 | 2.37 | 7.50 |
+| Wall Stick | hold on walls up to 1.5 s | 20 s | 100 | 2,000 | 100 | 0.80 | 1.10 | 1.58 | 5.00 |
+| Shield | gongs harmless | 20 s | 100 | 2,000 | 100 | 0.80 | 1.10 | 1.58 | 5.00 |
+| Safety Net | a fall jumps you up 3 floors | not timed | 150 | 3,000 | 150 | 1.20 | 1.65 | 2.37 | n/a |
+| Glide Cape | after every jump the whole game runs at half speed until you land | 20 s | 150 | 3,000 | 150 | 1.20 | 1.65 | 2.37 | 7.50 |
+| Wide Platforms | platforms 20 percent wider | 20 s | 100 | 2,000 | 100 | 0.80 | 1.10 | 1.58 | 5.00 |
+| Slow Time | danger zone 50 percent slower | 30 s | 150 | 3,000 | 150 | 1.20 | 1.65 | 2.37 | 5.00 |
+| Average of the 9 | | | 144.4 | 2,889 | 144.4 | 1.16 | 1.59 | 2.28 | |
 
-Bundle prices (gems / coins): 5 units of a 50-gem type 225 / 4,500; of a 75-gem type 338 / 6,750; 10 units 400 / 8,000 and 600 / 12,000.
+Before 2026-11-22 the prices were 1,000 coins / 50 gems and 1,500 coins / 75 gems (average 58.3 gems).
+
+Quantity prices (coins; gems value in brackets): 5 units of a 2,000 type 9,000 (450); of a 3,000 type 13,500 (675); of a 4,000 type 18,000 (900); 10 units 16,000 (800), 24,000 (1,200) and 32,000 (1,600) (`PowerUpCatalog.PriceFor`: 5 units -10 percent, 10 or more -20 percent).
 
 ### 7.3 Affordability
 
-| Free source | Buys one power-up of 1,000 coins in | One of 50 gems in |
+| Free source (since 2026-11-22) | Buys one power-up of 2,000 coins in | One of 4,000 coins in |
 |---|---|---|
-| Level income only (250 coins, 3.4 gems a level) | 4.0 levels | 14.7 levels of gem pickups |
-| Hour of play (4,650 coins, 61 gems) | 13 min | 49 min |
-| Daily reward (1,500 coins, 45 gems, if all done) | 0.7 day | 1.1 days |
+| Level income only (200 coins for 3 stars, region 1, Relaxed) | 10 levels | 20 levels |
+| Daily reward track (4,000 coins, if all 500 points are done) | half a day | 1 day |
+| Weekly tasks (15,800 coins, if all done) | 7.9 of them a week | 3.9 a week |
 
-Free players therefore buy power-ups with coins; gems are spent on revives, chests, bundles and skips.
+Power-ups are sold for coins only; gems are spent on revives, chests, bundles and skips.
 
 ---
 
 ## 8. Subscription [CODE, DOC 26]
 
-> **Update 2026-11-13: four plans (owner economy review).** The old two-plan tables below section 8.2 are replaced by this section; Starter and Standard are the old Weekly and Monthly, unchanged.
+> **Update 2026-11-22 (Final Change 1): new prices and contents; the tables of this section are the current ones (`Content/economy/subscriptions.json`, `SubscriptionCatalog`).** Before: $1.49 / $2.99 / $4.99 / $9.99, daily 10 gems on Starter and Standard, 500 coins on Starter, 3 Gold chests on Premium (claims 1, 11, 21), worth 3.0x / 3.8x / 3.9x / 4.0x.
+>
+> **Update 2026-11-13: four plans (owner economy review).** Starter and Standard are the old Weekly and Monthly.
 
 ### 8.1 Rules
 
 | Item | Weekly Starter | Weekly Plus | Monthly Standard | Monthly Premium |
 |---|---|---|---|---|
 | Id | `weekly` | `weekly_plus` | `monthly` | `monthly_premium` |
-| Price | $1.49 | $2.99 | $4.99 | $9.99 |
+| Price | $1.99 | $4.99 | $6.99 | $14.99 |
 | Length | 7 days | 7 days | 30 days | 30 days |
 | Instant on purchase | 100 gems | 250 gems | 200 gems | 300 gems |
-| Daily claim | 10 gems + 500 coins | 20 gems + 1,000 coins | 10 gems + 600 coins | 20 gems + 1,000 coins |
+| Daily claim | 15 gems + 600 coins | 20 gems + 1,000 coins | 15 gems + 600 coins | 20 gems + 1,000 coins |
 | Free power-up (random type) | 1, on claim 4 | every 2nd claim (3) | every 5th claim (6) | every 5th claim (6) |
-| Chests | none | 1 Iron on claim 1 | none | 1 Gold on claims 1, 11, 21 (3) |
+| Chests | none | 1 Iron on claim 1 | none | 1 Gold on claims 1 and 16 (2) |
 | Stacking | same plan again extends the time; another plan is refused while one runs | same | same | same |
 | Claim rule | once per local day; missed days are not stacked | same | same | same |
 
 ### 8.2 Value (price measure: chests counted at their gem price)
 
-Gem equivalents: 1 gem = 20 coins, one power-up 60.7 gems, Iron chest 100, Gold chest 300; $0.011 per gem.
+Gem equivalents: 1 gem = 20 coins, one power-up 144.44 gems (the mean shop gem price, `SubscriptionCatalog.PowerUpGems`), Iron chest 400, Gold chest 1,500; $0.011 per gem.
 
 | Plan | Gems (instant + daily) | Coins | PU units | Chests | GE | Price | Worth (x) | GE per $ |
 |---|---|---|---|---|---|---|---|---|
-| Starter | 170 | 3,500 | 1 | 0 | 405.7 | $1.49 | **3.0x** | 272 |
-| Plus | 390 | 7,000 | 3 | 1 Iron | 1,022.1 | $2.99 | **3.8x** | 342 |
-| Standard | 500 | 18,000 | 6 | 0 | 1,764.2 | $4.99 | **3.9x** | 354 |
-| Premium | 900 | 30,000 | 6 | 3 Gold | 3,664.2 | $9.99 | **4.0x** | 367 |
+| Starter | 205 | 4,200 | 1 | 0 | 559.4 | $1.99 | **3.1x** | 281 |
+| Plus | 390 | 7,000 | 3 | 1 Iron | 1,573.3 | $4.99 | **3.5x** | 315 |
+| Standard | 650 | 18,000 | 6 | 0 | 2,416.7 | $6.99 | **3.8x** | 346 |
+| Premium | 900 | 30,000 | 6 | 2 Gold | 6,266.7 | $14.99 | **4.6x** | 418 |
 
-Luck-adjusted worth of the chests at the new odds and card prices (owner review, not shown in the game): Iron about 356 GE, Gold about 1,602 GE, so Plus about x4.7 and Premium about x7.7; 3 Gold chests give about 0.3 Legendary a month in expectation. Gems per day for a subscriber: Starter 24, Plus 70, Standard 17, Premium 60, against 2.6 to 6 for a free engaged player.
+Every plan must be worth 3.0 to 6.0 (`SubscriptionCatalog.WorthMin/WorthMax`, `SubscriptionTests`). Luck-adjusted (chests at their expected contents, section 0.4, instead of their gem price; not shown in the game): Iron 1,474 GE, Gold 8,273 GE, so Plus about x5.8 and Premium about x14.5; 2 Gold chests give 0.2 Legendary a month in expectation. Gems per day for a subscriber: Starter 29, Plus 56, Standard 22, Premium 30.
 
 ---
 
 ## 9. Bundles [CODE, DOC 26]
 
-> **Update 2026-11-13 (owner economy review): the COIN part of every bundle is cut 30 percent** (total coins of the 2,000 bundles 14.27 to 10.02 million, average 4,996, range 1,100 to 12,100; prices 200 to 500 gems, power-ups and the hidden card unchanged; ids stay; `BundleCatalog.PoolVersion` 4 redraws old saved offers). The hidden card is valued at the hero card coin price / 20 (Uncommon 250, Rare 600, Elite 1,600 gems, expected 455, was 180). **Real worth is now x1.85 to x3.6 (average 2.56)**, no longer 1.5 to 2.5: the card gives +275 gems of worth, the coin cut takes away about 30 percent of the coin share. The tables below are the older 1,000-bundle pool and are kept as history; the current numbers are in `37-bundles.md`.
+> **Update 2026-11-22 (Final Change 1): the pool was redrawn from scratch.** 2,000 bundles, 200 to 1,000 gems (average 610), hidden card Common 50 / Uncommon 40 / Rare 10 percent (400 / 1,200 / 3,600 gems, expected 1,040), worth 3.03x to 5.97x, average 4.54x, `BundleCatalog.PoolVersion` 5. Everything below in this section is history; the current numbers are in section 0.5 and `37-bundles.md`.
+>
+> **Update 2026-11-13 (owner economy review, history): the COIN part of every bundle is cut 30 percent** (total coins of the 2,000 bundles 14.27 to 10.02 million, average 4,996, range 1,100 to 12,100; prices 200 to 500 gems, power-ups and the hidden card unchanged; ids stay; `BundleCatalog.PoolVersion` 4 redraws old saved offers). The hidden card is valued at the hero card coin price / 20 (Uncommon 250, Rare 600, Elite 1,600 gems, expected 455, was 180). **Real worth is now x1.85 to x3.6 (average 2.56)**, no longer 1.5 to 2.5: the card gives +275 gems of worth, the coin cut takes away about 30 percent of the coin share. The tables below are the older 1,000-bundle pool and are kept as history; the current numbers are in `37-bundles.md`.
 
 ### 9.1 Rules
 
@@ -320,7 +418,9 @@ Bundles are the best-value gem sink: 1.6 times the price, against 0.81 to 0.86 f
 
 ## 10. Treasure chests [CODE, DOC 22]
 
-> **Update 2026-11-13 (owner economy review): chests carry one hero card with new odds; richer chests accepted.** Prices and loot unchanged (Iron 100 gems: 1 power-up + 800 to 1,200 coins; Gold 300 gems: 3 power-ups + 3,000 to 4,200 coins). Iron card odds 50 Common / 30 Uncommon / 20 Rare; Gold 60 Rare / 30 Elite / 10 Legendary (`ChestRolls.IronWeights/GoldenWeights`). Card gem value = coin price / 20: Common 100, Uncommon 250, Rare 600, Elite 1,600, Legendary 4,000. Expected card Iron 245, Gold 1,240 gems. **Worth: Iron x3.56 (shown "Worth x3.6"), Gold x5.34 ("Worth x5.3")**; band at the extremes Iron 3.35 to 3.80, Gold 5.13 to 5.58; the test band is 2 to 6 (was 1.5 to 2.5). The chest (i) popup reads the odds from the same table. The tables below predate the hero card and are history.
+> **Update 2026-11-22 (Final Change 1): Iron 400 gems, Gold 1,500 gems (Open 10 = 4,000 / 15,000); contents and odds unchanged.** Card gem value = coin price / 20: Common 400, Uncommon 1,200, Rare 3,600, Elite 10,000, Legendary 25,000. Expected card Iron 1,280, Gold 7,660 gems; a random power-up is 144.44 gems. **Worth: Iron x3.69 (shown "Worth x3.7"), Gold x5.52 ("Worth x5.5")**; test band 2 to 6. Current table: section 0.4.
+>
+> **Update 2026-11-13 (owner economy review, history for the prices and worth): chests carry one hero card with new odds; richer chests accepted.** Prices and loot unchanged (Iron 100 gems: 1 power-up + 800 to 1,200 coins; Gold 300 gems: 3 power-ups + 3,000 to 4,200 coins). Iron card odds 50 Common / 30 Uncommon / 20 Rare; Gold 60 Rare / 30 Elite / 10 Legendary (`ChestRolls.IronWeights/GoldenWeights`). Card gem value = coin price / 20: Common 100, Uncommon 250, Rare 600, Elite 1,600, Legendary 4,000. Expected card Iron 245, Gold 1,240 gems. **Worth: Iron x3.56 (shown "Worth x3.6"), Gold x5.34 ("Worth x5.3")**; band at the extremes Iron 3.35 to 3.80, Gold 5.13 to 5.58; the test band is 2 to 6 (was 1.5 to 2.5). The chest (i) popup reads the odds from the same table. The tables below predate the hero card and are history.
 
 ### 10.1 Rules
 
@@ -353,7 +453,9 @@ When characters are switched on, doc 22 open item 1: an average character is wor
 
 ## 11. Main rewards [CODE, DOC 26]
 
-> **Update 2026-11-13 (economy review, owner): rewards re-priced for gem scarcity. Daily pays ZERO gems (gifts 200 / 400 / 600 / 800 coins, then 50 percent a random Common hero, otherwise 1,000 coins: 2,000 coins a day plus the hero-or-coins gift). Weekly pays 50 gems (ten hard-skill tasks), 5,500 task coins, 5 power-ups and two hero-or-1,000-coins gifts (w_hard5, w_hard10). Main pays exactly 50 gems per region (250 in all) on 8 milestone goals, 2 Common hero gifts per region (clear all 25 levels, gold medals on 25 levels), claim coins about 80 percent of the old table (R1 9,650 over all 49 goals), the former hero tiers pay small coins (150 to 220). Wherever the text below quotes 45 gems a day, 160 gems a week, 580 Main gems or the old Daily, Weekly and Main totals, read these numbers; the current tables are in `39-rewards-economy.md` sections 2 to 4 and `Tests/Simulation/REWARDS_TABLES.md`.**
+> **Update 2026-11-22 (Final Change 1): Main, Daily and Weekly were redrawn from scratch and no reward gives a hero.** Daily: 30 tasks = 500 points, track 250 / 500 / 750 / 1,000 / 1,500 coins at 100 to 500 points (4,000 coins a day), no gems, 1 ad power-up a day. Weekly: 40 tasks, 15,800 coins, 50 gems, 3 power-ups. Main: 75 goals per region, region 1 pays 19,200 coins, 50 gems, 5 power-ups; other regions use the region coin factor (each goal rounded to 10). Totals in section 0.7, task tables in `39-rewards-economy.md`. Every older number in sections 11 to 14 and in the notes below is history.
+>
+> **Update 2026-11-13 (economy review, owner; history): rewards re-priced for gem scarcity. Daily pays ZERO gems (gifts 200 / 400 / 600 / 800 coins, then 50 percent a random Common hero, otherwise 1,000 coins: 2,000 coins a day plus the hero-or-coins gift). Weekly pays 50 gems (ten hard-skill tasks), 5,500 task coins, 5 power-ups and two hero-or-1,000-coins gifts (w_hard5, w_hard10). Main pays exactly 50 gems per region (250 in all) on 8 milestone goals, 2 Common hero gifts per region (clear all 25 levels, gold medals on 25 levels), claim coins about 80 percent of the old table (R1 9,650 over all 49 goals), the former hero tiers pay small coins (150 to 220). Wherever the text below quotes 45 gems a day, 160 gems a week, 580 Main gems or the old Daily, Weekly and Main totals, read these numbers; the current tables are in `39-rewards-economy.md` sections 2 to 4 and `Tests/Simulation/REWARDS_TABLES.md`.**
 >
 > **Update 2026-11-13 (Main Bug List 2): Daily is now 20 tasks and 200 points (15 gems + 1,500 coins + 1 Common hero a day) and Weekly 25 tasks (120 gems, 10,500 coins, 5 power-ups, 2 heroes a week); a perfect week is 225 gems (was 150). The tables are in `39-rewards-economy.md` sections 3 and 4.**
 >
@@ -442,7 +544,7 @@ Note (2026-11-01): the former gem tasks ("collect all gems in a level", "collect
 
 ---
 
-## 14. Free income summary
+## 14. Free income summary (history of 2026-11-01; current reward totals in section 0.7)
 
 All rewards claimed, power-ups at 60.7 gems each.
 
@@ -464,7 +566,7 @@ All rewards claimed, power-ups at 60.7 gems each.
 
 ## 15. Comparison: what $1 buys, what 100 gems cost
 
-### 15.1 Value per dollar of every money product
+### 15.1 Value per dollar of every money product (gem packs current; the two subscription rows are history, see section 0.6: 281 / 315 / 346 / 418 GE per $)
 
 | Product | Price | Gems | Coins | PU | GE | GE per $ | Value at $ref | Value / price |
 |---|---|---|---|---|---|---|---|---|
@@ -480,7 +582,7 @@ All rewards claimed, power-ups at 60.7 gems each.
 | Weekly subscription | $1.49 | 170 | 3,500 | 0 | 345 | **232** | 3.79 | 2.5x |
 | Monthly subscription | $4.99 | 500 | 18,000 | 6 | 1,764 | **354** | 19.39 | 3.9x |
 
-### 15.2 Value of what gems buy (return when spending gems)
+### 15.2 Value of what gems buy (history of 2026-11-01; now: Iron chest x3.7, Gold chest x5.5, bundles x4.54 on average, region skip 500 gems)
 
 | Gem purchase | Price | Value received | Value / price | Verdict |
 |---|---|---|---|---|
@@ -509,7 +611,7 @@ All rewards claimed, power-ups at 60.7 gems each.
 
 ## 16. How players buy gems or watch ads
 
-### 16.1 What drives a gem purchase today
+### 16.1 What drives a gem purchase today (rows 1, 3, 4, 5 and 8 show the prices of 2026-11-01; current prices in section 0)
 
 | # | Trigger | Where | Cost | Free-play gap |
 |---|---|---|---|---|
@@ -519,7 +621,7 @@ All rewards claimed, power-ups at 60.7 gems each.
 | 4 | An Iron or Gold chest | Chests | 100 / 300 gems | 2 or 6 regions of pickups |
 | 5 | Region skip | Map | 100 to 150 gems | 2 to 3 regions |
 | 6 | More coins | Coins tab | 50 to 4,000 gems | - |
-| 7 | Subscription | Subscription button | $1.49 / $4.99 | 232 to 354 GE per $ |
+| 7 | Subscription | Subscription button | $1.99 / $4.99 / $6.99 / $14.99 (since 2026-11-22) | 281 to 418 GE per $ |
 | 8 | Characters | not built | 150 to 1,500 gems | - |
 
 Pull toward buying is strong only for the **gems-only** sinks (chests, bundles, skips, revives). Power-ups and coins can be reached with free coins, which the rewards supply in large amounts (52,740 coins a month for a daily player).
@@ -557,7 +659,7 @@ Payer mix guess (per 100 monthly payers, $1,840 gross): gem packs about 50 perce
 
 ---
 
-## 17. Recommendations (RC 1 to RC 14)
+## 17. Recommendations (RC 1 to RC 14) (history of 2026-11-01; RC 2 to RC 7 were answered by the economy review of 2026-11-13 and Final Change 1)
 
 | ID | Recommendation | Why (numbers) | Where |
 |---|---|---|---|
@@ -604,12 +706,14 @@ Payer mix guess (per 100 monthly payers, $1,840 gross): gem packs about 50 perce
 Nothing in this file spends OpenArt credits.
 
 ## Update 2026-11-13: level payout, gems in play, hero milestone bonus, region skip (economy review, levels)
+(Since 2026-11-22 the region factor is 1.00 / 1.05 for regions 1 / 2 to 5 and the Gameplay setting bonus is added on top, section 0.1.)
+
 | Item | Now | Was |
 |---|---|---|
-| Clear coins (before region factor 1.00 to 1.12) | 56 + 48 per star (0 stars 56, 1 star 104, 2 stars 152, 3 stars 200), 4 per combo step | 70 + 60 per star, 5 per combo step |
+| Clear coins (before the region factor) | 56 + 48 per star (0 stars 56, 1 star 104, 2 stars 152, 3 stars 200), 4 per combo step | 70 + 60 per star, 5 per combo step |
 | 3-star replay | 25 percent of the coins, no gems | 50 percent |
 | Gem pickups on rows | none (`DifficultyGemPermille` all 0) | about 55 to 75 gem value per region |
-| Level gems | first clear of L5, L10, L15, L20, L25: 1, 1, 2, 2, 3 (9 per region, 45 in all) | milestone rolls, 5 + 2 on the last level, hidden gems, pickups (about 260) |
+| Level gems | first clear of L5, L10, L15, L20, L25: 1, 1, 2, 2, 3 (9 per region, 45 in all); since 2026-11-17: 1, 2, 2, 3, 4 (12 per region) plus collectible gems, section 5.1 | milestone rolls, 5 + 2 on the last level, hidden gems, pickups (about 260) |
 | Hero milestone bonus (first clear of those five levels, selected hero) | Common +50 coins; Uncommon +100 +1 gem; Rare +200 +2; Elite +300 +3; Legendary +500 +5; upper tiers 50 percent one more gem | per-run "Run bonus" |
 | Region skip | 500 gems for regions 2 to 5 | 100, 116, 133, 150 |
 A perfect 3-star pass of a region pays about 5,000 coins at factor 1.00 (was 6,250). Endless and Time Attack are unchanged.

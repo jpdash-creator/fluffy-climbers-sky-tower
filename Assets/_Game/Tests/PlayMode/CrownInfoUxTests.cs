@@ -112,7 +112,7 @@ namespace FluffyClimbers.Tests
 
             if (CrownTextIn(calc, "Formula") == null || !CrownTextIn(calc, "Formula").Contains("floors + chain squares")) problems.Add(tag + "the formula is missing");
             if (CrownTextIn(calc, "Tip") == null) problems.Add(tag + "the tip line is missing");
-            string bonus = "+" + SimConfig.DifficultyStepPercent[expect.Mode] + "%";
+            string bonus = "+" + SimConfig.DifficultyRewardPercent[expect.Mode] + "%";   // 0/5/10/15/25: Relaxed reads "+0%"
             if (CrownTextIn(calc, "RowBonusValue") != bonus) problems.Add(tag + "bonus shows '" + CrownTextIn(calc, "RowBonusValue") + "', expected " + bonus);
             if (CrownTextIn(calc, "RowCrownValue") != expect.Crown.ToString()) problems.Add(tag + "crown shows '" + CrownTextIn(calc, "RowCrownValue") + "', expected " + expect.Crown);
             if (expect.PartsKnown)
@@ -158,19 +158,19 @@ namespace FluffyClimbers.Tests
                 foreach (int percent in new[] { 100, 130 })
                 {
                     GameSettings.TextPercent = percent;
-                    GameSettings.Difficulty = 3;   // Hard: +40 percent
+                    GameSettings.Difficulty = 3;   // Hard: +15 percent crown bonus
                     yield return Load("Meta");
                     var meta = Object.FindFirstObjectByType<MetaController>();
                     RegionDef r1 = GameSession.Repo.GetRegionByIndex(1);
                     var levels = GameSession.Repo.LevelsOf(r1.Id);
                     ProgressService progress = GameSession.Progress;
-                    // 37 floors and a chain of 5: 37 + 5 squared = 62, crown 62 x 5 x 1.40 = 434
+                    // 37 floors and a chain of 5: 37 + 5 squared = 62, crown 62 x 5 x 1.15 = 356.5 -> 357 (half up)
                     progress.ApplyRun("lvl_001_01", new RunOutcome { Completed = true, StarMask = 1, Score = 62, Floors = 37, BestCombo = 5, Mode = 3 });
                     progress.FinishEndlessRun(new RunRecord { Kind = RunKind.Endless, RegionId = r1.Id, Floors = 90, Ticks = 5400, Mode = 3, Score = 106, BestCombo = 4 }, "20261113", out RecordResult rr);
                     CrownBreakdown level = CrownBreakdown.From(progress.BestCrownRun("lvl_001_01", 3), 3, progress.BestCrown("lvl_001_01", 3));
                     CrownBreakdown endless = CrownBreakdown.From(progress.EndlessCrownRun(r1.Id, 3), 3);
-                    if (level.Crown != 434 || level.FloorPoints != 37 || level.ComboPoints != 25) problems.Add(percent + ": the stored level run is wrong (" + level.Crown + ")");
-                    if (endless.Crown != 742) problems.Add(percent + ": the stored endless run is wrong (" + endless.Crown + ")");
+                    if (level.Crown != 357 || level.FloorPoints != 37 || level.ComboPoints != 25) problems.Add(percent + ": the stored level run is wrong (" + level.Crown + ")");
+                    if (endless.Crown != 610) problems.Add(percent + ": the stored endless run is wrong (" + endless.Crown + ")");
 
                     var holder = new RenderTexture[1];
                     foreach (Aspect a in Aspects)
@@ -254,7 +254,7 @@ namespace FluffyClimbers.Tests
                 RectTransform calc = FindRt(CrownInfoUi.CalcName);
                 if (calc == null) { problems.Add(tag + "calculation pop-up missing"); continue; }
                 if (CrownTextIn(calc, "RowCrownValue") != "0" || CrownTextIn(calc, "RowFloorsValue") != "0" || CrownTextIn(calc, "RowComboValue") != "0") problems.Add(tag + "zeros missing");
-                if (CrownTextIn(calc, "RowBonusValue") != "+" + SimConfig.DifficultyStepPercent[2] + "%") problems.Add(tag + "the setting bonus must show without a run");
+                if (CrownTextIn(calc, "RowBonusValue") != "+" + SimConfig.DifficultyRewardPercent[2] + "%") problems.Add(tag + "the setting bonus must show without a run");
                 string hint = CrownTextIn(calc, "Hint");
                 if (hint == null || !hint.Contains("Play this level")) problems.Add(tag + "the 'Play this level' hint is missing");
             }

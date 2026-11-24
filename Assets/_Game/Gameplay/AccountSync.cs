@@ -23,6 +23,8 @@ namespace FluffyClimbers.Gameplay
         static bool dirty, uploading, syncReady, blockUpload, startInFlight, pendingCheck;
         static float uploadAt;
         static int startAttempts;
+        /// <summary>Quiet saves (play time, bundle timer, settings, housekeeping) upload at most once per 60 s (Final Change 3).</summary>
+        static QuietUploadGate quiet = new QuietUploadGate();
 
         /// <summary>Canvas that hosts the popups; set by <see cref="LoginFlow.Begin"/>. A destroyed canvas (scene change) defers the popup.</summary>
         public static Transform Parent;
@@ -51,9 +53,11 @@ namespace FluffyClimbers.Gameplay
         public static void Hook(ProgressService p)
         {
             if (p == null || ReferenceEquals(p, progress)) return;
-            if (progress != null) progress.Changed -= OnChanged;
+            if (progress != null) { progress.Changed -= OnChanged; progress.QuietChanged -= OnQuiet; }
             progress = p;
             progress.Changed += OnChanged;
+            progress.QuietChanged += OnQuiet;
+            quiet.Clear();
             dirty = uploading = syncReady = blockUpload = startInFlight = pendingCheck = false;
             startAttempts = 0;
             if (runner == null)
@@ -73,6 +77,12 @@ namespace FluffyClimbers.Gameplay
             dirty = true;
         }
 
+        static void OnQuiet()
+        {
+            if (!Active) return;   // the durable CloudDirty marker in the save covers this until the next sync
+            quiet.Request();
+        }
+
         static void QueueUpload(bool immediate)
         {
             dirty = true;
@@ -81,8 +91,10 @@ namespace FluffyClimbers.Gameplay
 
         static void Tick()
         {
+            float now = Time.unscaledTime;
+            if (!dirty && !uploading && quiet.Due(now)) { dirty = true; uploadAt = now; }   // a quiet change waited long enough
             if (!dirty || uploading) return;
-            if (Time.unscaledTime < uploadAt) return;
+            if (now < uploadAt) return;
             Flush();
         }
 
@@ -97,6 +109,8 @@ namespace FluffyClimbers.Gameplay
             dirty = false;
             if (!Active) return;
             uploading = true;
+            quiet.Uploaded(Time.unscaledTime);
+            GameSettings.EnsureInSave(progress);   // the first upload of a save without settings carries the device's current ones
             byte[] bytes = SaveSync.Serialize(progress.Data);
             ProgressService p = progress;
             Account.SaveCloud(bytes, ok =>
@@ -205,6 +219,8 @@ namespace FluffyClimbers.Gameplay
             {
                 dirty = false;
                 uploading = true;
+                quiet.Uploaded(Time.unscaledTime);
+                GameSettings.EnsureInSave(progress);
                 byte[] bytes = SaveSync.Serialize(progress.Data);
                 ProgressService p = progress;
                 Account.SaveCloud(bytes, ok =>
@@ -279,6 +295,7 @@ namespace FluffyClimbers.Gameplay
         {
             progress.ReplaceData(SaveSync.PrepareCloudForDevice(env, accountId));
             progress.MarkCloudSynced();
+            GameSettings.ApplyFromSave(progress.Data.Settings);   // settings travel with the save and apply only when the cloud save is adopted (never on upload; Final Change 3)
             syncReady = true;
             blockUpload = false;
             if (RefreshUi != null && Parent != null) RefreshUi();
@@ -316,8 +333,9 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Tests: forget everything.</summary>
         public static void ResetForTests()
         {
-            if (progress != null) progress.Changed -= OnChanged;
+            if (progress != null) { progress.Changed -= OnChanged; progress.QuietChanged -= OnQuiet; }
             progress = null;
+            quiet = new QuietUploadGate();
             dirty = uploading = syncReady = blockUpload = startInFlight = pendingCheck = false;
             startAttempts = 0;
             Parent = null;
@@ -330,6 +348,8 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Tests: run one debounce check.</summary>
         public static void TickForTests() { Tick(); }
         public static bool UploadPending { get { return dirty; } }
+        /// <summary>Tests: a quiet change is waiting for its rate-limited upload.</summary>
+        public static bool QuietPending { get { return quiet.Pending; } }
 
         sealed class Runner : MonoBehaviour
         {

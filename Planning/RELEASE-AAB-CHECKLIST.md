@@ -40,6 +40,22 @@ java -jar %BT% install-apks --apks=E:\Unity\builds\fc_release.apks
 bundletool asks for the keystore passwords on the console (do not put them on the command line). Uninstall the old build first (clean install rule).
 Without a device: `--mode=universal` gives one APK inside the .apks zip.
 
+## Owner steps before a release that contains Final Change 1 (added 2026-11-22)
+These are done by the owner, not by the build:
+1. **Play Console subscription prices.** Monetize > Products > Subscriptions: set the new list prices of the four products and update their benefit lines (doc 48 section 2). The ids do not change.
+
+   | Product ID | Plan | New USD price | Was |
+   |---|---|---|---|
+   | `com.jdlabs.fluffyclimbers.sub.weekly` | Weekly Starter | 1.99 | 1.49 |
+   | `com.jdlabs.fluffyclimbers.sub.weekly_plus` | Weekly Plus | 4.99 | 2.99 |
+   | `com.jdlabs.fluffyclimbers.sub.monthly` | Monthly Standard | 6.99 | 4.99 |
+   | `com.jdlabs.fluffyclimbers.sub.monthly_premium` | Monthly Premium | 14.99 | 9.99 |
+
+   The game shows the store's price at run time, so a build shipped before the console change shows the old price next to the new contents. Existing subscribers are handled by Google Play's own price-change rules (read the notice the console shows when the price is saved; not verified here).
+2. **Leaderboard service.** Redeploy the Cloud Run service from the release commit, set `simVersions` [3] in Firestore (rules version 3, Final Change 2) `config/leaderboard`, clear or roll over the open week, re-measure the entry limits (`Planning/LEADERBOARD-DEPLOY-LOG.md`, section "Pending owner steps (2026-11-22)"). The release AAB has the leaderboard ON, so do this before testers get the build.
+3. **Legal pages.** `POLICY.md` and `TERMS.md` changed on 2026-11-22 (leaderboard keeps up to three best Endless and Time Attack runs; chest prices and odds; bundle price range and card odds). Regenerate and publish the public pages: `python Tools/legal_html.py` (writes `docs/policy.html` and `docs/terms.html`), then push the site (`Planning/LEGAL-HOSTING.md`).
+4. **Saves.** Players keep their progress: old stars and clears count as Relaxed, opened regions stay open, saved crowns are reset once, saved bundle offers are redrawn once. No owner action; tell testers.
+
 ## Firebase and privacy checks of a release (added 2026-11-12)
 - Firebase Analytics is OFF by the manifest flags in `Assets/Plugins/Android/FluffyPrivacyDefaults.androidlib` (`firebase_analytics_collection_deactivated`, `firebase_analytics_collection_enabled=false`, no ad-ID or SSAID collection, consent defaults denied) and the install-referrer permission is removed. Check the merged manifest of the AAB: `java -jar %BT% dump manifest --bundle=...aab` must show the flags and must NOT list `com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE`.
 - The Firebase Unity packages 14.1.0 (`com.google.firebase.app`, `.auth`) are local tgz files in `E:/tools/firebase_unity` (see CLAUDE.md); a build on another machine fails at package resolve until they are there.

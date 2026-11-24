@@ -6,7 +6,7 @@
 | Stream | Role | State | Notes |
 |---|---|---|---|
 | Gem packs (IAP, consumable) | Core | **Built (test purchase in dev builds; release shows "Not available yet" until billing)** | 9 packs, 50 to 15,000 gems, $0.79 to $119.99 (INR prices too); launch promo (about half price) and first-purchase double exist but are **OFF** by default |
-| Subscription | Recurring | **Built (same billing state)** | Weekly $1.49 (Rs 149) and Monthly $4.99 (Rs 449); instant gems, daily gems and coins, free power-ups on the monthly plan; replaces the VIP tiers |
+| Subscription | Recurring | **Built (same billing state)** | Four plans since 2026-11-13; prices of 2026-11-22: Weekly Starter $1.99, Weekly Plus $4.99, Monthly Standard $6.99, Monthly Premium $14.99; instant gems, daily gems and coins, free power-ups, chests on Plus and Premium; replaces the VIP tiers (doc 27 section 0.6) |
 | Gem spending: bundles, chests, power-ups, coin packs, skips, revives | Sinks | **Built** | Everything except the packs and subscriptions is bought with gems or coins; bundles give 1.4 to 1.8 times their gem price in value, chests 0.81 to 0.86 times |
 | Rewarded ads | Free-user monetization | **Revive only (first revive of a run)**; LevelPlay test ads, app key and ad unit are placeholders | Double result, daily power-up ad and gem ads are planned, not built |
 | Starter pack | Conversion | Planned, not built | Doc 22 point 7: $0.99 = 100 gems + 2,000 coins, once per account |
@@ -16,7 +16,7 @@
 Realistic revenue mix with only the revive ad built: ads about 5 to 12 percent of ARPDAU (roughly $0.003 to $0.007 of about $0.06), IAP the rest. The old target of "ads 50-60 percent" needs 2.5 rewarded views per player per day at $10 eCPM, or high-eCPM traffic, and more placements than exist today (doc 27 section 16). Tune using soft launch data.
 
 ## 2. Chest compliance (important)
-- Two chests only: **Iron (100 gems) and Gold (300 gems), gems only, open 1 or open 10**. Contents are shown as text on the card and in the (i) popup (Iron: 1 power-up and 400 to 600 coins; Gold: 3 power-ups and 1,000 to 1,400 coins; each power-up one of the 7 types with equal chance). Characters in chests are switched off.
+- Two chests only: **Iron (400 gems) and Gold (1,500 gems) since 2026-11-22 (100 and 300 before), gems only, open 1 or open 10**, each with one hero card since Bug List 5 (the contents text that follows is the 2026-11-01 state; current contents in doc 27 section 0.4). Contents are shown as text on the card and in the (i) popup (Iron: 1 power-up and 400 to 600 coins; Gold: 3 power-ups and 1,000 to 1,400 coins; each power-up one of the 7 types with equal chance). Characters in chests are switched off.
 - No rarity tiers, pity counter or duplicate system exists while characters are off. Before characters are switched on, the odds list (doc 22: Iron Uncommon 67 / Rare 33, Gold Rare 57 / Epic 29 / Legendary 14, duplicates refund 25 percent as gems) must be shown before purchase (Apple guideline 3.1.1, Google Play policy) and the price/odds must be fixed (an average character would return 276 to 286 percent of the chest price, doc 22 open item 1).
 - Server-side RNG later (the roll is already seeded by the open index and recomputable). No paid-only chance mechanic for leaderboard-affecting items; power-ups are Casual only, Ranked stays neutral.
 - Region restrictions: some jurisdictions restrict paid random items (for example Belgium, Netherlands, China rules). Use a Remote Config flag to disable gem chests per country; bundles and power-ups are direct purchases. **(verify with a lawyer before launch)**
@@ -36,6 +36,7 @@ Realistic revenue mix with only the revive ad built: ads about 5 to 12 percent o
 
 ## 5. Retention loops
 - Session loop (60 s): play, earn coins, see progress bar to next unlock, replay.
+- **Rewards since 2026-11-22 (Final Change 1, doc 39 section 0):** Daily 30 tasks = 500 points with a coin track of 4,000 coins a day; Weekly 40 tasks = 15,800 coins, 50 gems, 3 power-ups; Main 75 goals per region; no reward gives a hero. The two bullets below describe the first tables of 2026-11-01 and are history.
 - **Daily loop (built, Rewards screen, Daily tab):** 10 actions of 10 points (log in, play 5 minutes, complete 1 or 3 levels, combo of 3, a hard level, the no-wall level, a gem level, 2 stars in a level, use a power-up); milestones at 20 / 40 / 60 / 80 / 100 points pay 10 gems, 500 coins, 15 gems, 1,000 coins, 20 gems + 1 random power-up. Resets at local midnight. Subscribers also claim their daily gems and coins.
 - **Weekly loop (built, Weekly tab):** 11 tasks (log in 7 days, play 100 / 150 minutes, combos 5 / 10 / 25 / 50, clear 15 levels, earn 20 stars, no-wall level, 3 stars on 5 levels) worth 160 gems, 1,800 coins and 1 random power-up. Resets Monday local time.
 - **Main loop (built, Main tab):** star milestones at 25 to 225 stars and one reward per region cleared (50 gems + 2,000 coins).

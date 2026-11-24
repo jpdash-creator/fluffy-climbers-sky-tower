@@ -94,7 +94,11 @@ namespace FluffyClimbers.Gameplay
         float lastAspect, worldWidth;
         RectTransform gaugeTrack;
         float speedCueTimer;
-        int lastSpeedStep;
+        ScrollCue speedCue;          // memory of Sim.NextScrollCue (a struct: no allocation)
+        string[] speedCueTexts;      // "+N%" of step 1..max of this run's Gameplay setting, built once in Build
+        int speedCueStep;            // the setting's step percent the texts were built for
+        /// <summary>The speed cue text when the scroll speed reaches the ceiling (SimConfig.ScrollMaxSpeed). Public for tests.</summary>
+        public const string SpeedCueMaxText = "MAX";
         RectTransform overlay;
         float comboPulse;
         int lastCombo;
@@ -248,6 +252,8 @@ namespace FluffyClimbers.Gameplay
             speedRoot = BannerRoot(root, "SpeedBanner", "icon_speed", new Color(1f, 0.7f, 0.4f), BannerSpeedY, out speedText);
             comboRoot.gameObject.SetActive(false);
             speedRoot.gameObject.SetActive(false);
+            BuildSpeedCueTexts(session.Cfg);
+            BuildSpecialCues(root, session);
 
             timeText = UiKit.AddText(root, "Time", "", 40, Color.white, TextAnchor.MiddleCenter);
             RectTransform trt0 = (RectTransform)timeText.transform;
@@ -279,6 +285,108 @@ namespace FluffyClimbers.Gameplay
         public const float IntroCenterY = 0f;
 
         public const float BannerW = 380f, BannerH = 112f, BannerComboY = 70f, BannerSpeedY = -70f;
+
+        // ---- special level types (owner Final Change 1, 2026-11-22) ----
+
+        /// <summary>Keep Moving cue texts by the whole seconds left (index 0 = the last ticks): text plus the ring on the hero, so the warning is never colour or motion alone.</summary>
+        public static readonly string[] KeepMovingCueTexts = { "MOVE!", "MOVE! 1", "MOVE! 2" };
+        /// <summary>Names of the Keep Moving cue banner and of the Combo Climb progress text (tests).</summary>
+        public const string KeepMovingBannerName = "KeepMovingBanner", ComboProgressName = "ComboProgress";
+        /// <summary>Centre offset of the Keep Moving cue above the combo banner (reference px from the middle of the safe area).</summary>
+        public const float BannerKeepMovingY = BannerComboY + BannerH + 16f;
+        RectTransform keepRoot;
+        Text keepText;
+        int lastKeepSecs = -1, lastComboJumps = -1;
+        string[] comboProgressTexts;
+
+        /// <summary>
+        /// Builds what a special level adds to the HUD: the "MOVE!" cue of a Keep Moving level (hidden until the last 2 seconds on a platform) and the "Combo jumps n / N" line of a
+        /// Combo Climb level (in the slot of the old speedrun clock between the pads). All texts are built here once: Refresh only swaps cached strings (CUX-1).
+        /// </summary>
+        void BuildSpecialCues(RectTransform root, RunSession session)
+        {
+            if (session.IsEndless) return;
+            if (session.Sim.KeepMoving)
+            {
+                Image pill = Theme.GlassPanel(root, KeepMovingBannerName, 24f);
+                keepRoot = pill.rectTransform;
+                keepRoot.anchorMin = keepRoot.anchorMax = new Vector2(0.5f, 0.5f);
+                keepRoot.pivot = new Vector2(0.5f, 0.5f);
+                keepRoot.anchoredPosition = new Vector2(0f, BannerKeepMovingY);
+                keepRoot.sizeDelta = new Vector2(BannerW, BannerH);
+                keepText = UiKit.AddText(pill.transform, "Value", KeepMovingCueTexts[2], 64, new Color(1f, 0.8f, 0.55f), TextAnchor.MiddleCenter, true);
+                keepText.horizontalOverflow = HorizontalWrapMode.Overflow;
+                keepText.resizeTextForBestFit = true;   // stays inside the pill at 130 percent text, like the speed cue
+                keepText.resizeTextMinSize = 40;
+                keepText.resizeTextMaxSize = 64;
+                RectTransform krt = (RectTransform)keepText.transform;
+                krt.anchorMin = Vector2.zero;
+                krt.anchorMax = Vector2.one;
+                krt.offsetMin = new Vector2(24f, 0f);
+                krt.offsetMax = new Vector2(-24f, 0f);
+                pill.gameObject.AddComponent<A11yLabel>().Text = "Keep moving: leave this platform";
+                keepRoot.gameObject.SetActive(false);
+            }
+            if (session.Spec.Goal.Type == GoalType.ComboChain)
+            {
+                int need = GoalEvaluator.ComboJumpsNeeded(session.Spec);
+                comboProgressTexts = new string[need + 1];
+                for (int i = 0; i <= need; i++) comboProgressTexts[i] = "Combo jumps " + i + " / " + need;
+            }
+        }
+
+        /// <summary>Per frame: swaps the cached cue texts when their value changed. No allocation.</summary>
+        void RefreshSpecialCues(RunSession s, in SimState st)
+        {
+            if (keepRoot != null)
+            {
+                bool warn = s.Sim.KeepMovingWarning(in st);
+                int secs = warn ? Mathf.Clamp((s.Sim.KeepMovingTicksLeft(in st) + SimConfig.TicksPerSecond - 1) / SimConfig.TicksPerSecond, 0, KeepMovingCueTexts.Length - 1) : -1;
+                if (secs != lastKeepSecs)
+                {
+                    bool starts = lastKeepSecs < 0 && secs >= 0;
+                    lastKeepSecs = secs;
+                    keepRoot.gameObject.SetActive(warn);
+                    if (warn) UiKit.SetText(keepText, KeepMovingCueTexts[secs]);
+                    if (starts) AudioManager.Play(Sfx.SpeedUp);   // the warning is audible too (CUX-6: a cue is never only visual or only audible)
+                }
+            }
+            if (comboProgressTexts != null)
+            {
+                int made = GoalEvaluator.ComboJumpsMade(s.Spec, st);
+                if (made != lastComboJumps)
+                {
+                    lastComboJumps = made;
+                    UiKit.SetText(timeText, comboProgressTexts[Mathf.Clamp(made, 0, comboProgressTexts.Length - 1)]);
+                }
+            }
+        }
+
+        /// <summary>Builds the "+N%" texts of the run's Gameplay setting once (step 1 .. ScrollStepMaxSteps: Normal "+30%" .. "+240%"; the longest, "+400%", is 5 characters and fits the banner like the old "+100%").</summary>
+        void BuildSpeedCueTexts(SimConfig cfg)
+        {
+            speedCue = default(ScrollCue);
+            speedCueStep = cfg.ScrollStepPercent;
+            int n = cfg.ScrollStepMaxSteps < 0 ? 0 : cfg.ScrollStepMaxSteps;
+            speedCueTexts = new string[n + 1];
+            for (int i = 1; i <= n; i++)
+            {
+                int pct = i * speedCueStep;
+                if (pct > cfg.ScrollStepCapPercent) pct = cfg.ScrollStepCapPercent;
+                speedCueTexts[i] = "+" + pct + "%";
+            }
+        }
+
+        /// <summary>The cached "+N%" text of a setting speed-up (a multiple of the step). A value outside the cache (a config changed mid-run, tests) is built on the spot: once per step, never per frame.</summary>
+        string SpeedCueText(int percent)
+        {
+            if (speedCueStep > 0 && percent % speedCueStep == 0)
+            {
+                int i = percent / speedCueStep;
+                if (speedCueTexts != null && i > 0 && i < speedCueTexts.Length) return speedCueTexts[i];
+            }
+            return "+" + percent + "%";
+        }
 
         /// <summary>An icon + text pill (combo, speed up) in the centre of the screen: anchored to the middle, offset vertically by <paramref name="y"/>. Returns its root; the text is the out parameter.</summary>
         RectTransform BannerRoot(RectTransform root, string name, string icon, Color number, float y, out Text text)
@@ -332,13 +440,48 @@ namespace FluffyClimbers.Gameplay
             string rule = endless ? null : RunSession.GoalRule(session.Spec);
             if (rule != null)
             {
-                // Level rule shown before the run starts (e.g. "Don't touch the walls."), small italic, centred under the goal.
+                // Special level (owner Final Change 1, 2026-11-22): its name and its one-sentence rule before the run starts, centred under the goal.
+                // The rule may wrap onto a second line (130 percent text, narrow screens), so the box and the panel leave room for two.
+                float nameH = Mathf.Ceil(48f * UiKit.TextScale * 1.25f), ruleH = Mathf.Ceil(2f * Mathf.Max(40f, UiKit.MinBodyTextPx) * UiKit.TextScale * 1.25f);
+                Text special = UiKit.AddText(introRoot, "Special", RunSession.SpecialName(session.Spec), 48, Color.white, TextAnchor.MiddleCenter, true);
+                special.horizontalOverflow = HorizontalWrapMode.Overflow;
+                UiKit.Place((RectTransform)special.transform, new Vector2(0.5f, 1f), new Vector2(0f, -360f), new Vector2(720f, nameH));
+                special.rectTransform.pivot = new Vector2(0.5f, 1f);
                 Text ruleText = UiKit.AddText(introRoot, "Rule", rule, 40, new Color(1f, 0.95f, 0.6f), TextAnchor.MiddleCenter, true);
                 ruleText.fontStyle = FontStyle.Italic;
-                UiKit.Place((RectTransform)ruleText.transform, new Vector2(0.5f, 1f), new Vector2(0f, -360f), new Vector2(720f, 70f));
-                back.rectTransform.sizeDelta = new Vector2(780f, 490f);   // room for the rule line under the goal
+                UiKit.Place((RectTransform)ruleText.transform, new Vector2(0.5f, 1f), new Vector2(0f, -360f - nameH - 6f), new Vector2(720f, ruleH));
+                ruleText.rectTransform.pivot = new Vector2(0.5f, 1f);
+                back.rectTransform.sizeDelta = new Vector2(780f, 360f + nameH + 6f + ruleH + 28f);   // room for the name and the rule under the goal
             }
             // The small control-hint chips (left, right, jump) were removed on purpose (owner 2026-11-02): the intro shows the level number, the target and the rule only.
+            AddPenaltyCue(back.rectTransform, session);
+        }
+
+        /// <summary>Name of the penalty cue text on the intro (tests look it up).</summary>
+        public const string PenaltyCueName = "PenaltyCue";
+
+        /// <summary>
+        /// Region penalty (owner Final Change 2): when the chosen hero is away from its home region the intro says so under everything else, and names the Legendary power that is off
+        /// this run ("Slow Time is off"). The panel grows by the cue's height so nothing overlaps; the cue is built once with the intro, never per frame.
+        /// </summary>
+        void AddPenaltyCue(RectTransform introPanel, RunSession session)
+        {
+            if (session == null || !session.HeroAwayFromHome) return;
+            CharacterSpec hero = CharacterDefs.Get(session.HeroId);
+            string text = hero == null ? null : HeroRegionPenalty.BadgeText(hero.Rarity);
+            if (text == null) return;
+            if (session.HeroDisabledPower != PowerUp.None)
+            {
+                PowerUpDef def = PowerUpUi.Defs().Get(session.HeroDisabledPower);
+                text = HeroRegionPenalty.Points(hero.Rarity) > 0 ? "Away from home: -" + HeroRegionPenalty.Points(hero.Rarity) + "% stats" : text;
+                text += "\n" + (def != null ? def.Name : "A power") + " is off";
+            }
+            float lineH = Mathf.Ceil(Mathf.Max(40f, UiKit.MinBodyTextPx) * UiKit.TextScale * 1.25f);
+            float h = 2f * lineH + 4f;
+            Vector2 size = introPanel.sizeDelta;
+            introPanel.sizeDelta = new Vector2(size.x, size.y + h + 14f);
+            Text cue = UiKit.AddText(introPanel, PenaltyCueName, text, 40, new Color(1f, 0.82f, 0.45f), TextAnchor.MiddleCenter, true);
+            UiKit.Place((RectTransform)cue.transform, new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(720f, h));
         }
 
         Image[] starIcons;
@@ -392,6 +535,7 @@ namespace FluffyClimbers.Gameplay
                 int sec = st.Tick / 60;
                 if (sec != lastTimeKey) { lastTimeKey = sec; UiKit.SetText(timeText, sec + " / " + s.Spec.Goal.TimeSec + " s"); }
             }
+            RefreshSpecialCues(s, in st);
 
             if (st.Combo != lastCombo)
             {
@@ -409,18 +553,16 @@ namespace FluffyClimbers.Gameplay
             if (!GameSettings.ReducedMotion) comboRoot.localScale = Vector3.one * (1f + comboPulse * 0.06f);
 
             // "Speed up" cue each time the screen speeds up (every ScrollStepSeconds): icon plus percent, a static cue with reduced motion.
-            if (st.StartTick >= 0)
+            // Owner Final Change 1 (2026-11-22): the cue shows ONLY the Gameplay setting's own round value (steps x step: +30%, +60%, ..), never the measured speed
+            // (the 4 u/s ceiling made that +163%). When the real speed reaches the ceiling it shows "MAX" once and stays silent while the speed is held there.
+            // The rule lives in the simulation (Sim.NextScrollCue: integers only, no allocation); the texts are cached, so nothing is built per frame.
+            int cue = s.Sim.NextScrollCue(in st, ref speedCue);
+            if (cue != ScrollCue.None)
             {
-                // The percent comes from the simulation itself: (current danger-line speed / starting speed - 1), so screen and game always match.
-                int step = s.Sim.ScrollSpeedUpPercent(in st);
-                if (step > lastSpeedStep)
-                {
-                    lastSpeedStep = step;
-                    UiKit.SetText(speedText, "+" + step + "%");
-                    speedRoot.gameObject.SetActive(true);
-                    speedCueTimer = 1.6f;
-                    AudioManager.Play(Sfx.SpeedUp);
-                }
+                UiKit.SetText(speedText, cue == ScrollCue.Max ? SpeedCueMaxText : SpeedCueText(cue));
+                speedRoot.gameObject.SetActive(true);
+                speedCueTimer = 1.6f;
+                AudioManager.Play(Sfx.SpeedUp);
             }
             if (speedCueTimer > 0f)
             {
@@ -646,6 +788,7 @@ namespace FluffyClimbers.Gameplay
         public void ShowFailed(RunSession s, int gems, bool adReady)
         {
             // The Watch Ad button is ALWAYS shown while the schedule still has an ad revive (owner 2026-11-10); without a loaded ad it is dimmed and a tap explains why.
+            // A One Life level offers NO revive at all (owner Final Change 1, 2026-11-22): RunSession.CanRevive is false there, so neither button is built; Retry stays one tap (CUX-7).
             adHint = null;
             bool offerAd = s.AdReviveOffered;
             bool adDim = offerAd && !adReady && !s.AdRewardPending;
@@ -653,11 +796,12 @@ namespace FluffyClimbers.Gameplay
             float hintH = adDim ? AdHintH + 8f : 0f;   // reserved line above the revive row for the "Ad not ready" message (hidden until the player taps)
             // Compact popup (owner 2026-11-02): title, result pills, progress bar, then ONE line with the ad and gem buttons next to each other, then the action row.
             // The height follows the real content: the action row grows with big touch targets / 130 percent text, the revive line with the touch size.
-            float contentBottom = s.GoalLost ? 505f : 395f;   // from the top of the panel: end of the progress bar (or of the reason line)
+            string reason = s.FailReason;   // a special rule ended the run or forbids the revive: one line under the progress bar
+            float contentBottom = reason != null ? 505f : 395f;   // from the top of the panel: end of the progress bar (or of the reason line)
             float reviveH = ReviveButtonH;
             float actionTop = ButtonY + ButtonSizeFor(150f);   // from the bottom of the panel: top of the action buttons
             float reviveY = actionTop + 24f;
-            OpenOverlay(s.GoalLost ? "Wall touched!" : "You fell!", contentBottom + 30f + (offerGems ? reviveH + 24f + hintH : 0f) + actionTop);
+            OpenOverlay(s.FailTitle, contentBottom + 30f + (offerGems ? reviveH + 24f + hintH : 0f) + actionTop);
             AudioManager.Play(Sfx.Fail);
             OnClose = () => { if (OnMenu != null) OnMenu(); };
             Transform panel = PanelOf();
@@ -667,10 +811,10 @@ namespace FluffyClimbers.Gameplay
             ToyKit.InfoPill(row, ToyKit.Get("icon_tower"), s.State.Row.ToString(), Color.white, 270f, 104f);
             ToyKit.InfoPill(row, ToyKit.Get("icon_flag"), target.ToString(), new Color(1f, 0.95f, 0.6f), 270f, 104f);
             ProgressBar(panel, 345f, s.State.Row / (float)target);
-            if (s.GoalLost)
+            if (reason != null)
             {
                 // The reason, crisp and centred under the progress bar.
-                Text why = UiKit.AddText(panel, "Reason", "This level fails on any wall touch.", 38, Theme.Ink, TextAnchor.MiddleCenter, true);
+                Text why = UiKit.AddText(panel, "Reason", reason, 38, Theme.Ink, TextAnchor.MiddleCenter, true);
                 why.fontStyle = FontStyle.Italic;
                 UiKit.Place((RectTransform)why.transform, new Vector2(0.5f, 1f), new Vector2(0f, -415f), new Vector2(780f, 90f));
             }

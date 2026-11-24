@@ -10,7 +10,7 @@ namespace FluffyClimbers.Economy
         /// <summary>The fixed "x5" of the formula (CrownScore.CrownFactor).</summary>
         public const int Factor = CrownScore.CrownFactor;
 
-        /// <summary>Gameplay setting 0..4 (Relaxed .. Insane) and its bonus in percent (CrownScore.BonusPercent, the same numbers as SimConfig.DifficultyStepPercent).</summary>
+        /// <summary>Gameplay setting 0..4 (Relaxed .. Insane) and its bonus in percent (CrownScore.BonusPercent = SimConfig.DifficultyRewardPercent: 0, 5, 10, 15, 25; Relaxed has no bonus and shows "+0%").</summary>
         public int Mode, BonusPercent;
         /// <summary>A crown exists in this setting (the player has finished a run that counts). False shows the formula with placeholders.</summary>
         public bool HasRun;

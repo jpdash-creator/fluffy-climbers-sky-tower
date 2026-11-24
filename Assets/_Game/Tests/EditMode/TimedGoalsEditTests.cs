@@ -8,8 +8,10 @@ using UnityEngine;
 namespace FluffyClimbers.Tests
 {
     /// <summary>
-    /// Reward time goals (doc 46 section 8) and the medal target data: the Daily, Weekly and Main goals read the timed counters and gold medals, pay the existing
-    /// reward sizes, restart with the day and week, and old saves start at 0. Written for Unity EditMode (not run by the dotnet suite).
+    /// Reward time goals (doc 46 section 8) and the medal target data: the timed counters, gold medals and Time Attack floors restart with the day and week, and old
+    /// saves start at 0. Owner Final Change 1 (2026-11-22) redrew the reward tables: the gold medal and Time Attack tasks stayed (new ids and rewards), the three pace
+    /// tasks (2 clears at 0.6 plat/s, floor 100 in 3:00, best pace on 3 levels) are gone; their counters are still counted and are checked here as plain counters.
+    /// Written for Unity EditMode (not run by the dotnet suite).
     /// </summary>
     public class TimedGoalsEditTests
     {
@@ -71,47 +73,44 @@ namespace FluffyClimbers.Tests
         // ---- the tables ----
 
         [Test]
-        public void TheTimedGoalsAreInTheDailyAndWeeklyTables()
+        public void TheGoldMedalAndTimeAttackTasksAreInTheTablesAndThePaceTasksAreGone()
         {
             RewardCatalog c = RewardCatalog.BuiltIn();
-            RewardEntry pace = null, floor = null;
-            foreach (RewardEntry a in c.DailyActions) { if (a.Id == "d_pace2") pace = a; if (a.Id == "d_floor100") floor = a; }
-            Assert.IsNotNull(pace);
-            Assert.AreEqual(RewardStat.PaceClears, pace.Stat);
-            Assert.AreEqual(2, pace.Target);
-            Assert.AreEqual(12, pace.Points, "Main Bug List 2: 12 of the 200 daily points");
-            Assert.IsNotNull(floor);
-            Assert.AreEqual(RewardStat.Floor100In3, floor.Stat);
-            Assert.AreEqual(1, floor.Target);
-
-            RewardEntry p3 = c.Find(RewardTab.Weekly, "w_pace3"), g5 = c.Find(RewardTab.Weekly, "w_gold5"), ta = c.Find(RewardTab.Weekly, "w_ta100");
-            Assert.AreEqual(3, p3.Target);
+            RewardEntry g5 = c.Find(RewardTab.Weekly, "w2_gold5"), g3 = c.Find(RewardTab.Weekly, "w2_normal_gold3"), ta = c.Find(RewardTab.Weekly, "w2_ta100");
             Assert.AreEqual(5, g5.Target);
-            Assert.AreEqual(100, ta.Target);
-            Assert.AreEqual(RewardStat.BestPaceLevels, p3.Stat);
             Assert.AreEqual(RewardStat.GoldMedals, g5.Stat);
+            Assert.AreEqual(400, g5.Coins); Assert.AreEqual(5, g5.Gems); Assert.AreEqual(0, g5.PowerUps);
+            Assert.AreEqual(3, g3.Target);
+            Assert.AreEqual(RewardStat.AtLeast(RewardStat.GoldMedals, 2), g3.Stat, "gold medals on Normal or harder");
+            Assert.AreEqual(500, g3.Coins); Assert.AreEqual(5, g3.Gems);
+            Assert.AreEqual(100, ta.Target);
             Assert.AreEqual(RewardStat.TimeAttackFloors, ta.Stat);
-            // economy review 2026-11-13: the weekly table has 25 tasks, gems only on the hard-skill tasks (50 a week), 5,500 task coins
-            Assert.AreEqual(4, p3.Gems); Assert.AreEqual(200, p3.Coins);
-            Assert.AreEqual(5, g5.Gems); Assert.AreEqual(250, g5.Coins); Assert.AreEqual(1, g5.PowerUps);
-            Assert.AreEqual(0, ta.Gems); Assert.AreEqual(200, ta.Coins);
-            Assert.AreEqual(25, c.WeeklyTasks.Count);
-            Assert.AreEqual("w_hard10", c.WeeklyTasks[c.WeeklyTasks.Count - 1].Id, "the hardest task, with a hero, stays last");
+            Assert.AreEqual(300, ta.Coins); Assert.AreEqual(0, ta.Gems);
+            RewardEntry d60 = DailyAction("d2_ta60");
+            Assert.AreEqual(RewardStat.TimeAttackRun, d60.Stat);
+            Assert.AreEqual(60, d60.Target);
+            Assert.AreEqual(25, d60.Points);
+            Assert.AreEqual(40, c.WeeklyTasks.Count);
+            // no task reads the pace counters any more
+            foreach (RewardEntry a in c.DailyActions) { Assert.AreNotEqual(RewardStat.PaceClears, a.Stat, a.Id); Assert.AreNotEqual(RewardStat.Floor100In3, a.Stat, a.Id); }
+            foreach (RewardEntry w in c.WeeklyTasks) Assert.AreNotEqual(RewardStat.BestPaceLevels, w.Stat, w.Id);
+            Assert.IsNull(c.Find(RewardTab.Weekly, "w_pace3"));
+            Assert.IsNull(c.Find(RewardTab.Weekly, "w_gold5"), "the old ids are not reused");
         }
 
         // ---- Daily ----
 
         [Test]
-        public void DailyPaceClearsCountClearsAtZeroPointSixAndPayFifteenPoints()
+        public void DailyPaceClearsCountClearsAtZeroPointSix()
         {
+            MedalTargets.Source = new NoMedalTargets();              // no medal from these runs: only the pace counter is looked at
             svc.RecordRun(LevelRun(Lvl(1), 60, 3600));              // 1.00 plat/s
             Assert.AreEqual(1, Daily(svc, RewardStat.PaceClears));
             Assert.AreEqual(0, svc.DailyPoints());
             svc.RecordRun(LevelRun(Lvl(2), 30, 3600));              // 0.50: too slow
             svc.RecordRun(LevelRun(Lvl(3), 36, 3600, 2, true));     // revived, exactly 0.60: counts since 2026-11-10
             Assert.AreEqual(2, Daily(svc, RewardStat.PaceClears));
-            Assert.AreEqual(12, svc.DailyPoints(), "d_pace2 is done");
-            Assert.AreEqual(2, svc.RewardProgress(RewardTab.Daily, DailyAction("d_pace2")));
+            Assert.AreEqual(0, svc.DailyPoints(), "no daily task reads the pace clears any more (no medal targets for these levels in this test: no medal either)");
         }
 
         [Test]
@@ -123,10 +122,9 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(0, Daily(svc, RewardStat.Floor100In3));
             svc.RecordRun(endless(TimeRecords.TimeAttackTicks));       // exactly 3:00
             Assert.AreEqual(1, Daily(svc, RewardStat.Floor100In3));
-            Assert.AreEqual(14, svc.DailyPoints(), "d_floor100 is worth 14 points");
+            Assert.AreEqual(0, svc.DailyPoints(), "no daily task reads the 3:00 split any more (RecordRun alone sets no Endless floor task: that is ApplyEndlessRun)");
             now = now.AddDays(1);
             Assert.AreEqual(0, Daily(svc, RewardStat.Floor100In3), "a new day starts empty");
-            Assert.AreEqual(0, svc.DailyPoints());
         }
 
         [Test]
@@ -137,38 +135,35 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void TheDailyPointMilestonesStillWorkWithTheTimedGoalsInTheTwentyTasks()
+        public void TheDailyPointGiftsCountOnlyTheTasksOfTheNewTable()
         {
-            svc.RecordLogin();                                       // 5
-            svc.AddPlaySeconds(1500);                                // 7 + 11
+            MedalTargets.Source = new NoMedalTargets();              // no medal from the runs below
+            svc.RecordLogin();                                       // 10
+            svc.AddPlaySeconds(1800);                                // 10 + 15
             svc.RecordRun(LevelRun(Lvl(1), 60, 3600));
-            svc.RecordRun(LevelRun(Lvl(2), 60, 3600));               // d_pace2: 12
-            svc.RecordRun(new RunRecord { Kind = RunKind.Endless, RegionId = region1.Id, Floors = 150, Ticks = 9000, Mode = 2, Splits = new[] { 5000 } });   // d_floor100: 14
-            Assert.GreaterOrEqual(svc.DailyPoints(), 49, "5 + 18 + 12 + 14 (a medal task may add 8 when the shipped targets give a medal)");
-            Assert.AreEqual(RewardClaimResult.Ok, svc.TryClaimReward(RewardTab.Daily, "dp_40").Result);
-            Assert.AreEqual(RewardClaimResult.NotReady, svc.TryClaimReward(RewardTab.Daily, "dp_80").Result);
+            svc.RecordRun(LevelRun(Lvl(2), 60, 3600));               // two pace clears: no task any more
+            svc.RecordRun(new RunRecord { Kind = RunKind.Endless, RegionId = region1.Id, Floors = 150, Ticks = 9000, Mode = 2, Splits = new[] { 5000 } });   // floor 100 within 3:00: no task any more
+            Assert.AreEqual(35, svc.DailyPoints(), "10 + 10 + 15");
+            Assert.AreEqual(RewardClaimResult.NotReady, svc.TryClaimReward(RewardTab.Daily, "dp2_100").Result);
+            svc.RecordRun(new RunRecord { Kind = RunKind.TimeAttack, RegionId = region1.Id, Floors = 60, Ticks = TimeRecords.TimeAttackTicks, Mode = 2 });   // finish a Time Attack run 10 + 60 floors 25
+            Assert.AreEqual(70, svc.DailyPoints());
+            Assert.AreEqual(60, svc.RewardProgress(RewardTab.Daily, DailyAction("d2_ta60")));
+            Assert.AreEqual(RewardClaimResult.Invalid, svc.TryClaimReward(RewardTab.Daily, "dp_40").Result, "the old gift ids are gone");
         }
 
         // ---- Weekly ----
 
         [Test]
-        public void WeeklyBeatYourBestPaceCountsDistinctLevelsAndPaysTheLevels20Package()
+        public void WeeklyBestPaceLevelsCountDistinctLevels()
         {
-            RewardEntry task = WeeklyTask("w_pace3");
             svc.RecordRun(LevelRun(Lvl(1), 30, 3600));
             svc.RecordRun(LevelRun(Lvl(1), 60, 3600));               // the same level again: still one level
             svc.RecordRun(LevelRun(Lvl(2), 30, 3600));
             Assert.AreEqual(2, Weekly(svc, RewardStat.BestPaceLevels));
-            Assert.IsFalse(svc.IsRewardReady(RewardTab.Weekly, task));
             svc.RecordRun(LevelRun(Lvl(3), 30, 3600));
             Assert.AreEqual(3, Weekly(svc, RewardStat.BestPaceLevels));
-            Assert.IsTrue(svc.IsRewardReady(RewardTab.Weekly, task));
-            int gems = svc.Gems, coins = svc.Coins;
-            RewardClaimOutcome o = svc.TryClaimReward(RewardTab.Weekly, "w_pace3");
-            Assert.AreEqual(RewardClaimResult.Ok, o.Result);
-            Assert.AreEqual(4, svc.Gems - gems);
-            Assert.AreEqual(200, svc.Coins - coins);
-            Assert.AreEqual(RewardClaimResult.AlreadyClaimed, svc.TryClaimReward(RewardTab.Weekly, "w_pace3").Result);
+            Assert.AreEqual(3, svc.TimedBestPaceLevelsThisWeek());
+            Assert.IsFalse(svc.HasClaimable(RewardTab.Weekly), "no weekly task reads this counter any more");
         }
 
         [Test]
@@ -183,27 +178,30 @@ namespace FluffyClimbers.Tests
             svc.RecordRun(LevelRun(Lvl(3), 600, 3600, 2, true));     // revived: counts, gold
             for (int i = 4; i <= 5; i++) svc.RecordRun(LevelRun(Lvl(i), 60, 3600));
             Assert.AreEqual(4, Weekly(svc, RewardStat.GoldMedals));  // levels 1, 3, 4, 5
-            Assert.IsFalse(svc.IsRewardReady(RewardTab.Weekly, WeeklyTask("w_gold5")));
+            Assert.IsFalse(svc.IsRewardReady(RewardTab.Weekly, WeeklyTask("w2_gold5")));
             svc.RecordRun(LevelRun(Lvl(2), 60, 3600));               // silver becomes gold: the fifth
             Assert.AreEqual(5, Weekly(svc, RewardStat.GoldMedals));
-            Assert.IsTrue(svc.IsRewardReady(RewardTab.Weekly, WeeklyTask("w_gold5")));
-            int coins = svc.Coins;
-            Assert.AreEqual(RewardClaimResult.Ok, svc.TryClaimReward(RewardTab.Weekly, "w_gold5").Result);
-            Assert.AreEqual(250, svc.Coins - coins);
+            Assert.IsTrue(svc.IsRewardReady(RewardTab.Weekly, WeeklyTask("w2_gold5")));
+            Assert.AreEqual(5, Weekly(svc, RewardStat.AtLeast(RewardStat.GoldMedals, 2)), "all five were earned on Normal");
+            Assert.AreEqual(0, Weekly(svc, RewardStat.AtLeast(RewardStat.GoldMedals, 3)), "none on Hard or Insane");
+            int coins = svc.Coins, gems = svc.Gems;
+            Assert.AreEqual(RewardClaimResult.Ok, svc.TryClaimReward(RewardTab.Weekly, "w2_gold5").Result);
+            Assert.AreEqual(400, svc.Coins - coins);
+            Assert.AreEqual(5, svc.Gems - gems);
         }
 
         [Test]
         public void WeeklyTimeAttackWantsOneHundredFloors()
         {
-            RewardEntry task = WeeklyTask("w_ta100");
+            RewardEntry task = WeeklyTask("w2_ta100");
             svc.RecordRun(new RunRecord { Kind = RunKind.TimeAttack, RegionId = region1.Id, Floors = 99, Ticks = TimeRecords.TimeAttackTicks, Mode = 2 });
             Assert.AreEqual(99, Weekly(svc, RewardStat.TimeAttackFloors));
             Assert.IsFalse(svc.IsRewardReady(RewardTab.Weekly, task));
             svc.RecordRun(new RunRecord { Kind = RunKind.TimeAttack, RegionId = region1.Id, Floors = 100, Ticks = TimeRecords.TimeAttackTicks, Mode = 0 });   // another mode counts too
             Assert.IsTrue(svc.IsRewardReady(RewardTab.Weekly, task));
             int coins = svc.Coins;
-            Assert.AreEqual(RewardClaimResult.Ok, svc.TryClaimReward(RewardTab.Weekly, "w_ta100").Result);
-            Assert.AreEqual(200, svc.Coins - coins);
+            Assert.AreEqual(RewardClaimResult.Ok, svc.TryClaimReward(RewardTab.Weekly, "w2_ta100").Result);
+            Assert.AreEqual(300, svc.Coins - coins);
         }
 
         [Test]
@@ -224,35 +222,35 @@ namespace FluffyClimbers.Tests
         // ---- Main (region goals) ----
 
         [Test]
-        public void TheGoldMedalGoalsCountLevelsWithAGoldInAnyModeAndPayTheStarTierRewards()
+        public void TheGoldMedalGoalsCountLevelsWithAGoldInAnyMode()
         {
             var table = new DictionaryMedalTargets();
-            for (int i = 1; i <= 6; i++) for (int m = 0; m < TimeRecords.ModeCount; m++) table.Set(Lvl(i), m, 1000);
+            for (int i = 1; i <= 12; i++) for (int m = 0; m < TimeRecords.ModeCount; m++) table.Set(Lvl(i), m, 1000);
             MedalTargets.Source = table;
             Assert.AreEqual(0, svc.GoldMedalLevelsInRegion(1));
             svc.RecordRun(LevelRun(Lvl(1), 60, 3600, 0));
             svc.RecordRun(LevelRun(Lvl(1), 60, 3600, 4));            // a second mode of the same level: still one level
             svc.RecordRun(LevelRun(Lvl(2), 50, 3600, 2));            // silver: not counted
-            for (int i = 3; i <= 5; i++) svc.RecordRun(LevelRun(Lvl(i), 60, 3600, 1));
-            Assert.AreEqual(4, svc.GoldMedalLevelsInRegion(1));
-            Assert.AreEqual(5, svc.GoldMedalsInRegion(1), "the older helper still counts level x mode pairs");
+            for (int i = 3; i <= 10; i++) svc.RecordRun(LevelRun(Lvl(i), 60, 3600, 1));
+            Assert.AreEqual(9, svc.GoldMedalLevelsInRegion(1));
+            Assert.AreEqual(10, svc.GoldMedalsInRegion(1), "the older helper still counts level x mode pairs");
             Assert.AreEqual(0, svc.GoldMedalLevelsInRegion(2));
-            RegionGoal g1 = svc.RewardDefs.FindGoal("g_1_gold_1");
+            RegionGoal g1 = svc.RewardDefs.FindGoal("g2_1_gold_10");
             Assert.IsNotNull(g1);
-            Assert.AreEqual(5, g1.Target);
-            Assert.AreEqual(4, svc.RegionGoalProgress(g1));
+            Assert.AreEqual(10, g1.Target);
+            Assert.AreEqual(9, svc.RegionGoalProgress(g1));
             Assert.IsFalse(svc.IsRegionGoalReady(g1));
-            svc.RecordRun(LevelRun(Lvl(6), 60, 3600, 3));
-            Assert.AreEqual(5, svc.RegionGoalProgress(g1));
+            svc.RecordRun(LevelRun(Lvl(11), 60, 3600, 3));
+            Assert.AreEqual(10, svc.RegionGoalProgress(g1));
             Assert.IsTrue(svc.IsRegionGoalReady(g1));
             Assert.IsTrue(svc.HasClaimableInRegion(1));
 
             int coins = svc.Coins;
-            Assert.AreEqual(RewardClaimResult.Ok, svc.TryClaimRegionGoal("g_1_gold_1").Result);
-            Assert.AreEqual(RegionGoalTable.ScaledCoins(100, 1), svc.Coins - coins, "gold tier 1 pays 100 coins");
-            Assert.AreEqual(RewardClaimResult.AlreadyClaimed, svc.TryClaimRegionGoal("g_1_gold_1").Result);
-            Assert.IsFalse(svc.IsRegionGoalReady(svc.RewardDefs.FindGoal("g_1_gold_2")));
-            Assert.AreEqual(5 * 49, svc.RewardDefs.AllRegionGoals.Count);
+            Assert.AreEqual(RewardClaimResult.Ok, svc.TryClaimRegionGoal("g2_1_gold_10").Result);
+            Assert.AreEqual(200, svc.Coins - coins, "gold medals on 10 levels pays 200 coins");
+            Assert.AreEqual(RewardClaimResult.AlreadyClaimed, svc.TryClaimRegionGoal("g2_1_gold_10").Result);
+            Assert.IsFalse(svc.IsRegionGoalReady(svc.RewardDefs.FindGoal("g2_1_gold_25")));
+            Assert.AreEqual(5 * 75, svc.RewardDefs.AllRegionGoals.Count);
         }
 
         [Test]

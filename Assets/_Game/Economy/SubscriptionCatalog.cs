@@ -25,7 +25,7 @@ namespace FluffyClimbers.Economy
         public string Id;
         public int Order;
         public string Name;
-        /// <summary>List price in US dollars (a number, 1.49). The store's localized price replaces the shown text later (see PriceText).</summary>
+        /// <summary>List price in US dollars (a number, 1.99). The store's localized price replaces the shown text later (see PriceText).</summary>
         public double PriceUsd;
         /// <summary>Length of one purchase in days; also the number of daily claims one purchase pays.</summary>
         public int Days;
@@ -88,15 +88,31 @@ namespace FluffyClimbers.Economy
     /// The subscription plans. The runtime uses the built-in copy below (no manifest change needed); a unit test keeps it identical to
     /// Content/economy/subscriptions.json, which is the editable source (parsed by FromJson for tools and remote overrides).
     /// Four fixed-period passes (owner 2026-11-13): Weekly Starter, Weekly Plus, Monthly Standard, Monthly Premium; one plan runs at a time.
+    /// Prices and contents of Final Change 1 (owner 2026-11-22): $1.99 / $4.99 / $6.99 / $14.99 (the real store prices are set in the Play Console; product ids are unchanged).
     /// </summary>
     public sealed class SubscriptionCatalog
     {
         public const string Weekly = "weekly", WeeklyPlus = "weekly_plus", Monthly = "monthly", MonthlyPremium = "monthly_premium";
 
-        /// <summary>List rates for the "worth about N x" text: one gem costs $0.011, 1 gem = 20 coins, a random power-up counts 60.7 gems, chests count at their gem price.</summary>
+        /// <summary>List rates for the "worth about N x" text: one gem costs $0.011, 1 gem = 20 coins, a random power-up counts <see cref="PowerUpGems"/> gems, chests count at their gem price.</summary>
         public const double UsdPerGem = 0.011;
         public const int CoinsPerGem = 20;
-        public const double PowerUpGems = 60.7;
+        /// <summary>Every plan's worth must stay inside this band (owner Final Change 1, 2026-11-22).</summary>
+        public const double WorthMin = 3.0, WorthMax = 6.0;
+
+        static double powerUpGems = -1.0;
+        /// <summary>
+        /// Gem value of one random free power-up = the mean gem price of the implemented power-ups of the built-in catalog (<see cref="ChestRolls.AveragePowerUpGems"/>):
+        /// 144.44 = (3 x 100 + 4 x 150 + 2 x 200) / 9 since Final Change 1 (was the constant 60.7). Derived, so it follows the power-up prices by itself.
+        /// </summary>
+        public static double PowerUpGems
+        {
+            get
+            {
+                if (powerUpGems < 0.0) powerUpGems = ChestRolls.AveragePowerUpGems(PowerUpCatalog.BuiltIn());
+                return powerUpGems;
+            }
+        }
 
         readonly List<SubscriptionDef> all = new List<SubscriptionDef>();
 
@@ -120,14 +136,14 @@ namespace FluffyClimbers.Economy
         {
             return new SubscriptionCatalog(new[]
             {
-                new SubscriptionDef { Id = Weekly, Order = 1, Name = "Weekly Starter", PriceUsd = 1.49, Days = 7, InstantGems = 100, DailyGems = 10, DailyCoins = 500,
+                new SubscriptionDef { Id = Weekly, Order = 1, Name = "Weekly Starter", PriceUsd = 1.99, Days = 7, InstantGems = 100, DailyGems = 15, DailyCoins = 600,
                     PowerUpEveryClaims = 0, PowerUpCount = 1, PowerUpOnClaims = new[] { 4 } },
-                new SubscriptionDef { Id = WeeklyPlus, Order = 2, Name = "Weekly Plus", PriceUsd = 2.99, Days = 7, InstantGems = 250, DailyGems = 20, DailyCoins = 1000,
+                new SubscriptionDef { Id = WeeklyPlus, Order = 2, Name = "Weekly Plus", PriceUsd = 4.99, Days = 7, InstantGems = 250, DailyGems = 20, DailyCoins = 1000,
                     PowerUpEveryClaims = 2, PowerUpCount = 1, Chests = new List<SubscriptionChestGrant> { Chest("iron", 1) }, Featured = true },
-                new SubscriptionDef { Id = Monthly, Order = 3, Name = "Monthly Standard", PriceUsd = 4.99, Days = 30, InstantGems = 200, DailyGems = 10, DailyCoins = 600,
+                new SubscriptionDef { Id = Monthly, Order = 3, Name = "Monthly Standard", PriceUsd = 6.99, Days = 30, InstantGems = 200, DailyGems = 15, DailyCoins = 600,
                     PowerUpEveryClaims = 5, PowerUpCount = 1 },
-                new SubscriptionDef { Id = MonthlyPremium, Order = 4, Name = "Monthly Premium", PriceUsd = 9.99, Days = 30, InstantGems = 300, DailyGems = 20, DailyCoins = 1000,
-                    PowerUpEveryClaims = 5, PowerUpCount = 1, Chests = new List<SubscriptionChestGrant> { Chest("gold", 1, 11, 21) }, Featured = true },
+                new SubscriptionDef { Id = MonthlyPremium, Order = 4, Name = "Monthly Premium", PriceUsd = 14.99, Days = 30, InstantGems = 300, DailyGems = 20, DailyCoins = 1000,
+                    PowerUpEveryClaims = 5, PowerUpCount = 1, Chests = new List<SubscriptionChestGrant> { Chest("gold", 1, 16) }, Featured = true },
             });
         }
 
@@ -161,8 +177,8 @@ namespace FluffyClimbers.Economy
         }
 
         /// <summary>
-        /// The "price measure" of the whole plan in gems: instant gems + daily gems + daily coins / 20 + free power-ups x 60.7 + chests at their gem price
-        /// (Iron 100, Gold 300). Luck of the chest cards is NOT counted (conservative).
+        /// The "price measure" of the whole plan in gems: instant gems + daily gems + daily coins / 20 + free power-ups x <see cref="PowerUpGems"/> (144.44) + chests at their gem price
+        /// (Iron 400, Gold 1,500). Luck of the chest cards is NOT counted (conservative).
         /// </summary>
         public static double TotalGemValue(SubscriptionDef def)
         {
@@ -172,14 +188,14 @@ namespace FluffyClimbers.Economy
             return v;
         }
 
-        /// <summary>Value for the money: gem value at $0.011 per gem divided by the price. Starter about 3.0, Plus 3.8, Standard 3.9, Premium 4.0.</summary>
+        /// <summary>Value for the money: gem value at $0.011 per gem divided by the price. Starter about 3.1, Plus 3.5, Standard 3.8, Premium 4.6 (band <see cref="WorthMin"/> to <see cref="WorthMax"/>).</summary>
         public static double WorthMultiple(SubscriptionDef def)
         {
             if (def == null || def.PriceUsd <= 0.0) return 0.0;
             return TotalGemValue(def) * UsdPerGem / def.PriceUsd;
         }
 
-        /// <summary>The short badge of a card, like the chest cards: "Worth x3.9".</summary>
+        /// <summary>The short badge of a card, like the chest cards: "Worth x3.8".</summary>
         public static string WorthBadge(SubscriptionDef def)
         {
             return "Worth x" + WorthMultiple(def).ToString("0.0", CultureInfo.InvariantCulture);
@@ -191,14 +207,14 @@ namespace FluffyClimbers.Economy
             return "Pay once, rewards every day for " + def.Days.ToString(CultureInfo.InvariantCulture) + " days";
         }
 
-        /// <summary>"Worth about 3.0x" (one decimal, invariant culture).</summary>
+        /// <summary>"Worth about 3.1x" (one decimal, invariant culture).</summary>
         public static string WorthText(SubscriptionDef def)
         {
             return "Worth about " + WorthMultiple(def).ToString("0.0", CultureInfo.InvariantCulture) + "x";
         }
 
         /// <summary>
-        /// The ONE place that formats a plan's price, e.g. "$1.49 / 7 Days". When billing exists, replace <paramref name="symbolAndPrice"/> with the
+        /// The ONE place that formats a plan's price, e.g. "$1.99 / 7 Days". When billing exists, replace <paramref name="symbolAndPrice"/> with the
         /// store's localized price (Google Play) and keep the " / N Days" part.
         /// </summary>
         public static string PriceText(SubscriptionDef def, string symbolAndPrice = null)
@@ -206,7 +222,7 @@ namespace FluffyClimbers.Economy
             return (symbolAndPrice ?? AmountText(def)) + " / " + def.Days.ToString(CultureInfo.InvariantCulture) + " Days";
         }
 
-        /// <summary>"$1.49".</summary>
+        /// <summary>"$1.99".</summary>
         public static string AmountText(SubscriptionDef def)
         {
             return "$" + def.PriceUsd.ToString("0.00", CultureInfo.InvariantCulture);
@@ -224,7 +240,7 @@ namespace FluffyClimbers.Economy
             return n.ToString(CultureInfo.InvariantCulture) + suffix;
         }
 
-        /// <summary>"1", "1 and 11", "1, 11 and 21".</summary>
+        /// <summary>"1", "1 and 16", "1, 11 and 21".</summary>
         public static string DayList(int[] days)
         {
             var sb = new StringBuilder();
@@ -258,7 +274,7 @@ namespace FluffyClimbers.Economy
             return each + " on " + total + " days";
         }
 
-        /// <summary>One line per chest grant: "Gold chest on days 1, 11 and 21", "Iron chest on day 1".</summary>
+        /// <summary>One line per chest grant: "Gold chest on days 1 and 16", "Iron chest on day 1".</summary>
         public static string ChestLine(SubscriptionChestGrant g)
         {
             return g.KindName + " chest on " + (g.Claims.Length == 1 ? "day " : "days ") + DayList(g.Claims);
@@ -270,7 +286,7 @@ namespace FluffyClimbers.Economy
             return "In all: " + Num(def.InstantGems + def.TotalDailyGems()) + " gems + " + Num(def.TotalDailyCoins()) + " coins";
         }
 
-        /// <summary>"6 power-ups + 3 Gold chests", "1 power-up", or null when there are neither.</summary>
+        /// <summary>"6 power-ups + 2 Gold chests", "1 power-up", or null when there are neither.</summary>
         public static string TotalsLine2(SubscriptionDef def)
         {
             var parts = new List<string>();
@@ -303,7 +319,7 @@ namespace FluffyClimbers.Economy
     /// <summary>What a chip of a subscription card shows.</summary>
     public enum SubscriptionChipKind { Gems, Coins, PowerUps, Chest, Days }
 
-    /// <summary>One icon chip of a subscription card: an icon kind and a short text ("900", "30,000", "x6", "Gold x3", "30 days"). Totals over the whole period.</summary>
+    /// <summary>One icon chip of a subscription card: an icon kind and a short text ("900", "30,000", "x6", "Gold x2", "30 days"). Totals over the whole period.</summary>
     public struct SubscriptionChip
     {
         public SubscriptionChipKind Kind;
@@ -336,8 +352,8 @@ namespace FluffyClimbers.Economy
         }
 
         /// <summary>
-        /// The pills of the "i" popup (what you get and when, per plan, from the plan data only): "Now: 100" (instant gems), "10 / day", "500 / day", the power-up schedule
-        /// ("Day 4", "Every 5th day", "2 x Day 4"), one pill per chest grant ("Gold: day 1, 11 and 21") and the duration ("7 days"). Zero amounts are left out.
+        /// The pills of the "i" popup (what you get and when, per plan, from the plan data only): "Now: 100" (instant gems), "15 / day", "600 / day", the power-up schedule
+        /// ("Day 4", "Every 5th day", "2 x Day 4"), one pill per chest grant ("Gold: days 1 and 16") and the duration ("7 days"). Zero amounts are left out.
         /// </summary>
         public static List<SubscriptionChip> InfoPills(SubscriptionDef def)
         {
@@ -377,7 +393,7 @@ namespace FluffyClimbers.Economy
             return all;
         }
 
-        /// <summary>The info pills as plain text for tests: "Now: 100, 10 / day, 500 / day, Day 4, 7 days".</summary>
+        /// <summary>The info pills as plain text for tests: "Now: 100, 15 / day, 600 / day, Day 4, 7 days".</summary>
         public static string JoinInfo(SubscriptionDef def)
         {
             List<SubscriptionChip> c = InfoPills(def);
@@ -386,7 +402,7 @@ namespace FluffyClimbers.Economy
             return string.Join(", ", parts);
         }
 
-        /// <summary>The chips as plain text for tests and logs: "900, 30,000, x6, Gold x3, 30 days".</summary>
+        /// <summary>The chips as plain text for tests and logs: "900, 30,000, x6, Gold x2, 30 days".</summary>
         public static string Join(SubscriptionDef def)
         {
             List<SubscriptionChip> c = For(def);

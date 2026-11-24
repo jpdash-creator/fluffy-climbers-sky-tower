@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace FluffyClimbers.Gameplay
 {
     /// <summary>
-    /// The "Completed (N)" section at the bottom of the Main, Daily and Weekly lists (owner Bug List 10). Finished cards (claimed goals and weekly tasks, finished daily actions)
+    /// The grouped lists (owner Final Change 1) and the "Completed (N)" section at the bottom of the Main, Daily and Weekly lists (owner Bug List 10). Finished cards (claimed goals and weekly tasks, finished daily actions)
     /// leave the main list and live under a header row that is collapsed by default: a tap expands small dimmed cards, a second tap collapses again.
     /// Main and Weekly cards move when the list is rebuilt after the claim (after the jingle and the reward card were started); Daily actions have no claim of their own
     /// (their chests are on the track), so a finished action moves at once, with the next rebuild.
@@ -27,21 +27,48 @@ namespace FluffyClimbers.Gameplay
             return progress.RewardProgress(Tab, e) >= progress.RewardTarget(Tab, e);
         }
 
-        /// <summary>Open cards first (in table order), then the Completed section (header row, and the small cards when it is expanded).</summary>
+        /// <summary>The Daily and Weekly lists: grouped cards, then the Completed section (see <see cref="AddGroupedCards"/>).</summary>
         void AddCardsWithCompleted(RectTransform content, IReadOnlyList<RewardEntry> entries, bool claimable)
         {
+            AddGroupedCards(content, entries, claimable);
+        }
+
+        /// <summary>True when the card of the entry can be claimed right now (always false for a daily task: its points are claimed on the track).</summary>
+        bool EntryReady(RewardEntry e, bool claimable)
+        {
+            if (!claimable) return false;
+            RegionGoal goal = e as RegionGoal;
+            return goal != null ? progress.IsRegionGoalReady(goal) : progress.IsRewardReady(Tab, e);
+        }
+
+        /// <summary>
+        /// One list in three parts (owner Final Change 1, 2026-11-22):
+        /// 1. the READY cards (yellow, with the green Claim button) on top, in table order, without a heading (owner Main Bug List 3: what can be claimed is seen first);
+        /// 2. every group that still has open cards: its small heading (<see cref="RewardEntry.Group"/>, in the order the groups first appear in the table), then its open cards in table order;
+        /// 3. the Completed section (header row, and the small cards when it is expanded): claimed goals and weekly tasks, finished daily tasks.
+        /// A group whose cards are all ready or finished shows no heading.
+        /// </summary>
+        void AddGroupedCards(RectTransform content, IReadOnlyList<RewardEntry> entries, bool claimable)
+        {
             List<RewardEntry> done = null;
-            // Weekly (claimable): ready cards first (RewardOrder), then the open ones in table order; Daily keeps the table order.
-            if (claimable)
+            int n = entries.Count;
+            var state = new int[n];   // RewardOrder groups: 0 ready, 1 open, 2 finished
+            System.Func<RewardEntry, bool> isReady = e => EntryReady(e, claimable), isDone = e => EntryDone(e, claimable);
+            for (int i = 0; i < n; i++)
             {
-                RewardTab tab = Tab;
-                entries = RewardOrder.Sort(entries, e => progress.IsRewardReady(tab, e), e => EntryDone(e, true));
+                state[i] = RewardOrder.GroupOf(entries[i], isReady, isDone);
+                if (state[i] == 2) { if (done == null) done = new List<RewardEntry>(8); done.Add(entries[i]); }
             }
-            for (int i = 0; i < entries.Count; i++)
+            for (int i = 0; i < n; i++) if (state[i] == 0) AddCard(content, entries[i], claimable);
+            for (int i = 0; i < n; i++)
             {
-                RewardEntry e = entries[i];
-                if (EntryDone(e, claimable)) { if (done == null) done = new List<RewardEntry>(8); done.Add(e); }
-                else AddCard(content, e, claimable);
+                if (state[i] != 1) continue;
+                RewardGroup group = entries[i].Group;
+                bool first = true;
+                for (int k = 0; k < i; k++) if (state[k] == 1 && entries[k].Group == group) { first = false; break; }
+                if (!first) continue;   // this group was listed when its first open card came up
+                BuildGroupHeading(content, group);
+                for (int k = i; k < n; k++) if (state[k] == 1 && entries[k].Group == group) AddCard(content, entries[k], claimable);
             }
             AddCompletedSection(content, done, claimable);
         }
@@ -123,16 +150,11 @@ namespace FluffyClimbers.Gameplay
             Text title = UiKit.AddText(card, "Title", TitleOf(e), BodyPx, Theme.Ink, TextAnchor.MiddleLeft, true);
             UiKit.OnPanel(title);
             title.horizontalOverflow = HorizontalWrapMode.Wrap;
-            float textW = Mathf.Max(1f, cardW - left - right);
-            float titleH = Mathf.Max(LineH(BodyPx), MeasureTitle(title, textW));
-            int minFs = Mathf.CeilToInt(UiKit.MinBodyTextPx);
-            while (titleH > Mathf.Ceil(title.fontSize * 1.3f) && title.fontSize - 2 >= minFs)
-            {
-                title.fontSize -= 2;
-                titleH = Mathf.Max(Mathf.Ceil(title.fontSize * 1.22f), MeasureTitle(title, textW));
-            }
-            float h = Mathf.Max(CompletedHeaderH, titleH + 24f);
-            FixedHeight(row, h);
+            var fit = card.gameObject.AddComponent<RewardCardFit>();
+            fit.Mode = RewardCardFit.Kind.Completed; fit.Card = card; fit.Title = title; fit.MidL = left; fit.MidR = right;
+            fit.Row = row.gameObject.AddComponent<LayoutElement>();
+            fit.Row.flexibleHeight = 0f;
+            FitCompleted(fit, cardW);
             RectTransform trt = title.rectTransform;
             trt.anchorMin = Vector2.zero;
             trt.anchorMax = Vector2.one;

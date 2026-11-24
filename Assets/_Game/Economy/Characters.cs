@@ -67,8 +67,8 @@ namespace FluffyClimbers.Economy
         public static readonly string[] RarityNames = { "Common", "Uncommon", "Rare", "Elite", "Legendary" };
         /// <summary>Cooldown in seconds of every power of a character, by rarity (Common has no power).</summary>
         public static readonly int[] CooldownSeconds = { 0, 30, 22, 15, 10 };
-        /// <summary>How many powers a character of this rarity has.</summary>
-        public static readonly int[] PowerCount = { 0, 1, 2, 3, 4 };
+        /// <summary>How many powers a character of this rarity has (owner Final Change 2, 2026-11-23: Uncommon none, Rare one, Elite one, Legendary two; which ones is rolled per copy, <see cref="HeroRolls"/>).</summary>
+        public static readonly int[] PowerCount = { 0, 0, 1, 1, 2 };
 
         /// <summary>
         /// The stats of a Common hero: the four physics numbers come from its row in <see cref="HeroTable"/> (docs/44; the table is the one place the numbers live), the flat finds and the run bonus are the hero's own.

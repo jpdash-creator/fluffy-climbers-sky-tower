@@ -32,8 +32,14 @@ namespace FluffyClimbers.Leaderboard
         public string Label = "";
         /// <summary>The Gameplay setting name ("Easy"), empty for the "other" line.</summary>
         public string Setting = "";
+        /// <summary>What the line counts: the best crown of a level, or the SUM of the counted runs of an Endless / Time Attack region (owner 2026-11-22: the three best runs of the week).</summary>
         public long Crown;
         public bool IsOther;
+        /// <summary>
+        /// Endless / Time Attack lines: the crowns of the counted runs (up to three, best first); they add up to <see cref="Crown"/> exactly. Null for a level line, for the "other" line and when the runs behind the
+        /// sum are not known (then the line is only its sum).
+        /// </summary>
+        public long[] Runs;
     }
 
     /// <summary>A block of lines with its subtotal: one region of the campaign, or "Endless", or "Time Attack".</summary>
@@ -74,6 +80,8 @@ namespace FluffyClimbers.Leaderboard
     /// <summary>
     /// How the number of one leaderboard tab is made from the week's slots (owner request 2026-11-14): Overall = Levels + Endless, the Regions tab = the campaign slots, the Endless tab = Endless + Time Attack slots.
     /// Pure functions (no Unity): slot list in, groups out. The campaign lines are grouped by region (region order, then level, then setting), Endless and Time Attack get their own groups.
+    /// A level line is the best crown of the week in that level and setting. An Endless or Time Attack line (owner 2026-11-22) is the sum of the three best runs of the week in that region and setting; the runs are
+    /// listed on the line (<see cref="BreakdownLine.Runs"/>) and the lines still add up exactly to the total.
     /// </summary>
     public static class LeaderboardBreakdown
     {
@@ -100,6 +108,23 @@ namespace FluffyClimbers.Leaderboard
             public int Mode, RegionIndex, LevelIndex;
             public string RegionName = "", Label = "";
             public long Crown;
+            public long[] Runs;
+        }
+
+        /// <summary>
+        /// The crowns of the counted runs of an Endless / Time Attack slot, best first, or null when the slot is a level slot, has no run list, or its runs do not add up to its crown (a list that does not explain
+        /// the number is not shown).
+        /// </summary>
+        public static long[] RunCrowns(LbSlot s, char kind)
+        {
+            if (s == null || kind == LbSlotId.Campaign || s.Runs == null || s.Runs.Count == 0) return null;
+            var crowns = new long[s.Runs.Count];
+            long sum = 0;
+            for (int i = 0; i < crowns.Length; i++) { crowns[i] = s.Runs[i] != null ? s.Runs[i].Crown : 0; sum += crowns[i]; }
+            if (sum != s.Crown) return null;
+            Array.Sort(crowns);
+            Array.Reverse(crowns);
+            return crowns;
         }
 
         /// <summary>
@@ -118,7 +143,9 @@ namespace FluffyClimbers.Leaderboard
                     char kind; string target; int mode;
                     if (!LbSlotId.TryParse(s.SlotId, out kind, out target, out mode)) continue;
                     if (!CountsFor(board, kind)) continue;
-                    items.Add(MakeItem(kind, target, mode, s.Crown, content));
+                    Item item = MakeItem(kind, target, mode, s.Crown, content);
+                    item.Runs = RunCrowns(s, kind);
+                    items.Add(item);
                 }
             items.Sort(Compare);
 
@@ -126,7 +153,7 @@ namespace FluffyClimbers.Leaderboard
             BreakdownGroup endless = null, attack = null;
             foreach (Item it in items)
             {
-                var line = new BreakdownLine { Label = it.Label, Setting = SettingName(it.Mode), Crown = it.Crown };
+                var line = new BreakdownLine { Label = it.Label, Setting = SettingName(it.Mode), Crown = it.Crown, Runs = it.Runs };
                 BreakdownGroup g;
                 if (it.Kind == LbSlotId.Campaign)
                 {
@@ -160,7 +187,8 @@ namespace FluffyClimbers.Leaderboard
             if (result.Difference != 0)
             {
                 var other = new BreakdownGroup { Section = BreakdownGroup.SectionOther, Header = "Other", Subtotal = result.Difference };
-                other.Lines.Add(new BreakdownLine { Label = "Other (not itemised)", Setting = "", Crown = result.Difference, IsOther = true });
+                // a negative difference = runs the phone lists but the service did not count (no ticket, offline, no consent): honest label instead of a negative "Other"
+                other.Lines.Add(new BreakdownLine { Label = result.Difference < 0 ? "Not counted on the board" : "Other (not itemised)", Setting = "", Crown = result.Difference, IsOther = true });
                 result.Groups.Add(other);
             }
             return result;

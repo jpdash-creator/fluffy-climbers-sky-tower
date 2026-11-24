@@ -23,9 +23,13 @@ Owner list 33, item 5. Code: `Assets/_Game/Services` (assembly `FluffyClimbers.S
 | Gems10000 | ...gems.pack_10000 | Consumable | 10,000 Gems | 89.99 | 44.99 | 10,000 gems |
 | Gems15000 | ...gems.pack_15000 | Consumable | 15,000 Gems | 119.99 | 59.99 | 15,000 gems |
 | AdsRemove | ...ads.remove | **Non-consumable** (one time) | Remove Ads | 2.99 | - | No interstitials; every ad reward is given at once without an ad (owner 2026-11-17). Save flag `adsRemoved`, restored by Restore purchases. **Live: create it in the console** (INR set there). 14 live products in all |
-| SubWeekly | ...sub.weekly | Subscription (1 week) | Weekly Subscription | 1.49 | - | 100 gems now; daily 10 gems + 500 coins, 7 days |
-| SubMonthly | ...sub.monthly | Subscription (1 month) | Monthly Subscription | 4.99 | - | 200 gems now; daily 10 gems + 600 coins, 30 days; power-up every 5th claim |
+| SubWeekly | ...sub.weekly | Subscription (1 week) | Weekly Starter | 1.99 | - | 100 gems now; daily 15 gems + 600 coins, 7 days; 1 power-up on claim 4 |
+| SubWeeklyPlus | ...sub.weekly_plus | Subscription (1 week) | Weekly Plus | 4.99 | - | 250 gems now; daily 20 gems + 1,000 coins, 7 days; power-up every 2nd claim; 1 Iron chest on claim 1 |
+| SubMonthly | ...sub.monthly | Subscription (1 month) | Monthly Standard | 6.99 | - | 200 gems now; daily 15 gems + 600 coins, 30 days; power-up every 5th claim |
+| SubMonthlyPremium | ...sub.monthly_premium | Subscription (1 month) | Monthly Premium | 14.99 | - | 300 gems now; daily 20 gems + 1,000 coins, 30 days; power-up every 5th claim; Gold chest on claims 1 and 16 |
 | StarterPack | ...bundle.starter | Consumable | Starter Pack | 0.99 | - | 100 gems + 2,000 coins. **PLANNED, `Live=false`: do not create yet** (doc 22 point 7) |
+
+Subscription rows: prices and contents of Final Change 1 (owner 2026-11-22; before 1.49 / 2.99 / 4.99 / 9.99, four plans since 2026-11-13). **Owner step: set the four new prices in the Play Console** (doc 48 section 2).
 
 "..." stands for the prefix `com.jdlabs.fluffyclimbers`. INR prices (doc 22 4.1) are set in the store per country, not in code. The first-purchase double (packs up to 1,000 gems) is granted by the game, not by the store.
 
@@ -95,7 +99,7 @@ Flow (`AdMobAdService`): request configuration, then UMP `ConsentInformation.Upd
 1. Pay the one-time Play developer registration, create the app `com.jdlabs.fluffyclimbers`, set up the **merchant/payments profile**.
 2. Upload a signed build (internal testing track at least) - products can only be created once a build with the BILLING permission is uploaded.
 3. Play Console > Monetize > Products > **In-app products**: create each **Consumable** row of section 2 (Live only): Product ID exactly as in the table, name, description, price (USD default, then country prices). Activate it.
-4. Monetize > **Subscriptions**: create `...sub.weekly` (base plan weekly, auto-renewing) and `...sub.monthly` (base plan monthly); add a base plan in each, set prices, activate. In code the product id is the **subscription id**; Unity IAP uses the base plan automatically (single base plan per subscription recommended).
+4. Monetize > **Subscriptions**: create `...sub.weekly` and `...sub.weekly_plus` (base plan weekly, auto-renewing) and `...sub.monthly` and `...sub.monthly_premium` (base plan monthly); add a base plan in each, set prices, activate. In code the product id is the **subscription id**; Unity IAP uses the base plan automatically (single base plan per subscription recommended).
 5. Add license testers (Setup > License testing) to buy without being charged; install the internal-test build from the Play link (sideloaded APKs cannot buy).
 6. Optional promo variants `<id>_launch` (section 1) - or use Play promotions.
 7. **Receipt validation** (done in code, key needed): Play Console > Monetize > **Monetization setup** > "Licensing" shows the base64 **licence key** (a public key). Paste it into `Assets/Resources/Services/iap_config.json` as `playLicenseKey` (shipped placeholder `REPLACE_WITH_PLAY_LICENSE_KEY`). `UnityIapPaymentService` decodes it and checks every purchase with `UnityEngine.Purchasing.Security.CrossPlatformValidator` (RSA signature, package name `com.jdlabs.fluffyclimbers`, product id, state Purchased) before the grant. No key: development builds grant with a logged warning; **release builds refuse the purchase** (Failed, logged, never granted) and `AndroidReleaseBuild` fails its preflight while the key is a placeholder. The package's own tangle generator (`GooglePlayTangle`) is not used: the key is a public key, so a config file is enough and easier to replace. Local validation only stops casual tampering and replayed receipts of other apps; **validating on a server with the Google Play Developer API (purchases.products / purchases.subscriptionsv2) is the stronger option** and the way to see cancellations, refunds and renewals.

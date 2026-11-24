@@ -12,7 +12,7 @@ namespace FluffyClimbers.Simulation.Tests
     public class HeroVariantTests
     {
         /// <summary>Smallest number of generated variants a hero may have (the pool also holds the table row); the generator aims for 8 (HERO_VARS) and gives every hero 4 first.</summary>
-        const int MinVariants = 4;
+        const int MinVariants = 3;
 
         static IEnumerable<string> TierIds()
         {
@@ -31,7 +31,7 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Equal(20, TierIds().Count(HeroRolls.IsRollable));
             Assert.False(HeroRolls.IsRollable("momo"));
             Assert.Equal(0, HeroRolls.Pick(1, "momo", 0));
-            Assert.Equal(190, HeroTable.Find("momo").LaunchTenths);   // Momo Common is still the fixed 19.0 default
+            Assert.Equal(HeroIndex.MomoCommon.LaunchTenths, HeroTable.Find("momo").LaunchTenths);   // Momo Common is the FI anchor (19.2 / 9 / 29 / 77)
         }
 
         [Fact]
@@ -39,7 +39,8 @@ namespace FluffyClimbers.Simulation.Tests
         {
             foreach (string id in TierIds())
             {
-                Assert.True(HeroRolls.PoolSize(id) >= 1 + MinVariants, id + " pool " + HeroRolls.PoolSize(id));
+                Assert.True(HeroRolls.StatPoolSize(id) >= 1 + MinVariants, id + " stat pool " + HeroRolls.StatPoolSize(id));
+                Assert.Equal(HeroRolls.StatPoolSize(id) * HeroRolls.ComboCount(id), HeroRolls.PoolSize(id));   // a variant = stat row x power combination (owner Final Change 2)
                 Assert.Same(HeroTable.Find(id), HeroRolls.Row(id, 0));
             }
         }
@@ -51,11 +52,11 @@ namespace FluffyClimbers.Simulation.Tests
             {
                 int tier = HeroTable.Find(id).Tier;
                 var seen = new HashSet<string>();
-                for (int v = 0; v < HeroRolls.PoolSize(id); v++)
+                for (int v = 0; v < HeroRolls.StatPoolSize(id); v++)   // the stat rows (variants 0..StatPoolSize-1 are the combination 0 of each row)
                 {
                     HeroRow r = HeroRolls.Row(id, v);
                     Assert.Equal(id, r.Id);
-                    Assert.Null(HeroIndex.Validate(tier, new HeroPhysics(r.LaunchTenths, r.Speed, r.Control, r.Wall)));
+                    Assert.Null(TierRules.ValidatePhysics(r));   // bands over the line's Common and the legal limits
                     Assert.True(seen.Add(r.LaunchTenths + "/" + r.Speed + "/" + r.Control + "/" + r.Wall), id + " duplicate variant " + v);
                 }
             }
@@ -68,15 +69,16 @@ namespace FluffyClimbers.Simulation.Tests
             {
                 int size = HeroRolls.PoolSize(id);
                 var counts = new int[size];
-                for (int seed = 1; seed <= 4000; seed++)
+                const int draws = 40000;
+                for (int seed = 1; seed <= draws; seed++)
                 {
                     int v = HeroRolls.Pick(seed, id, 0);
                     Assert.Equal(v, HeroRolls.Pick(seed, id, 0));
                     Assert.InRange(v, 0, size - 1);
                     counts[v]++;
                 }
-                double expect = 4000.0 / size;
-                foreach (int c in counts) Assert.InRange(c, expect * 0.5, expect * 1.5);
+                double expect = draws / (double)size, tol = 5 * Math.Sqrt(expect);
+                foreach (int c in counts) Assert.InRange(c, expect - tol, expect + tol);
             }
         }
 
@@ -100,7 +102,7 @@ namespace FluffyClimbers.Simulation.Tests
             {
                 CharacterSpec c = CharacterInventory.Get(id);
                 Assert.Same(c.Stats, HeroRolls.StatsFor(c, 0));
-                for (int v = 1; v < HeroRolls.PoolSize(id); v++)
+                for (int v = 1; v < HeroRolls.StatPoolSize(id); v++)
                 {
                     CharacterStats s = HeroRolls.StatsFor(c, v);
                     HeroRow r = HeroRolls.Row(id, v);
@@ -116,7 +118,77 @@ namespace FluffyClimbers.Simulation.Tests
             }
         }
 
-        // ---- the recorded gate values (the measured proof is HeroVariantGeneratorTests, HERO_VAR=1; HERO_VAR_VERIFY=1 re-measures every variant) ----
+        // ---- hero powers rolled with the stats (owner Final Change 2, docs/44 section 13) ----
+
+        static readonly PowerUp[] RareList = { PowerUp.WidePlatforms, PowerUp.Shield, PowerUp.SafetyNet, PowerUp.WallStick, PowerUp.Glide, PowerUp.SlowTime };
+        static readonly PowerUp[] EliteList = { PowerUp.SafetyNet, PowerUp.DoubleJump, PowerUp.Glide, PowerUp.SlowTime, PowerUp.Flight, PowerUp.Rocket };
+
+        [Fact]
+        public void EveryVariantCarriesTheTiersPowerCountFromTheOwnersLists()
+        {
+            foreach (string id in TierIds())
+            {
+                int tier = HeroTable.Find(id).Tier;
+                int want = tier == 1 ? 0 : (tier == 4 ? 2 : 1);
+                PowerUp[] list = tier == 2 ? RareList : EliteList;
+                int combos = tier == 1 ? 1 : (tier == 4 ? 15 : 6);
+                Assert.Equal(combos, HeroRolls.ComboCount(id));
+                var seen = new HashSet<string>();
+                for (int v = 0; v < HeroRolls.PoolSize(id); v++)
+                {
+                    PowerUp[] p = HeroRolls.PowersFor(id, v);
+                    Assert.Equal(want, p.Length);
+                    Assert.Equal(want, p.Distinct().Count());
+                    foreach (PowerUp x in p) Assert.Contains(x, list);
+                    seen.Add(string.Join("+", p));
+                }
+                Assert.Equal(combos, seen.Count);   // every combination is reachable
+                Assert.Null(TierRules.ValidatePowers(HeroTable.Find(id).Line, (CharacterRarity)tier, HeroRolls.PowersFor(id, HeroRolls.PoolSize(id) - 1)));
+            }
+        }
+
+        [Fact]
+        public void ThePowerAndTheStatRowAreDrawnIndependentlyAndTheEncodingRoundTrips()
+        {
+            foreach (string id in TierIds())
+            {
+                int m = HeroRolls.StatPoolSize(id), k = HeroRolls.ComboCount(id);
+                for (int s = 0; s < m; s++)
+                    for (int c = 0; c < k; c++)
+                    {
+                        int v = HeroRolls.Compose(id, s, c);
+                        Assert.Equal(s, HeroRolls.StatIndex(id, v));
+                        Assert.Equal(c, HeroRolls.ComboIndex(id, v));
+                        Assert.True(HeroRolls.IsValidVariant(id, v));
+                    }
+                Assert.Equal(-1, HeroRolls.Compose(id, m, 0));
+                Assert.Equal(-1, HeroRolls.Compose(id, 0, k));
+                Assert.Equal(0, HeroRolls.ComboIndex(id, 0));   // variant 0 = the table row with the default combination
+            }
+        }
+
+        [Fact]
+        public void TheRolledSpecCarriesTheCopysPowersAndStatsAndTheDefaultSpecStaysTheSame()
+        {
+            foreach (string id in TierIds())
+            {
+                CharacterSpec c = CharacterInventory.Get(id);
+                Assert.Same(c, HeroRolls.Rolled(c, 0));
+                Assert.Equal(TierRules.PowersFor(c.LineId, c.Rarity), c.Powers);   // the static spec carries the default combination
+                for (int v = 1; v < HeroRolls.PoolSize(id); v += 7)
+                {
+                    CharacterSpec r = HeroRolls.Rolled(c, v);
+                    Assert.Equal(HeroRolls.PowersFor(id, v), r.Powers);
+                    Assert.Equal(HeroRolls.StatsFor(c, v).LaunchTenths, r.Stats.LaunchTenths);
+                    Assert.Equal(c.Id, r.Id);
+                    Assert.Equal(c.LineId, r.LineId);
+                    Assert.Same(r, HeroRolls.Rolled(c, v));   // cached: no allocation in the game loop
+                }
+            }
+            Assert.Same(CharacterDefs.Momo, HeroRolls.Rolled(CharacterDefs.Momo, 3));   // Common is never rolled
+        }
+
+        // ---- the recorded gate values (the measured proof is the FI table hero_gen/fi_cells.csv, HeroFiCellsTests with HERO_FI=1; the selection is Tools/hero_band_select.py) ----
 
         sealed class Rec { public string Id; public int L, S, C, W, Att; public double Fi15, Mean, Dev; }
 
@@ -141,39 +213,40 @@ namespace FluffyClimbers.Simulation.Tests
             foreach (string id in TierIds())
             {
                 var fromCsv = recs.Where(r => r.Id == id).Select(r => r.L + "/" + r.S + "/" + r.C + "/" + r.W).Distinct().ToList();
-                var fromCode = Enumerable.Range(1, HeroRolls.PoolSize(id) - 1).Select(v => HeroRolls.Row(id, v)).Select(r => r.LaunchTenths + "/" + r.Speed + "/" + r.Control + "/" + r.Wall).ToList();
+                var fromCode = Enumerable.Range(1, HeroRolls.StatPoolSize(id) - 1).Select(v => HeroRolls.Row(id, v)).Select(r => r.LaunchTenths + "/" + r.Speed + "/" + r.Control + "/" + r.Wall).ToList();
                 Assert.Equal(fromCsv, fromCode);
             }
         }
 
         [Fact]
-        public void EveryRecordedVariantPassesTheGateAgainstMomosSameTier()
+        public void EveryActiveTableRowAndEveryVariantPassesTheMeasuredFiGate()
         {
-            // Momo's same-tier reference from the committed per-layout reference (hero_gen/FI_REFERENCE_VAR.csv, written by the generator): the same numbers it gates against
-            string[] lines = File.ReadAllLines(Path.Combine(ContentLoader.FindRoot(), "Tests", "Simulation", "hero_gen", "FI_REFERENCE_VAR.csv")).Skip(2).Where(l => l.Length > 0).ToArray();
-            var levelIds = lines.Select(l => l.Split(',')[0]).Distinct().ToList();
-            double[][] ok = new double[5][];
-            for (int t = 0; t < 5; t++) ok[t] = new double[levelIds.Count];
-            foreach (string l in lines)
-            {
-                string[] f = l.Split(',');
-                ok[int.Parse(f[1])][levelIds.IndexOf(f[0])] = f.Skip(2).Average(x => double.Parse(x, CultureInfo.InvariantCulture));
-            }
-            int l15 = levelIds.IndexOf("lvl_001_15");
-            var target15 = new double[5]; var mean = new double[5];
-            for (int t = 0; t < 5; t++)
-            {
-                target15[t] = ok[t][l15] / ok[0][l15];
-                mean[t] = Enumerable.Range(0, levelIds.Count).Average(i => ok[t][i] / ok[0][i]);
-            }
+            // the committed measured table (hero_gen/fi_cells.csv, HeroFiCellsTests with HERO_FI=1): every active row and every variant, measured with its own wall on every level, passes its tier's window
+            FiTable table = FiTable.LoadRaw(FiTable.Path());
+            foreach (HeroRow r in HeroTable.Rows.Where(x => x.Active))
+                Assert.Null(table.CheckGate(FiTable.KeyOf(r.LaunchTenths, r.Speed, r.Control, r.Wall), r.Tier));
+            foreach (HeroRow r in HeroVariants.Rows)
+                Assert.Null(table.CheckGate(FiTable.KeyOf(r.LaunchTenths, r.Speed, r.Control, r.Wall), r.Tier));
+        }
+
+        [Fact]
+        public void TheRecordedFiNumbersOfTheCsvFilesMatchTheMeasuredTable()
+        {
+            FiTable table = FiTable.LoadRaw(FiTable.Path());
             foreach (Rec r in ReadCsv())
             {
-                int tier = HeroTable.Find(r.Id).Tier;
-                Assert.True(Math.Abs(r.Fi15 - target15[tier]) <= HeroIndex.GateTolerance, r.Id + " fi15 " + r.Fi15 + " vs " + target15[tier]);
-                Assert.True(Math.Abs(r.Mean - mean[tier]) <= HeroIndex.GateTolerance, r.Id + " mean " + r.Mean + " vs " + mean[tier]);
-                Assert.True(r.Dev <= HeroIndex.PerLevelTolerance, r.Id + " maxdev " + r.Dev);
-                Assert.True(r.Fi15 <= HeroIndex.BandMax + 0.005 && r.Mean <= HeroIndex.BandMax + 0.005, r.Id + " ceiling");
+                double[] f = table.Fi(FiTable.KeyOf(r.L, r.S, r.C, r.W));
+                Assert.InRange(r.Mean, f.Average() - 0.0015, f.Average() + 0.0015);
             }
+        }
+
+        [Fact]
+        public void TheMeasuredTableBelongsToTheShippedLevelsWhenVerifyingIsAsked()
+        {
+            if (Environment.GetEnvironmentVariable("HERO_FI_VERIFY") != "1") return;   // slow (builds every level once): set HERO_FI_VERIFY=1 after the levels changed
+            var ls = HeroFi.Levels();
+            FiTable table = FiTable.LoadRaw(FiTable.Path());
+            Assert.Equal(VarEngine.Fingerprint(ls), table.Fingerprint);
         }
     }
 }

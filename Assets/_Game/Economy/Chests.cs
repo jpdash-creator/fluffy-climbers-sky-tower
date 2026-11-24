@@ -34,7 +34,7 @@ namespace FluffyClimbers.Economy
             unchecked { return ((openIndex + 1) * (int)0x9E3779B1) ^ (((int)kind + 1) * 0x5bd1e995) ^ (accountSeed * 0x2545F491); }
         }
 
-        /// <summary>Mean gem price of one random power-up of the implemented types (the number the worth uses). 58.33 with the built-in catalog (3 x 75 + 6 x 50 over 9 types).</summary>
+        /// <summary>Mean gem price of one random power-up of the implemented types (the number the worth uses). 144.44 with the built-in catalog (3 x 100 + 4 x 150 + 2 x 200 over 9 types, owner Final Change 1, 2026-11-22).</summary>
         public static double AveragePowerUpGems(PowerUpCatalog powerUps)
         {
             double sum = 0.0;
@@ -51,7 +51,7 @@ namespace FluffyClimbers.Economy
             return WorthMultiplier(kind, AveragePowerUpGems(powerUps ?? (builtIn ?? (builtIn = PowerUpCatalog.BuiltIn()))));
         }
 
-        /// <summary>"Worth x1.8" for the chest card and its info popup.</summary>
+        /// <summary>"Worth x3.7" (Iron) / "Worth x5.5" (Gold) for the chest card and its info popup.</summary>
         public static string WorthLabel(ChestKind kind, PowerUpCatalog powerUps = null)
         {
             return WorthText(kind, AveragePowerUpGems(powerUps ?? (builtIn ?? (builtIn = PowerUpCatalog.BuiltIn()))));
