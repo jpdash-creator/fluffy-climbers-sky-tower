@@ -40,6 +40,7 @@ namespace FluffyClimbers.Gameplay
             Sprite a = RoundSprite, b = RingSprite, c = ShadowSprite, d = GradientDownSprite;
             Glyphs.Warmup();
             TimedIcons.Warmup();
+            PenaltyUi.Warmup();
             if (a == null || b == null || c == null || d == null) Debug.LogWarning("Theme sprites missing");
         }
 

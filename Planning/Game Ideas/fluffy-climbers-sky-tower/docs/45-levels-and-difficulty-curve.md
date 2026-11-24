@@ -4,6 +4,8 @@
 
 Units: `u` = world unit (player width 1, screen width 10), `u/s` = units per second.
 
+> **Final Change 1 (owner 2026-11-22).** Three parts of this document changed and are rewritten in place: section 4 (special levels: six types, one level each per region; levels 10, 15 and 20 are plain gem levels), section 5 (stars and clears per Gameplay setting, 375 stars per region) and section 7 (the Gameplay setting: speed steps every 30 s, its own crown and coin bonus, the new level screen row). The difficulty score, the target curve, the rows per level and the endless tower are unchanged. Owner decisions: `.claude/pendingdecisions/decisions-2026-11-22-final-change-1.md` (repo).
+
 ## 1. The rule in one paragraph
 
 Every region has **25 levels instead of 15**. Difficulty is no longer a loose "d from 0.05 to 1.00"; every level has a measured score from 0 to 100 and a target score. The curve rises gently over levels 1 to 15 (score 5 to 75) and then faster over levels 16 to 25 (75 to 100), so the new Level 25 is as hard as the old Level 15, and the new Level 15 is about as hard as the old Levels 9 to 10. The first 15 levels become easier to climb into, and the extra 10 levels carry the player to the old peak.
@@ -61,14 +63,40 @@ Shape: 5, then 20, then +6.67 per level to 40 (level 5), +4 per level to 60 (lev
 
 Level 15 (target exactly 75) sits on the border: it counts as Hard (the top of the hard band).
 
-- **Special-goal levels** (combo chain, no wall bounce, hidden gem, speedrun) are levels **5, 10, 15 and 20**. Which goal sits on which level is set per region in the level table; the goal rules themselves stay as in doc 25 (combo chain has no gems, no wall bounce fails on a wall touch, and so on). The speedrun goal is new and is specified when it is built.
+- **Level types (owner 2026-11-22, Final Change 1).** The 25 levels of a region are 14 Regular Run levels, 5 gem levels and 6 special levels (section 4b). The old special-goal levels 5, 10, 15 and 20 (combo chain, no wall bounce, hidden gem, speedrun) are gone: the hidden gem goal and the speedrun goal are retired, no wall bounce and combo chain moved to special levels.
+- **Gem levels are levels 5, 10, 15, 20 and 25**: plain Regular Run goals (reach the last platform) with the gem rewards of `GemLevels` (fixed 1 / 2 / 2 / 3 / 4 gems on the first clear in any setting, plus 2 or 3 collectible gems with a seeded 50 percent chance). A gem level is never a special level.
 - **Level 25 is the highly complex reach-the-top level** of the region (plain reach-the-last-platform goal, the hardest layout of the region).
 - Level ids are `lvl_RRR_01` to `lvl_RRR_25` (RRR = region number, three digits). The existing ids 1 to 15 **keep their ids and their seeds**, so saves, stars and bot proofs stay valid; ids 16 to 25 are new.
 - Platforms per row and special share are set so the measured score meets the target of section 3; the doc 25 values are a starting point, not a rule. **Rows per level are fixed by the owner (section 4a).**
 
+### 4b. Special levels (owner 2026-11-22, Final Change 1)
+
+Six special types, exactly ONE level of each per region, the same in all five Gameplay settings, never on a gem level. Every other level is a Regular Run. Code: `Assets/_Game/Simulation/SpecialLevels.cs` (`SpecialLevelType`, `SpecialLevels.TypeOf`, `Name`, `RuleText`, `Glyph`); content: `Tools/content_cli/migrate_levels_25.py` (`SPECIAL_PLACEMENT`). UI, rewards and the server ask `SpecialLevels.TypeOf`; nothing tests a level index.
+
+| Type (value) | How the level carries it | Rule |
+|---|---|---|
+| No Wall Touch (1) | goal `noWallBounce` | Touching a wall fails the goal |
+| No Power-ups (2) | level JSON field `special: noPowerUps` on a reach-the-top level | Bought power-ups and the hero's own power are off (the simulation ignores every power-up input) |
+| Combo Climb (3) | goal `comboChain` (3 combo jumps of 3 floors or more), explicit row count of its band (`overrides.rows`) | The level is cleared with the combo jumps AND the top row; reaching the top without them fails the run. A combo ladder under the top makes the jumps possible |
+| Chase (4) | goal `bossChase` with the row ramp (`overrides.ramp`) | The danger line gets faster with every 25 floors climbed (+4 percent per 25 floors, cap 60 percent), on top of the setting's time steps |
+| One Life (5) | `special: oneLife` | No revive (gems or ad) and no Safety Net: one fall really ends the run. The Safety Net input is ignored in the simulation and the HUD shows no Safety Net button; every other power-up works. Rule text in the popup: "No revive, no Safety Net: one fall ends the run." |
+| Keep Moving (6) | `special: keepMoving` | Standing on the same platform for more than 3 s (`SimConfig.KeepMovingLimitTicks` 180) ALWAYS ends the run, even with an armed Safety Net (the Safety Net rescues real falls only; a gem or ad revive afterwards is allowed). The clock starts after the first jump and a landing on another platform resets it; the last 2 s show a ring on the hero and a "MOVE!" cue. Rule text: "Over 3 seconds on one platform ends the run." |
+
+Placement in regions 1 to 5 (L = level):
+
+| Region | No Wall Touch | No Power-ups | Combo Climb | Chase | One Life | Keep Moving |
+|---|---|---|---|---|---|---|
+| 1 Meadow Springs | L6 | L14 | L24 | L21 | L9 | L16 |
+| 2 Mushroom Grove | L4 | L13 | L16 | L23 | L7 | L18 |
+| 3 Sunny Beach | L21 | L11 | L17 | L3 | L6 | L23 |
+| 4 Candy Canyon | L19 | L4 | L11 | L14 | L24 | L6 |
+| 5 Bamboo Temple | L4 | L24 | L14 | L6 | L18 | L9 |
+
+Rule for every region (also regions 6 to 30 when they are built, doc 50): the six special levels are drawn from levels 3 to 24 without 5, 10, 15 and 20, one level per type. A special level keeps the rows, class and difficulty target of its level number. The level tile shows a type badge (a glyph, not colour alone) and the level popup states the rule in one sentence. Golden hashes: 14 of 125 lines changed (level 15 of every region, the five Combo Climb levels, the old and new No Wall Touch levels of regions 3 and 4). Tests: `Tests/Simulation/SpecialLevelTests.cs`, `Tests/LeaderboardService/SpecialLevelReplayTests`; the ladder proves all 625 level x setting pairs solvable (`SolvabilityLadderTests`, `LADDER=1`).
+
 ### 4a. Rows (floors) per level, Regions 1 to 5 (owner Bug List 8 item 3, 2026-11-09)
 
-The level size is the number of platform rows (floors) from the start platform to the top row. It is the goal value of every row goal (reach the top, no wall bounce, hidden gem, speedrun) and `LevelSpec.RowsFor()` (the combo chain level 5 has no row goal and uses 75). It is the same in all five open regions; Regions 6 to 30 keep their legacy tables until they are migrated.
+The level size is the number of platform rows (floors) from the start platform to the top row. It is the goal value of every row goal (reach the top, No Wall Touch, Chase) and `LevelSpec.RowsFor()` (the goal value of a Combo Climb level is the floors per combo jump, so it carries its rows explicitly). It is the same in all five open regions; Regions 6 to 30 keep their legacy tables until they are migrated.
 
 | Levels | Rows (floors) | Was (old table) |
 |---|---|---|
@@ -79,19 +107,18 @@ The level size is the number of platform rows (floors) from the start platform t
 | 16 to 20 | 120 | 150 (16 to 19), 90 (20, speedrun) |
 | 21 to 25 | 150 | 150 |
 
-Rows per region fall from 3,240 to 2,685 (a level is on average 17 percent shorter). The special levels follow their band: level 5 combo chain 75 rows, level 10 no wall bounce 90, level 15 hidden gem 105, level 20 speedrun 120 rows. **The speedrun time limit scales with its rows: 75 s for 90 rows became 100 s for 120 rows** (same margin over the bot as before). Goals, stars and star tiers, rewards (coin payout per level) and the difficulty scores of section 3 are unchanged; the builder difficulty d of each level was re-solved for the new lengths (section 10).
+Rows per region fall from 3,240 to 2,685 (a level is on average 17 percent shorter). Since 2026-11-22 every level, special or not, has the rows of its band (for example region 1: No Wall Touch L6 90 rows, One Life L9 90, No Power-ups L14 105, Keep Moving L16 120, Chase L21 150, Combo Climb L24 150). (History: the special-goal levels 5 / 10 / 15 / 20 used 75 / 90 / 105 / 120 rows and the speedrun had 100 s for 120 rows; that goal is retired.) Goals, stars and star tiers, rewards (coin payout per level) and the difficulty scores of section 3 are unchanged; the builder difficulty d of each level was re-solved for the new lengths (section 10).
 
-## 5. Region goal tiers and stars
+## 5. Region goal tiers and stars (per Gameplay setting since 2026-11-22)
 
-| Tier | Clear this many levels of the region | Reward |
-|---|---|---|
-| 1 | 5 | same as the old tier 1 (doc 39) |
-| 2 | 10 | same as the old tier 2 |
-| 3 | 15 | same as the old tier 3 |
-| 4 | 20 | same as the old tier 4 |
-| 5 | 25 (all) | same as before, and the region's **Common hero** |
+**Stars and clears are stored per Gameplay setting** (owner Final Change 1): 25 levels x 3 stars x 5 settings = **375 stars per region**, 75 per setting. Save fields `starsByMode` / `starMaskByMode` / `clearsByMode` (five numbers per level); an old save counts as Relaxed and opened regions stay open.
 
-Stars per region: 25 levels x 3 = **75**. Star thresholds that unlock regions or rewards are scaled to 75 per region in the code, and doc 39 is updated in the same change.
+- **Own path per setting.** Level N is open in a setting when level N-1 is cleared in that setting; level 1 of an enterable region is open in every setting.
+- **Next region.** It opens when all 25 levels are cleared in ONE single setting (12 on Relaxed plus 13 on Easy does not count), and it is then open for all settings. The gem skip is unchanged.
+- **Where the numbers show.** The level screen pills and tiles follow the selected setting (n/25 levels, n/75 stars). The wallet star pill and the world map badge add all settings up (n/375 per region).
+- **Coins and gems.** The 25 percent replay rule is judged per setting (the level has 3 stars in the setting of the run). Gems pay once per level: the fixed gems, the hero milestone bonus and the collectible gems on the first clear in any setting.
+
+Main reward goals (doc 39 section 0.4): clear 5 / 10 / 15 / 20 / 25 levels counts the best single setting; earn 25 / 75 / 150 / 250 / 375 stars adds all settings; no goal gives a hero any more (the Common hero on tier 5 is gone).
 
 ## 6. The endless tower
 
@@ -103,17 +130,20 @@ The endless tower has **25 stages of 100 floors** (floors 1 to 2500). Stage N fo
 
 ## 7. The Gameplay setting (replaces the old Difficulty setting)
 
-The old Difficulty setting is removed from Settings. The new **Gameplay** setting lives on the **Level screen**: a centred row of five icon buttons directly under the region name (each at least 48 x 48 dp, with icon or shape differences, not colour alone, per CUX-4 and CUX-6).
+The old Difficulty setting is removed from Settings. The **Gameplay** setting lives on the **Level screen**. Since 2026-11-22 (Final Change 1) the order from the top is: wallet pills, progress pills, the five Gameplay settings, then the region name with the Endless button, then the level path. The settings row has no green or yellow plates: each slot is a larger icon with its name under it, and the whole slot is the button (at least 48 x 48 dp, 8 dp between neighbours). The selected setting has a white ring around a bigger icon and a bold white name; the other four are smaller and slightly faded (never colour alone, CUX-4 and CUX-6; sizes in `MetaController.Gameplay.cs`: ring 164, selected icon 146, other icons 116 canvas units). The Endless button is slightly wider (204 x 136) and shows the infinity icon and the stopwatch (Time Attack) icon; it opens the Endless popup as before.
 
-| Button | Relaxed | Easy | Normal | Hard | Insane |
+| Setting | Relaxed | Easy | Normal | Hard | Insane |
 |---|---|---|---|---|---|
-| Scroll speed-up step per 5 s (owner 2026-11-12; was 20/22/25/28/30 as 20 percent x 1.00/1.10/1.25/1.40/1.50) | 10 percent | 20 percent | 25 percent | 40 percent | 50 percent |
-| Top speed-up after 8 steps (40 s), no global cap (owner 2026-11-12; was 6 steps and a 150 percent cap) | 80 percent | 160 percent | 200 percent | 320 percent | 400 percent |
-| Crown bonus (same percents, doc 46 section 6a) | +10 percent | +20 percent | +25 percent | +40 percent | +50 percent |
+| Speed step, percent of the START speed, added every 30 s after the first jump (owner 2026-11-22; was 10 / 20 / 25 / 40 / 50 every 5 s) | 10 | 20 | 30 | 40 | 50 |
+| Top speed-up after 8 steps (4 minutes), no global cap | +80 percent | +160 percent | +240 percent | +320 percent | +400 percent |
+| Crown and coin bonus (its own table `SimConfig.DifficultyRewardPercent` since 2026-11-22; was the step percents) | 0 percent | +5 percent | +10 percent | +15 percent | +25 percent |
 | Medal target scale (doc 46 section 6) | x0.85 | x0.92 | x1.00 | x1.12 | x1.25 |
 
-- It only changes the **size of the scroll speed-up steps**. The campaign speed ceiling `SimConfig.ScrollMaxSpeed` (4 u/s) stays as before, while the stepped speed-up itself tops out at step x 8 per setting (row above); start speed, layouts, goals, stars and gems are unchanged (gems are not scaled by Gameplay).
-- Hard and Insane still count as **hard clears** (as the old Hard did).
+- **Speed rule.** The start speed is 100 percent. Every 30 s the setting adds its step, always a percent of the start speed (additive, never compounding): speed = start x (100 + steps x step) / 100. It stops after 8 steps. The ceiling `SimConfig.ScrollMaxSpeed` (4 u/s) stays, on levels and in Endless; it caused the odd 163 and 213 percent readings of the old cue. The HUD cue now shows only round steps ("+N%") and, when the real speed reaches the ceiling, MAX once.
+- **Endless** keeps its growth with height; the setting steps multiply that speed, then the ceiling applies. The cue shows only the setting steps.
+- **Chase levels** get the setting steps and their row ramp multiplied on top.
+- The setting changes the speed steps, the crown and coin bonus, the medal target scale and which stars and clears the run counts for (section 5). Start speed, layouts, goals and gems are unchanged (gems are not scaled by Gameplay).
+- Reward tasks read the setting of the run: "on Normal or harder" counts Normal, Hard and Insane, "on Hard or Insane" those two (doc 39 section 0). (The old "hard clear" counter of Hard and Insane is no longer read by any task.)
 - The choice is saved at once and applies to the next run.
 - The difficulty scores of sections 2 and 3 do not depend on this setting: the score uses the scroll speed at the start of a level, which Gameplay does not change.
 
@@ -123,14 +153,14 @@ Only the five primary hero lines (Momo, Capi, Otto, Bonbon, Bao) with their five
 
 ## 9. What is NOT migrated yet
 
-- **Regions 6 to 30** still have 15 levels each and keep working unchanged. They are migrated later with the same rules (sections 1 to 6); until then doc 25 describes them.
+- **Regions 6 to 30** still have 15 levels each and keep working unchanged. They are migrated later with the same rules (sections 1 to 6, the special levels of section 4b and the region coin factor: 110 percent for regions 6 to 15, 115 for 16 to 25, 120 for 26 to 30; doc 50); until then doc 25 describes them.
 - Star and reward tables of Regions 6 to 30 stay on the 15-level numbers until their migration.
-- The speedrun goal is not specified yet.
+- The speedrun goal and the hidden gem goal are retired (2026-11-22).
 
 ## 10. Results
 
 <!-- RESULTS START -->
-Run of 2026-11-09 (Regions 1 to 5, 25 levels each, default hero Momo).
+Run of 2026-11-09 (Regions 1 to 5, 25 levels each, default hero Momo). History: points 2, 4 and 5 below name the goals, region goals and economy of that day; since 2026-11-22 read sections 4, 4b and 5 above and doc 27 section 0.
 
 **1. Difficulty curve (`Tests/Simulation/DIFFICULTY_CURVE_REPORT.md`, 3 layouts per level).** The score formula reproduces the old Region 1 numbers exactly (5, 22, 40, 44, 39, 61, 66, 73, 75, 77, 86, 88, 93, 96, 100). The builder difficulty d of every level is solved per region and stored in `Content/config/difficulty_curve.json` (applied to the level files by `Tools/content_cli/migrate_levels_25.py`).
 
@@ -159,4 +189,5 @@ Region 1 builder difficulty, levels 1 to 25: .05 .202 .233 .28 .49 .375 .398 .42
 
 - 2026-11-09 (Bug List 8 item 3): level sizes fixed in rows (section 4a: 60 / 75 / 90 / 105 / 120 / 150), speedrun time 100 s for 120 rows, difficulty curve re-solved, golden hashes, medal targets and gem income re-checked; endless unchanged; Time Attack ramps from level 10 (section 6).
 - 2026-11-09: document created from owner Bug List 6 (25 levels per region, the 0..100 difficulty score, the target curve, region goal tiers, the endless tower of 25 stages, the Gameplay setting, the active hero rule).
-- 2026-11-12 (owner): Gameplay settings now speed up 10/20/25/40/50 percent per 5 s, top step x 8 (80/160/200/320/400 percent); the ceiling `ScrollMaxSpeed` 4 u/s still applies to the campaign; crown and medal target scale per setting (doc 46).
+- 2026-11-12 (owner, superseded 2026-11-22): Gameplay settings sped up 10 / 20 / 25 / 40 / 50 percent every 5 s, top step x 8; the ceiling `ScrollMaxSpeed` 4 u/s still applies; crown and medal target scale per setting (doc 46).
+- 2026-11-22 (owner, Final Change 1): six special level types, one level each per region (section 4b); levels 10, 15 and 20 are plain gem levels; stars and clears per Gameplay setting, 375 stars per region, own path per setting, next region needs 25 levels in one setting (section 5); speed steps 10 / 20 / 30 / 40 / 50 percent of the start speed every 30 s, 8 steps, cue with round steps and MAX; crown and coin bonus 0 / 5 / 10 / 15 / 25 percent; settings row above the region name, plate-free icons, wider Endless button (section 7); medal targets recalibrated.

@@ -1,3 +1,4 @@
+using System;
 using FluffyClimbers.Content;
 using FluffyClimbers.Economy;
 using UnityEngine;
@@ -39,7 +40,7 @@ namespace FluffyClimbers.Gameplay
         /// ONE row at the bottom of the endless popup (Bug List 8 item 2b): the green START play button (Endless) on the left and the green Time Attack button (stopwatch
         /// icon) on the right, each with a caption under it so the two are told apart by icon AND word. Both are at least 48 dp, centred on the panel as a pair.
         /// </summary>
-        void AddEndlessActionRow(RectTransform panel, RegionDef region)
+        void AddEndlessActionRow(RectTransform panel, RegionDef region, CharacterSpec penalised = null, Action backToEndless = null)
         {
             float size = EndlessActionSize(), capH = ActionCaptionH();
             float btnY = ActionRowBottom + capH + ActionCaptionGap;
@@ -49,6 +50,12 @@ namespace FluffyClimbers.Gameplay
             UiKit.Place((RectTransform)ta.transform, new Vector2(0.5f, 0f), new Vector2(ActionSlotX, btnY), new Vector2(size, size));
             ActionCaption(panel, EndlessCaptionName, "Endless", -ActionSlotX, capH);
             ActionCaption(panel, TimeAttackCaptionName, "Time Attack", ActionSlotX, capH);
+            if (penalised != null)
+            {
+                // Region penalty (owner Final Change 2): the icon sits in the gap between START and Time Attack (centred, level with the buttons), the short message on its own line above the row.
+                PenaltyUi.AddBadge(panel, penalised, 0f, btnY + (size - PenaltyUi.BadgeSize()) / 2f, () => ShowPenaltyInfo(penalised, backToEndless));
+                PenaltyUi.AddNote(panel, penalised, btnY + size + 10f);
+            }
         }
 
         static void ActionCaption(RectTransform panel, string name, string text, float x, float h)

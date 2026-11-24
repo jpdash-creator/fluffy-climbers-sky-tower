@@ -73,7 +73,8 @@
         "min": 0,
         "max": 0
       }
-    }
+    },
+    "special": "noPowerUps"
   },
   {
     "id": "lvl_004_05",
@@ -111,7 +112,8 @@
         "min": 0,
         "max": 0
       }
-    }
+    },
+    "special": "keepMoving"
   },
   {
     "id": "lvl_004_07",
@@ -178,7 +180,7 @@
     "class": "hard",
     "difficulty": 0.568,
     "goal": {
-      "type": "noWallBounce",
+      "type": "reachFloor",
       "value": 90
     },
     "rewards": {
@@ -197,8 +199,12 @@
     "class": "hard",
     "difficulty": 0.593,
     "goal": {
-      "type": "reachFloor",
-      "value": 105
+      "type": "comboChain",
+      "value": 3,
+      "count": 3
+    },
+    "overrides": {
+      "rows": 105
     },
     "rewards": {
       "gems": {
@@ -254,8 +260,11 @@
     "class": "hard",
     "difficulty": 0.705,
     "goal": {
-      "type": "reachFloor",
+      "type": "bossChase",
       "value": 105
+    },
+    "overrides": {
+      "ramp": true
     },
     "rewards": {
       "gems": {
@@ -273,7 +282,7 @@
     "class": "complex",
     "difficulty": 0.733,
     "goal": {
-      "type": "findHiddenGem",
+      "type": "reachFloor",
       "value": 105
     },
     "rewards": {
@@ -349,7 +358,7 @@
     "class": "complex",
     "difficulty": 0.828,
     "goal": {
-      "type": "reachFloor",
+      "type": "noWallBounce",
       "value": 120
     },
     "rewards": {
@@ -368,9 +377,8 @@
     "class": "complex",
     "difficulty": 0.875,
     "goal": {
-      "type": "speedrun",
-      "value": 120,
-      "timeSec": 100
+      "type": "reachFloor",
+      "value": 120
     },
     "rewards": {
       "gems": {
@@ -454,7 +462,8 @@
         "min": 0,
         "max": 0
       }
-    }
+    },
+    "special": "oneLife"
   },
   {
     "id": "lvl_004_25",

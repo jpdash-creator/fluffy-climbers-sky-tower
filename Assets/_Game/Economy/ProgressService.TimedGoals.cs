@@ -43,5 +43,18 @@ namespace FluffyClimbers.Economy
                     if (Medal(id, m) == MedalLevel.Gold) { n++; break; }
             return n;
         }
+
+        /// <summary>
+        /// Levels of the region that hold a medal of ANY colour in ONE Gameplay setting (0 to 25): the counter of the Main "earn 10 medals on Relaxed / Easy / Normal / Hard / Insane" goals
+        /// (owner Final Change 1, 2026-11-22). Read from the saved records, so medals earned before the goals existed count.
+        /// </summary>
+        public int MedalLevelsInRegion(int regionIndex, int mode)
+        {
+            RegionDef def = repo.TryGetRegionByIndex(regionIndex);
+            if (def == null || !TimeRecords.ValidMode(mode)) return 0;
+            int n = 0;
+            foreach (string id in def.Levels) if (Medal(id, mode) > MedalLevel.None) n++;
+            return n;
+        }
     }
 }

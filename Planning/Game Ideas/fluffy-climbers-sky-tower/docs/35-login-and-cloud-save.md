@@ -42,6 +42,13 @@ The header lets the popup show a summary without understanding the save. Size is
 - A failed upload is ignored and retried after 45 s. Uploads only run when: Google mode, signed in, and the start-up check has finished (`syncReady`).
 - Level results, purchases and merges all go through `ProgressService.Commit`, so they are covered without any call at the call sites.
 
+### Final Change 3 (owner 2026-11-23): complete cloud save and launch catch-up
+- **Selection in the save.** `SaveData.SelectedHero` / `SelectedCopy` (additive, null = never stored). `CharacterCatalog.Select/Selected` write them through `ProgressService.SetSelection` (a Commit, so the 6 s upload runs); PlayerPrefs `settings.character(.copy)` stay as the fast local mirror and the one-time migration source (`ProgressService.InitSelection`, quiet, no dirty marker). After `ReplaceData(cloud)` the choice comes from the cloud (`NormalizeSelection`: unknown id becomes Momo, copy clamped); ownership and copy range are checked on read as before. Reset progress sets Momo, copy 0.
+- **Settings in the save.** `SaveData.Settings` (`SyncedSettings`: sound, music, haptics, reducedMotion, leftHanded, textPercent, difficulty, paceGhost, menuMusic). `GameSettings` setters call `CaptureToSave` (quiet save, rate-limited upload). The settings are APPLIED to PlayerPrefs only when a cloud save is adopted (`AccountSync.ApplyCloud` calls `GameSettings.ApplyFromSave`), never on upload or compare. Dev and admin flags are never included. Reset progress keeps the settings (`SaveSync.CarryAccount`).
+- **Catch-up at launch.** `SaveSync.Decide` no longer stops when the four summary numbers agree: `SaveSync.Fingerprint` also compares power-up counts, stars over all settings, reward claim counts, purchases, Remove Ads, the subscription, selected hero and copy and the hero roll counter. `SaveData.CloudDirty` (set by every save of a Google-linked player, cleared by `MarkCloudSynced`) is a durable "upload pending" marker that counts as a local change, so a kill before the 6 s flush is caught. Conflict rules are unchanged: both sides changed and different asks the player; a newer cloud save is never overwritten silently.
+- **Quiet saves.** Play-time flush, bundle redraw and timer, the leaderboard wipe confirmation and the settings now call `ProgressService.CommitQuiet` / `TouchQuiet`: file write, `CloudDirty` and the `QuietChanged` event (no `Changed`, no LastPlayed stamp). `AccountSync` feeds them to `QuietUploadGate` (Economy, pure): at most ONE quiet-triggered upload per 60 s, and any upload restarts the gap.
+- Deleting a player's data: `Planning/PLAYER-DATA-DELETION.md`. Tests: `CloudSaveCompletenessTests` (EditMode), `QuietUploadGateTests` (dotnet).
+
 ## 3. Code map
 
 | File | Role |

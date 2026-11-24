@@ -14,9 +14,12 @@ namespace FluffyClimbers.Simulation.Tests
         static CharacterSpec Tier(string id, string line, CharacterRarity r) { return new CharacterSpec { Id = id, Name = id, Rarity = r, Line = line, IsMergeTier = true }; }
 
         [Fact]
-        public void PriceTableIsCommon2000Uncommon5000Rare12000Elite32000Legendary80000Coins()
+        public void PriceTableIsCommon8000Uncommon24000Rare72000Elite200000Legendary500000Coins()
         {
-            Assert.Equal(new[] { 2000, 5000, 12000, 32000, 80000 }, HeroPurchase.Tiers.Select(HeroPurchase.CoinPrice).ToArray());
+            // owner Final Change 1 (2026-11-22); before 2,000 / 5,000 / 12,000 / 32,000 / 80,000
+            Assert.Equal(new[] { 8000, 24000, 72000, 200000, 500000 }, HeroPurchase.Tiers.Select(HeroPurchase.CoinPrice).ToArray());
+            Assert.Equal(new[] { 400, 1200, 3600, 10000, 25000 }, HeroPurchase.Tiers.Select(r => ChestRolls.CardGems(r)).ToArray());   // card gem value = price / 20
+            Assert.Equal(0, HeroPurchase.CoinPrice((CharacterRarity)99));
             Assert.Equal(new[] { "Common", "Uncommon", "Rare", "Elite", "Legendary" }, HeroPurchase.Tiers.Select(HeroPurchase.RarityName).ToArray());
         }
 
@@ -77,8 +80,8 @@ namespace FluffyClimbers.Simulation.Tests
                 TierRule rule = TierRules.RuleFor(r);
                 List<string> lines = HeroPurchase.InfoLines(r);
                 Assert.Equal(3, lines.Count);
-                Assert.Contains(rule.PowerCount.ToString(), lines[0]);
-                Assert.Contains("free once per run", lines[0]);
+                if (rule.PowerCount == 0) Assert.Contains("No hero power", lines[0]);   // owner Final Change 2: Uncommon has no power, Rare and Elite one, Legendary two
+                else { Assert.Contains(rule.PowerCount.ToString(), lines[0]); Assert.Contains("free once per run", lines[0]); }
                 Assert.Contains(TierRules.JumpBandText(r), lines[1]);
                 Assert.Contains("Milestone bonus +" + CoinPayoutRules.HeroBonusCoins((int)r) + " coins", lines[2]);   // owner 2026-11-13: the rarity bonus on levels 5/10/15/20/25 replaced the run-bonus range
             }

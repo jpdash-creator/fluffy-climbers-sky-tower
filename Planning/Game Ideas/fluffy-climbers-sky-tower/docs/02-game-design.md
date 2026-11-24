@@ -13,7 +13,7 @@
 - Jump impulse = base + k * |horizontal speed|; fast runners jump much higher.
 - Wall bounce reverses horizontal velocity with a small speed boost.
 - Combo: a jump that passes 2 or more floors starts or extends a combo. The combo ends on landing without enough height, and the bonus score is combo^2 style. Visual feedback: screen shake, shout text ("Sweet!", "Super!", "Wow!") with cute-themed words, trail intensity.
-- Scroll: after the first jump the screen scrolls up on its own (platforms and background slide down); the bottom edge of the screen is the danger line, so falling below it ends the run. No hazard comes from below. Speed is a 120 percent base that steps up every 5 s by the chosen difficulty step (20/40/60/80/100 percent), capped at +400 percent, with a visible "SPEED UP +N%" cue at each step (details in doc 08, scroll model). *(Update 2026-10-20: replaces the earlier "ratcheting camera and rising kill zone".)*
+- Scroll: after the first jump the screen scrolls up on its own (platforms and background slide down); the bottom edge of the screen is the danger line, so falling below it ends the run. No hazard comes from below. Speed starts at a 120 percent base and, since 2026-11-22 (Final Change 1), gains 10 / 20 / 30 / 40 / 50 percent of that start speed every 30 s by the Gameplay setting, 8 steps, ceiling 4 u/s, with a visible "+N%" cue at each step and MAX at the ceiling (history: 20/40/60/80/100 percent steps on a 5 second clock, capped at +400 percent) (details in doc 08, scroll model). *(Update 2026-10-20: replaces the earlier "ratcheting camera and rising kill zone".)*
 - Jump numbers (T9 baselines, owner retune 2026-10-20): `JumpBase` 19 u/s. A standing jump peaks at 4.51 u (1.3 median row gaps). Hero physics and the rarity rules: see docs/44-power-mechanics-bible.md. (`JumpSpeedFactor` and the full-speed peak: doc 44 section 3). Normal vertical gaps are capped at 4.2 u so a standing jump always reaches the next platform. The layout code sizes rows from a separate reference jump (`LayoutJumpBase`, see `Assets/_Game/Simulation/NOTES.md`).
 - Floor numbering shown on platforms; milestone every 100 floors (confetti + background shift inside the region).
 
@@ -132,7 +132,7 @@ Not built (hidden rows in the data): Spring Boots, Coin Doubler, Star Seeker, Sa
 > **Authoritative numbers: [27-economy-tables-from-code.md](27-economy-tables-from-code.md)** (read from the code) and docs 22 and 26. The older "100 coins : 1 gem : about $0.011" model and the gear/VIP ladders that were here are void. **Fixed rate: 1 gem = 20 coins.**
 
 ### Faucets (summary)
-- Level payout (economy v3): clear 70 + 60 per star + 5 per combo step, times the region factor (1.00, 1.03, 1.06, 1.09, 1.12). A 3-star level pays 250 coins before combo. Replays pay 50 percent once the level has 3 stars and drop no gems.
+- Level payout (since 2026-11-13 and 2026-11-22): clear 56 + 48 per star + 4 per combo step, times the region coin factor (1.00 region 1, 1.05 regions 2 to 5), then the Gameplay setting bonus (0 / 5 / 10 / 15 / 25 percent). A 3-star level pays 200 coins in region 1 before combo. Replays pay 25 percent once the level has 3 stars in that setting and drop no gems. (Economy v3 was 70 + 60 + 5 and a 50 percent replay.)
 - Gems: collectible pickups in rarity tiers (Common 1, Rare 2, Epic 5, Legendary 10 gems at 70/22/7/1 percent), about 75 placed per region (2.7 to 3.2 percent of rows), plus milestone gems (L5, L10, L15 first clear).
 - Rewards screen (Main, Daily, Weekly): stars and region milestones, 10 daily actions, 11 weekly tasks (doc 26 section 4).
 - Subscription (Weekly, Monthly): instant gems and a daily claim (doc 26 section 2).
@@ -140,15 +140,15 @@ Not built (hidden rows in the data): Spring Boots, Coin Doubler, Star Seeker, Sa
 
 ### Sinks (summary)
 - Region skip: 100, 116, 133, 150 gems for regions 2 to 5.
-- Power-ups: 1,000 coins / 50 gems or 1,500 coins / 75 gems.
-- Treasure chests: Iron 100 gems (1 power-up + 400 to 600 coins), Gold 300 gems (3 power-ups + 1,000 to 1,400 coins); open 10 costs 10 times.
+- Power-ups (since 2026-11-22): 2,000, 3,000 or 4,000 coins (gem value 100 / 150 / 200).
+- Treasure chests (since 2026-11-22): Iron 400 gems (1 power-up + 800 to 1,200 coins + 1 hero card), Gold 1,500 gems (3 power-ups + 3,000 to 4,200 coins + 1 hero card); open 10 costs 10 times.
 - Bundles: 1,000 generated bundles priced 200 to 500 gems, worth 1.4 to 1.8 times their price; Refresh 100 coins or 5 gems; a timer bundle at 30 percent off.
 - Coin packs: 1,000 to 100,000 coins for 50 to 4,000 gems.
 - Revive: 5 gems, then 10 (max 2 per run); the first can be free by rewarded ad.
 - Characters (Coming Soon): 150 to 1,500 gems.
 
 ### Money
-Nine gem packs (50 to 15,000 gems, $0.79 to $119.99, rupee prices too) and two subscriptions (Weekly $1.49, Monthly $4.99). Launch promo and first-purchase double are in the code, OFF by default. Pack table: doc 27 section 6.
+Nine gem packs (50 to 15,000 gems, $0.79 to $119.99, rupee prices too) and four subscription plans (since 2026-11-22: $1.99, $4.99, $6.99, $14.99). Launch promo and first-purchase double are in the code, OFF by default. Pack table: doc 27 section 6.
 
 Tuning goal: gems come mostly from rewards and spending is driven by chests, bundles, skips and power-ups; spending accelerates collecting, never gates leaderboard skill.
 

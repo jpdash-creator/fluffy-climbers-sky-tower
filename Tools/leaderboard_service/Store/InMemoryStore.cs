@@ -32,6 +32,16 @@ namespace FluffyClimbers.LeaderboardService
             }
         }
 
+        /// <summary>Tests: puts a slot document (and the totals that count it) into a week exactly as given, e.g. a document written before the top-3 rule (no run list).</summary>
+        public void SeedSlot(string weekKey, SlotDoc slot, TotalsDoc totals)
+        {
+            lock (gate)
+            {
+                slots[weekKey + "|" + slot.Uid + "|" + slot.SlotId] = Clone(slot);
+                if (totals != null) this.totals[weekKey + "|" + totals.Uid] = Clone(totals);
+            }
+        }
+
         public Task<PlayerDoc> GetPlayerAsync(string uid) { lock (gate) { PlayerDoc p; return Task.FromResult(players.TryGetValue(uid, out p) ? Clone(p) : null); } }
 
         public Task<ApplyOutcome> ApplyRunAsync(ApplyInput input)

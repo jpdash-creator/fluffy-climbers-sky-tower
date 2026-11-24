@@ -23,7 +23,7 @@ namespace FluffyClimbers.Tests
             var cfg = new SimConfig();
             cfg.ScrollStepPercent = GameSettings.DifficultyStepPercent[difficulty];
             cfg.GemSpotPermille = GameSettings.DifficultyGemPermille[difficulty];
-            cfg.ScrollStepCapPercent = 400;
+            cfg.ScrollStepCapPercent = SimConfig.TopSpeedUpPercent(difficulty);
             return cfg;
         }
 
@@ -351,6 +351,34 @@ namespace FluffyClimbers.Tests
             var brain = new AutopilotBrain(1f, 7, 2);
             PlayHeadless(ses, brain, 60 * 120);
             Assert.GreaterOrEqual(ses.State.Row, 3, "even a laggy player gets off the ground floor");
+        }
+
+        [Test]
+        public void TheReportedScrollPercentIsTheSpeedTheSimulationApplies()
+        {
+            // AutopilotReport.ScrollPercentAt used to re-implement the maths and ignored the 8-step limit and the 4 u/s ceiling; it now reads the simulation.
+            for (int mode = 0; mode < 5; mode++)
+            {
+                var ses = new RunSession(repo, GameCfg(mode), "lvl_001_01");   // start speed 0.69 u/s
+                Sim sim = ses.Sim;
+                SimState s = ses.State;
+                Assert.AreEqual(0, AutopilotReport.ScrollPercentAt(sim, s), "0 before the first jump");
+                s.StartTick = 0;
+                int step = GameSettings.DifficultyStepPercent[mode];
+                s.Tick = 29 * 60;
+                Assert.AreEqual(100, AutopilotReport.ScrollPercentAt(sim, s), "no step before 30 s");
+                s.Tick = 31 * 60;
+                Assert.AreEqual(100 + step, AutopilotReport.ScrollPercentAt(sim, s), "one step after 30 s");
+                s.Tick = 95 * 60;
+                Assert.AreEqual(100 + 3 * step, AutopilotReport.ScrollPercentAt(sim, s), "three steps after 90 s");
+                s.Tick = 3600 * 60;   // an hour: 8 steps at most, and never above the ceiling
+                int top = AutopilotReport.ScrollPercentAt(sim, s);
+                Assert.LessOrEqual(top, 100 + GameSettings.MaxSpeedUpPercent(mode), "the 8-step limit holds");
+                Assert.AreEqual(100 + sim.ScrollSpeedUpPercent(in s), top);
+                float ups = sim.BaseScrollPerSecond * top / 100f;
+                Assert.LessOrEqual(ups, 4.02f, "the reported speed never passes the 4 u/s ceiling");
+                if (mode <= 2) Assert.AreEqual(100 + GameSettings.MaxSpeedUpPercent(mode), top, "Relaxed to Normal reach their full top on the slowest level");
+            }
         }
 
         [Test]

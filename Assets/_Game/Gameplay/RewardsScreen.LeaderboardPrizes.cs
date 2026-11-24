@@ -48,9 +48,7 @@ namespace FluffyClimbers.Gameplay
         {
             const float btnW = 260f;
             float line = LineH(BodyPx);
-            float h = CardPadY * 2f + line * 2f + 6f + line * 3f + 12f;   // title, then up to three lines of prize text at 130 percent text
             RectTransform card = UiKit.Rect(content, PrizeCardName + "_" + p.Board);
-            FixedHeight(card, h);
             Image plate = Plate(card, "Plate", "plate_cream", StateTint(CardState.Ready), CardCorner);
             UiKit.Stretch(plate.rectTransform);
 
@@ -60,7 +58,6 @@ namespace FluffyClimbers.Gameplay
             BestFit(title, false);
             var trt = title.rectTransform;
             trt.anchorMin = new Vector2(0f, 1f); trt.anchorMax = new Vector2(1f, 1f); trt.pivot = new Vector2(0.5f, 1f);
-            trt.offsetMin = new Vector2(CardPadX, -(CardPadY + line * 2f)); trt.offsetMax = new Vector2(-(btnW + CardPadX * 2f), -CardPadY);
 
             bool failed = prizeFailKey == p.Key && prizeFailText.Length > 0;
             string items = failed ? prizeFailText : p.Prize.Describe();
@@ -69,7 +66,12 @@ namespace FluffyClimbers.Gameplay
             BestFit(body, true);
             var brt = body.rectTransform;
             brt.anchorMin = new Vector2(0f, 1f); brt.anchorMax = new Vector2(1f, 1f); brt.pivot = new Vector2(0.5f, 1f);
-            brt.offsetMin = new Vector2(CardPadX, -(CardPadY + line * 2f + 6f + line * 3f)); brt.offsetMax = new Vector2(-(btnW + CardPadX * 2f), -(CardPadY + line * 2f + 6f));
+            // sized by RewardCardFit at the real width: title two lines or more, prize text three lines or more (nothing spills under the card into the next row)
+            var fit = card.gameObject.AddComponent<RewardCardFit>();
+            fit.Mode = RewardCardFit.Kind.ButtonCard; fit.Card = card; fit.Title = title; fit.Body = body; fit.BtnW = btnW; fit.BodyMinLines = 3f; fit.TailExtra = 12f;
+            FixedHeight(card, 0f);
+            fit.Row = card.GetComponent<LayoutElement>();
+            FitButtonCard(fit, ListCardWidth());
 
             PendingPrize prize = p;
             float btnH = Mathf.Max(ClaimButtonH, UiKit.MinTouchRef);

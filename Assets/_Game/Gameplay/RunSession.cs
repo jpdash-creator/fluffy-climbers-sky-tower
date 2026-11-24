@@ -25,8 +25,54 @@ namespace FluffyClimbers.Gameplay
         public bool AdReviveOffered { get { return CanRevive && Revive.AdAvailable; } }
         /// <summary>Gems still missing for the next gem revive (0 when affordable).</summary>
         public int ReviveShortfall(ProgressService progress) { return progress == null ? NextReviveCost : System.Math.Max(0, NextReviveCost - progress.Gems); }
-        /// <summary>Endless runs have no revive: the result (best floor, coins) is saved the moment the player falls (CUX-8), so a revive would double pay.</summary>
-        public bool CanRevive { get { return !IsEndless && !GoalLost; } }
+        /// <summary>
+        /// Endless runs have no revive: the result (best floor, coins) is saved the moment the player falls (CUX-8), so a revive would double pay.
+        /// A One Life level has none either (owner Final Change 1, 2026-11-22): no gem revive, no ad revive, one fall ends the run (Sim.Revive refuses there too).
+        /// </summary>
+        public bool CanRevive { get { return !IsEndless && !GoalLost && !Spec.OneLife; } }
+
+        // ---- special level types (owner Final Change 1, 2026-11-22; SpecialLevels is the one lookup) ----
+
+        /// <summary>The special type of this run's level (None = Regular Run, also in Endless and Time Attack).</summary>
+        public SpecialLevelType SpecialType { get { return SpecialLevels.TypeOf(Spec); } }
+        /// <summary>No Power-ups level: bought power-ups and the hero's own power are off. The HUD builds no power button and <see cref="Step"/> drops every activation bit (the simulation ignores them as well).</summary>
+        public bool PowersOff { get { return Spec.NoPowerUps; } }
+        /// <summary>
+        /// False for a power type that is switched off on this level: every type on a No Power-ups level, the Safety Net on a One Life level (owner 2026-11-22: one fall really
+        /// ends the run; the other power-ups keep working there). The HUD builds no button for such a type and <see cref="Step"/> drops its activation, so no unit is taken.
+        /// </summary>
+        public bool PowerAllowed(PowerUp type)
+        {
+            if (PowersOff) return false;
+            return !(type == PowerUp.SafetyNet && Spec.OneLife);
+        }
+
+        /// <summary>Keep Moving level: the run ended because the hero stood on one platform for more than the limit (not a fall).</summary>
+        public bool KeepMovingTimedOut { get { return Sim.KeepMoving && State.Dead && State.StandTicks > Cfg.KeepMovingLimitTicks; } }
+        /// <summary>Combo Climb level: the top row was reached without the combo jumps asked for (the goal is lost, see GoalEvaluator.IsFailed).</summary>
+        public bool ComboMissed { get { return GoalLost && Spec.Goal.Type == GoalType.ComboChain; } }
+
+        /// <summary>Title of the failed popup: what ended the run.</summary>
+        public string FailTitle
+        {
+            get
+            {
+                if (GoalLost) return ComboMissed ? "Combo missed!" : "Wall touched!";
+                return KeepMovingTimedOut ? "Too slow!" : "You fell!";
+            }
+        }
+
+        /// <summary>One short line under the result of the failed popup that explains a special rule (why the run ended, or why no revive is offered); null on a plain fall.</summary>
+        public string FailReason
+        {
+            get
+            {
+                if (GoalLost) return ComboMissed ? "The combo jumps were still missing at the top." : "This level fails on any wall touch.";
+                if (KeepMovingTimedOut) return "Over 3 seconds on one platform.";
+                if (!IsEndless && Spec.OneLife) return "One Life: no revive and no Safety Net.";
+                return null;
+            }
+        }
 
         public readonly SimConfig Cfg;
         /// <summary>The campaign level, or null in endless mode.</summary>
@@ -125,6 +171,8 @@ namespace FluffyClimbers.Gameplay
         public void Step(int input)
         {
             if (Over) return;
+            if (PowersOff) input &= ~(SimInput.PowerMask | SimInput.HeroMask);   // No Power-ups level: nothing is activated, no unit and no free hero use is taken, nothing is recorded
+            else if (Spec.OneLife) input &= ~SimInput.SafetyNetBit;              // One Life level: the Safety Net is off (no unit taken, nothing recorded); the simulation ignores it as well
             if ((input & SimInput.PowerMask) != 0) input = TakePowerUnits(input);
             if ((input & SimInput.HeroMask) != 0) input = TakeHeroPowers(input);
             input &= ~SimInput.JumpHeld;   // the Glide is an automatic slow-mo now (2026-11-17): the held-jump level is not read by the simulation, keep recordings short
@@ -309,13 +357,37 @@ namespace FluffyClimbers.Gameplay
             if (Hero != null) Hero.ResetFree();
         }
 
+        /// <summary>Seed the region penalty draws from: the tower seed in Endless and Time Attack, the attempt seed of the layout in a level (what the leaderboard submission calls Seed).</summary>
+        public int PenaltySeed { get { return IsEndless ? Seed : AttemptSeed; } }
+        /// <summary>True when the chosen hero is away from its home region this run (stats cut, see <see cref="HeroRegionPenalty"/>). Set by <see cref="ApplyHeroPowers"/>.</summary>
+        public bool HeroAwayFromHome { get; private set; }
+        /// <summary>True when the penalty switched at least one hero power off (the HUD cue).</summary>
+        public bool HeroPowersOffAway { get; private set; }
+        /// <summary>The Legendary power that is off this run because the hero is away from home (PowerUp.None otherwise: a Rare or Elite hero loses its only power, shown as <see cref="HeroPowersOffAway"/>).</summary>
+        public PowerUp HeroDisabledPower { get; private set; }
+
         /// <summary>Gives the run the powers of the chosen hero. Null or a hero without powers = no hero buttons. Call before the HUD is built.</summary>
         public void ApplyHeroPowers(CharacterSpec hero)
         {
             Hero = null;
+            HeroAwayFromHome = false;
+            HeroDisabledPower = PowerUp.None;
+            HeroPowersOffAway = false;
+            // Region penalty (owner Final Change 2): away from its home region the stats are cut (GameSession.BuildRunCfg), Rare and Elite lose their power, a Legendary loses ONE drawn once from the run seed (the server replay draws the same)
+            HeroAwayFromHome = HeroRegionPenalty.IsPenalised(hero, Region.Index);
+            if (PowersOff) return;   // No Power-ups level: the hero's own power is off too (no button, no free use)
             if (hero == null || hero.Powers == null || hero.Powers.Length == 0) return;
+            PowerUp[] powers = hero.Powers;
+            if (HeroAwayFromHome)
+            {
+                int disabled;
+                powers = HeroRegionPenalty.FilterPowers(hero.Powers, hero.Rarity, PenaltySeed, hero.Id, out disabled);
+                if (disabled >= 0 && disabled < hero.Powers.Length) HeroDisabledPower = hero.Powers[disabled];
+                HeroPowersOffAway = powers.Length < hero.Powers.Length;
+                if (powers.Length == 0) return;
+            }
             int r = (int)hero.Rarity;
-            var h = new HeroPowerCooldown(hero.Powers, r >= 0 && r < CharacterDefs.CooldownSeconds.Length ? CharacterDefs.CooldownSeconds[r] : 0);
+            var h = new HeroPowerCooldown(powers, r >= 0 && r < CharacterDefs.CooldownSeconds.Length ? CharacterDefs.CooldownSeconds[r] : 0);
             if (h.Count > 0) Hero = h;
         }
 
@@ -476,10 +548,23 @@ namespace FluffyClimbers.Gameplay
             return n;
         }
 
-        /// <summary>The extra rule line shown under the goal before the level starts ("Don't touch the walls."), or null when the level has no such rule.</summary>
+        /// <summary>
+        /// The rule line shown under the goal before the level starts: the one-sentence rule of the level's special type (SpecialLevels.RuleText, "Touching a wall ends the run."),
+        /// or null for a Regular Run and in Endless. Menus and the intro only (a Combo Climb builds its text from the goal numbers).
+        /// </summary>
         public static string GoalRule(LevelSpec spec)
         {
-            return !spec.Endless && spec.Goal.Type == GoalType.NoWallBounce ? "Don't touch the walls." : null;
+            SpecialLevelType type = SpecialLevels.TypeOf(spec);
+            if (type == SpecialLevelType.None) return null;
+            if (type == SpecialLevelType.ComboClimb) return "A combo jump climbs " + spec.Goal.Value + " floors or more at once.";
+            return SpecialLevels.RuleText(type);
+        }
+
+        /// <summary>Name of the level's special type ("Keep Moving"), or null for a Regular Run and in Endless. Shown above the rule line.</summary>
+        public static string SpecialName(LevelSpec spec)
+        {
+            SpecialLevelType type = SpecialLevels.TypeOf(spec);
+            return type == SpecialLevelType.None ? null : SpecialLevels.Name(type);
         }
 
         /// <summary>Short goal text for the HUD and the level info popup.</summary>
@@ -491,7 +576,7 @@ namespace FluffyClimbers.Gameplay
             {
                 case GoalType.ReachFloor: return "Reach floor " + g.Value;   // economy review 2026-11-13: no gem pickups on the rows, so no "grab the gems" line
                 case GoalType.CollectCoins: return "Collect " + g.Count + " coins";
-                case GoalType.ComboChain: return "Chain " + g.Count + " jump" + (g.Count == 1 ? "" : "s") + " of " + g.Value + "+ floors";
+                case GoalType.ComboChain: return "Floor " + spec.TargetRow() + " with " + GoalEvaluator.ComboJumpsNeeded(spec) + " combo jump" + (GoalEvaluator.ComboJumpsNeeded(spec) == 1 ? "" : "s");
                 case GoalType.NoWallBounce: return "Reach floor " + g.Value;
                 case GoalType.FindHiddenGem: return "Find the hidden gem";
                 case GoalType.Speedrun: return "Reach floor " + g.Value + " in " + g.TimeSec + " s";

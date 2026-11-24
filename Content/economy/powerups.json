@@ -3,63 +3,63 @@
     "id": "pw_flight", "order": 1, "name": "Flight",
     "description": "Fly upward for 10 seconds and steer left and right. Gongs cannot hurt you. Tap again to add 10 more seconds.",
     "trigger": "button", "durationSec": 10, "uses": 1, "stack": "add",
-    "price": { "coins": 1500, "gems": 75 }, "unlockRegion": 1, "implemented": true,
+    "price": { "coins": 4000, "gems": 200 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "riseUps": 8.0, "graceSec": 1.0, "stopsRowsBelowTop": 3 }, "icon": "pw_flight"
   },
   {
     "id": "pw_rocket", "order": 2, "name": "Rocket",
     "description": "Auto-climb 20 floors in about 4 seconds. Gongs cannot hurt you. Tap again to add 20 more floors. Stops before the last floors of a level.",
     "trigger": "button", "durationSec": 4, "uses": 1, "stack": "add",
-    "price": { "coins": 1500, "gems": 75 }, "unlockRegion": 1, "implemented": true,
+    "price": { "coins": 4000, "gems": 200 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "floors": 20, "slowFallSec": 1.0, "stopsRowsBelowTop": 3 }, "icon": "pw_rocket"
   },
   {
     "id": "pw_doublejump", "order": 3, "name": "Double Jump",
     "description": "For 20 seconds you can jump once more in mid-air. Tap again to add 20 seconds.",
     "trigger": "button", "durationSec": 20, "uses": 1, "stack": "add",
-    "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
+    "price": { "coins": 3000, "gems": 150 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "airJumpsPerAirPhase": 1 }, "icon": "pw_doublejump"
   },
   {
     "id": "pw_wallstick", "order": 4, "name": "Wall Stick",
     "description": "For 20 seconds you stick to the side walls for up to 1.5 seconds. Jump to leap off. Tap again to add 20 seconds.",
     "trigger": "button", "durationSec": 20, "uses": 1, "stack": "add",
-    "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
+    "price": { "coins": 2000, "gems": 100 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "holdSec": 1.5 }, "icon": "pw_wallstick"
   },
   {
     "id": "pw_shield", "order": 5, "name": "Shield",
     "description": "Gongs cannot hurt you for 20 seconds. Tap again to add 20 seconds.",
     "trigger": "button", "durationSec": 20, "uses": 1, "stack": "add",
-    "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
+    "price": { "coins": 2000, "gems": 100 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "gongsHarmless": true }, "icon": "pw_shield"
   },
   {
     "id": "pw_safety_net", "order": 6, "name": "Safety Net",
     "description": "Arm it any time before a fall. The next time you fall, it jumps you up 3 floors. Arm the next one after a rescue. Not timed.",
     "trigger": "button", "durationSec": 0, "uses": 1, "stack": "none",
-    "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
+    "price": { "coins": 3000, "gems": 150 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "bounceFloors": 3 }, "icon": "pw_safety_net"
   },
   {
     "id": "pw_glide", "order": 7, "name": "Glide Cape",
     "description": "For 20 seconds the whole game slows to half speed after every jump until you land, so you can steer to the next platform. Tap again to add 20 seconds.",
     "trigger": "button", "durationSec": 20, "uses": 1, "stack": "add",
-    "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
+    "price": { "coins": 3000, "gems": 150 }, "unlockRegion": 1, "implemented": true,
     "simParams": {}, "icon": "pw_glide"
   },
   {
     "id": "pw_wide_platforms", "order": 8, "name": "Wide Platforms",
     "description": "For 20 seconds every platform is 20 percent wider to land on. Tap again to add 20 seconds.",
     "trigger": "button", "durationSec": 20, "uses": 1, "stack": "add",
-    "price": { "coins": 1000, "gems": 50 }, "unlockRegion": 1, "implemented": true,
+    "price": { "coins": 2000, "gems": 100 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "widthPercent": 120 }, "icon": "pw_wide_platforms"
   },
   {
     "id": "pw_slowtime", "order": 9, "name": "Slow Time",
     "description": "The rising danger zone moves 50 percent slower for 30 seconds. Tap again to add 30 seconds.",
     "trigger": "button", "durationSec": 30, "uses": 1, "stack": "add",
-    "price": { "coins": 1500, "gems": 75 }, "unlockRegion": 1, "implemented": true,
+    "price": { "coins": 3000, "gems": 150 }, "unlockRegion": 1, "implemented": true,
     "simParams": { "scrollPercent": 50 }, "icon": "pw_slowtime"
   },
   {

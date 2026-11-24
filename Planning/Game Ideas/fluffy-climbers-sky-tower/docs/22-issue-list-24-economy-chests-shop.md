@@ -1,11 +1,13 @@
 # 22. Issue list 24: name tags, chest screen, economics, gems, coins, bundles, daily rewards, revive (owner, 2026-10-25)
 
-> **Update 2026-11-13 (owner economy review):** hero card coin prices Common 2,000 / Uncommon 5,000 / Rare 12,000 / Elite 32,000 / Legendary 80,000 (Common now buyable); chests carry one hero card: Iron 50 Common / 30 Uncommon / 20 Rare, Gold 60 Rare / 30 Elite / 10 Legendary, worth about x3.6 and x5.3 (owner accepts richer chests); bundle coins -30 percent, worth x1.85 to x3.6. Loot and prices of the chests are unchanged. Numbers: docs 27 sections 9 and 10, doc 37.
+> **Update 2026-11-22 (owner, Final Change 1): current shop and level numbers.** Hero cards in coins: Common 8,000 / Uncommon 24,000 / Rare 72,000 / Elite 200,000 / Legendary 500,000. Power-ups: Wall Stick, Shield, Wide Platforms 2,000 coins (100 gems of value); Safety Net, Double Jump, Glide Cape, Slow Time 3,000 (150); Flight, Rocket 4,000 (200). Chests: Iron 400 gems (worth x3.7), Gold 1,500 gems (worth x5.5), contents and card odds unchanged. Bundles: redrawn, 200 to 1,000 gems, hidden card Common 50 / Uncommon 40 / Rare 10 percent, worth 3.0x to 6.0x (average 4.5x). Level coins: (56 + 48 per star + 4 per combo step) x region coin factor (region 1 100 percent, regions 2 to 5 105, 6 to 15 110, 16 to 25 115, 26 to 30 120), then the Gameplay setting bonus 0 / 5 / 10 / 15 / 25 percent; a replay of a level with 3 stars in that setting pays 25 percent. Rewards were redrawn (doc 39 section 0) and give no heroes. These numbers win over every price, payout and reward number in the points below and in the 2026-11-13 updates; tables: doc 27 section 0, doc 37.
+>
+> **Update 2026-11-13 (owner economy review; prices and worth superseded on 2026-11-22):** hero card coin prices Common 2,000 / Uncommon 5,000 / Rare 12,000 / Elite 32,000 / Legendary 80,000 (Common now buyable); chests carry one hero card: Iron 50 Common / 30 Uncommon / 20 Rare, Gold 60 Rare / 30 Elite / 10 Legendary, worth about x3.6 and x5.3 (owner accepts richer chests); bundle coins -30 percent, worth x1.85 to x3.6. Loot and prices of the chests are unchanged. Numbers: docs 27 sections 9 and 10, doc 37.
 
 Source: the owner's pasted "Fluffy Climbers: full requirements for issue-list points 1 to 9". This file is the working copy with the owner's answers (Q&A) applied. Where it differs from docs/21 (characters, chests, shop of 2026-10-24) THIS file wins.
 
 ## Shared conventions
-- $1 = 95 rupees. 1 gem = 20 coins. A 1,000-coin power-up = 50 gems, a 1,500-coin one = 75 gems. Reference gem value = the 1000-pack rate, $0.01099 per gem.
+- $1 = 95 rupees. 1 gem = 20 coins. A power-up is worth its coin price / 20 in gems (since 2026-11-22: 2,000 coins = 100 gems, 3,000 = 150, 4,000 = 200; before: 1,000 = 50 and 1,500 = 75). Reference gem value = the 1000-pack rate, $0.01099 per gem.
 - Characters, the chest character slot and the shop Characters section are Coming Soon. Chests ship with coins and power-ups only (character code stays but is switched off).
 - (2026-11-12, owner: there is no neutral Ranked mode any more; the weekly boards count everything, see `Planning/LEADERBOARD-DESIGN.md`.) Power-ups roll with equal chance across the 9 types (Safety Net, Glide Cape, Wide Platforms, Shield, Wall Stick, Double Jump, Slow Time, Rocket, Flight). 10x open costs exactly 10x a single open.
 - Critical UX (docs/11, .claude/rules/ux-gameplay-critical.md): CUX-3 no overlap or clipping on 9:16, 9:19.5, 9:21, 3:4; CUX-4 targets >= 48 dp with >= 8 dp gaps; CUX-5 text >= 16 sp, contrast >= 4.5:1, survives 130% text scale; CUX-6 colour never the only cue, reduced motion honoured; pause on interruption. Progress saved immediately after every purchase/open/result.
@@ -13,7 +15,7 @@ Source: the owner's pasted "Fluffy Climbers: full requirements for issue-list po
 ## Owner answers that settle conflicts (2026-10-25)
 1. Chest loot: THIS list. Iron = 1 power-up + 400 to 600 coins; Golden = 3 power-ups + 1,000 to 1,400 coins; no characters until they launch (code kept, switched off).
 2. Treasure Chest screen is its own screen opened by the chest button (bottom bar Chests tab and chest button on home, world map and level screens, one tap); the Shop's first section links to it.
-3. Coin payout: clear 70 + 60 per star + 5 per combo step, times the region coin factor; replays once a level has 3 stars pay 50% and no gems; below 3 stars full pay.
+3. Coin payout (history; now 56 + 48 per star + 4 per combo step and a 25 percent replay, see the updates at the top): clear 70 + 60 per star + 5 per combo step, times the region coin factor; replays once a level has 3 stars pay 50% and no gems; below 3 stars full pay.
 4. Parallel background helpers inside the main chat, on main, no new sessions or branches.
 5. Old launch promo stays in the code but OFF by default; first-purchase double also stays but OFF by default (a switch, turned on later by the owner). Both must be tested end to end.
 6. Rewarded ads: integrate Unity LevelPlay now (package install OK), test ads only until the owner gives the app key.
@@ -32,12 +34,12 @@ Source: the owner's pasted "Fluffy Climbers: full requirements for issue-list po
 - No overlap with wallet, pause, settings; each >= 48 dp, gaps >= 8 dp. Labels: "Treasure chests", "VIP, coming soon", "Bundles, coming soon", "Daily rewards, coming soon". Coming Soon is a text tag plus lock/dim.
 
 ## Point 3: Treasure Chest screen and the (i) info
-- One chest per row: chest art, name, (i) icon, and on the right Buy (top) and Buy 10 (below). Iron row first, Golden below. No rarity rows or boxes. Prices: Iron 100 / 1,000 gems, Golden 300 / 3,000 gems with a gem icon. Buttons >= 48 dp tall, gaps >= 8 dp.
+- One chest per row: chest art, name, (i) icon, and on the right Buy (top) and Buy 10 (below). Iron row first, Golden below. No rarity rows or boxes. Prices since 2026-11-22: Iron 400 / 4,000 gems, Gold 1,500 / 15,000 gems (Iron 100 / 1,000 and Golden 300 / 3,000 at the time of this list), with a gem icon. Buttons >= 48 dp tall, gaps >= 8 dp.
 - Opening: animation about 1.2 s, skippable by a second tap; reduced motion shows the result at once; nothing flashes more than 3 times per second.
 - Single open result: coins and the power-up gained with names (not colour only) and a Collect button. Buy 10 result: summary with total coins and a count per power-up type, "Collect all".
 - Too few gems: open the shop's gem purchase prompt with the smallest pack that covers the shortfall; never spend partial amounts. Confirmation above 50 gems (doc 14 rule) on both buttons with price and contents. Save immediately after every open (an app kill never loses or doubles a reward).
 - (i) info: text only (body font >= 16 sp, contrast >= 4.5:1, backing panel), scrolls if needed, clear close button, no clipping at 130%.
-  - Iron Chest, 100 gems: each chest gives 1 power-up and 400 to 600 coins. The power-up is random from all 7 types, 1 in 7 each. Characters: coming soon, chances will be listed here.
+  - (History: now 400 and 1,500 gems, 800 to 1,200 and 3,000 to 4,200 coins, 9 power-up types and one hero card each, see the updates at the top.) Iron Chest, 100 gems: each chest gives 1 power-up and 400 to 600 coins. The power-up is random from all 7 types, 1 in 7 each. Characters: coming soon, chances will be listed here.
   - Golden Chest, 300 gems: each chest gives 3 power-ups and 1,000 to 1,400 coins. Each power-up random from all 7 types (same type may repeat). Characters: coming soon.
   - When characters go live the info lists: Iron Uncommon 67%, Rare 33%; Golden Rare 57%, Epic 29%, Legendary 14%; one character per chest; duplicates refund 25% as gems.
 - Value (for tests): Iron 70 to 105 gems (avg 86, return 86%); Golden 200 to 295 gems (avg 242, return 81%); average power-up unit 60.7 gems. A Golden chest can never beat its price. 10x = ten independent openings.
@@ -66,7 +68,7 @@ Source: the owner's pasted "Fluffy Climbers: full requirements for issue-list po
 | 20,000 | 900 |
 | 50,000 | 2,200 |
 | 100,000 | 4,000 |
-### 4.3 Power-ups: Safety Net, Glide Cape, Wide Platforms, Shield, Wall Stick, Double Jump 1,000 coins / 50 gems (Bug List 4 2026-11-16: the Magnet was replaced by the first three); Slow Time, Rocket, Flight 1,500 coins / 75 gems.
+### 4.3 Power-ups (since 2026-11-22): Wall Stick, Shield, Wide Platforms 2,000 coins / 100 gems; Safety Net, Double Jump, Glide Cape, Slow Time 3,000 / 150; Flight, Rocket 4,000 / 200. (Before: six types at 1,000 coins / 50 gems and Slow Time, Rocket, Flight at 1,500 / 75; Bug List 4 2026-11-16: the Magnet was replaced by Safety Net, Glide Cape and Wide Platforms.)
 ### 4.4 Chests: see point 3.
 ### 4.5 Shop layout and badges
 - Section order: Treasure Chests, Power-ups, Characters (a single Coming Soon card, no buy buttons), Coins, Gems.
@@ -80,7 +82,7 @@ Source: the owner's pasted "Fluffy Climbers: full requirements for issue-list po
 - Tests: average placed gems per region within 70 to 110 on all five difficulty levels; rarity distribution 70/22/7/1 over 100,000 spots; budget test pickups + earned chest value per region <= 130.
 
 ## Point 6: coins in game
-- Clear pays 70 + 60 per star + 5 per combo step, times the region coin factor (about 1.00 region 1 to about 1.12 region 5). 0 stars 70, 1 star 130, 2 stars 190, 3 stars 250 before combo. Failed runs pay nothing. Endless coin rules unchanged.
+- (History; now 56 + 48 per star + 4 per combo step, factor 1.00 region 1 and 1.05 regions 2 to 5: 0 / 1 / 2 / 3 stars = 56 / 104 / 152 / 200.) Clear pays 70 + 60 per star + 5 per combo step, times the region coin factor (about 1.00 region 1 to about 1.12 region 5). 0 stars 70, 1 star 130, 2 stars 190, 3 stars 250 before combo. Failed runs pay nothing. Endless coin rules unchanged.
 - Replay rule: 50% once the level has 3 stars (no gems then); below 3 stars full pay.
 - Tests: payout formula for 0 to 3 stars and regions 1 to 5 including combo; replay test; economy simulation about 3,750 coins per region for a perfect player within 10%. Risk noted: replay farming below 3 stars (see open items).
 
@@ -144,7 +146,7 @@ Characters of locked regions never appear in chests or the shop; powers fixed, n
 **Update 2026-11-13 (Main Bug List 2): gem inflow from rewards.** Daily rewards now pay 15 gems at 200 points (was 10 at 100 points, 130 points possible) and the Weekly tasks 120 gems (was 80), so a perfect week is 225 gems instead of 150 (+50 percent). Reaching 200 points needs 60 to 90 minutes of play a day, so a 30-minute player still gets mostly the 5-gem and coin gifts (about 125 gems a week with the weekly tasks). Details and the reachability reasoning: `39-rewards-economy.md` sections 3, 4 and 5.1.
 
 **Update 2026-11-13 (economy review, levels; `.claude/pendingdecisions/economy-review-2026-11-13.md`).** Supersedes the level payout, gem and replay rules above.
-- Level coins are 20 percent lower: clear 56 + 48 per star + 4 per combo step (was 70 + 60 + 5), times the region factor 1.00 to 1.12. A 3-star replay pays 25 percent (was 50) and drops no gems. Endless and Time Attack payouts are unchanged and pay no gems.
+- Level coins are 20 percent lower: clear 56 + 48 per star + 4 per combo step (was 70 + 60 + 5), times the region factor (1.00 to 1.12 then; since 2026-11-22 1.00 for region 1 and 1.05 for regions 2 to 5, plus the Gameplay setting bonus). A 3-star replay pays 25 percent (was 50) and drops no gems. Endless and Time Attack payouts are unchanged and pay no gems.
 - Gems in play: only the first clear of levels 5, 10, 15, 20, 25 of regions 1 to 5, fixed 1, 1, 2, 2, 3 (9 per region, 45 over the campaign; was about 260). No gem pickups on the rows, no level 8 hidden gem, no +2 level 15/25 bonus, no chance roll. Level 15 keeps the find-the-hidden-gem goal; its hidden gem is the goal object and the level's 2 gems are the fixed reward.
 - Hero milestone bonus (selected hero, first clear of the same five levels only): Common +50 coins; Uncommon +100 coins +1 gem; Rare +200 +2; Elite +300 +3; Legendary +500 +5; each upper tier has a 50 percent chance of one more gem, seeded from the level seed and the hero id. Fixed coins (no region factor). The old per-run hero "Run bonus" is not paid any more.
 - Region skip costs 500 gems for every region from 2 on (was 100, 116, 133, 150).

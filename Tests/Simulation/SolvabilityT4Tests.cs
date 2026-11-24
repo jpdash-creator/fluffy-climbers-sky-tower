@@ -104,7 +104,7 @@ namespace FluffyClimbers.Simulation.Tests
         /// <summary>Goals that complete before the top row, so the run (and the coin count for star 2) ends earlier.</summary>
         internal static bool EndsBeforeTop(GoalType t)
         {
-            return t == GoalType.CollectCoins || t == GoalType.ComboChain || t == GoalType.FindHiddenGem;
+            return t == GoalType.CollectCoins || t == GoalType.FindHiddenGem;   // a ComboChain (Combo Climb) level ends at the top row since Final Change 1 (2026-11-22)
         }
 
         private static string GoalText(GoalSpec g)

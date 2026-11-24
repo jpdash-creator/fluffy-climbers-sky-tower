@@ -222,15 +222,16 @@ namespace FluffyClimbers.Tests
             SaveData data = JsonConvert.DeserializeObject<SaveData>(oldJson);
             Assert.IsNull(data.Levels["lvl_001_01"].Records);
             var legacy = new ProgressService(repo, new FixedStore(data), 5);
-            Assert.AreEqual(4, legacy.GetProgress("lvl_001_01").Clears);
+            Assert.AreEqual(4, legacy.GetProgress("lvl_001_01").ClearsIn(0), "an old save's clears are Relaxed clears (Final Change 1)");
             Assert.IsFalse(legacy.BestPace("lvl_001_01", 0).IsValid);
             Assert.AreEqual(MedalLevel.None, legacy.Medal("lvl_001_01", 0));
             Assert.AreEqual(0, legacy.GoldMedalsInRegion(1));
             Assert.AreEqual(0, legacy.TimedPaceClearsToday());
             RecordResult r = legacy.RecordRun(LevelRun("lvl_001_01", 60, 4344));   // records join the old level entry
             Assert.IsTrue(r.NewBestPace);
-            Assert.AreEqual(4, legacy.GetProgress("lvl_001_01").Clears);
-            Assert.AreEqual(2, legacy.GetProgress("lvl_001_01").Stars);
+            Assert.AreEqual(4, legacy.GetProgress("lvl_001_01").ClearsIn(0));
+            Assert.AreEqual(2, legacy.StarsOf("lvl_001_01", 0));
+            Assert.AreEqual(0, legacy.StarsOf("lvl_001_01", 2), "the other settings start empty");
         }
 
         [Test]

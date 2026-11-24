@@ -112,7 +112,7 @@ namespace FluffyClimbers.Gameplay
             bar.offsetMax = new Vector2(-24f, BarH * 0.5f);
         }
 
-        /// <summary>Daily: points n/200 and a row of five milestone chests with the thresholds under them (40 80 120 160 200; the last one is a hero); a tap on a ready chest claims it.</summary>
+        /// <summary>Daily: points n/500 and a row of five gift chests with the thresholds under them (100 200 300 400 500) and their coins (250, 500, 750, 1K, 1.5K); a tap on a ready chest claims it.</summary>
         void BuildDailyTrack(RectTransform panel)
         {
             IReadOnlyList<RewardEntry> ms = progress.RewardDefs.DailyMilestones;
@@ -249,8 +249,6 @@ namespace FluffyClimbers.Gameplay
         {
             if (e.Gems > 0) { pic = GemSprite; count = Compact(e.Gems); }
             else if (e.Coins > 0) { pic = CoinSprite; count = Compact(e.Coins); }
-            else if (e.IsHeroOrCoins) { pic = ToyKit.Get("icon_heroes") ?? BoltSprite; count = "or " + Compact(e.HeroOrCoins); }   // 50 percent a random Common hero, otherwise these coins (a11y text says the whole gift)
-            else if (e.GivesHero) { pic = ToyKit.Get("icon_heroes") ?? BoltSprite; count = "Hero"; }   // the 200-point chest: one random Common hero (the face is only known after the claim)
             else { pic = BoltSprite; count = "x" + e.PowerUps; }
         }
 
@@ -459,18 +457,11 @@ namespace FluffyClimbers.Gameplay
         {
             if (progress.IsRegionComingSoon(selectedRegion)) { BuildComingSoon(content); return; }
             if (!progress.IsRegionGoalsOpen(selectedRegion)) BuildLockedNote(content);
-            // Owner Main Bug List 3: ready goals first, then the open ones in table order; claimed ones go to "Completed (N)" below.
-            List<RegionGoal> goals = RewardOrder.Sort(progress.RegionGoals(selectedRegion), g => progress.IsRegionGoalReady(g), g => progress.IsRegionGoalClaimed(g));
-            bool divider = false;
-            List<RewardEntry> done = null;
-            for (int i = 0; i < goals.Count; i++)
-            {
-                RegionGoal g = goals[i];
-                if (progress.IsRegionGoalClaimed(g)) { if (done == null) done = new List<RewardEntry>(16); done.Add(g); continue; }   // claimed goals wait in "Completed (N)" at the bottom
-                if (g.IsEndless && !divider && !progress.IsRegionGoalReady(g)) { BuildEndlessDivider(content); divider = true; }   // the endless tiers come last, under their own heading
-                AddCard(content, g, true);
-            }
-            AddCompletedSection(content, done, true);
+            // Ready goals first (owner Main Bug List 3), then the open ones under their group headings in table order (owner Final Change 1); claimed ones go to "Completed (N)" below.
+            IReadOnlyList<RegionGoal> goals = progress.RegionGoals(selectedRegion);
+            var entries = new List<RewardEntry>(goals.Count);
+            for (int i = 0; i < goals.Count; i++) entries.Add(goals[i]);
+            AddGroupedCards(content, entries, true);
         }
 
         /// <summary>One centred card for a region without goals: a lock and "Coming Soon", nothing to claim.</summary>
@@ -516,10 +507,30 @@ namespace FluffyClimbers.Gameplay
             row.gameObject.AddComponent<A11yLabel>().Text = "This region is locked. Unlock it to earn these rewards.";
         }
 
-        /// <summary>The small "Endless" heading (tower icon between two lines) above the endless tiers.</summary>
-        void BuildEndlessDivider(RectTransform content)
+        /// <summary>Picture of a group heading (a UI kit icon; shape, not colour, tells the groups apart).</summary>
+        static Sprite GroupIcon(RewardGroup g)
         {
-            RectTransform row = UiKit.Rect(content, "EndlessDivider");
+            switch (g)
+            {
+                case RewardGroup.Levels: return RewardArt.Slot("task_flag") ?? ToyKit.Get("icon_flag");
+                case RewardGroup.GameplaySetting: return ToyKit.Get("icon_dial") ?? ToyKit.Get("icon_speed");
+                case RewardGroup.Endless: case RewardGroup.EndlessAndTimeAttack: return ToyKit.Get("icon_tower");
+                case RewardGroup.TimeAttack: return RewardArt.Icon("clock") ?? ToyKit.Get("icon_tower");
+                case RewardGroup.SpecialLevels: return RewardArt.Slot("task_boss_skull") ?? RewardArt.Icon("helmet") ?? ToyKit.Get("icon_bolt");
+                default: return RewardArt.Slot("task_key") ?? RewardArt.Icon("key") ?? ToyKit.Get("icon_daily");
+            }
+        }
+
+        /// <summary>Height of a group heading row at the current text size.</summary>
+        public static float GroupHeadingH { get { return Mathf.Max(56f, LineH(BodyPx)) + 12f; } }
+
+        /// <summary>
+        /// The small heading of a group ("Levels", "Gameplay setting" ...): an icon and the name between two lines, above the cards of that group. Not a button.
+        /// The row is named "Group_" + the group id (the task rows are "Row_" + id, so row counts do not see it). The name is one line: the two lines give way first.
+        /// </summary>
+        void BuildGroupHeading(RectTransform content, RewardGroup group)
+        {
+            RectTransform row = UiKit.Rect(content, "Group_" + RewardGroups.Id(group));
             var hl = row.gameObject.AddComponent<HorizontalLayoutGroup>();
             hl.padding = new RectOffset(8, 8, 6, 6);
             hl.spacing = 16f;
@@ -527,14 +538,15 @@ namespace FluffyClimbers.Gameplay
             hl.childControlWidth = hl.childControlHeight = true;
             hl.childForceExpandWidth = hl.childForceExpandHeight = false;
             var le = row.gameObject.AddComponent<LayoutElement>();
-            le.minHeight = LineH(BodyPx) + 12f;
+            le.minHeight = le.preferredHeight = GroupHeadingH;
+            le.flexibleHeight = 0f;
             MakeLine(row);
-            Image ic = UiKit.AddImage(row, "Icon", ToyKit.Get("icon_tower"), Color.white);
+            Image ic = UiKit.AddImage(row, "Icon", GroupIcon(group), Color.white);
             SetPref(ic.gameObject, 56f, 56f);
-            Text t = UiKit.AddText(row, "Label", "Endless", BodyPx, Color.white, TextAnchor.MiddleCenter, true);
+            Text t = UiKit.AddText(row, "Label", RewardGroups.Name(group), BodyPx, Color.white, TextAnchor.MiddleCenter, true);
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             MakeLine(row);
-            row.gameObject.AddComponent<A11yLabel>().Text = "Endless goals";
+            row.gameObject.AddComponent<A11yLabel>().Text = RewardGroups.Name(group) + " rewards";
         }
 
         static void MakeLine(RectTransform row)

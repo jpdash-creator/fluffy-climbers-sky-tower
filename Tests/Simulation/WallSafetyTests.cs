@@ -50,7 +50,7 @@ namespace FluffyClimbers.Simulation.Tests
             foreach (string b in bad) output.WriteLine(b);
             Assert.Equal(125, levels);
             Assert.True(wallTicks > 0, "the scripted run must really touch the wall");
-            Assert.Equal(5, noWallFails);   // exactly lvl_00X_10 fail (the no-wall level moved from 7 to 10, Bug List 6 item 4) on a wall touch, with the explicit reason (GoalLost)
+            Assert.Equal(5, noWallFails);   // exactly the five No Wall Touch levels (one per region, Final Change 1) fail on a wall touch, with the explicit reason (GoalLost)
             Assert.Empty(bad);
         }
 
@@ -64,7 +64,8 @@ namespace FluffyClimbers.Simulation.Tests
                 SimState s = new SimState();
                 s.WallBounces = 5;
                 Assert.Equal(ll.Spec.Goal.Type == GoalType.NoWallBounce, GoalEvaluator.IsFailed(ll.Spec, s));
-                Assert.True(ll.Id.EndsWith("_10") == (ll.Spec.Goal.Type == GoalType.NoWallBounce), ll.Id);
+                Assert.True((SpecialLevels.TypeOf(ll.Spec) == SpecialLevelType.NoWallTouch) == (ll.Spec.Goal.Type == GoalType.NoWallBounce), ll.Id);
+                Assert.True((SpecialLevelTests.LevelOf(ll.Region, SpecialLevelType.NoWallTouch) == ll.Spec.LevelIndex) == (ll.Spec.Goal.Type == GoalType.NoWallBounce), ll.Id);
                 s.Row = ll.Spec.RowsFor() + 5;
                 s.Coins = 100000;
                 s.WallBounces = 0;

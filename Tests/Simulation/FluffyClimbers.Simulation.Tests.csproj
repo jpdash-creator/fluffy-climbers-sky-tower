@@ -18,15 +18,19 @@
     <Compile Include="../../Assets/_Game/Economy/HeroVariants.cs" />
     <Compile Include="../../Assets/_Game/Economy/HeroRolls.cs" />
     <Compile Include="../../Assets/_Game/Economy/TierRules.cs" />
+    <Compile Include="../../Assets/_Game/Economy/HeroRegionPenalty.cs" />
     <Compile Include="../../Assets/_Game/Economy/MergeTierDefs.cs" />
     <Compile Include="../../Assets/_Game/Economy/Characters.cs" />
     <Compile Include="../../Assets/_Game/Economy/AdminGate.cs" />
+    <Compile Include="../../Assets/_Game/Economy/QuietUploadGate.cs" />
     <Compile Include="../../Assets/_Game/Economy/BundleCards.cs" />
     <Compile Include="../../Assets/_Game/Economy/HeroPurchase.cs" />
     <Compile Include="../../Assets/_Game/Economy/ChestCards.cs" />
     <Compile Include="../../Assets/_Game/Economy/CharacterInventory.cs" />
     <Compile Include="../../Assets/_Game/Economy/RewardEntry.cs" />
     <Compile Include="../../Assets/_Game/Economy/RegionGoals.cs" />
+    <!-- the Daily and Weekly reward tables and the counter names (pure data, owner Final Change 1) -->
+    <Compile Include="../../Assets/_Game/Economy/RewardTables.cs" />
     <Compile Include="../../Assets/_Game/Economy/MergeRules.cs" />
     <Compile Include="../../Assets/_Game/Economy/HeroCards.cs" />
     <Compile Include="../../Assets/_Game/Economy/AllHeroes.cs" />

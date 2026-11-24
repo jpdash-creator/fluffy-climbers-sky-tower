@@ -44,7 +44,7 @@ namespace FluffyClimbers.LeaderboardService
     public sealed class ReplayResult
     {
         public bool Ok;
-        /// <summary>Machine readable reason when not Ok: bad_request, unsupported_version, unknown_level, unknown_hero, bad_variant, bad_inputs, too_long, bad_revive, inputs_after_end, power_budget, mismatch.</summary>
+        /// <summary>Machine readable reason when not Ok: bad_request, unsupported_version, unknown_level, unknown_hero, bad_variant, bad_inputs, too_long, bad_revive (also: any revive on a One Life level), inputs_after_end, power_budget, mismatch.</summary>
         public string Error;
         public string Detail;
         public string SlotId;
@@ -72,7 +72,11 @@ namespace FluffyClimbers.LeaderboardService
         /// <summary>Input bits a legitimate recording can hold: Left, Right, Jump, the held-jump level (Glide Cape) and the nine bought power-up edges. Hero bits never reach the recorder (RunSession converts them).</summary>
         public const int ValidInputMask = SimInput.Left | SimInput.Right | SimInput.Jump | SimInput.PowerMask | SimInput.JumpHeld;
 
-        /// <summary>The simulation config of a Gameplay setting: the shared defaults plus what GameSession.ApplyDifficulty sets (scroll step percent, gem chance, top speed-up of the setting). Keep in sync with GameSession.ApplyDifficulty; a test pins the source lines.</summary>
+        /// <summary>
+        /// The simulation config of a Gameplay setting: the shared defaults plus what GameSession.ApplyDifficulty sets (scroll step percent 10/20/30/40/50, gem chance, top speed-up
+        /// of the setting = step x 8). The step interval (30 s) and the step count (8) are the SimConfig defaults on both sides (owner Final Change 1, 2026-11-22, rules version 2).
+        /// Keep in sync with GameSession.ApplyDifficulty; a test pins the source lines.
+        /// </summary>
         public static SimConfig ConfigFor(int mode)
         {
             SimConfig cfg = new SimConfig();
@@ -117,12 +121,14 @@ namespace FluffyClimbers.LeaderboardService
             // ---- world (same construction as RunSession's two constructors) ----
             SimConfig cfg = ConfigFor(s.Mode);
             CharacterStats stats = HeroRolls.StatsFor(hero, s.HeroVariant);   // the player's own rolled copy, capped at the safety limits
-            stats.ApplyTo(cfg);
+            hero = HeroRolls.Rolled(hero, s.HeroVariant);   // and its rolled hero power(s) (owner Final Change 2): the variant carries the power choice, hero.Powers is that copy's
+            // the stats are applied once the play region is known (Final Change 2 region penalty, see ApplyHeroIn)
 
             LevelSpec spec;
             Sim sim;
             EndlessWorld world = null;
             RegionDef region;
+            PowerUp[] heroPowers;
             string slotId;
             if (s.Kind == Kinds.Level)
             {
@@ -130,7 +136,10 @@ namespace FluffyClimbers.LeaderboardService
                 if (level == null) return ReplayResult.Fail("unknown_level", s.LevelId);
                 region = repo.GetRegion(level.Region);
                 if (region.Index < 1 || region.Index > lim.MaxRegion) return ReplayResult.Fail("unknown_level", "region closed");
+                heroPowers = ApplyHeroIn(hero, stats, region.Index, cfg, s.Seed);
                 spec = LevelSpecFactory.Build(level, region, s.Seed);
+                // One Life level (owner Final Change 1, 2026-11-22): the game offers no revive there (RunSession.CanRevive) and Sim.Revive refuses, so a run that carries one is forged
+                if (spec.OneLife && revives.Length > 0) return ReplayResult.Fail("bad_revive", "revive on a One Life level");
                 LevelData data = LevelBuilder.Build(cfg, spec);   // a first clear strips gems on the client; gems never change the climb (pinned by a test)
                 sim = new Sim(cfg, data, spec);
                 slotId = SlotIds.Level(level.Id, s.Mode);
@@ -141,6 +150,7 @@ namespace FluffyClimbers.LeaderboardService
                 if (region == null) return ReplayResult.Fail("unknown_level", s.RegionId);
                 if (region.Index < 1 || region.Index > lim.MaxRegion) return ReplayResult.Fail("unknown_level", "region closed");
                 bool ta = s.Kind == Kinds.TimeAttack;
+                heroPowers = ApplyHeroIn(hero, stats, region.Index, cfg, s.Seed);
                 spec = LevelSpecFactory.BuildEndless(region, s.Seed, repo.RemoteConfig.Generator.EndlessDifficultyFloors, ta);
                 world = new EndlessWorld(cfg, spec);
                 sim = world.Sim;
@@ -150,10 +160,10 @@ namespace FluffyClimbers.LeaderboardService
 
             // hero cooldown clock, only to tell free hero activations from bought units
             HeroPowerCooldown cd = null;
-            if (hero.Powers != null && hero.Powers.Length > 0)
+            if (heroPowers != null && heroPowers.Length > 0)
             {
                 int r = (int)hero.Rarity;
-                var h = new HeroPowerCooldown(hero.Powers, r >= 0 && r < CharacterDefs.CooldownSeconds.Length ? CharacterDefs.CooldownSeconds[r] : 0);
+                var h = new HeroPowerCooldown(heroPowers, r >= 0 && r < CharacterDefs.CooldownSeconds.Length ? CharacterDefs.CooldownSeconds[r] : 0);
                 if (h.Count > 0) cd = h;
             }
 
@@ -175,6 +185,8 @@ namespace FluffyClimbers.LeaderboardService
                 if (over) return ReplayResult.Fail("inputs_after_end", "tick " + i);
 
                 int input = inputs[i];
+                if (spec.NoPowerUps) input &= ~SimInput.PowerMask;   // No Power-ups level: the simulation ignores every activation bit, so none is a bought unit or a hero use (RunSession.Step drops them the same way)
+                else if (spec.OneLife) input &= ~SimInput.SafetyNetBit;   // One Life level: the Safety Net is off in the simulation, so its bit is no bought unit either
                 if ((input & SimInput.PowerMask) != 0 && !CountBought(res, cd, in state, input, lim)) return ReplayResult.Fail("power_budget", "too many bought power-up units");
                 sim.Step(ref state, input);                       // RunSession.Step: Sim.Step(ref State, input)
                 if (cd != null) cd.Tick();                        // hero cooldowns run in simulation ticks
@@ -201,6 +213,19 @@ namespace FluffyClimbers.LeaderboardService
             res.GoalReached = goalReached;
             res.Dead = state.Dead;
             return res;
+        }
+
+        /// <summary>
+        /// Region penalty (owner Final Change 2): writes the hero's physics into the config the way GameSession.BuildRunCfg does (HeroRegionPenalty.StatsIn: cut by the tier's points
+        /// when the hero is away from its home region) and returns the hero power list that still works there (RunSession.ApplyHeroPowers: Rare and Elite lose their power, a Legendary
+        /// loses the one drawn from the run seed, which is the submission's seed for levels, Endless and Time Attack alike). Same pure functions as the client.
+        /// </summary>
+        static PowerUp[] ApplyHeroIn(CharacterSpec hero, CharacterStats stats, int playRegion, SimConfig cfg, int seed)
+        {
+            HeroRegionPenalty.StatsIn(hero, stats, playRegion).ApplyTo(cfg);
+            if (!HeroRegionPenalty.IsPenalised(hero, playRegion)) return hero.Powers;
+            int disabled;
+            return HeroRegionPenalty.FilterPowers(hero.Powers, hero.Rarity, seed, hero.Id, out disabled);
         }
 
         /// <summary>Mirror of RunSession.TakePowerUnits seen from the record: every power bit in the stream was an ACCEPTED activation; a free hero use (ready cooldown, power in the hero's list) is not a bought unit, everything else is.</summary>

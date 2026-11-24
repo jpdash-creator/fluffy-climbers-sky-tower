@@ -91,11 +91,12 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void ScrollSpeedFlattensAfterFortySecondsAndStaysUnderTheCeiling()
+        public void ScrollSpeedFlattensAfterFourMinutesAndStaysUnderTheCeiling()
         {
             SimConfig cfg = Region1AuditTests.GameConfig(100);
             Assert.Equal(8, cfg.ScrollStepMaxSteps);
-            // d = 1: base 2.4 u/s; step 100 percent per 5 s would be 7.2 u/s at 10 s without the ceiling.
+            Assert.Equal(30, cfg.ScrollStepSeconds);
+            // d = 1: base 2.4 u/s; step 100 percent per 30 s would be 7.2 u/s at 60 s without the ceiling.
             Platform[] plats = new Platform[] { MakeStart(), MakeTop() };
             Sim sim = new Sim(cfg, LevelData.FromPlatforms(plats), Fx.One, false, false);
             SimState s = sim.NewState();
@@ -103,7 +104,7 @@ namespace FluffyClimbers.Simulation.Tests
             s.Grounded = true;
             Fx last = s.KillY;
             double maxPerSecond = 0;
-            for (int t = 0; t < 70 * 60; t++)
+            for (int t = 0; t < 300 * 60; t++)   // 5 minutes: past the last (8th) step at 4 minutes
             {
                 s.Y = s.MaxY = s.KillY + Fx.FromInt(8);   // alive, and MaxY - KillDistance stays below KillY so only the scroll moves it
                 sim.Step(ref s, 0);
@@ -112,13 +113,15 @@ namespace FluffyClimbers.Simulation.Tests
                 last = s.KillY;
             }
             Assert.True(maxPerSecond <= 4.02, "scroll " + maxPerSecond);
-            // Flat from 40 s on (8 steps): speed at 41 s equals speed at 69 s.
+            // Flat from 4 minutes on (8 steps of 30 s): the speed at 241 s equals the speed at 400 s (d = 0.2: 0.96 u/s x 2.6 = 2.5 u/s, under the ceiling).
             SimConfig c2 = Region1AuditTests.GameConfig(20);
             Sim sim2 = new Sim(c2, LevelData.FromPlatforms(plats), Fx.FromRatio(2, 10), false, false);
-            double v31 = Speed(sim2, 41), v69 = Speed(sim2, 69);
-            Assert.Equal(v31, v69, 3);
-            Assert.True(Speed(sim2, 34) < Speed(sim2, 36) + 0.001);
-            Assert.True(Speed(sim2, 6) > Speed(sim2, 1));
+            double v241 = Speed(sim2, 241), v400 = Speed(sim2, 400);
+            Assert.Equal(v241, v400, 3);
+            Assert.True(Speed(sim2, 209) < Speed(sim2, 211) - 0.1);   // the 7th step at 210 s
+            Assert.True(Speed(sim2, 239) < Speed(sim2, 241) - 0.1);   // the 8th and last step at 240 s
+            Assert.Equal(Speed(sim2, 1), Speed(sim2, 29), 3);         // no step before 30 s
+            Assert.True(Speed(sim2, 31) > Speed(sim2, 1) + 0.1);
         }
 
         private static double Speed(Sim sim, int second)
@@ -153,7 +156,7 @@ namespace FluffyClimbers.Simulation.Tests
         {
             string root = ContentLoader.FindRoot();
             if (root == null) return;
-            // The game config at Insane: +50 percent per 5 s, 8 steps = top speed-up 400 percent (GameSession), ceiling from SimConfig.
+            // The game config at Insane: +50 percent per 30 s, 8 steps = top speed-up 400 percent (GameSession), ceiling from SimConfig.
             SimConfig cfg = MedalCalibrationTests.ConfigFor(2);   // exactly what GameSession applies at Normal (step 25, top speed-up step x 8, the mode's gem density): the plain Momo bot must solve it; Hard and Insane are proven by SolvabilityLadderTests (owner rule 2026-11-12: they may need a stronger hero or power-ups)
             List<string> failures = new List<string>();
             foreach (LoadedLevel ll in ContentLoader.LoadRegions(root, region, region))

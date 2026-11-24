@@ -29,7 +29,7 @@ namespace FluffyClimbers.LeaderboardService
         /// <summary>The player's profile (display name, avatar) as the client wrote it; null when none.</summary>
         Task<PlayerDoc> GetPlayerAsync(string uid);
 
-        /// <summary>Atomically: read slot, totals, player; apply <see cref="SlotMath.Apply"/>; write what changed.</summary>
+        /// <summary>Atomically: read slot, totals, player; apply <see cref="SlotMath.Apply"/> (a level slot keeps its best run, an Endless / Time Attack slot the sum of its three best); write what changed.</summary>
         Task<ApplyOutcome> ApplyRunAsync(ApplyInput input);
 
         Task<PlayerWeek> GetPlayerWeekAsync(string weekKey, string uid, bool withSlots);

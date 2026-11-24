@@ -8,10 +8,13 @@ namespace FluffyClimbers.Economy
         {
             if (data == null) return;
             Data = data;
+            EnsureLevelFields();   // a cloud save from before the per-setting stars: everything counts as Relaxed (ProgressService.cs)
             EnsureEndlessFields();
             EnsurePowerUpFields();
             EnsureChestFields();
             MigrateCrownFormula();   // a cloud save of the old crown formula is cleared as well
+            MigrateHeroRolls();   // a cloud save of the old hero rolls: every owned upper-tier copy is re-rolled once (ProgressService.HeroRolls.cs)
+            NormalizeSelection();   // the chosen hero of the cloud save: an unknown id or a negative copy falls back (ownership is checked on read, CharacterCatalog)
             Commit();
         }
 
@@ -41,6 +44,7 @@ namespace FluffyClimbers.Economy
         {
             Data.LastCloudSyncUtc = SaveSync.NowText();
             Data.CloudResetPending = false;   // the cloud save now holds this device's save (a reset one included)
+            Data.CloudDirty = false;          // nothing waits for an upload any more (Final Change 3)
             store.Save(Data);
         }
     }

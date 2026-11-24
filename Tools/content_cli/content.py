@@ -98,7 +98,28 @@ D_BY_LEVEL = {1: 0.05, 2: 0.10, 3: 0.15, 4: 0.22, 5: 0.40, 6: 0.35, 7: 0.42, 8: 
 # Bug List 6 item 4: regions 1..MIGRATED_REGIONS have 25 levels, the others still 15 (TODO regions 6-30 migration: raise to 30 and drop the legacy tables).
 MIGRATED_REGIONS = 5
 TARGET_SCORE = [5, 20, 26.7, 33.3, 40, 44, 48, 52, 56, 60, 63, 66, 69, 72, 75, 77.5, 80, 82.5, 85, 87.5, 90, 92.5, 95, 97.5, 100]
-SPECIAL_LEVELS_25 = (5, 10, 15, 20)
+# Owner Final Change 1 (2026-11-22): the approved placement of the six special level types (one level each per region, never on a gem level). The table lives
+# next to the generator of the level files (migrate_levels_25.py) and is checked here against the shipped JSON.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from migrate_levels_25 import SPECIAL_PLACEMENT, SPECIAL_TYPES, GEM_LEVELS, COMBO_FLOORS, COMBO_JUMPS, rows as rows_25   # noqa: E402
+
+
+def special_type_of(lv):
+    """The special level type of a level JSON object ("" = Regular Run): the rule field "special", or the type its goal stands for (Simulation SpecialLevels.TypeOf)."""
+    if lv.get("special"):
+        return lv["special"]
+    return {"noWallBounce": "noWallTouch", "comboChain": "comboClimb", "bossChase": "chase"}.get(lv["goal"]["type"], "")
+
+
+def expected_level_25(n, i):
+    """What migrate_levels_25.py writes for level i of region n: (goal, overrides or None, special or None)."""
+    t = next((k for k, idx in SPECIAL_PLACEMENT[n].items() if idx == i), "")
+    r = rows_25(i)
+    if t == "noWallTouch": return {"type": "noWallBounce", "value": r}, None, None
+    if t == "chase": return {"type": "bossChase", "value": r}, {"ramp": True}, None
+    if t == "comboClimb": return {"type": "comboChain", "value": COMBO_FLOORS, "count": COMBO_JUMPS}, {"rows": r}, None
+    if t: return {"type": "reachFloor", "value": r}, None, t
+    return {"type": "reachFloor", "value": r}, None, None
 # Bug List 4 item 9 (2026-11-16): no level JSON pays a gem reward; gems are collectible pickups (Simulation GemLevels.GemsInLevel).
 
 
@@ -180,7 +201,8 @@ def validate():
         want_off = round(0.25 * (n - 1) / 29, 4)
         if abs(r["rules"]["difficultyOffset"] - want_off) > 1e-4:
             errors.append("%s: difficultyOffset should be %s" % (r["id"], want_off))
-        want_cf = round(1 + 0.03 * (n - 1), 2)
+        # owner Final Change 1 (2026-11-22): region 1 = 1.00, 2 to 5 = 1.05, 6 to 15 = 1.10, 16 to 25 = 1.15, 26 to 30 = 1.20 (CoinPayoutRules.RegionFactorPercent)
+        want_cf = 1.0 if n <= 1 else 1.05 if n <= 5 else 1.1 if n <= 15 else 1.15 if n <= 25 else 1.2
         if abs(r["coinFactor"] - want_cf) > 1e-9:
             errors.append("%s: coinFactor should be %s" % (r["id"], want_cf))
         if r["rules"]["signatureModule"] not in modules:
@@ -219,22 +241,23 @@ def validate():
                 errors.append("%s: class should be %s" % (lid, class_25(i)))
             if lid not in curve or abs(lv["difficulty"] - curve[lid]) > 1e-9:
                 errors.append("%s: base difficulty should be %s (config/difficulty_curve.json)" % (lid, curve.get(lid)))
-            specials = SPECIAL_LEVELS_25
-            if i in specials:
-                gt = lv["goal"]["type"]
-                if gt not in ("noWallBounce", "findHiddenGem", "speedrun", "reachFloor"):
-                    errors.append("%s: special level goal %s" % (lid, gt))
-                # Bug List 4 item 10: level 5 is a plain "reach floor 75" (no combo chain, no extra condition, no ladder)
-                if i == 5 and (lv["goal"] != {"type": "reachFloor", "value": 75}):
-                    errors.append("%s: level 5 goal must be exactly reachFloor 75" % lid)
-            elif lv["goal"]["type"] != "reachFloor":
-                errors.append("%s: goal should be reachFloor" % lid)
+            # Final Change 1: goal, overrides and the rule field are exactly what the placement table gives (gem levels 5/10/15/20/25 are plain reachFloor levels)
+            want_goal, want_ov, want_special = expected_level_25(n, i)
+            if lv["goal"] != want_goal:
+                errors.append("%s: goal should be %s" % (lid, want_goal))
+            if lv.get("overrides") != want_ov:
+                errors.append("%s: overrides should be %s" % (lid, want_ov))
+            if lv.get("special") != want_special:
+                errors.append("%s: special should be %s" % (lid, want_special))
+            if i in GEM_LEVELS and special_type_of(lv):
+                errors.append("%s: a gem level is never a special level" % lid)
         else:
             if lv["class"] != CLASS_BY_LEVEL[i]:
                 errors.append("%s: class should be %s" % (lid, CLASS_BY_LEVEL[i]))
             if abs(lv["difficulty"] - D_BY_LEVEL[i]) > 1e-9:
                 errors.append("%s: base difficulty should be %s" % (lid, D_BY_LEVEL[i]))
-            specials = (5, 10)
+            if lv.get("special"):
+                errors.append("%s: the special rule field is for the migrated regions only" % lid)
         if lv["rewards"]["gems"]["min"] > lv["rewards"]["gems"]["max"]:
             errors.append("%s: gems min > max" % lid)
         # Bug List 4 item 9 (2026-11-16): no level pays a fixed gem reward any more (the gems are collectible pickups in the level).
@@ -254,6 +277,19 @@ def validate():
 
     if len(speedrun_times) > 1:
         errors.append("speedrun timeSec must be one constant for all regions, found %s" % sorted(speedrun_times))
+
+    # --- Final Change 1: exactly one level of each special type per migrated region ---
+    for n in range(1, MIGRATED_REGIONS + 1):
+        found = {}
+        for lid, lv in levels.items():
+            if int(lid.split("_")[1]) == n and special_type_of(lv):
+                found.setdefault(special_type_of(lv), []).append(lv["index"])
+        for t in SPECIAL_TYPES:
+            if found.get(t) != [SPECIAL_PLACEMENT[n][t]]:
+                errors.append("region %d: special type %s should be on level %d only, found %s" % (n, t, SPECIAL_PLACEMENT[n][t], found.get(t)))
+        for t in found:
+            if t not in SPECIAL_TYPES:
+                errors.append("region %d: unknown special type %s" % (n, t))
 
     # --- modules ---
     covered = set()

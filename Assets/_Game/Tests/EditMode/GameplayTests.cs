@@ -124,8 +124,9 @@ namespace FluffyClimbers.Tests
         [Test]
         public void AWallBounceEndsANoWallBounceRunAtOnceAndCannotBeRevived()
         {
-            var s = new RunSession(repo, new SimConfig(), "lvl_001_10");
+            var s = new RunSession(repo, new SimConfig(), "lvl_001_06");   // the No Wall Touch level of region 1 (owner Final Change 1, 2026-11-22; it was level 10)
             Assert.AreEqual(GoalType.NoWallBounce, s.Spec.Goal.Type);
+            Assert.AreEqual(SpecialLevelType.NoWallTouch, s.SpecialType);
             s.Step(0);
             Assert.IsFalse(s.Over);
             s.State.WallBounces = 1;   // the player bounced off a wall in the air
@@ -137,6 +138,194 @@ namespace FluffyClimbers.Tests
             Assert.IsFalse(s.State.Dead, "alive, but the goal can no longer be met");
             Assert.IsFalse(s.CanRevive, "a revive cannot undo a lost goal");
             Assert.IsFalse(s.BuildOutcome().Completed);
+            Assert.AreEqual("Wall touched!", s.FailTitle);
+            Assert.AreEqual("This level fails on any wall touch.", s.FailReason);
+        }
+
+        // ---- special level types (owner Final Change 1, 2026-11-22). Region 1: L6 No Wall Touch, L9 One Life, L14 No Power-ups, L16 Keep Moving, L21 Chase, L24 Combo Climb ----
+
+        [Test]
+        public void EveryRegionHasItsSixSpecialLevelsAndTheGemLevelsAreRegularRuns()
+        {
+            for (int region = 1; region <= 5; region++)
+            {
+                RegionDef r = repo.GetRegionByIndex(region);
+                var seen = new HashSet<SpecialLevelType>();
+                foreach (LevelDef level in repo.LevelsOf(r.Id))
+                {
+                    SpecialLevelType type = level.SpecialType;
+                    Assert.AreEqual(type, SpecialLevels.TypeOf(LevelSpecFactory.Build(level, r)), level.Id + ": the content lookup and the spec lookup agree");
+                    if (level.Index % 5 == 0)
+                    {
+                        Assert.AreEqual(SpecialLevelType.None, type, level.Id + " is a gem level");
+                        Assert.AreEqual("reachFloor", level.Goal.Type, level.Id);
+                    }
+                    if (type != SpecialLevelType.None) Assert.IsTrue(seen.Add(type), level.Id + ": a second " + type + " level in the region");
+                }
+                Assert.AreEqual(SpecialLevels.Count, seen.Count, "region " + region + " has one level of each special type");
+            }
+            Assert.AreEqual(SpecialLevelType.NoWallTouch, repo.GetLevel("lvl_001_06").SpecialType);
+            Assert.AreEqual(SpecialLevelType.OneLife, repo.GetLevel("lvl_001_09").SpecialType);
+            Assert.AreEqual(SpecialLevelType.NoPowerUps, repo.GetLevel("lvl_001_14").SpecialType);
+            Assert.AreEqual(SpecialLevelType.KeepMoving, repo.GetLevel("lvl_001_16").SpecialType);
+            Assert.AreEqual(SpecialLevelType.Chase, repo.GetLevel("lvl_001_21").SpecialType);
+            Assert.AreEqual(SpecialLevelType.ComboClimb, repo.GetLevel("lvl_001_24").SpecialType);
+        }
+
+        [Test]
+        public void OneLifeLevelOffersNoReviveForGemsOrAds()
+        {
+            var progress = new ProgressService(repo, new MemorySaveStore(), 5);
+            progress.AddGems(100);
+            var s = new RunSession(repo, new SimConfig(), "lvl_001_09");
+            Assert.IsTrue(s.Spec.OneLife);
+            Assert.IsFalse(s.CanRevive, "no revive is offered even before the fall");
+            s.State.Grounded = false;
+            s.State.Y = Fx.FromInt(-200);
+            s.Step(0);
+            Assert.IsTrue(s.State.Dead);
+            Assert.IsTrue(s.Failed);
+            Assert.IsFalse(s.CanRevive);
+            Assert.IsFalse(s.AdReviveOffered);
+            int gems = progress.Gems;
+            Assert.IsFalse(s.TryRevive(progress), "no gem revive");
+            Assert.AreEqual(gems, progress.Gems, "nothing is charged");
+            s.MarkAdWatched();
+            Assert.IsFalse(s.AdRewardPending);
+            Assert.IsFalse(s.TryReviveFree(), "no ad revive");
+            Assert.IsTrue(s.State.Dead);
+            Assert.AreEqual(0, s.State.RevivesUsed);
+            Assert.AreEqual("You fell!", s.FailTitle);
+            Assert.AreEqual("One Life: no revive and no Safety Net.", s.FailReason);
+            Assert.AreEqual("No revive, no Safety Net: one fall ends the run.", RunSession.GoalRule(s.Spec));
+        }
+
+        /// <summary>Owner 2026-11-22: on a One Life level the Safety Net is off (no button, no unit, nothing armed, a fall ends the run); the other power-ups work.</summary>
+        [Test]
+        public void OneLifeLevelSwitchesTheSafetyNetOffAndKeepsTheOtherPowerUps()
+        {
+            var s = new RunSession(repo, new SimConfig(), "lvl_001_09");
+            var stock = new int[PowerUps.MaxType + 1];
+            foreach (PowerUp p in PowerUps.Implemented) stock[(int)p] = 2;
+            s.ApplyStock(stock);
+            Assert.IsFalse(s.PowerAllowed(PowerUp.SafetyNet));
+            Assert.IsTrue(s.PowerAllowed(PowerUp.Shield));
+            Assert.IsFalse(s.PowersOff);
+            s.Step(PowerUps.InputBit(PowerUp.SafetyNet) | PowerUps.InputBit(PowerUp.Shield));
+            Assert.IsFalse(s.State.SafetyNetArmed, "the net is not armed");
+            Assert.AreEqual(2, s.PowerStock(PowerUp.SafetyNet), "no unit taken");
+            Assert.AreEqual(1, s.PowerStock(PowerUp.Shield), "the shield works");
+            Assert.AreEqual(1, s.State.PwUsed);
+            s.State.SafetyNetArmed = true;   // even a net that is somehow armed does nothing here
+            s.State.Grounded = false;
+            s.State.Y = Fx.FromInt(-200);
+            s.Step(0);
+            Assert.IsTrue(s.State.Dead, "one fall ends the run");
+            Assert.AreEqual(0, s.State.NetTicks);
+            Assert.IsFalse(s.CanRevive);
+
+            // a plain level and a Keep Moving level keep the net
+            Assert.IsTrue(new RunSession(repo, new SimConfig(), "lvl_001_08").PowerAllowed(PowerUp.SafetyNet));
+            Assert.IsTrue(new RunSession(repo, new SimConfig(), "lvl_001_16").PowerAllowed(PowerUp.SafetyNet));
+        }
+
+        [Test]
+        public void NoPowerUpsLevelDropsEveryActivationAndTakesNoUnit()
+        {
+            var s = new RunSession(repo, new SimConfig(), "lvl_001_14");
+            Assert.IsTrue(s.PowersOff);
+            var stock = new int[PowerUps.MaxType + 1];
+            foreach (PowerUp p in PowerUps.Implemented) stock[(int)p] = 2;
+            s.ApplyStock(stock);
+            s.ApplyHeroPowers(new CharacterSpec { Id = "test_legendary", Name = "Test", Rarity = CharacterRarity.Legendary, Powers = TierRules.PowersFor("momo", CharacterRarity.Legendary) });
+            Assert.IsNull(s.Hero, "the hero's own power is off as well");
+            for (int t = 0; t < 30; t++) s.Step(SimInput.PowerMask | SimInput.HeroMask | (t == 3 ? SimInput.Jump : 0));
+            Assert.AreEqual(0, s.State.PwUsed);
+            Assert.AreEqual(0, s.State.FlightTicks);
+            Assert.IsFalse(s.State.SafetyNetArmed);
+            foreach (PowerUp p in PowerUps.Implemented) Assert.AreEqual(2, s.PowerStock(p), p + ": no unit taken");
+            Assert.AreEqual(0, s.BuildOutcome().PowerUpsUsed);
+            // the same taps on a plain level do activate
+            var plain = new RunSession(repo, new SimConfig(), "lvl_001_13");
+            plain.ApplyStock(stock);
+            plain.Step(PowerUps.InputBit(PowerUp.Shield));
+            Assert.AreEqual(1, plain.State.PwUsed);
+        }
+
+        /// <summary>
+        /// Puts the hero of a running session onto a plain platform a few rows up, as if he had just landed there after his first jump (test helper for the Keep Moving timer:
+        /// a plain platform cannot throw, drop or carry him, and the danger line is a full kill distance below, so only the timer can end the run in the next 3 seconds).
+        /// </summary>
+        static int StandOnAPlainPlatform(RunSession s)
+        {
+            Platform[] ps = s.Data.Platforms;
+            for (int i = 1; i < ps.Length; i++)
+            {
+                if (ps[i].Kind != PlatformKind.Normal || ps[i].Row < 3) continue;
+                s.State.X = ps[i].X; s.State.Y = ps[i].Y; s.State.Vx = Fx.Zero; s.State.Vy = Fx.Zero;
+                s.State.Grounded = true; s.State.GroundId = i; s.State.BestGroundId = i; s.State.Row = ps[i].Row;
+                s.State.MaxY = ps[i].Y; s.State.KillY = ps[i].Y - s.Cfg.KillDistance;
+                s.State.StartTick = s.State.Tick; s.State.StandTicks = 0;
+                return i;
+            }
+            return -1;
+        }
+
+        [Test]
+        public void KeepMovingLevelEndsTheRunAfterThreeSecondsOnOnePlatformAndCanBeRevived()
+        {
+            var progress = new ProgressService(repo, new MemorySaveStore(), 5);
+            progress.AddGems(100);
+            var s = new RunSession(repo, new SimConfig(), "lvl_001_16");
+            Assert.IsTrue(s.Sim.KeepMoving);
+            var netStock = new int[PowerUps.MaxType + 1];
+            netStock[(int)PowerUp.SafetyNet] = 1;
+            s.ApplyStock(netStock);
+            s.Step(PowerUps.InputBit(PowerUp.SafetyNet));   // owner 2026-11-22: an armed Safety Net rescues real falls only, never the timeout
+            Assert.IsTrue(s.State.SafetyNetArmed);
+            for (int t = 0; t < 600; t++) s.Step(0);
+            Assert.IsFalse(s.Over, "the start platform before the first jump has no timer");
+            Assert.AreEqual(-1, s.Sim.KeepMovingTicksLeft(in s.State));
+            Assert.Greater(StandOnAPlainPlatform(s), 0);
+            for (int t = 1; t <= 180; t++)
+            {
+                s.Step(0);
+                Assert.IsFalse(s.Over, "tick " + t + " of 180 is allowed");
+                Assert.AreEqual(180 - t, s.Sim.KeepMovingTicksLeft(in s.State));
+                Assert.AreEqual(t >= 60, s.Sim.KeepMovingWarning(in s.State), "the warning runs for the last 2 seconds only (tick " + t + ")");
+            }
+            s.Step(0);
+            Assert.IsTrue(s.State.Dead, "tick 181 ends the run, also with an armed Safety Net");
+            Assert.IsTrue(s.KeepMovingTimedOut, "the timer ended the run, not the danger line");
+            Assert.AreEqual(0, s.State.NetTicks, "no rescue jump");
+            Assert.AreEqual(0, s.State.SafetyNetCatches);
+            Assert.AreEqual("Too slow!", s.FailTitle);
+            Assert.AreEqual("Over 3 seconds on one platform.", s.FailReason);
+            Assert.IsTrue(s.CanRevive);
+            Assert.IsTrue(s.TryRevive(progress));
+            Assert.IsFalse(s.State.Dead);
+            Assert.AreEqual(0, s.State.StandTicks, "the revive restarts the timer");
+            Assert.IsFalse(s.KeepMovingTimedOut);
+        }
+
+        [Test]
+        public void ComboClimbAndChaseGoalTextsAndRules()
+        {
+            LevelSpec combo = new RunSession(repo, new SimConfig(), "lvl_001_24").Spec;
+            Assert.AreEqual(GoalType.ComboChain, combo.Goal.Type);
+            Assert.AreEqual(150, combo.TargetRow());
+            Assert.AreEqual("Floor 150 with 3 combo jumps", RunSession.DescribeGoal(combo));
+            Assert.AreEqual("A combo jump climbs 3 floors or more at once.", RunSession.GoalRule(combo));
+            Assert.AreEqual("Combo Climb", RunSession.SpecialName(combo));
+            LevelSpec chase = new RunSession(repo, new SimConfig(), "lvl_001_21").Spec;
+            Assert.IsTrue(chase.Ramp, "a Chase level has the row ramp");
+            Assert.AreEqual("Outclimb the chase: floor 150", RunSession.DescribeGoal(chase));
+            Assert.AreEqual(SpecialLevels.RuleText(SpecialLevelType.Chase), RunSession.GoalRule(chase));
+            // levels 10, 15 and 20 lost their old goals: plain reach-floor gem levels with the same floor count
+            Assert.AreEqual("Reach floor 90", RunSession.DescribeGoal(new RunSession(repo, new SimConfig(), "lvl_001_10").Spec));
+            Assert.AreEqual("Reach floor 105", RunSession.DescribeGoal(new RunSession(repo, new SimConfig(), "lvl_001_15").Spec));
+            Assert.AreEqual("Reach floor 120", RunSession.DescribeGoal(new RunSession(repo, new SimConfig(), "lvl_001_20").Spec));
+            Assert.IsNull(RunSession.GoalRule(new RunSession(repo, new SimConfig(), "lvl_001_10").Spec));
         }
 
         [Test]
@@ -176,7 +365,11 @@ namespace FluffyClimbers.Tests
             var s = new RunSession(repo, new SimConfig(), "lvl_001_01");
             Assert.AreEqual("Reach floor 60", RunSession.DescribeGoal(s.Spec));
             Assert.IsNull(RunSession.GoalRule(s.Spec));
-            Assert.AreEqual("Don't touch the walls.", RunSession.GoalRule(new RunSession(repo, new SimConfig(), "lvl_001_10").Spec));
+            LevelSpec noWall = new RunSession(repo, new SimConfig(), "lvl_001_06").Spec;
+            Assert.AreEqual("Reach floor 90", RunSession.DescribeGoal(noWall));
+            Assert.AreEqual("Touching a wall ends the run.", RunSession.GoalRule(noWall));
+            Assert.AreEqual("No Wall Touch", RunSession.SpecialName(noWall));
+            Assert.IsNull(RunSession.SpecialName(s.Spec));
         }
 
         [Test]

@@ -98,7 +98,7 @@ namespace FluffyClimbers.Gameplay
             for (int k = 0; k < PowerUps.Implemented.Length; k++)
             {
                 PowerUp t = PowerUps.Implemented[k];
-                shown[(int)t] = run.OwnedAtStart(t) || (run.Hero != null && run.Hero.IndexOf(t) >= 0);
+                shown[(int)t] = Wanted(run, t);
             }
             PowerUp[] buf = new PowerUp[MaxButtons];
             int built = 0;
@@ -120,6 +120,16 @@ namespace FluffyClimbers.Gameplay
         Action<RectTransform, Vector2, Vector2, Vector2> buildPlace;
 
         /// <summary>
+        /// True when the run shows a button for this type: owned (bought) or a free hero power, and allowed on the level (RunSession.PowerAllowed). On a No Power-ups level no type
+        /// is wanted (the bar stays empty); on a One Life level the Safety Net has no button (owner 2026-11-22), the other types keep theirs. Also when a power-up is bought in the
+        /// shop during the run. A button that could do nothing is not shown at all (CUX-8: no dead control).
+        /// </summary>
+        static bool Wanted(RunSession run, PowerUp t)
+        {
+            return run.PowerAllowed(t) && (run.OwnedAtStart(t) || (run.Hero != null && run.Hero.IndexOf(t) >= 0));
+        }
+
+        /// <summary>
         /// A power-up bought during the run (RunSession.SyncStock) makes its button appear, or a hero-only button show its count: rebuilds the bar once when the owned set differs from the
         /// built one (a rare event, so the allocation is fine; nothing happens otherwise and the check allocates nothing). Keeps the visibility. Returns true when it rebuilt.
         /// </summary>
@@ -130,7 +140,7 @@ namespace FluffyClimbers.Gameplay
             for (int k = 0; k < PowerUps.Implemented.Length && !differs; k++)
             {
                 PowerUp t = PowerUps.Implemented[k];
-                bool want = session.OwnedAtStart(t) || (session.Hero != null && session.Hero.IndexOf(t) >= 0);
+                bool want = Wanted(session, t);
                 Slot have = null;
                 for (int i = 0; i < slots.Length; i++) if (slots[i] != null && slots[i].Type == t) { have = slots[i]; break; }
                 if (want != (have != null) || (have != null && have.Bought != session.OwnedAtStart(t))) differs = true;

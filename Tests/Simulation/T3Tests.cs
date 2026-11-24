@@ -936,11 +936,19 @@ namespace FluffyClimbers.Simulation.Tests
             sim.Step(ref s, SimInput.Jump);
             for (int i = 0; i < 200 && s.Row < 2; i++) sim.Step(ref s, 0);
             Assert.False(GoalEvaluator.IsComplete(two, s));
+            Assert.False(GoalEvaluator.ComboJumpsDone(two, s));
             Assert.Equal(1, GoalEvaluator.JumpsWithFloors(s, 2));
             sim.Step(ref s, SimInput.Jump);
             for (int i = 0; i < 200 && s.Row < 4; i++) sim.Step(ref s, 0);
-            Assert.True(GoalEvaluator.IsComplete(two, s));
-            Assert.False(GoalEvaluator.IsComplete(three, s), "two 2-floor jumps are not a 3-floor jump");
+            // Final Change 1 (2026-11-22): the combo jumps are counted as before, the level is cleared once the top row is reached as well
+            Assert.True(GoalEvaluator.ComboJumpsDone(two, s));
+            Assert.False(GoalEvaluator.IsComplete(two, s), "the top row is still ahead");
+            SimState top = s;
+            top.Row = two.TargetRow();
+            Assert.True(GoalEvaluator.IsComplete(two, top));
+            Assert.False(GoalEvaluator.ComboJumpsDone(three, s), "two 2-floor jumps are not a 3-floor jump");
+            Assert.False(GoalEvaluator.IsComplete(three, top), "two 2-floor jumps are not a 3-floor jump");
+            Assert.True(GoalEvaluator.IsFailed(three, top), "the top without the combo jump loses the goal");
             Assert.Equal(2, s.BestJumpFloors);
             Assert.Equal(0, GoalEvaluator.JumpsWithFloors(s, 3));
         }

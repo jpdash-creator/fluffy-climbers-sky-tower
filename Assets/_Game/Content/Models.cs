@@ -54,6 +54,8 @@ namespace FluffyClimbers.Content
     {
         [JsonProperty("fixedChunks")] public List<string> FixedChunks { get; set; }
         [JsonProperty("ramp")] public bool? Ramp { get; set; }
+        /// <summary>Explicit platform rows of the level (LevelSpec.Rows). Needed by a Combo Climb level: its goal value is the floors per combo jump, not the height of the level.</summary>
+        [JsonProperty("rows")] public int? Rows { get; set; }
     }
 
     public sealed class GemRewardDef
@@ -87,6 +89,18 @@ namespace FluffyClimbers.Content
         [JsonProperty("goal", Required = Required.Always)] public GoalDef Goal { get; set; }
         [JsonProperty("overrides")] public LevelOverridesDef Overrides { get; set; }
         [JsonProperty("rewards", Required = Required.Always)] public RewardsDef Rewards { get; set; }
+        /// <summary>
+        /// Rule of a special level that is not a goal (owner Final Change 1, 2026-11-22): "noPowerUps", "oneLife" or "keepMoving" (FluffyClimbers.Simulation.SpecialLevels);
+        /// absent on every other level. The goal-based special types (noWallBounce, comboChain, bossChase) are told by the goal. Use <see cref="SpecialType"/>.
+        /// </summary>
+        [JsonProperty("special")] public string Special { get; set; }
+
+        /// <summary>The special level type of this level (None = Regular Run): the ONE lookup for UI, rewards and the server (SpecialLevels.Name / RuleText / Glyph take it).</summary>
+        [JsonIgnore]
+        public FluffyClimbers.Simulation.SpecialLevelType SpecialType
+        {
+            get { return FluffyClimbers.Simulation.SpecialLevels.TypeOf(Goal == null ? null : Goal.Type, Special); }
+        }
     }
 
     public sealed class ModuleDef

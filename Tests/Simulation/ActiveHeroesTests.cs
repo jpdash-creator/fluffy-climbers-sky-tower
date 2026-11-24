@@ -130,7 +130,7 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void TheRarityIsRolledFirstThenAnActiveHeroOfThatRarity()
         {
-            // the odds of the rarity are unchanged (Iron 50/30/20 since 2026-11-13, bundles 70/20/10); every region open, so no fallback happens
+            // the odds of the rarity (Iron 50/30/20 since 2026-11-13, bundles Common 50 / Uncommon 40 / Rare 10 since Final Change 1, 2026-11-22); every region open, so no fallback happens
             ulong s = 99;
             const int N = 60000;
             var iron = new Dictionary<CharacterRarity, int>();
@@ -148,29 +148,28 @@ namespace FluffyClimbers.Simulation.Tests
                 CharacterSpec c = BundleCards.Draw(Mix(ref s), Mix(ref s), CharacterDefs.All, null);
                 int n; bundle.TryGetValue(c.Rarity, out n); bundle[c.Rarity] = n + 1;
             }
-            Assert.InRange(bundle[CharacterRarity.Uncommon] / (double)N, 0.68, 0.72);
-            Assert.InRange(bundle[CharacterRarity.Rare] / (double)N, 0.18, 0.22);
-            Assert.InRange(bundle[CharacterRarity.Epic] / (double)N, 0.08, 0.12);
+            Assert.InRange(bundle[CharacterRarity.Common] / (double)N, 0.48, 0.52);
+            Assert.InRange(bundle[CharacterRarity.Uncommon] / (double)N, 0.38, 0.42);
+            Assert.InRange(bundle[CharacterRarity.Rare] / (double)N, 0.08, 0.12);
+            Assert.False(bundle.ContainsKey(CharacterRarity.Epic));
+            Assert.False(bundle.ContainsKey(CharacterRarity.Legendary));
             // each pool of a rarity holds the five active lines at that rarity
             foreach (CharacterRarity r in HeroPurchase.Tiers)
                 Assert.Equal(ActiveLines.OrderBy(x => x, StringComparer.Ordinal).ToArray(), ChestRolls.Pool(r, CharacterDefs.All, null).Select(c => c.LineId).OrderBy(x => x, StringComparer.Ordinal).ToArray());
         }
 
         [Fact]
-        public void RegionGoalsNameNoHeroAndGiveOnlyTheStarterOrARandomActiveCommon()
+        public void NoRewardRowCanGiveAHero()
         {
+            // Owner Final Change 1 (2026-11-22): no hero anywhere in the Main, Daily and Weekly rewards. The reward row type has no hero field left at all,
+            // so neither an active nor an inactive hero can be handed out by a reward table.
+            foreach (System.Reflection.FieldInfo f in typeof(RegionGoal).GetFields())
+                Assert.True(f.Name.IndexOf("Hero", StringComparison.OrdinalIgnoreCase) < 0, "reward rows have no hero field: " + f.Name);
+            foreach (System.Reflection.PropertyInfo p in typeof(RegionGoal).GetProperties())
+                Assert.True(p.Name.IndexOf("Hero", StringComparison.OrdinalIgnoreCase) < 0, "reward rows have no hero property: " + p.Name);
             for (int region = 1; region <= RegionGoalTable.PlayableRegions; region++)
-            {
-                int random = 0, starter = 0;
                 foreach (RegionGoal g in RegionGoalTable.Build(region))
-                {
-                    Assert.True(string.IsNullOrEmpty(g.HeroId), g.Id + " must not name a hero");
-                    if (g.HeroRegion == RewardEntry.RandomOpenRegionHero) random++;
-                    else if (g.HeroRegion != 0) { Assert.Equal(region, g.HeroRegion); starter++; }
-                }
-                Assert.Equal(1, random);    // owner 2026-11-13: only gold medals on 25 levels gives a random ACTIVE Common hero of an open region
-                Assert.Equal(1, starter);   // clear all levels: the region's starter (active)
-            }
+                    Assert.True(g.Gems > 0 || g.Coins > 0 || g.PowerUps > 0, g.Id + " pays gems, coins or power-ups");
         }
 
         [Fact]

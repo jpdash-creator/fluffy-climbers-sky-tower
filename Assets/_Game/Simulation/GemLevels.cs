@@ -2,7 +2,7 @@ namespace FluffyClimbers.Simulation
 {
     /// <summary>
     /// Gem rules of the campaign. Three separate things live here:
-    /// 1. The hidden gem: only the level whose goal is FindHiddenGem (level 15) has one, as the goal object (it pays no gem of its own).
+    /// 1. The hidden gem: only a level whose goal is FindHiddenGem has one, as the goal object (it pays no gem of its own). Since owner Final Change 1 (2026-11-22) NO shipped level of regions 1 to 5 has that goal (level 15 is a plain reach-floor gem level), so IsGemLevel is false for all of them.
     /// 2. FIXED first-clear gems (owner Main Bug List 7 item 2, 2026-11-17): level 5 pays 1, 10 pays 2, 15 pays 2, 20 pays 3, 25 pays 4, no pickup needed (RewardCalculator.Compute).
     /// 3. Collectible gems on top: levels 5, 10, 15, 20 and 25 each hold 2 or 3 gems of value 1 with a seeded 50 percent chance (the count is a second seeded roll).
     ///    The gems are placed in the level (LevelBuilder) and only gems the player picks up pay. The rolls come from the level seed alone, so every device and the server agree.

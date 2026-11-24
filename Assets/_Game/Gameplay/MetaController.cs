@@ -175,6 +175,8 @@ namespace FluffyClimbers.Gameplay
             starText = null;
             levelsText = null;
             regionStarsText = null;
+            gameplayRow = null;   // MetaController.Gameplay.cs: the five setting buttons of the level screen
+            levelPath = null;     // the level path of the level screen (a pending LayoutPath of the old screen stops when it sees this)
             screenRoot = UiKit.Rect(canvas.transform, name);
             UiKit.Stretch(screenRoot);
             screen = UiKit.SafeArea(screenRoot);
@@ -295,7 +297,10 @@ namespace FluffyClimbers.Gameplay
             RefreshWallet();
         }
 
-        /// <summary>Level screen header: the three currency pills, then two region progress pills (levels cleared and stars of this region).</summary>
+        /// <summary>
+        /// Level screen header: the three currency pills, then two region progress pills. Since Final Change 1 (owner 2026-11-22) the two progress pills show the
+        /// SELECTED Gameplay setting: levels cleared on it (of 25) and stars earned on it (of 75); <see cref="RefreshRegionPills"/> redraws them when the setting changes.
+        /// </summary>
         void AddLevelsWallet(RegionDef region)
         {
             AddPillRow();
@@ -309,12 +314,34 @@ namespace FluffyClimbers.Gameplay
             hl.spacing = 10f;
             hl.childControlWidth = hl.childControlHeight = true;
             hl.childForceExpandWidth = hl.childForceExpandHeight = true;
-            int cleared = 0;
-            foreach (string id in region.Levels) if (progress.IsLevelCleared(id)) cleared++;
             levelsText = ToyKit.WalletPillFlex(row, "LevelsPill", ToyKit.Get("icon_flag"), Color.white, 96f);
             regionStarsText = ToyKit.WalletPillFlex(row, "RegionStarsPill", art != null ? art.StarFilled : null, new Color(1f, 0.92f, 0.5f), 96f);
-            UiKit.SetText(levelsText, cleared + "/" + region.Levels.Count);
-            UiKit.SetText(regionStarsText, progress.StarsInRegion(region) + "/" + region.Levels.Count * 3);
+            levelsText.transform.parent.gameObject.AddComponent<A11yLabel>();
+            regionStarsText.transform.parent.gameObject.AddComponent<A11yLabel>();
+            RefreshRegionPills(region);
+        }
+
+        /// <summary>The flag pill (levels cleared) and the star pill (stars earned) of a region for the SELECTED Gameplay setting, with their accessibility text.</summary>
+        void RefreshRegionPills(RegionDef region)
+        {
+            if (region == null) return;
+            int mode = GameSettings.Difficulty;
+            string setting = GameSettings.DifficultyNames[Mathf.Clamp(mode, 0, GameSettings.DifficultyNames.Length - 1)];
+            int levels = region.Levels.Count;
+            if (levelsText != null)
+            {
+                int cleared = progress.LevelsClearedInRegion(region, mode);
+                UiKit.SetText(levelsText, cleared + "/" + levels);
+                var a11y = levelsText.transform.parent.GetComponent<A11yLabel>();
+                if (a11y != null) a11y.Text = cleared + " of " + levels + " levels cleared on " + setting;
+            }
+            if (regionStarsText != null)
+            {
+                int stars = progress.StarsInRegion(region, mode);
+                UiKit.SetText(regionStarsText, stars + "/" + levels * 3);
+                var a11y = regionStarsText.transform.parent.GetComponent<A11yLabel>();
+                if (a11y != null) a11y.Text = stars + " of " + levels * 3 + " stars on " + setting;
+            }
         }
 
         void RefreshWallet()
@@ -323,6 +350,7 @@ namespace FluffyClimbers.Gameplay
             if (gemText != null) UiKit.SetText(gemText, progress.Gems.ToString());
             if (starText != null)
             {
+                // Wallet star pill: the stars of ALL five Gameplay settings and all playable regions added up (StarsInRegion without a setting sums the settings).
                 int stars = 0;
                 for (int i = 1; i <= GameSession.PlayableRegions; i++)
                 {
@@ -886,14 +914,16 @@ namespace FluffyClimbers.Gameplay
             nrt.sizeDelta = new Vector2(400f, 56f);
             if (unlocked)
             {
+                // Region badge (Final Change 1): the stars of all five Gameplay settings added up, of 25 levels x 3 stars x 5 settings = 375.
                 int stars = progress.StarsInRegion(region);
+                int starsMax = region.Levels.Count * 3 * GameSettings.DifficultyNames.Length;
                 RectTransform pillRow = UiKit.Rect(page, "Stars" + region.Index);
                 pillRow.anchorMin = pillRow.anchorMax = new Vector2(lane, frac);
                 pillRow.pivot = new Vector2(0.5f, 1f);
                 pillRow.anchoredPosition = new Vector2(0f, -(size * 0.5f + 74f));
-                pillRow.sizeDelta = new Vector2(230f, 62f);
+                pillRow.sizeDelta = new Vector2(Mathf.Ceil(300f * Mathf.Max(1f, UiKit.TextScale)), 62f);   // wide enough for "375/375" at 130 percent text
                 Text st = ToyKit.WalletPillFlex(pillRow, "StarsPill", art != null ? art.StarFilled : null, new Color(1f, 0.92f, 0.5f), 62f);
-                UiKit.SetText(st, stars + "/" + region.Levels.Count * 3);
+                UiKit.SetText(st, stars + "/" + starsMax);
                 var hl = pillRow.gameObject.AddComponent<HorizontalLayoutGroup>();
                 hl.childControlWidth = hl.childControlHeight = true;
                 hl.childForceExpandWidth = hl.childForceExpandHeight = true;
@@ -1274,11 +1304,13 @@ namespace FluffyClimbers.Gameplay
         {
             bool playable = progress.IsRegionPlayable(region);
             bool unlocked = progress.IsRegionUnlocked(region);
-            int cleared = 0;
-            if (playable) foreach (string id in region.Levels) if (progress.IsLevelCleared(id)) cleared++;
+            // Per-setting progress (Final Change 1): "started" = a level cleared on ANY Gameplay setting, "completed" = all levels cleared on ONE setting (the rule that opens the next region).
+            bool started = false;
+            if (playable) foreach (string id in region.Levels) if (progress.IsLevelCleared(id)) { started = true; break; }
+            bool completed = playable && progress.IsRegionCompleteInAnySetting(region);
 
             // MapNodes order from the art sheet: unlocked, current, completed, locked, teaser, ring.
-            int sprite = !playable ? 4 : (!unlocked ? 3 : (cleared >= region.Levels.Count ? 2 : (cleared > 0 ? 1 : 0)));
+            int sprite = !playable ? 4 : (!unlocked ? 3 : (completed ? 2 : (started ? 1 : 0)));
             Sprite nodeSprite = art != null ? ArtCatalog.Pick(art.MapNodes, sprite) : null;
 
             // The painted medallion of this region (docs/16 section D, owner 2026-10-24); the old node art is the fallback.
@@ -1420,7 +1452,8 @@ namespace FluffyClimbers.Gameplay
             int price = progress.GemSkipPrice(region);
             RegionDef prev = repo.GetRegionByIndex(region.Index - 1);
             bool isNext = region.Index == progress.HighestUnlockedRegionIndex() + 1;
-            string body = "Clear level " + prev.Levels.Count + " of " + prev.Name + " to open " + region.Name + ".";
+            // Final Change 1: a region opens when ALL levels of the region before it are cleared on ONE Gameplay setting (any of the five).
+            string body = "Clear all " + prev.Levels.Count + " levels of " + prev.Name + " on one gameplay setting to open " + region.Name + ".";
             if (isNext) body += "\nOr skip ahead for " + price + " gems (you have " + progress.Gems + ").";
             OpenPopup(region.Name + " is locked", body);
             if (isNext)
@@ -1446,39 +1479,48 @@ namespace FluffyClimbers.Gameplay
             AddLevelsWallet(region);
             AddBack("Map", ShowMap);
             List<LevelDef> levels = repo.LevelsOf(region.Id);
-            string currentId = null;
-            foreach (LevelDef l in levels) if (progress.IsLevelUnlocked(l) && !progress.IsLevelCleared(l.Id)) { currentId = l.Id; break; }
 
-            // A winding path of 15 round nodes, level 1 at the bottom (docs/16 section C): the nodes follow four lanes (centre, left, centre, right),
-            // dotted lines join them, and the path scrolls; it opens on the current level. Title row and the Endless icon stay fixed above it.
+            // Fixed header, from the top (owner Final Change 1, 2026-11-22): the wallet pills and the two progress pills (they end at 236), THEN the five Gameplay
+            // settings, THEN the region name row with the Endless button, then the scrolling level path.
+            float gameplayRowH = BuildGameplayRow(screen, LevelHeaderTop);   // the row plus the gap below it (MetaController.Gameplay.cs)
+
+            float titleTop = LevelHeaderTop + gameplayRowH;
+            float titleH = LevelTitleRowHeight();
+            float endlessH = EndlessButtonHeight(), endlessW = EndlessButtonWidth();
             RectTransform titleRow = UiKit.Rect(screen, "TitleRow");
             titleRow.anchorMin = new Vector2(0f, 1f);
             titleRow.anchorMax = new Vector2(1f, 1f);
             titleRow.pivot = new Vector2(0.5f, 1f);
-            titleRow.anchoredPosition = new Vector2(0f, -244f);
-            titleRow.sizeDelta = new Vector2(-40f, 176f);
+            titleRow.anchoredPosition = new Vector2(0f, -titleTop);
+            titleRow.sizeDelta = new Vector2(-32f, titleH);
             Text hdr = UiKit.AddText(titleRow, "Header", region.Name, 64, Color.white, TextAnchor.MiddleLeft, true);
             var hrt = (RectTransform)hdr.transform;
             hrt.anchorMin = Vector2.zero;
             hrt.anchorMax = Vector2.one;
-            hrt.offsetMin = new Vector2(24f, 0f);
-            hrt.offsetMax = new Vector2(-170f, 0f);
+            hrt.offsetMin = new Vector2(8f, 0f);
+            hrt.offsetMax = new Vector2(-(endlessW + 12f), 0f);
 
-            Button endlessIcon = ToyKit.IconButton(titleRow, "Endless", "Endless mode", 1, Glyphs.Infinity, new Vector2(136f, 136f), () => OnEndlessTapped(region), 0.72f);
-            UiKit.Place((RectTransform)endlessIcon.transform, new Vector2(1f, 0.5f), Vector2.zero, new Vector2(136f, 136f));
-            endlessIcon.GetComponent<RectTransform>().pivot = new Vector2(1f, 0.5f);
+            // ONE button for Endless and Time Attack (the Endless popup holds START and Time Attack): slightly wider than before, the two glyphs side by side.
+            Button endlessIcon = UiKit.AddButton(titleRow, "Endless", "", ToyKit.Button(1), Color.white, new Vector2(endlessW, endlessH), () => OnEndlessTapped(region));
+            endlessIcon.GetComponent<A11yLabel>().Text = "Endless and Time Attack";
+            endlessIcon.GetComponent<Image>().raycastTarget = true;
+            var ert = (RectTransform)endlessIcon.transform;
+            UiKit.Place(ert, new Vector2(1f, 0.5f), Vector2.zero, new Vector2(endlessW, endlessH));
+            ert.pivot = new Vector2(1f, 0.5f);
+            float glyph = Mathf.Round(Mathf.Min(endlessH * 0.62f, endlessW * 0.41f));
+            AddEndlessGlyph(ert, EndlessGlyphName, Glyphs.Infinity, -endlessW * 0.235f, glyph);
+            AddEndlessGlyph(ert, TimeAttackGlyphName, TimedIcons.Stopwatch, endlessW * 0.235f, glyph);
 
-            float gameplayRowH = BuildGameplayRow(screen, 244f + 176f + 12f);   // five Gameplay buttons directly below the region name
-
+            // A winding path of round nodes, level 1 at the bottom (docs/16 section C): three levels per row on a snake road, and the path scrolls; it opens on
+            // the current level of the selected Gameplay setting. The header rows above stay fixed.
             RectTransform vp = UiKit.Rect(screen, "PathViewport");
             vp.anchorMin = Vector2.zero;
             vp.anchorMax = Vector2.one;
             vp.offsetMin = new Vector2(0f, ToyKit.TabBarReserve + 8f);
-            vp.offsetMax = new Vector2(0f, -(430f + gameplayRowH));   // the path starts below the Gameplay row (Bug List 6 item 6)
+            vp.offsetMax = new Vector2(0f, -(titleTop + titleH + LevelHeaderGap));   // the path starts below the region name row
             vp.gameObject.AddComponent<RectMask2D>();
             var vhit = vp.gameObject.AddComponent<Image>();
             vhit.color = new Color(0f, 0f, 0f, 0f);
-            const float nodeSize = 150f;
             RectTransform content = UiKit.Rect(vp, "PathContent");
             content.anchorMin = new Vector2(0f, 0f);
             content.anchorMax = new Vector2(1f, 0f);
@@ -1495,22 +1537,139 @@ namespace FluffyClimbers.Gameplay
             scroll.movementType = ScrollRect.MovementType.Elastic;
             scroll.scrollSensitivity = 60f;
 
-            var nodes = new RectTransform[levels.Count];
-            int lastUnlocked = 0, currentIdx = 0;
+            levelPath = new LevelPathUi { Region = region, Levels = levels, Scroll = scroll, Content = content };
+            BuildLevelNodes(levelPath);
+            StartCoroutine(LayoutPath(levelPath));
+            AddTabBar(-1, false);
+        }
+
+        // ---- level screen header geometry (canvas units below the top of the safe area) ----
+
+        /// <summary>Top of the Gameplay row: the wallet pills end at 128, the two progress pills at 236.</summary>
+        const float LevelHeaderTop = 244f;
+        /// <summary>Gap between the region name row and the path.</summary>
+        const float LevelHeaderGap = 8f;
+        /// <summary>Size of a level node on the path.</summary>
+        const float LevelNodeSize = 150f;
+
+        /// <summary>Names of the two glyphs on the Endless button of the level screen (tests look them up).</summary>
+        public const string EndlessGlyphName = "EndlessGlyph", TimeAttackGlyphName = "TimeAttackGlyph";
+
+        /// <summary>Height of the Endless button on the level screen: 136, never below 48 dp on the real screen.</summary>
+        public static float EndlessButtonHeight() { return Mathf.Max(136f, UiKit.MinTouchRef); }
+
+        /// <summary>Width of the Endless button: one and a half times its height (204 x 136; it was 136 x 136), room for the infinity and the stopwatch glyph side by side.</summary>
+        public static float EndlessButtonWidth() { return Mathf.Round(EndlessButtonHeight() * 1.5f); }
+
+        /// <summary>
+        /// Height of the region name row: the Endless button plus a little air, and never less than TWO lines of the region name at the current text size
+        /// (a long name on a narrow screen at 130 percent text wraps; it must not run into the Gameplay row above or the path below).
+        /// </summary>
+        static float LevelTitleRowHeight()
+        {
+            return Mathf.Max(EndlessButtonHeight() + 8f, Mathf.Ceil(2f * 64f * UiKit.TextScale * 1.2f) + 4f);
+        }
+
+        /// <summary>One white glyph on the Endless button, <paramref name="x"/> right of its centre (never stretched: the image keeps its aspect).</summary>
+        static void AddEndlessGlyph(RectTransform button, string name, Sprite glyph, float x, float size)
+        {
+            Image g = UiKit.AddImage(button, name, glyph, Color.white);
+            g.preserveAspect = true;
+            RectTransform rt = g.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(x, 0f);
+            rt.sizeDelta = new Vector2(size, size);
+        }
+
+        // ---- the level path of the selected Gameplay setting ----
+
+        /// <summary>
+        /// The live level path of the level screen. Stars, locks and the current level are kept PER Gameplay setting (Final Change 1), so each setting has its own path
+        /// through the region: when the setting changes the nodes are rebuilt and the road is re-split into its lit and dim part, without drawing the road texture again.
+        /// </summary>
+        sealed class LevelPathUi
+        {
+            public RegionDef Region;
+            public List<LevelDef> Levels;
+            public ScrollRect Scroll;
+            public RectTransform Content;
+            public RectTransform[] Nodes;
+            /// <summary>The road, four pieces of ONE texture: 0 = the rows below the last open level (lit), 1 = the lit part of its row, 2 = the dim part of its row, 3 = the rows above (dim).</summary>
+            public RawImage[] Line;
+            public float YBase, RowPitch, ContentH;
+            public bool LaidOut;
+            /// <summary>Index of the current level (first open, not cleared) and of the last open level of the selected setting.</summary>
+            public int Current, LastUnlocked;
+        }
+
+        LevelPathUi levelPath;
+
+        /// <summary>
+        /// (Re)builds the level nodes for the SELECTED Gameplay setting: lock state, cleared look, the three stars, the medal and the current-level marker all come
+        /// from that setting. Earlier nodes are removed first. About 25 small objects, no texture work: cheap enough for a tap on a setting.
+        /// </summary>
+        void BuildLevelNodes(LevelPathUi ui)
+        {
+            int mode = GameSettings.Difficulty;
+            List<LevelDef> levels = ui.Levels;
+            if (ui.Nodes != null)
+            {
+                for (int i = 0; i < ui.Nodes.Length; i++)
+                {
+                    if (ui.Nodes[i] == null) continue;
+                    ui.Nodes[i].name = "LevelOld";               // Destroy runs at the end of the frame: until then the old node is hidden and out of the way of name look-ups
+                    ui.Nodes[i].gameObject.SetActive(false);
+                    Destroy(ui.Nodes[i].gameObject);
+                }
+            }
+            int current = -1, lastUnlocked = 0;
             for (int i = 0; i < levels.Count; i++)
             {
-                LevelDef l = levels[i];
-                bool isCur = l.Id == currentId;
-                nodes[i] = AddLevelNode(l, content, isCur);
-                nodes[i].anchorMin = nodes[i].anchorMax = new Vector2(0.5f, 0f);
-                nodes[i].pivot = new Vector2(0.5f, 0.5f);
-                nodes[i].sizeDelta = new Vector2(nodeSize, nodeSize);
-                nodes[i].localScale = Vector3.one * (isCur ? 1.15f : 1f);
-                if (progress.IsLevelUnlocked(levels[i])) lastUnlocked = i;
-                if (isCur) currentIdx = i;
+                if (!progress.IsLevelUnlocked(levels[i], mode)) continue;
+                lastUnlocked = i;
+                if (current < 0 && !progress.IsLevelCleared(levels[i].Id, mode)) current = i;
             }
-            StartCoroutine(LayoutPath(scroll, content, nodes, nodeSize, lastUnlocked, currentIdx));
-            AddTabBar(-1, false);
+            var nodes = new RectTransform[levels.Count];
+            for (int i = 0; i < levels.Count; i++)
+            {
+                bool isCur = i == current;
+                RectTransform n = AddLevelNode(levels[i], ui.Content, isCur);
+                n.anchorMin = n.anchorMax = new Vector2(ui.LaidOut ? PathX(i) : 0.5f, 0f);
+                n.pivot = new Vector2(0.5f, 0.5f);
+                n.sizeDelta = new Vector2(LevelNodeSize, LevelNodeSize);
+                n.localScale = Vector3.one * (isCur ? 1.15f : 1f);
+                if (ui.LaidOut) n.anchoredPosition = new Vector2(0f, ui.YBase + PathRow(i) * ui.RowPitch);
+                nodes[i] = n;
+            }
+            ui.Nodes = nodes;
+            ui.Current = Mathf.Max(0, current);
+            ui.LastUnlocked = lastUnlocked;
+        }
+
+        /// <summary>
+        /// The Gameplay setting changed (MetaController.Gameplay.cs): the two progress pills, every node (stars, lock, medal, current marker), the lit part of the road
+        /// and the scroll position follow the new setting. No-op when the level screen is not open.
+        /// </summary>
+        void RefreshLevelPath()
+        {
+            LevelPathUi ui = levelPath;
+            if (ui == null || ui.Content == null) return;
+            RefreshRegionPills(ui.Region);
+            BuildLevelNodes(ui);
+            ApplyPathProgress(ui);
+        }
+
+        /// <summary>Splits the road at the last open level of the selected setting and scrolls so its current level sits in the middle. Needs the first layout pass.</summary>
+        void ApplyPathProgress(LevelPathUi ui)
+        {
+            if (ui == null || !ui.LaidOut || ui.Scroll == null) return;
+            SplitPathLine(ui);
+            float vpH = ((RectTransform)ui.Scroll.viewport).rect.height;
+            float y = ui.YBase + PathRow(ui.Current) * ui.RowPitch;
+            float span = Mathf.Max(1f, ui.ContentH - vpH);
+            ui.Scroll.StopMovement();
+            ui.Scroll.verticalNormalizedPosition = Mathf.Clamp01((y - vpH * 0.5f) / span);
         }
 
         /// <summary>
@@ -1578,8 +1737,15 @@ namespace FluffyClimbers.Gameplay
             }
         }
 
-        /// <summary>Draws the road as ONE thin translucent white line (a hair of navy around it) into a single texture, under the nodes.</summary>
-        void BuildPathLine(RectTransform content, float w, float h, System.Collections.Generic.List<Vector2> pts, System.Collections.Generic.List<int> toNode, int lastUnlocked)
+        /// <summary>Share of the road's opacity that the part leading to still locked levels keeps.</summary>
+        const float PathLockedFade = 0.45f;
+
+        /// <summary>
+        /// Draws the road as ONE thin translucent white line (a hair of navy around it) into a single texture, under the nodes. The whole road is drawn at full strength
+        /// ONCE; four images share the texture and <see cref="SplitPathLine"/> shows the part behind the last open level lit and the rest faded, so a change of the
+        /// Gameplay setting (another level is the last open one) never draws the texture again (no hitch, CUX-1).
+        /// </summary>
+        RawImage[] BuildPathLine(RectTransform content, float w, float h, System.Collections.Generic.List<Vector2> pts)
         {
             const float sc = 1f;
             int tw = Mathf.Max(8, Mathf.RoundToInt(w * sc)), th = Mathf.Max(8, Mathf.RoundToInt(h * sc));
@@ -1592,7 +1758,7 @@ namespace FluffyClimbers.Gameplay
                 float baseAlpha = pass == 0 ? 0.22f : 0.6f;
                 for (int n = 0; n < pts.Count; n++)
                 {
-                    float sa = baseAlpha * (toNode[n] <= lastUnlocked ? 1f : 0.45f);
+                    float sa = baseAlpha;
                     int cx = Mathf.RoundToInt(pts[n].x * sc), cy = Mathf.RoundToInt(pts[n].y * sc), r = Mathf.CeilToInt(radius) + 1;
                     for (int dy = -r; dy <= r; dy++)
                     {
@@ -1622,35 +1788,84 @@ namespace FluffyClimbers.Gameplay
             var tex = new Texture2D(tw, th, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
             tex.SetPixels(px);
             tex.Apply();
-            var raw = UiKit.Rect(content, "PathLine").gameObject.AddComponent<RawImage>();
-            raw.texture = tex;
-            raw.raycastTarget = false;
-            raw.rectTransform.anchorMin = new Vector2(0f, 0f);
-            raw.rectTransform.anchorMax = new Vector2(1f, 0f);
-            raw.rectTransform.pivot = new Vector2(0.5f, 0f);
-            raw.rectTransform.anchoredPosition = Vector2.zero;
-            raw.rectTransform.sizeDelta = new Vector2(0f, h);
-            raw.transform.SetAsFirstSibling();   // under the nodes
+            var parts = new RawImage[4];
+            for (int i = parts.Length - 1; i >= 0; i--)
+            {
+                var raw = UiKit.Rect(content, i == 0 ? "PathLine" : "PathLine" + i).gameObject.AddComponent<RawImage>();
+                raw.texture = tex;
+                raw.raycastTarget = false;
+                raw.transform.SetAsFirstSibling();   // under the nodes
+                parts[i] = raw;
+                SetPathPart(raw, 0f, i == 0 ? 1f : 0f, 0f, h, h, 1f);   // the whole road in piece 0 until SplitPathLine cuts it
+            }
+            return parts;
         }
 
         /// <summary>
-        /// After the first layout pass: places the 15 nodes on the snake so that TEN levels fit the real height of the view (owner, 2026-10-24),
-        /// draws the road, and scrolls so the current level sits in the middle.
+        /// Shows the road lit up to the last open level of the selected Gameplay setting and faded beyond it. The road is a snake, three levels per row: every row below the
+        /// row of that level is lit, every row above it is faded, and its own row is cut at the level (the side the road comes from is lit). The row bands end at the
+        /// hairpin apex between two rows, so each half of a turn belongs to the row it touches. Only rectangles and UV rectangles change: no texture work.
         /// </summary>
-        System.Collections.IEnumerator LayoutPath(ScrollRect scroll, RectTransform content, RectTransform[] nodes, float nodeSize, int lastUnlocked, int currentIdx)
+        void SplitPathLine(LevelPathUi ui)
+        {
+            if (ui.Line == null) return;
+            float h = ui.ContentH;
+            int last = Mathf.Clamp(ui.LastUnlocked, 0, Mathf.Max(0, ui.Levels.Count - 1));
+            int row = PathRow(last);
+            float y0 = row == 0 ? 0f : Mathf.Clamp(ui.YBase + (row - 0.5f) * ui.RowPitch, 0f, h);
+            float y1 = Mathf.Clamp(ui.YBase + (row + 0.5f) * ui.RowPitch, 0f, h);
+            float x = PathX(last);
+            bool leftToRight = row % 2 == 0;
+            SetPathPart(ui.Line[0], 0f, 1f, 0f, y0, h, 1f);
+            SetPathPart(ui.Line[1], leftToRight ? 0f : x, leftToRight ? x : 1f, y0, y1, h, 1f);
+            SetPathPart(ui.Line[2], leftToRight ? x : 0f, leftToRight ? 1f : x, y0, y1, h, PathLockedFade);
+            SetPathPart(ui.Line[3], 0f, 1f, y1, h, h, PathLockedFade);
+        }
+
+        /// <summary>
+        /// One piece of the road: the part of the texture from <paramref name="x0"/> to <paramref name="x1"/> (fractions of the width) and <paramref name="y0"/> to
+        /// <paramref name="y1"/> (canvas units from the bottom of the content, which is <paramref name="h"/> high), drawn exactly where it lies. An empty piece is switched off.
+        /// </summary>
+        static void SetPathPart(RawImage raw, float x0, float x1, float y0, float y1, float h, float alpha)
+        {
+            if (raw == null) return;
+            bool show = x1 - x0 > 0.0005f && y1 - y0 > 0.5f && h > 0.5f;
+            raw.enabled = show;
+            if (!show) return;
+            RectTransform rt = raw.rectTransform;
+            rt.anchorMin = new Vector2(x0, 0f);
+            rt.anchorMax = new Vector2(x1, 0f);
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.anchoredPosition = new Vector2(0f, y0);
+            rt.sizeDelta = new Vector2(0f, y1 - y0);
+            raw.uvRect = new Rect(x0, y0 / h, x1 - x0, (y1 - y0) / h);
+            raw.color = new Color(1f, 1f, 1f, alpha);
+        }
+
+        /// <summary>
+        /// After the first layout pass: places the nodes on the snake so that TEN levels fit the real height of the view (owner, 2026-10-24),
+        /// draws the road once, and scrolls so the current level of the selected Gameplay setting sits in the middle.
+        /// </summary>
+        System.Collections.IEnumerator LayoutPath(LevelPathUi ui)
         {
             yield return null;
-            if (scroll == null) yield break;
-            RectTransform vpr = (RectTransform)scroll.viewport;
+            if (ui == null || ui != levelPath || ui.Scroll == null || ui.Content == null) yield break;   // the screen was left or rebuilt meanwhile
+            RectTransform vpr = (RectTransform)ui.Scroll.viewport;
             float vpH = vpr.rect.height, w = vpr.rect.width;
             const float starRoom = 56f, edge = 24f;
             // level 10 is the first node of row 3: rows 0..3 span three row gaps; they plus one node and its stars fill the view
-            float rowPitch = Mathf.Clamp((vpH - nodeSize - starRoom - 2f * edge) / 3f, MinPathRowPitch, 600f);   // never below MinPathRowPitch: the path scrolls, so a short view shows fewer levels instead of overlapping stars and numbers
-            float yBase = edge + starRoom + nodeSize * 0.5f;
-            int rows = (nodes.Length + PathPerRow - 1) / PathPerRow;
+            float rowPitch = Mathf.Clamp((vpH - LevelNodeSize - starRoom - 2f * edge) / 3f, MinPathRowPitch, 600f);   // never below MinPathRowPitch: the path scrolls, so a short view shows fewer levels instead of overlapping stars and numbers
+            float yBase = edge + starRoom + LevelNodeSize * 0.5f;
+            int count = ui.Levels.Count;
+            int rows = (count + PathPerRow - 1) / PathPerRow;
             float contentH = yBase * 2f + (rows - 1) * rowPitch;
-            content.sizeDelta = new Vector2(0f, contentH);
-            for (int i = 0; i < nodes.Length; i++)
+            ui.Content.sizeDelta = new Vector2(0f, contentH);
+            ui.YBase = yBase;
+            ui.RowPitch = rowPitch;
+            ui.ContentH = contentH;
+            ui.LaidOut = true;
+            RectTransform[] nodes = ui.Nodes;   // the nodes of the setting that is selected NOW (a tap during the first frame already rebuilt them)
+            for (int i = 0; nodes != null && i < nodes.Length; i++)
             {
                 if (nodes[i] == null) continue;
                 nodes[i].anchorMin = nodes[i].anchorMax = new Vector2(PathX(i), 0f);
@@ -1658,12 +1873,10 @@ namespace FluffyClimbers.Gameplay
             }
             var pts = new System.Collections.Generic.List<Vector2>();
             var toNode = new System.Collections.Generic.List<int>();
-            BuildRoad(nodes.Length, w, yBase, rowPitch, pts, toNode);
-            BuildPathLine(content, w, contentH, pts, toNode, lastUnlocked);
-            float y = yBase + PathRow(currentIdx) * rowPitch;
-            float span = Mathf.Max(1f, contentH - vpH);
-            scroll.verticalNormalizedPosition = Mathf.Clamp01((y - vpH * 0.5f) / span);
-            var cg = content.GetComponent<CanvasGroup>();
+            BuildRoad(count, w, yBase, rowPitch, pts, toNode);
+            ui.Line = BuildPathLine(ui.Content, w, contentH, pts);
+            ApplyPathProgress(ui);
+            var cg = ui.Content.GetComponent<CanvasGroup>();
             if (cg != null) cg.alpha = 1f;
         }
 
@@ -1679,7 +1892,9 @@ namespace FluffyClimbers.Gameplay
             float recordTop = 440f + CrownInfoUi.RowHeight() + 14f;   // the single crown line (best crown | best floors) sits at 440, under the region name (352 to 432)
             float taLineTop = recordTop + TimedUi.RecordBlockHeight(bestPace.IsValid || bestAlive > 0) + 10f;
             TimeAttackRecord taRec = progress.TimeAttackBest(region.Id, mode);
-            OpenPopup("Endless", "", taLineTop + TimeAttackLineHeight(taRec) + 8f + EndlessActionRowHeight());
+            CharacterSpec penalisedHero = PenaltyUi.PenalisedHero(region);   // region penalty (owner Final Change 2): icon between START and Time Attack, message above the row
+            float penaltyH = penalisedHero != null ? PenaltyUi.NoteHeight() + 10f : 0f;
+            OpenPopup("Endless", "", taLineTop + TimeAttackLineHeight(taRec) + 8f + penaltyH + EndlessActionRowHeight());
             Transform panel = popup.Find("Panel");
             Destroy(panel.Find("Body").gameObject);
             Transform endTitle = panel.Find("Title");
@@ -1702,7 +1917,7 @@ namespace FluffyClimbers.Gameplay
                 ToyKit.Get("icon_tower"), best > 0 ? best.ToString() : "-", best > 0 ? "Best " + best + " floors" : "No floors yet");
             TimedUi.RecordBlock(panel, recordTop, mode, bestPace, bestAlive, true);
             AddTimeAttackEntry((RectTransform)panel, region, mode, taLineTop);
-            AddEndlessActionRow((RectTransform)panel, region);   // START (Endless) and Time Attack: two green buttons on one row
+            AddEndlessActionRow((RectTransform)panel, region, penalisedHero, () => OnEndlessTapped(region));   // START (Endless) and Time Attack: two green buttons on one row
         }
 
         /// <summary>Height reserved at the bottom of the level screen for the Endless button (button 130 + 24 margin + 16 gap).</summary>
@@ -1719,7 +1934,7 @@ namespace FluffyClimbers.Gameplay
         public const string MedalBadgeName = "MedalBadge";
 
         /// <summary>
-        /// Doc 46: the medal of the CURRENT Gameplay mode (not the best over all five) sits at the top left of the node (the gem badge is at the top right); nothing without medal data.
+        /// Doc 46: the medal of the CURRENT Gameplay mode (not the best over all five) is the corner pip at the top left of the node (the gem or special badge is the pip at the top right); nothing without medal data.
         /// Replaces an earlier badge, so the level screen can refresh it when the Gameplay mode changes.
         /// </summary>
         void ApplyMedalBadge(RectTransform node, LevelDef level, bool unlocked)
@@ -1731,31 +1946,28 @@ namespace FluffyClimbers.Gameplay
             Image mi = UiKit.AddImage(node, MedalBadgeName, MedalIcons.For(medal, true), Color.white);
             mi.rectTransform.anchorMin = mi.rectTransform.anchorMax = new Vector2(0f, 1f);
             mi.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            mi.rectTransform.anchoredPosition = new Vector2(14f, -14f);
-            mi.rectTransform.sizeDelta = new Vector2(64f, 64f);
+            // The corner pip rule mirrored to the top LEFT corner (see CornerPipPosition): the 64 px medal ends 20 px inside the tile's left edge (x -44..20 of the 150 px tile,
+            // y 0..64), so it is left of a two-digit level number at 130 percent text (the number starts at about x 20), inside the height of the tile (clear of the stars of the row
+            // above) and inside the path view (the left lane is at 16 percent of the view). It used to sit at x -18..46 and ran into the number.
+            mi.rectTransform.anchoredPosition = CornerPipPositionLeft(MedalBadgeSize);
+            mi.rectTransform.sizeDelta = new Vector2(MedalBadgeSize, MedalBadgeSize);
             mi.gameObject.AddComponent<A11yLabel>().Text = MedalIcons.Name(medal) + " medal, " + GameSettings.DifficultyNames[Mathf.Clamp(GameSettings.Difficulty, 0, GameSettings.DifficultyNames.Length - 1)];
         }
 
-        /// <summary>Redraws the medal badges of the open level screen for the current Gameplay mode.</summary>
-        void RefreshMedalBadges()
-        {
-            if (screen == null || string.IsNullOrEmpty(currentRegionId)) return;
-            List<LevelDef> levels = repo.LevelsOf(currentRegionId);
-            foreach (Button b in screen.GetComponentsInChildren<Button>(true))
-            {
-                if (!b.name.StartsWith("Level", System.StringComparison.Ordinal)) continue;
-                int idx;
-                if (!int.TryParse(b.name.Substring(5), out idx)) continue;
-                foreach (LevelDef l in levels) if (l.Index == idx) { ApplyMedalBadge((RectTransform)b.transform, l, progress.IsLevelUnlocked(l)); break; }
-            }
-        }
+        // The medal badges follow a change of the Gameplay setting with the rest of the node: RefreshLevelPath rebuilds every node (Final Change 1).
 
         // Sprite order of ui_level_nodes after slicing: 0 plain bubble, 1 gem bubble (garbled text), 2 crown, 3 padlock,
         // 4 = three small pieces (NOT a node), 5 large bubble.
+        /// <summary>
+        /// One level node for the SELECTED Gameplay setting (Final Change 1): locked / open / cleared, the three stars and the medal are those of that setting.
+        /// Only the gem badge looks at every setting: the gems of a level are paid once, so it reads "collected" once the level is cleared in ANY setting.
+        /// </summary>
         RectTransform AddLevelNode(LevelDef level, Transform parent, bool isCurrent)
         {
-            bool unlocked = progress.IsLevelUnlocked(level);
-            bool cleared = progress.IsLevelCleared(level.Id);
+            int mode = GameSettings.Difficulty;
+            bool unlocked = progress.IsLevelUnlocked(level, mode);
+            bool cleared = progress.IsLevelCleared(level.Id, mode);
+            int stars = unlocked ? progress.StarsOf(level.Id, mode) : 0;
             bool boss = level.LevelClass == LevelDef.ClassHighlyComplex;
             bool complex = level.LevelClass == LevelDef.ClassComplex;
             int sprite = !unlocked ? 3 : (boss ? 2 : (cleared ? 5 : 0));
@@ -1766,6 +1978,10 @@ namespace FluffyClimbers.Gameplay
             Button b = UiKit.AddButton(parent, "Level" + level.Index, "", nodeSprite, tint, new Vector2(190f, 190f), () => OnLevelTapped(level), 40);
             RectTransform rt = (RectTransform)b.transform;
             b.GetComponent<Image>().preserveAspect = true;
+            string setting = GameSettings.DifficultyNames[Mathf.Clamp(mode, 0, GameSettings.DifficultyNames.Length - 1)];
+            SpecialLevelType special = level.SpecialType;   // owner Final Change 1: one of the six special types, or None (Regular Run)
+            b.GetComponent<A11yLabel>().Text = "Level " + level.Index + (special != SpecialLevelType.None ? ", " + SpecialLevels.Name(special) : "")
+                + (unlocked ? ", " + stars + " of 3 stars on " + setting + (isCurrent ? ", current level" : "") : ", locked on " + setting);
             if (unlocked && !boss)
             {
                 Text num = UiKit.AddText(rt, "Num", level.Index.ToString(), 72, UiKit.ButtonInk);
@@ -1774,10 +1990,9 @@ namespace FluffyClimbers.Gameplay
             }
             // Economy review 2026-11-13: the gem icon alone (no numeral, no tick since 2026-11-16) marks the levels that hold gems (via the gem-level helper).
             int milestoneGems = RewardCalculator.MilestoneGemsOf(level);
-            if (unlocked && milestoneGems > 0 && art != null && art.GemIcon != null) AddGemBadge(rt, milestoneGems, cleared);
+            if (unlocked && milestoneGems > 0 && art != null && art.GemIcon != null) AddGemBadge(rt, milestoneGems, progress.IsLevelCleared(level.Id));   // collected = cleared in ANY setting
+            else if (unlocked && special != SpecialLevelType.None) AddSpecialBadge(rt, special);   // a special level is never a gem level: the badge takes the gem badge's corner
             ApplyMedalBadge(rt, level, unlocked);
-            LevelProgress p = progress.GetProgress(level.Id);
-            int stars = p != null ? p.Stars : 0;
             for (int s = 0; s < 3 && unlocked; s++)
             {
                 Sprite star = art != null ? (s < stars ? art.StarFilled : art.StarEmpty) : null;
@@ -1797,42 +2012,133 @@ namespace FluffyClimbers.Gameplay
         /// <summary>
         /// The gem badge on the top right of a level tile: the gem icon only (no numeral, no tick; owner 2026-11-16). The medal sits top left; the level number stays in the middle.
         /// </summary>
+        /// <summary>Size of the gem badge on a level tile (reference px).</summary>
+        public const float GemBadgeSize = 48f;
+        /// <summary>
+        /// The corner pip rule of a level tile (CUX-3, PlayMode run 2026-11-22). The tile is LevelNodeSize (150) wide on the path and its number is centred: two digits at 130 percent
+        /// text are about 110 wide, so the number's box ends about 130 from the tile's left edge. A badge in the top right corner therefore starts
+        /// <see cref="BadgeClearOfNumber"/> (20) px inside the tile's right edge, i.e. at x = 130, and hangs out over the right edge like a pip on the rim of the bubble; its top is the
+        /// tile's top. So it never shares a column with the number (whatever the text size), stays inside the height of the tile (the stars are below the tile, the stars of the row
+        /// above are above it) and the medal keeps the top left corner. The gem badge and the special badge both use it; a level never has both.
+        /// </summary>
+        public const float BadgeClearOfNumber = 20f;
+
+        /// <summary>Size of the medal badge on a level tile (reference px).</summary>
+        public const float MedalBadgeSize = 64f;
+
+        /// <summary>The same pip mirrored to the top LEFT corner (anchor = the tile's top left corner, pivot = the badge centre): the medal badge.</summary>
+        public static Vector2 CornerPipPositionLeft(float size)
+        {
+            return new Vector2(BadgeClearOfNumber - size * 0.5f, -size * 0.5f);
+        }
+
+        /// <summary>Anchored position (anchor = the tile's top right corner, pivot = the badge centre) of a square corner pip of the given size, see <see cref="BadgeClearOfNumber"/>.</summary>
+        public static Vector2 CornerPipPosition(float size)
+        {
+            return new Vector2(-BadgeClearOfNumber + size * 0.5f, -size * 0.5f);
+        }
+
         void AddGemBadge(RectTransform node, int gems, bool claimed)
         {
-            // Bug List 4 (2026-11-16): the icon sits on the green circle's edge at about 45 degrees (the circle edge is roughly 28 px in from the tile corner), so it touches the circle
-            // instead of floating in the corner. Icon 48 px, centre 30 px inside the corner: it spans x 136..184 and y 6..54 (tile 190 wide); the level number (72 px, two digits about 80 px wide)
-            // spans about x 55..135, so the icon stays clear of it and of the neighbouring tiles. Fully inside the tile: never clipped by the scroll area.
+            // A corner pip (CornerPipPosition): 48 px, x 130..178 of the 150 px tile (28 px over its right edge), y 0..48 from its top. It touches the rim of the bubble and is clear of
+            // the level number at every text size (it used to sit 30 px inside the corner and ran into a two-digit number). The path lanes leave room for it: the right lane ends
+            // at 84 percent of the view, so even the scaled current tile keeps its pip inside the scroll area.
+            // Collected = the level was cleared in ANY Gameplay setting (the gems are paid once per level). The tile keeps the plain icon (no tick, owner 2026-11-16);
+            // the accessibility text says "collected", and the level popup shows the tick.
             Image gem = UiKit.AddImage(node, GemBadgeName, art.GemIcon, Color.white);
             gem.rectTransform.anchorMin = gem.rectTransform.anchorMax = new Vector2(1f, 1f);
             gem.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            gem.rectTransform.anchoredPosition = new Vector2(-30f, -30f);
-            gem.rectTransform.sizeDelta = new Vector2(48f, 48f);
-            gem.gameObject.AddComponent<A11yLabel>().Text = "Gems to collect in this level";
+            gem.rectTransform.anchoredPosition = CornerPipPosition(GemBadgeSize);
+            gem.rectTransform.sizeDelta = new Vector2(GemBadgeSize, GemBadgeSize);
+            gem.gameObject.AddComponent<A11yLabel>().Text = claimed ? "Gems of this level collected" : "Gems to collect in this level";
+        }
+
+        /// <summary>Name of the special level badge on a level tile and of its glyph text.</summary>
+        public const string SpecialBadgeName = "SpecialBadge";
+        /// <summary>Size of the special badge (reference px). It is a corner pip like the gem badge (<see cref="CornerPipPosition"/>): x 130..186 of the 150 px tile, y 0..56.</summary>
+        public const float SpecialBadgeSize = 56f;
+
+        /// <summary>
+        /// The special level badge on the top right of a level tile (owner Final Change 1, 2026-11-22): a dark disc with the type's own glyph (SpecialLevels.Glyph: a different
+        /// character per type, so the six types never differ by colour alone) and an accessibility label with the type name and its rule. A special level is never a gem level,
+        /// so the badge uses the corner pip of the gem badge (CornerPipPosition): to the right of the level number at every text size, inside the height of the tile, so nothing
+        /// overlaps the number, the medal badge (top left) or the three stars (under the tile), CUX-3.
+        /// </summary>
+        void AddSpecialBadge(RectTransform node, SpecialLevelType type)
+        {
+            Image disc = UiKit.AddImage(node, SpecialBadgeName, Theme.RoundSprite, new Color(Theme.Ink.r, Theme.Ink.g, Theme.Ink.b, 0.94f));
+            disc.type = Image.Type.Sliced;
+            disc.pixelsPerUnitMultiplier = Mathf.Max(0.2f, 44f / (SpecialBadgeSize * 0.5f));
+            disc.raycastTarget = false;
+            disc.rectTransform.anchorMin = disc.rectTransform.anchorMax = new Vector2(1f, 1f);
+            disc.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            disc.rectTransform.anchoredPosition = CornerPipPosition(SpecialBadgeSize);   // the pip starts right of a two-digit level number at 130 percent text, so the widest glyph (W, M) never meets it
+            disc.rectTransform.sizeDelta = new Vector2(SpecialBadgeSize, SpecialBadgeSize);
+            Text glyph = UiKit.AddText(disc.transform, "Glyph", SpecialLevels.Glyph(type), 42, Color.white, TextAnchor.MiddleCenter, true);
+            glyph.fontSize = Mathf.RoundToInt(UiKit.MinBodyTextPx);   // a badge glyph, not body text: it keeps its size at 130 percent text so it stays inside the disc and clear of the level number
+            DropOutline(glyph);
+            glyph.horizontalOverflow = HorizontalWrapMode.Overflow;
+            UiKit.Stretch((RectTransform)glyph.transform);
+            disc.gameObject.AddComponent<A11yLabel>().Text = "Special level: " + SpecialLevels.Name(type) + ". " + SpecialLevels.RuleText(type);
+        }
+
+        // ---- special level popup geometry (reference px from the top of the panel; TextScale 1.0 / 1.3 in brackets). Public and pure so a test can check the rects. ----
+        /// <summary>Fixed font size of the two-line title of a special level popup ("Level 9" / "One Life").</summary>
+        public const int SpecialPopupTitleFont = 50;
+        /// <summary>Top of the goal line: the bottom of the title box (52 + 130).</summary>
+        public const float SpecialPopupGoalTop = 182f;
+        /// <summary>Gap between the goal line and the rule.</summary>
+        public const float SpecialPopupGap = 4f;
+        /// <summary>Gap between the rule and the stars.</summary>
+        public const float SpecialPopupStarGap = 12f;
+        /// <summary>Height of the goal line: one line of the 46 px goal text (60 / 78).</summary>
+        public static float SpecialPopupGoalHeight() { return Mathf.Ceil(46f * UiKit.TextScale * 1.3f); }
+        /// <summary>Height of the rule box: two lines of body text (105 / 137); a one-line rule is centred in it.</summary>
+        public static float SpecialPopupRuleHeight() { return Mathf.Ceil(2f * UiKit.MinBodyTextPx * UiKit.TextScale * 1.25f); }
+        /// <summary>How far the stars and everything below them move down on a special level popup (they start at 290 on a plain one): 73 / 123.</summary>
+        public static float SpecialPopupShift()
+        {
+            return SpecialPopupGoalTop + SpecialPopupGoalHeight() + SpecialPopupGap + SpecialPopupRuleHeight() + SpecialPopupStarGap - 290f;
         }
 
         public void OnLevelTapped(LevelDef level)
         {
-            if (!progress.IsLevelUnlocked(level)) { ShowMessage("Locked", "Clear level " + (level.Index - 1) + " first."); return; }
+            // Everything on this popup is the SELECTED Gameplay setting's (Final Change 1): each setting has its own path, stars and locks.
+            int mode = GameSettings.Difficulty;
+            if (!progress.IsLevelUnlocked(level, mode))
+            {
+                string setting = GameSettings.DifficultyNames[Mathf.Clamp(mode, 0, GameSettings.DifficultyNames.Length - 1)];
+                ShowMessage("Locked", "Clear level " + (level.Index - 1) + " on " + setting + " first.");
+                return;
+            }
             LevelSpec spec = LevelSpecFactory.Build(level, repo.GetRegion(level.Region));
-            LevelProgress p = progress.GetProgress(level.Id);
-            int starsHave = p != null ? p.Stars : 0;
+            int starsHave = progress.StarsOf(level.Id, mode);
             // Content-sized: the content ends at 536 (pills) or 646 (best score); then a gap, the PLAY button (at least 48 dp) and a bottom margin.
             float playSize = Mathf.Max(150f, UiKit.MinTouchRef);
             // Doc 46: medals under the stars (only when the level has medal targets) and the best Pace and Time of the chosen Gameplay mode after the pills.
-            int mode = GameSettings.Difficulty;
             int bestCrown = progress.BestCrown(level.Id, mode);   // owner 2026-11-12: the crown of the chosen Gameplay setting replaces the old best score
             bool hasBestScore = bestCrown > 0;
             bool hasMedals = MedalStrip.HasTargets(level.Id, mode);
             float medalsH = hasMedals ? MedalStrip.Height + 12f : 0f;
+            // Special level (owner Final Change 1, 2026-11-22). The type NAME is the second line of the title ("Level 9" / "One Life", inside the fixed 130 px title box, so it
+            // costs no height); the one-sentence RULE sits between the goal and the stars and everything below it moves down by SpecialPopupShift. The goal starts where the title box
+            // ends, in a box of its own line height, so title, goal, rule and stars keep their gaps at 130 percent text (PlayMode run 2026-11-22: the goal had been moved UP into the title).
+            string specialName = RunSession.SpecialName(spec);
+            string rule = RunSession.GoalRule(spec);
+            float specialGoalH = SpecialPopupGoalHeight(), specialRuleH = SpecialPopupRuleHeight();
+            float specialShift = specialName != null ? SpecialPopupShift() : 0f;
             PaceValue bestPace = progress.BestPace(level.Id, mode);
             int bestTicks = progress.BestTime(level.Id, mode);
             bool hasRecord = bestPace.IsValid || bestTicks > 0;
             // Owner 2026-11-13: ONE compact crown line (crown + best crown + (i), separator, coin + percent) without a dark backing; under 3 stars a small plain line tells what a clear pays.
-            float yRow = 440f + medalsH;
+            float yRow = 440f + medalsH + specialShift;
             float rowH = CrownInfoUi.RowHeight();
             float yRecord = yRow + rowH + 14f;
             float contentEnd = yRecord + TimedUi.RecordBlockHeight(hasRecord);
-            OpenPopup("Level " + level.Index, "", contentEnd + 30f + playSize + 56f);
+            // Region penalty (owner Final Change 2): a non-Common hero away from its home region shows a penalty icon right of PLAY and the short message above the row.
+            CharacterSpec penalised = PenaltyUi.PenalisedHero(repo.GetRegion(level.Region));
+            float penaltyH = penalised != null ? PenaltyUi.NoteHeight() + 10f : 0f;
+            OpenPopup(specialName != null ? "Level " + level.Index + "\n" + specialName : "Level " + level.Index, "", contentEnd + 30f + penaltyH + playSize + 56f);
             Transform panel = popup.Find("Panel");
             Destroy(panel.Find("Body").gameObject);
 
@@ -1840,30 +2146,36 @@ namespace FluffyClimbers.Gameplay
             Text goal = UiKit.AddText(panel, "Goal", RunSession.DescribeGoal(spec), 46, Theme.Ink, TextAnchor.MiddleCenter, true);
             DropOutline(goal);
             UiKit.Place((RectTransform)goal.transform, new Vector2(0.5f, 1f), new Vector2(0f, -170f), new Vector2(760f, 110f));
-            string rule = RunSession.GoalRule(spec);
-            if (rule != null)
+            if (specialName != null)
             {
-                // Level rule before PLAY: small italic line under the goal (e.g. "Don't touch the walls.").
-                goal.rectTransform.anchoredPosition = new Vector2(0f, -140f);
-                goal.rectTransform.sizeDelta = new Vector2(760f, 80f);
+                // Title: two lines ("Level 9" and the type name) at a fixed size that fits the 130 px title box at every text scale (2 lines x 50 px x the display line height of
+                // about 1.15 = 115), so the title never reaches the goal line or grows with the text setting. Still at least 16 sp.
+                Text titleText = panel.Find("Title").GetComponent<Text>();
+                titleText.fontSize = SpecialPopupTitleFont;
+                titleText.resizeTextMaxSize = SpecialPopupTitleFont;
+                titleText.gameObject.AddComponent<A11yLabel>().Text = "Level " + level.Index + ", special level: " + specialName;
+                // Goal: below the title box, one line high. Rule: the sentence (italic) under it, room for two lines.
+                goal.rectTransform.anchoredPosition = new Vector2(0f, -SpecialPopupGoalTop);
+                goal.rectTransform.sizeDelta = new Vector2(800f, specialGoalH);   // 800 of the 860 px panel: the longest goal ("Floor 150 with 3 combo jumps", about 750 px at 130 percent text) stays on one line
                 Text ruleText = UiKit.AddText(panel, "Rule", rule, 38, Theme.Ink, TextAnchor.MiddleCenter, true);
                 ruleText.fontStyle = FontStyle.Italic;
                 DropOutline(ruleText);
-                UiKit.Place((RectTransform)ruleText.transform, new Vector2(0.5f, 1f), new Vector2(0f, -215f), new Vector2(760f, 65f));
+                UiKit.Place((RectTransform)ruleText.transform, new Vector2(0.5f, 1f), new Vector2(0f, -(SpecialPopupGoalTop + specialGoalH + SpecialPopupGap)), new Vector2(760f, specialRuleH));
+                ruleText.gameObject.AddComponent<A11yLabel>().Text = specialName + ": " + rule;
             }
             for (int i = 0; i < 3; i++)
             {
                 bool got = i < starsHave;
                 Image star = UiKit.AddImage(panel, "Star" + i, art != null ? (got ? art.StarFilled : art.StarEmpty) : null, got ? Color.white : new Color(1f, 1f, 1f, 0.55f));
-                UiKit.Place(star.rectTransform, new Vector2(0.5f, 1f), new Vector2((i - 1) * 170f, -290f), new Vector2(130f, 130f));
+                UiKit.Place(star.rectTransform, new Vector2(0.5f, 1f), new Vector2((i - 1) * 170f, -290f - specialShift), new Vector2(130f, 130f));
                 star.rectTransform.pivot = new Vector2(0.5f, 1f);
             }
-            if (hasMedals) MedalStrip.Build(panel, 430f, level.Id, mode, progress.Medal(level.Id, mode), MedalLevel.None);
-            // 3-star levels: replays pay 25 percent of the coins and no gems; below that a clear pays in full (100 percent)
+            if (hasMedals) MedalStrip.Build(panel, 430f + specialShift, level.Id, mode, progress.Medal(level.Id, mode), MedalLevel.None);
+            // 3 stars in THIS setting: replays pay 25 percent of the coins and no gems; below that a clear pays in full (100 percent)
             int paidPercent = starsHave >= 3 ? FluffyClimbers.Simulation.CoinPayoutRules.ReplayPercent : 100;
             // Economy review 2026-11-13: milestone levels (5/10/15/20/25) add a third group, the first-clear gems (gem icon, amount, a tick once claimed) after the coin percent.
             int milestoneGems = RewardCalculator.MilestoneGemsOf(level);
-            bool gemsClaimed = progress.IsLevelCleared(level.Id);
+            bool gemsClaimed = progress.IsLevelCleared(level.Id);   // cleared in ANY setting: the gems are paid once per level
             CrownInfoUi.BuildRow(panel, yRow,
                 hasBestScore ? bestCrown.ToString() : "0",
                 (hasBestScore ? "This week's best crown " + bestCrown : "No crown yet this week") + ". Tap to see how the crown is calculated.",
@@ -1878,6 +2190,12 @@ namespace FluffyClimbers.Gameplay
                 GameSession.EndlessMode = false;
                 SceneManager.LoadScene("Run");
             }, 0f);
+            if (penalised != null)
+            {
+                float badge = PenaltyUi.BadgeSize();
+                PenaltyUi.AddBadge((RectTransform)panel, penalised, playSize / 2f + 30f + badge / 2f, 60f + (playSize - badge) / 2f, () => ShowPenaltyInfo(penalised, () => OnLevelTapped(level)));
+                PenaltyUi.AddNote((RectTransform)panel, penalised, 60f + playSize + 10f);
+            }
             // One close only: the X in the popup frame (the second red X next to PLAY was removed, emulator report 2 item 7).
         }
 
@@ -1906,6 +2224,13 @@ namespace FluffyClimbers.Gameplay
         Button PopupButton(string label, Sprite sprite, Color tint, float y, Action action)
         {
             return ToyKit.PopupAction(popup.Find("Panel"), label, sprite, tint, y, action);
+        }
+
+        /// <summary>The full region penalty message (tap on the penalty icon); OK goes back to the popup it came from.</summary>
+        void ShowPenaltyInfo(CharacterSpec hero, Action back)
+        {
+            OpenPopup("Away from home", PenaltyUi.FullText(hero, repo), 860f, 40);
+            PopupButton("OK", Btn(0), Color.white, 60f, back);
         }
 
         void ShowMessage(string title, string body)

@@ -114,6 +114,14 @@ namespace FluffyClimbers.Simulation
         /// <summary>Times a Mallet Smash or Rolling Log bumped the player (they never damage or end the run).</summary>
         public int Bumps;
 
+        // ---- Keep Moving levels (owner Final Change 1, 2026-11-22). One int; it stays 0 on every other level, so old runs, replays and goldens are unchanged. ----
+        /// <summary>
+        /// Keep Moving: ticks the hero has stood on the platform he is on (GroundId) since he first landed on it. Counted only while grounded, after the first jump of the run
+        /// and without invulnerability; a jump that lands back on the SAME platform does not reset it, a landing on a different platform and a revive do.
+        /// More than SimConfig.KeepMovingLimitTicks ends the run like a fall. Read it through Sim.KeepMovingTicksLeft.
+        /// </summary>
+        public int StandTicks;
+
         // ---- Power-ups. Plain ints for the stacked timers (no maximum, additions saturate at int.MaxValue); the OWNED STOCK lives outside the
         // state (RunSession counts it and only passes an activation bit while units are left), so the bot, which copies SimState on every
         // recursion level, stays small. Read and write the fields through the int properties. ----
@@ -177,6 +185,22 @@ namespace FluffyClimbers.Simulation
     }
 
     /// <summary>
+    /// Memory of the HUD speed cue between two frames (see <see cref="Sim.NextScrollCue"/>): the setting speed-up seen last and whether the real speed sits at the ceiling.
+    /// A plain value type: the HUD keeps it in a field, nothing is allocated.
+    /// </summary>
+    public struct ScrollCue
+    {
+        /// <summary>NextScrollCue result: nothing to show.</summary>
+        public const int None = 0;
+        /// <summary>NextScrollCue result: show "MAX" (the real speed reached SimConfig.ScrollMaxSpeed).</summary>
+        public const int Max = -1;
+        /// <summary>The setting speed-up percent seen last (steps x step percent).</summary>
+        public int Percent;
+        /// <summary>True while the real scroll speed is held at the ceiling (the MAX cue was given).</summary>
+        public bool AtCeiling;
+    }
+
+    /// <summary>
     /// Deterministic fixed-step simulation of one run. Stateless apart from the level: all mutable
     /// state lives in SimState so replays, bots and the server can branch and re-simulate cheaply.
     /// Platforms must be sorted by Y ascending (the generator guarantees this); pickups and hazards too.
@@ -192,6 +216,13 @@ namespace FluffyClimbers.Simulation
         public readonly bool Endless;
         /// <summary>Campaign scroll ramp (BossChase): endless step formula clamped to SimConfig.CampaignRampCapPercent.</summary>
         public readonly bool CampaignRamp;
+        /// <summary>
+        /// Special level rules (owner Final Change 1, 2026-11-22), taken from the LevelSpec by the campaign constructor; false in endless and for every plain level.
+        /// NoPowerUps: Step ignores every power-up and hero-power input bit (a recording that holds such bits replays as if they were never pressed).
+        /// OneLife: <see cref="Revive"/> refuses and the Safety Net is off (its input bit and an armed net do nothing; the other power-ups work), so one fall ends the run.
+        /// KeepMoving: see <see cref="SimState.StandTicks"/> and <see cref="KeepMovingTicksLeft"/>; its timeout is never rescued by the Safety Net (a real fall still is).
+        /// </summary>
+        public readonly bool NoPowerUps, OneLife, KeepMoving;
         private readonly Fx scrollPerTick;
         /// <summary>Endless: base scroll per tick of campaign level N (index 1..15), the speed of that level (EndlessTower.LevelForFloor); null otherwise.</summary>
         private readonly Fx[] endlessScroll;
@@ -216,6 +247,9 @@ namespace FluffyClimbers.Simulation
         public Sim(SimConfig cfg, LevelData level, LevelSpec spec)
             : this(cfg, level, spec.EffectiveDifficulty(cfg), false, spec.Ramp, spec.TargetRow())
         {
+            NoPowerUps = spec.NoPowerUps;
+            OneLife = spec.OneLife;
+            KeepMoving = spec.KeepMoving;
         }
 
         public Sim(SimConfig cfg, LevelData level, Fx difficulty, bool endless, bool campaignRamp)
@@ -353,10 +387,11 @@ namespace FluffyClimbers.Simulation
         /// <summary>
         /// Minimal revive: if dead, puts the player back on the highest platform landed on, clears speed,
         /// grants a short invulnerability and counts the revive. UI and payment are the caller's job.
+        /// A One Life level has no revive: the call does nothing there (the state stays dead, RevivesUsed is not counted).
         /// </summary>
         public void Revive(ref SimState s)
         {
-            if (!s.Dead) return;
+            if (!s.Dead || OneLife) return;
             // A paid revive must not drop the player again at once: a hidden or about-to-vanish Vanishing platform is skipped (the next platform
             // down the tower is used), and a Crumble / Snap Daisy / Spore Pop gets its clock reset (open, whole, calm) as if never touched.
             int rid = s.BestGroundId;
@@ -376,6 +411,7 @@ namespace FluffyClimbers.Simulation
             s.GlideTicks = 0;
             s.KoiStill = 0;
             s.KoiAir = 0;
+            s.StandTicks = 0;   // Keep Moving: a revive restarts the timer (and the revive invulnerability pauses it)
             s.Dead = false;
             s.GroundId = s.BestGroundId;
             s.X = PlatformX(s.BestGroundId, s.WorldTick);
@@ -830,24 +866,41 @@ namespace FluffyClimbers.Simulation
         }
 
         /// <summary>
-        /// Scroll speed (units per tick) of the danger line at <paramref name="tick"/> before the Slow Time power-up: base speed, stepped speed-up,
-        /// row ramp (endless / boss) and the campaign ceiling. The HUD percent is derived from this so screen and game cannot drift apart.
+        /// Scroll speed (units per tick) of the danger line at <paramref name="tick"/> before the Slow Time power-up and before the ceiling: base speed (Endless: the speed of the
+        /// cycle level of the row), the Gameplay setting's time steps (additive on that base: +ScrollStepPercent every ScrollStepSeconds, at most ScrollStepMaxSteps steps) and,
+        /// on a ramp level (BossChase), the row ramp multiplied on top. Owner Final Change 1 (2026-11-22): the time steps apply on EVERY level, ramp levels included.
         /// </summary>
-        public Fx ScrollPerTickAt(in SimState s, int tick)
+        private Fx UnclampedScrollPerTickAt(in SimState s, int tick)
         {
             Fx scroll = Endless ? endlessScroll[EndlessTower.LevelForFloor(s.Row, endlessLevels, endlessTimeAttack)] : scrollPerTick;
-            int steps = (tick - s.StartTick) / (Cfg.ScrollStepSeconds * SimConfig.TicksPerSecond);
-            if (steps > Cfg.ScrollStepMaxSteps) steps = Cfg.ScrollStepMaxSteps;
-            int stepPct = CampaignRamp ? 0 : steps * Cfg.ScrollStepPercent;   // boss levels already ramp with the row
-            if (stepPct > Cfg.ScrollStepCapPercent) stepPct = Cfg.ScrollStepCapPercent;
-            scroll = scroll * (100 + stepPct) / 100;
+            scroll = scroll * (100 + StepPercentAt(in s, tick)) / 100;
             if (!Endless && CampaignRamp)
             {
                 int pct = Cfg.RampPercentAt(s.Row);
                 if (pct > Cfg.CampaignRampCapPercent) pct = Cfg.CampaignRampCapPercent;
-                scroll = scroll * (100 + pct) / 100;
+                scroll = scroll * (100 + pct) / 100;   // the row ramp is level design: multiplied on top of the setting steps
             }
-            // the campaign ceiling holds in endless too: a floor at level N is as fast as campaign level N, never faster
+            return scroll;
+        }
+
+        /// <summary>The Gameplay setting's speed-up in percent of the start speed at <paramref name="tick"/>: steps applied x ScrollStepPercent, never above ScrollStepCapPercent.</summary>
+        private int StepPercentAt(in SimState s, int tick)
+        {
+            int steps = (tick - s.StartTick) / (Cfg.ScrollStepSeconds * SimConfig.TicksPerSecond);
+            if (steps > Cfg.ScrollStepMaxSteps) steps = Cfg.ScrollStepMaxSteps;
+            int stepPct = steps * Cfg.ScrollStepPercent;
+            if (stepPct > Cfg.ScrollStepCapPercent) stepPct = Cfg.ScrollStepCapPercent;
+            return stepPct;
+        }
+
+        /// <summary>
+        /// Scroll speed (units per tick) of the danger line at <paramref name="tick"/> before the Slow Time power-up: <see cref="UnclampedScrollPerTickAt"/> held at the
+        /// ceiling <see cref="SimConfig.ScrollMaxSpeed"/> (levels and Endless). The one source of truth of Sim.Step.
+        /// </summary>
+        public Fx ScrollPerTickAt(in SimState s, int tick)
+        {
+            Fx scroll = UnclampedScrollPerTickAt(in s, tick);
+            // the ceiling holds in endless too: a floor at level N is as fast as campaign level N, never faster
             Fx ceiling = Cfg.ScrollMaxSpeed / SimConfig.TicksPerSecond;
             if (scroll > ceiling) scroll = ceiling;
             return scroll;
@@ -857,8 +910,9 @@ namespace FluffyClimbers.Simulation
         public float BaseScrollPerSecond { get { return scrollPerTick.Raw * (float)SimConfig.TicksPerSecond / Fx.OneRaw; } }
 
         /// <summary>
-        /// Speed-up shown to the player: (current scroll speed / starting scroll speed - 1) in whole percent, rounded.
-        /// Slow Time is a temporary power-up and is not part of it. 0 before the first jump.
+        /// MEASURED speed-up: (current scroll speed / starting scroll speed - 1) in whole percent, rounded. Diagnostics and tests only: the ceiling and the Endless cycle make
+        /// it an odd number (+163), so the HUD never shows it (owner Final Change 1, 2026-11-22). The HUD reads <see cref="SettingSpeedUpPercent"/>,
+        /// <see cref="ScrollAtCeiling"/> and <see cref="NextScrollCue"/>. Slow Time is a temporary power-up and is not part of it. 0 before the first jump.
         /// </summary>
         public int ScrollSpeedUpPercent(in SimState s)
         {
@@ -866,6 +920,73 @@ namespace FluffyClimbers.Simulation
             long cur = ScrollPerTickAt(in s, s.Tick).Raw;
             long bas = scrollPerTick.Raw;
             return (int)((cur * 100 + bas / 2) / bas) - 100;
+        }
+
+        // ---- HUD speed cue (owner Final Change 1, 2026-11-22): only the setting's own round steps, then MAX at the ceiling. No allocation, a few integer operations. ----
+
+        /// <summary>Time steps of the Gameplay setting applied so far (0 .. ScrollStepMaxSteps); 0 before the first jump.</summary>
+        public int ScrollStepsApplied(in SimState s)
+        {
+            if (s.StartTick < 0) return 0;
+            int steps = (s.Tick - s.StartTick) / (Cfg.ScrollStepSeconds * SimConfig.TicksPerSecond);
+            return steps > Cfg.ScrollStepMaxSteps ? Cfg.ScrollStepMaxSteps : steps;
+        }
+
+        /// <summary>
+        /// The speed-up of the Gameplay setting shown to the player: steps applied x ScrollStepPercent, capped at ScrollStepCapPercent (Normal: 30, 60, .. 240). Always a round
+        /// multiple of the step, whatever the ceiling, the Endless cycle or a row ramp do to the real speed. 0 before the first jump.
+        /// </summary>
+        public int SettingSpeedUpPercent(in SimState s)
+        {
+            return s.StartTick < 0 ? 0 : StepPercentAt(in s, s.Tick);
+        }
+
+        /// <summary>True while the real scroll speed is held at the ceiling (SimConfig.ScrollMaxSpeed): the speed asked for by the base, the steps and the ramps has reached it. False before the first jump.</summary>
+        public bool ScrollAtCeiling(in SimState s)
+        {
+            if (s.StartTick < 0) return false;
+            return UnclampedScrollPerTickAt(in s, s.Tick) >= Cfg.ScrollMaxSpeed / SimConfig.TicksPerSecond;
+        }
+
+        /// <summary>
+        /// The speed cue to show for the state, called once per rendered frame with the caller's <paramref name="cue"/> memory (start a run with <c>default</c>):
+        /// <see cref="ScrollCue.None"/> (0) = nothing new; a positive number N = show "+N%" (the setting's speed-up after a new step, always a multiple of the step);
+        /// <see cref="ScrollCue.Max"/> = the real speed has just reached the ceiling, show "MAX". While the speed stays at the ceiling no further cue comes (later steps
+        /// change nothing the player can feel); when it leaves the ceiling again (Endless cycle) the step cues resume and MAX can come once more.
+        /// </summary>
+        public int NextScrollCue(in SimState s, ref ScrollCue cue)
+        {
+            if (s.StartTick < 0) return ScrollCue.None;
+            int pct = StepPercentAt(in s, s.Tick);
+            bool newStep = pct > cue.Percent;
+            cue.Percent = pct;
+            if (ScrollAtCeiling(in s))
+            {
+                if (cue.AtCeiling) return ScrollCue.None;
+                cue.AtCeiling = true;
+                return ScrollCue.Max;
+            }
+            cue.AtCeiling = false;
+            return newStep ? pct : ScrollCue.None;
+        }
+
+        /// <summary>
+        /// Keep Moving level: ticks the hero may still stand on his platform before the run ends (SimConfig.KeepMovingLimitTicks down to 0), or -1 when no timer applies
+        /// (not a Keep Moving level, before the first jump, or the run is over). The value holds while the hero is in the air or invulnerable (the timer is paused, not reset).
+        /// No allocation; the HUD reads it once per frame.
+        /// </summary>
+        public int KeepMovingTicksLeft(in SimState s)
+        {
+            if (!KeepMoving || s.Dead || s.StartTick < 0) return -1;
+            int left = Cfg.KeepMovingLimitTicks - s.StandTicks;
+            return left < 0 ? 0 : left;
+        }
+
+        /// <summary>Keep Moving level: true while the countdown ring should show (the timer has started on this platform and SimConfig.KeepMovingWarnTicks or fewer are left).</summary>
+        public bool KeepMovingWarning(in SimState s)
+        {
+            int left = KeepMovingTicksLeft(in s);
+            return left >= 0 && s.StandTicks > 0 && left <= Cfg.KeepMovingWarnTicks && s.NetTicks == 0;   // not during a Safety Net rescue jump after a real fall (the timer restarts at its landing)
         }
 
         /// <summary>True while the Glide slow-mo applies to the state: the Glide runs and the player is in the air (not flying, not holding a wall, not in the Safety Net jump). Everything then runs at 1 / SimConfig.GlideSlowDivisor speed.</summary>
@@ -890,7 +1011,8 @@ namespace FluffyClimbers.Simulation
             Fx maxSpeed = CurrentMaxSpeed(s.Row);
 
             // --- power-ups: activation edges, then the effect flags of this tick ---
-            if ((input & (SimInput.PowerMask | SimInput.HeroMask)) != 0) ActivatePowerUps(ref s, input, tick);
+            // A No Power-ups level ignores every activation bit, bought and hero alike: the rule holds in the simulation, so a replay with such bits behaves as if they were not pressed
+            if (!NoPowerUps && (input & (SimInput.PowerMask | SimInput.HeroMask)) != 0) ActivatePowerUps(ref s, input, tick);
             bool rocket = s.RocketTicks > 0;
             bool flying = rocket || s.FlightTicks > 0;
             if (s.Grounded) s.AirJumpUsed = false;
@@ -1195,7 +1317,11 @@ namespace FluffyClimbers.Simulation
             }
             Fx follow = s.MaxY - Cfg.KillDistance;
             if (follow > s.KillY) s.KillY = follow;
-            if (s.Y < s.KillY && !(s.SafetyNetArmed && SafetyNetCatch(ref s, tick))) s.Dead = true;
+            // A One Life level has no rescue at all (owner 2026-11-22): even a net that is somehow armed in the state does nothing there, one fall ends the run.
+            if (s.Y < s.KillY && !(s.SafetyNetArmed && !OneLife && SafetyNetCatch(ref s, tick))) s.Dead = true;
+            // Keep Moving: one more grounded tick on this platform; past the limit the run ALWAYS ends (owner 2026-11-22: the Safety Net rescues real falls only, never the timeout;
+            // a gem or ad revive afterwards is allowed). Not before the first jump, not in the air, not while invulnerable (revive grace, a gong or mallet bump).
+            if (KeepMoving && !s.Dead && s.Grounded && s.StartTick >= 0 && s.Invuln == 0 && ++s.StandTicks > Cfg.KeepMovingLimitTicks) s.Dead = true;
 
             if (s.JumpBuffer > 0) s.JumpBuffer--;
             if (s.Invuln > 0) s.Invuln--;
@@ -1222,6 +1348,7 @@ namespace FluffyClimbers.Simulation
             for (int i = 0; i < all.Length; i++)
             {
                 PowerUp p = all[i];
+                if (OneLife && p == PowerUp.SafetyNet) continue;   // One Life level (owner 2026-11-22): the Safety Net is off, its input does nothing (no unit counted, nothing armed); every other power-up works
                 if ((input & PowerUps.InputBit(p)) != 0 && PowerUps.CanActivate(in s, p)) ApplyPowerUp(ref s, p, tick, false);
                 int hb = PowerUps.HeroInputBit(p);
                 if (hb != 0 && (input & hb) != 0 && PowerUps.CanActivateHero(in s, p)) ApplyPowerUp(ref s, p, tick, true);
@@ -1534,6 +1661,7 @@ namespace FluffyClimbers.Simulation
             s.Y = p.Y;
             s.Vy = Fx.Zero;
             s.Grounded = true;
+            if (id != s.GroundId) s.StandTicks = 0;   // Keep Moving: only a landing on a DIFFERENT platform restarts the timer (a hop back onto the same one does not)
             s.GroundId = id;
             s.Coyote = Cfg.CoyoteTicks;
             s.LandTick = tick;

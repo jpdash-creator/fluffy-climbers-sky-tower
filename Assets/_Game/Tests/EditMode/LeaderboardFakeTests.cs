@@ -114,8 +114,72 @@ namespace FluffyClimbers.Tests
             var ids = new List<string>();
             foreach (WeekSlotInfo s in slots) { ids.Add(s.SlotId); Assert.Greater(s.Crown, 0); }
             CollectionAssert.AreEquivalent(new[] { "c.lvl_001_01.1", "e.region_001_meadow_springs.4", "t.region_002_mushroom_grove.0" }, ids);
+            // a store written before the top-3 rule (single best only): an Endless / Time Attack slot is one run, a level slot has no run list
+            Assert.IsNull(slots.Find(s => s.SlotId == "c.lvl_001_01.1").Parts);
+            WeekSlotInfo endless = slots.Find(s => s.SlotId == "e.region_001_meadow_springs.4");
+            Assert.AreEqual(1, endless.Parts.Count);
+            Assert.AreEqual(endless.Crown, endless.Parts[0].Crown);
+            Assert.AreEqual(CrownScore.FromScore(2000, 4), (int)endless.Crown);
             now = new DateTime(2026, 11, 16, 0, 0, 1, DateTimeKind.Utc);   // a new week forgets them (the board reset)
             Assert.AreEqual(0, svc.WeekSlots().Count);
+        }
+
+        [Test]
+        public void AnEndlessSlotIsTheSumOfItsThreeBestRunsAndThePopupLinesStillAddUpToTheTabTotal()
+        {
+            DateTime now = new DateTime(2026, 11, 11, 12, 0, 0, DateTimeKind.Utc);
+            ContentRepository repo = ContentRepository.LoadFromResources();
+            var svc = new ProgressService(repo, new MemorySaveStore(), 5);
+            svc.WeekClock = () => now;
+            string r1 = repo.GetRegionByIndex(1).Id;
+            RecordResult rr;
+            int seed = 1;
+            foreach (int score in new[] { 400, 900, 100, 600 })   // four Endless runs on Hard: 900 + 600 + 400 count
+                svc.FinishEndlessRun(new RunRecord { Kind = RunKind.Endless, RegionId = r1, Floors = 40, Ticks = 3600, LayoutSeed = seed++, Mode = 3, Score = score, BestCombo = 3 }, "20261111", out rr);
+            foreach (int score in new[] { 300, 200 })             // two Time Attack runs on Hard: both count
+                svc.FinishEndlessRun(new RunRecord { Kind = RunKind.TimeAttack, RegionId = r1, Floors = 30, Ticks = TimeRecords.TimeAttackTicks, LayoutSeed = seed++, Mode = 3, Score = score, BestCombo = 2 }, "20261111", out rr);
+            svc.ApplyRun("lvl_001_01", new RunOutcome { Completed = true, StarMask = 1, Score = 500, Mode = 0, Floors = 20, BestCombo = 2 });
+
+            List<WeekSlotInfo> slots = svc.WeekSlots();
+            Assert.AreEqual(3, slots.Count, "one slot per region and setting, however many runs count in it");
+            WeekSlotInfo e = slots.Find(s => s.SlotId == "e." + r1 + ".3"), t = slots.Find(s => s.SlotId == "t." + r1 + ".3");
+            long eSum = (long)CrownScore.FromScore(900, 3) + CrownScore.FromScore(600, 3) + CrownScore.FromScore(400, 3);
+            long tSum = (long)CrownScore.FromScore(300, 3) + CrownScore.FromScore(200, 3);
+            Assert.AreEqual(eSum, e.Crown);
+            Assert.AreEqual(3, e.Parts.Count);
+            Assert.AreEqual(900, e.Parts[0].Score, "best first");
+            Assert.AreEqual(400, e.Parts[2].Score);
+            Assert.AreEqual(900, e.Score, "the slot's own numbers are those of its best run");
+            Assert.AreEqual(tSum, t.Crown);
+            Assert.AreEqual(2, t.Parts.Count);
+
+            LeaderboardHub.ResetForTests();
+            try
+            {
+                LeaderboardHub.Setup(svc, LeaderboardConfig.Off, null, null);
+                LeaderboardHub.Clock = () => now;
+                MyWeekData local = LeaderboardHub.KnownSlots();
+                long level = CrownScore.FromScore(500, 0);
+                BreakdownResult all = LeaderboardBreakdown.Build(local.Slots, LbBoards.Overall, repo);
+                Assert.AreEqual(level + eSum + tSum, all.Total);
+                Assert.AreEqual(all.Total, all.LineSum(), "the lines add up exactly to the tab total");
+                BreakdownResult en = LeaderboardBreakdown.Build(local.Slots, LbBoards.Endless, repo);
+                Assert.AreEqual(eSum + tSum, en.Total);
+                Assert.AreEqual(en.Total, en.LineSum());
+                Assert.AreEqual(2, en.Groups.Count, "Endless and Time Attack");
+                BreakdownLine line = en.Groups[0].Lines[0];
+                Assert.AreEqual(1, en.Groups[0].Lines.Count, "ONE line per region and setting");
+                Assert.AreEqual(eSum, line.Crown);
+                CollectionAssert.AreEqual(new long[] { CrownScore.FromScore(900, 3), CrownScore.FromScore(600, 3), CrownScore.FromScore(400, 3) }, line.Runs, "the three counted runs, best first");
+                long parts = 0;
+                foreach (long c in line.Runs) parts += c;
+                Assert.AreEqual(line.Crown, parts, "the parts add up to the line");
+                Assert.AreEqual(2, en.Groups[1].Lines[0].Runs.Length);
+                BreakdownResult lv = LeaderboardBreakdown.Build(local.Slots, LbBoards.Levels, repo);
+                Assert.AreEqual(level, lv.Total);
+                Assert.IsNull(lv.Groups[0].Lines[0].Runs, "a level line is a single run");
+            }
+            finally { LeaderboardHub.ResetForTests(); }
         }
 
         [Test]

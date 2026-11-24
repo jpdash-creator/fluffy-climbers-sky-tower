@@ -15,7 +15,8 @@ namespace FluffyClimbers.Simulation.Tests
     public class GemCoinEconomyTests
     {
         const int Regions = 5;
-        static readonly double[] RegionFactor = { 1.0, 1.03, 1.06, 1.09, 1.12 };
+        // Region coin factor (owner Final Change 1, 2026-11-22): region 1 = 1.00, regions 2 to 5 = 1.05 (CoinPayoutRules.RegionFactorPercentOf; 6 to 15 = 1.10, 16 to 25 = 1.15, 26 to 30 = 1.20).
+        static readonly double[] RegionFactor = { 1.0, 1.05, 1.05, 1.05, 1.05 };
 
         readonly ITestOutputHelper output;
         public GemCoinEconomyTests(ITestOutputHelper output) { this.output = output; }
@@ -179,13 +180,22 @@ namespace FluffyClimbers.Simulation.Tests
         [Theory]
         [Trait("Category", "Economy")]
         [InlineData(1, 1.00)]
-        [InlineData(2, 1.03)]
-        [InlineData(3, 1.06)]
-        [InlineData(4, 1.09)]
-        [InlineData(5, 1.12)]
+        [InlineData(2, 1.05)]
+        [InlineData(3, 1.05)]
+        [InlineData(4, 1.05)]
+        [InlineData(5, 1.05)]
+        [InlineData(6, 1.10)]
+        [InlineData(15, 1.10)]
+        [InlineData(16, 1.15)]
+        [InlineData(25, 1.15)]
+        [InlineData(26, 1.20)]
+        [InlineData(30, 1.20)]
         public void PayoutFormulaForZeroToThreeStarsAndComboInEveryRegion(int region, double factor)
         {
-            Assert.Equal(RegionFactor[region - 1], factor);
+            Assert.Equal(CoinPayoutRules.RegionFactor(region), factor);   // the ONE table: 30 regions
+            Assert.Equal((int)Math.Round(factor * 100), CoinPayoutRules.RegionFactorPercentOf(region));
+            Assert.Equal(CoinPayoutRules.RegionFactorPercentOf(region), CoinPayoutRules.RegionFactorPercent[region - 1]);
+            if (region <= Regions) Assert.Equal(RegionFactor[region - 1], factor);
             for (int stars = 0; stars <= 3; stars++)
                 foreach (int comboSteps in new[] { 0, 1, 7, 40 })
                 {
@@ -205,7 +215,8 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Equal(152, CoinPayoutRules.Payout(2, 0, 1.0, false));
             Assert.Equal(200, CoinPayoutRules.Payout(3, 0, 1.0, false));
             Assert.Equal(200 + 4 * 12, CoinPayoutRules.Payout(3, 60, 1.0, false));   // 12 combo steps = 60 sim coins = 48 level coins
-            Assert.Equal(224, CoinPayoutRules.Payout(3, 0, 1.12, false));
+            Assert.Equal(210, CoinPayoutRules.Payout(3, 0, 1.05, false));   // regions 2 to 5
+            Assert.Equal(240, CoinPayoutRules.Payout(3, 0, 1.20, false));   // regions 26 to 30
         }
 
         [Fact]
@@ -224,6 +235,25 @@ namespace FluffyClimbers.Simulation.Tests
             }
             Assert.Equal(50, CoinPayoutRules.Payout(3, 0, 1.0, true));
             Assert.Equal(26, CoinPayoutRules.Payout(1, 0, 1.0, true));
+        }
+
+        [Fact]
+        [Trait("Category", "Economy")]
+        public void TheSettingBonusComesAfterTheRegionFactorAndTheReplayCut()
+        {
+            // Final Change 1 (owner 2026-11-22): level coins = Payout (region factor, replay cut) x (1 + setting bonus 0/5/10/15/25 percent), half up. Economy/Rewards.cs does exactly this
+            // (RewardResult.PayoutCoins + SettingBonusCoins); "already 3 stars" is judged in the Gameplay setting of the run, the hero milestone coins get no bonus.
+            int[] threeStars = { 200, 210, 220, 230, 250 };
+            int[] oneStar = { 104, 109, 114, 120, 130 };          // 104, 109.2, 114.4, 119.6, 130
+            int[] reducedReplay = { 50, 53, 55, 58, 63 };         // 50, 52.5, 55, 57.5, 62.5
+            for (int mode = 0; mode < 5; mode++)
+            {
+                Assert.Equal(threeStars[mode], CoinPayoutRules.ApplySettingBonus(CoinPayoutRules.Payout(3, 0, 1.0, false), mode));
+                Assert.Equal(oneStar[mode], CoinPayoutRules.ApplySettingBonus(CoinPayoutRules.Payout(1, 0, 1.0, false), mode));
+                Assert.Equal(reducedReplay[mode], CoinPayoutRules.ApplySettingBonus(CoinPayoutRules.Payout(3, 0, 1.0, true), mode));
+            }
+            Assert.Equal(120, CoinPayoutRules.ApplySettingBonus(CoinPayoutRules.Payout(1, 0, 1.05, false), 2));   // region 3: 104 x 1.05 = 109.2 -> 109, Normal +10 percent = 119.9 -> 120
+            Assert.Equal(290, CoinPayoutRules.ApplySettingBonus(CoinPayoutRules.Payout(3, 40, 1.0, false), 4));   // 200 + 8 combo steps x 4 = 232, Insane +25 percent
         }
 
         [Fact]

@@ -39,10 +39,11 @@ namespace FluffyClimbers.LeaderboardService.Tests
         public void OneCrownFunctionDecidesLevelPopupWeekTotalAndServer()
         {
             // The server stores CrownScore.FromScore(replay score); the client stores the same function of the same score (ProgressService.RecordCrown/RecordWeekCrown).
-            // Floors 80 + one chain of 48 = base 2384; Insane: 2384 x 5 x 1.5 = 17,880 on every layer.
-            Assert.Equal(17880, CrownScore.FromScore(2384, 4));
+            // Floors 80 + one chain of 48 = base 2384; Insane (bonus 25 percent since Final Change 1, 2026-11-22; it was 50): 2384 x 5 x 1.25 = 14,900 on every layer.
+            Assert.Equal(14900, CrownScore.FromScore(2384, 4));
             Assert.Equal(CrownScore.FromScore(2384, 4), CrownScore.FromFloorsChains(80, new[] { 48 }, 4));
-            Assert.Equal((int)Math.Min(int.MaxValue, 2384L * 5 * 15000 / 10000), CrownScore.FromScore(2384, 4));
+            Assert.Equal((int)Math.Min(int.MaxValue, 2384L * 5 * 12500 / 10000), CrownScore.FromScore(2384, 4));
+            Assert.Equal(2384 * 5, CrownScore.FromScore(2384, 0));   // Relaxed: no bonus
         }
     }
 }

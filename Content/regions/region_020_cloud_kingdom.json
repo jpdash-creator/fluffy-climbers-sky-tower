@@ -21,7 +21,7 @@
     "difficultyOffset": 0.1638,
     "hazards": []
   },
-  "coinFactor": 1.57,
+  "coinFactor": 1.15,
   "levels": [
     "lvl_020_01",
     "lvl_020_02",

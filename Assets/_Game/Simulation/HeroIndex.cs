@@ -12,112 +12,85 @@ namespace FluffyClimbers.Simulation
     }
 
     /// <summary>
-    /// The power mechanics index and rule engine (the bible: docs/44-power-mechanics-bible.md). One number, the Forgiveness Index (FI), decides every hero's physics.
-    /// FI = the share of safe jump options a hero has on a level, divided by the default hero's (Momo Common = 1.000) share on the same layouts. Higher = more forgiving.
-    /// The rules, per rarity tier (0 Common, 1 Uncommon, 2 Rare, 3 Elite, 4 Legendary):
-    ///   1. Jump is the only percent-banded stat: launch speed over the default 19 u/s, Common 0-5, Uncommon 6-10, Rare 10-15, Elite 15-20, Legendary 20-25 percent.
-    ///   2. Speed, Control and Wall bounce are drawn at random inside the legal limits (wall bounce also inside a rarity range).
-    ///   3. The draw is only valid when the measured FI matches the approved FI of the tier (<see cref="ApprovedFi"/>) on level 15 of Region 1 and the 75-level mean matches Momo's
-    ///      mean of the same tier (the generator tool, Tests/Simulation/HeroGeneratorTests.cs). Momo is the default hero and his five tiers are fixed (<see cref="LadderFinal"/>).
-    /// Everything here is pure data and arithmetic (no engine types); the measured gate lives in the test project because it needs the shipped levels.
+    /// The hero rule engine (docs/44 sections 13 and 14, owner Final Change 2, 2026-11-23). One number, the Forgiveness Index (FI), is the measured gate: FI = the share of safe jump options a hero has on a level, divided by the
+    /// anchor hero's (Momo Common = 1.000) share on the same layouts, averaged over the shipped levels.
+    /// Rules, per rarity tier (0 Common, 1 Uncommon, 2 Rare, 3 Elite, 4 Legendary):
+    ///   1. Every non-Common hero is a percentage BAND over the Common hero of its own line on ALL FOUR numbers (launch, speed, control, wall bounce): Uncommon +3 to +7, Rare +6 to +10, Elite +10 to +14, Legendary +14 to +18.
+    ///      The other Commons are -3 to +3 percent of Momo Common (the anchor, <see cref="MomoCommon"/>). A band value is the reference times (100 + pct) percent rounded half up to the stat's unit.
+    ///   2. The FI of a hero must be inside its tier's window (<see cref="FiWindowMin"/> to <see cref="FiWindowMax"/>) widened by <see cref="FiTolerance"/> on the mean over ALL shipped levels, level 15 of Region 1 within
+    ///      <see cref="Level15Extra"/> more, and no level more than <see cref="LevelOutside"/> outside the window. The measuring and the row selection are test and tool code (Tests/Simulation/HeroFiCells.cs, Tools/hero_band_select.py).
+    /// Everything here is pure data and arithmetic (no engine types).
     /// </summary>
     public static class HeroIndex
     {
         public const int Tiers = 5;
-        public const int DefaultLaunchTenths = 190;
 
-        /// <summary>Jump band per tier, whole percent of launch speed over the default (inclusive).</summary>
-        public static readonly int[] JumpPctMin = { 0, 6, 10, 15, 20 };
-        public static readonly int[] JumpPctMax = { 5, 10, 15, 20, 25 };
+        /// <summary>The anchor hero: Momo Common. Every FI is measured against it and the other Commons and every tier are bands over it or over their line's Common. Equal to the HeroTable row "momo" (a test checks it).</summary>
+        public static readonly HeroPhysics MomoCommon = new HeroPhysics(192, 9, 29, 77);
+        /// <summary>Launch of the anchor in tenths (kept for the layout and display code that speaks of "the default 19.x").</summary>
+        public static int DefaultLaunchTenths { get { return MomoCommon.LaunchTenths; } }
 
-        // Legal limits of the four physics stats (launch in tenths).
-        public const int LaunchMinTenths = 190, LaunchMaxTenths = 237;
+        // Legal limits of the four physics stats (launch in tenths). The launch floor is 18.4 since owner Final Change 2 (other Commons may be -3 percent of Momo's launch).
+        public const int LaunchMinTenths = 184, LaunchMaxTenths = 237;
         public const int SpeedMin = 8, SpeedMax = 12;
         public const int ControlMin = 27, ControlMax = 45;
         public const int WallMin = 69, WallMax = 100;
 
-        /// <summary>Wall bounce range per tier (hundredths): the rarity raises the floor; wall bounce costs no FI on the measured levels.</summary>
-        public static readonly int[] WallRangeMin = { 69, 72, 76, 80, 85 };
-        public static readonly int[] WallRangeMax = { 85, 90, 94, 97, 100 };
+        /// <summary>Stat band per tier in whole percent over the reference hero (tier 0: over Momo Common, tiers 1..4: over the hero's own line Common). Index = tier.</summary>
+        public static readonly int[] BandPctMin = { -3, 3, 6, 10, 14 };
+        public static readonly int[] BandPctMax = { 3, 7, 10, 14, 18 };
 
-        /// <summary>The approved FI per tier (Ladder Final, measured on level 15 of Region 1 with the full probe).</summary>
-        public static readonly double[] ApprovedFi = { 1.000, 1.002, 1.040, 1.012, 1.048 };
-        /// <summary>
-        /// Where the prediction model has to point so that the MEASURED level-15 FI (fast probe) lands on Momo's value of the tier: Momo's fast reading minus the model's bias per tier
-        /// (measured minus predicted, from the first 8 hero lines of the generator log: +0.027, -0.027, -0.011, +0.044, +0.059). Screening only; the measured gate decides.
-        /// </summary>
-        public static readonly double[] ScreenCenter = { 0.973, 1.014, 1.029, 0.978, 1.041 };
+        /// <summary>Forgiveness Index window per tier (Momo Common = 1.000): Common and Uncommon 1.00, Rare and Elite 1.00 to 1.03, Legendary 1.00 to 1.05.</summary>
+        public static readonly double[] FiWindowMin = { 1.00, 1.00, 1.00, 1.00, 1.00 };
+        public static readonly double[] FiWindowMax = { 1.00, 1.00, 1.03, 1.03, 1.05 };
+        /// <summary>"1.00" means 1.00 +- this on the mean over all shipped levels (every window is widened by it on both sides).</summary>
+        public const double FiTolerance = 0.005;
+        /// <summary>Level 15 of Region 1 may be this much further outside the (widened) window.</summary>
+        public const double Level15Extra = 0.02;
+        /// <summary>No single level may be further than this outside the (widened) window.</summary>
+        public const double LevelOutside = 0.10;
 
-        /// <summary>A hero's FI must be within this of the approved value on level 15 of Region 1 and of Momo's own 75-level mean for its tier.</summary>
-        public const double GateTolerance = 0.02;
-        /// <summary>No single level may be further than this from Momo's FI of the same tier on that level.</summary>
-        public const double PerLevelTolerance = 0.08;
-        /// <summary>The FI band every tier has to stay inside (physics only; hero powers are not in the index yet).</summary>
-        public const double BandMin = 0.97, BandMax = 1.10;
+        /// <summary><paramref name="common"/> times (100 + <paramref name="pct"/>) percent, rounded half up to the whole unit.</summary>
+        public static int BandValue(int common, int pct) { return (common * (100 + pct) + 50) / 100; }
 
-        /// <summary>Ladder Final: Momo's five tiers, measured. Common is the default hero (19.0 / 9 / 30 / 77).</summary>
-        public static readonly HeroPhysics[] LadderFinal =
+        /// <summary>Lowest and highest legal value of a stat of a hero of <paramref name="tier"/> over the reference value (not clipped to the legal limits).</summary>
+        public static void BandRange(int reference, int tier, out int lo, out int hi)
         {
-            new HeroPhysics(190, 9, 30, 77),     // Common      FI 1.000
-            new HeroPhysics(209, 9, 34, 82),     // Uncommon    FI 1.002
-            new HeroPhysics(216, 9, 38, 88),     // Rare        FI 1.040
-            new HeroPhysics(219, 10, 41, 94),    // Elite       FI 1.012
-            new HeroPhysics(228, 11, 41, 100),   // Legendary   FI 1.048
-        };
-
-        /// <summary>Whole-percent bounds of the launch speed of a tier in tenths: lowest and highest launch that is inside the band and the legal limits.</summary>
-        public static void LaunchRange(int tier, out int lo, out int hi)
-        {
-            lo = (int)Math.Ceiling(DefaultLaunchTenths * (100 + JumpPctMin[tier]) / 100.0 - 1e-9);
-            hi = (int)Math.Floor(DefaultLaunchTenths * (100 + JumpPctMax[tier]) / 100.0 + 1e-9);
-            if (hi > LaunchMaxTenths) hi = LaunchMaxTenths;
-            if (lo < LaunchMinTenths) lo = LaunchMinTenths;
+            lo = BandValue(reference, BandPctMin[tier]);
+            hi = BandValue(reference, BandPctMax[tier]);
         }
 
-        /// <summary>Jump percent over the default, measured on launch speed.</summary>
-        public static double JumpPercent(int launchTenths) { return (launchTenths / (double)DefaultLaunchTenths - 1.0) * 100.0; }
-
-        /// <summary>Null when the physics sit inside the legal limits and the tier's Jump band, else a short reason.</summary>
-        public static string Validate(int tier, HeroPhysics p)
+        /// <summary>Null when all four numbers of a hero of <paramref name="tier"/> are inside the band over its reference hero (Momo Common for tier 0, the line's Common otherwise) and the legal limits, else the first reason.</summary>
+        public static string ValidateBands(int tier, HeroPhysics p, HeroPhysics reference)
         {
             int lo, hi;
-            LaunchRange(tier, out lo, out hi);
-            if (p.LaunchTenths < lo || p.LaunchTenths > hi) return "launch " + p.Launch + " outside the tier band " + (lo / 10.0) + ".." + (hi / 10.0);
-            if (p.Speed < SpeedMin || p.Speed > SpeedMax) return "speed " + p.Speed + " outside " + SpeedMin + ".." + SpeedMax;
-            if (p.Control < ControlMin || p.Control > ControlMax) return "control " + p.Control + " outside " + ControlMin + ".." + ControlMax;
-            if (p.Wall < WallRangeMin[tier] || p.Wall > WallRangeMax[tier]) return "wall " + p.Wall + " outside the tier range " + WallRangeMin[tier] + ".." + WallRangeMax[tier];
+            BandRange(reference.LaunchTenths, tier, out lo, out hi);
+            if (p.LaunchTenths < lo || p.LaunchTenths > hi) return "launch " + p.LaunchTenths + " outside the band " + lo + ".." + hi;
+            BandRange(reference.Speed, tier, out lo, out hi);
+            if (p.Speed < lo || p.Speed > hi) return "speed " + p.Speed + " outside the band " + lo + ".." + hi;
+            BandRange(reference.Control, tier, out lo, out hi);
+            if (p.Control < lo || p.Control > hi) return "control " + p.Control + " outside the band " + lo + ".." + hi;
+            BandRange(reference.Wall, tier, out lo, out hi);
+            if (p.Wall < lo || p.Wall > hi) return "wall " + p.Wall + " outside the band " + lo + ".." + hi;
+            return ValidateLimits(p);
+        }
+
+        /// <summary>Null when the four numbers are inside the legal limits.</summary>
+        public static string ValidateLimits(HeroPhysics p)
+        {
+            if (p.LaunchTenths < LaunchMinTenths || p.LaunchTenths > LaunchMaxTenths) return "launch " + p.LaunchTenths + " outside the legal " + LaunchMinTenths + ".." + LaunchMaxTenths;
+            if (p.Speed < SpeedMin || p.Speed > SpeedMax) return "speed " + p.Speed + " outside the legal " + SpeedMin + ".." + SpeedMax;
+            if (p.Control < ControlMin || p.Control > ControlMax) return "control " + p.Control + " outside the legal " + ControlMin + ".." + ControlMax;
+            if (p.Wall < WallMin || p.Wall > WallMax) return "wall " + p.Wall + " outside the legal " + WallMin + ".." + WallMax;
             return null;
         }
 
-        // ---- the predictive FI model (a screening aid only: the MEASURED FI is the gate) ----
-        // FI = J(launch) x S(speed) x C(control) x I. Fitted on the level-15 measurements of ladders A to H (error about +-0.04). Wall bounce has no effect on level 15.
-        static readonly double[] JLaunch = { 17, 19, 20, 21, 22, 23, 24 };
-        static readonly double[] JValue = { 0.696, 1.0, 1.045, 1.12, 1.172, 1.334, 1.441 };
-        static readonly double[] SValue = { 1.033, 1.0, 0.961, 0.958, 0.958 };          // speed 8..12
-        static readonly double[] CAt = { 27, 30, 30.01, 41, 42, 45 };
-        static readonly double[] CValue = { 0.994, 1.0, 0.895, 0.895, 0.86, 0.81 };
-
-        static double Lerp(double[] xs, double[] ys, double x)
+        /// <summary>The widened FI window of a tier: lowest and highest mean FI that passes.</summary>
+        public static void FiWindow(int tier, out double lo, out double hi)
         {
-            if (x <= xs[0]) return ys[0];
-            for (int i = 1; i < xs.Length; i++)
-                if (x <= xs[i]) return ys[i - 1] + (ys[i] - ys[i - 1]) * (x - xs[i - 1]) / (xs[i] - xs[i - 1]);
-            return ys[ys.Length - 1];
+            lo = FiWindowMin[tier] - FiTolerance;
+            hi = FiWindowMax[tier] + FiTolerance;
         }
-
-        /// <summary>Predicted FI of a physics set on level 15 of Region 1 (screening only).</summary>
-        public static double PredictFi(HeroPhysics p)
-        {
-            double j = Lerp(JLaunch, JValue, p.LaunchTenths / 10.0);
-            double s = SValue[Math.Max(0, Math.Min(4, p.Speed - 8))];
-            double c = Lerp(CAt, CValue, p.Control);
-            double interaction = 1.0;
-            if (p.Control >= 43 && p.Speed >= 10) interaction = 0.90;
-            else if (p.Speed >= 11 && p.Control >= 41) interaction = 0.95;
-            return j * s * c * interaction;
-        }
-
-        // ---- the seeded generator ----
 
         /// <summary>Deterministic hash of a text (FNV-1a), the same on every runtime.</summary>
         public static int Hash(string text)
@@ -128,46 +101,6 @@ namespace FluffyClimbers.Simulation
                 foreach (char ch in text) { h ^= ch; h *= 16777619u; }
                 return (int)h;
             }
-        }
-
-        sealed class Rng
-        {
-            uint state;
-            public Rng(int seed) { state = (uint)seed; }
-            uint Next()
-            {
-                unchecked
-                {
-                    state += 0x9E3779B9u;
-                    uint z = state;
-                    z = (z ^ (z >> 16)) * 0x85EBCA6Bu;
-                    z = (z ^ (z >> 13)) * 0xC2B2AE35u;
-                    return z ^ (z >> 16);
-                }
-            }
-            public int Range(int lo, int hi) { return lo + (int)(Next() % (uint)(hi - lo + 1)); }
-        }
-
-        /// <summary>
-        /// Candidate number <paramref name="attempt"/> for a hero (its line id, its tier). Jump is drawn inside the tier band, Speed, Control and Wall bounce inside the legal limits
-        /// and the rarity range. The draw is repeated until the PREDICTED FI is within <paramref name="screen"/> of the approved FI of the tier, so the expensive measured gate sees
-        /// plausible candidates only. Deterministic: the same (line, tier, attempt) always gives the same candidate. Momo's tiers are not drawn: use <see cref="LadderFinal"/>.
-        /// </summary>
-        public static HeroPhysics Draw(string lineId, int tier, int attempt, double screen = 0.03)
-        {
-            var rng = new Rng(Hash(lineId) ^ (tier * 7919) ^ (attempt * 104729 + 17));
-            int lo, hi;
-            LaunchRange(tier, out lo, out hi);
-            HeroPhysics best = new HeroPhysics(lo, SpeedMin + 1, 30, WallRangeMin[tier]);
-            double bestErr = double.MaxValue;
-            for (int i = 0; i < 4000; i++)
-            {
-                var p = new HeroPhysics(rng.Range(lo, hi), rng.Range(SpeedMin, SpeedMax), rng.Range(ControlMin, ControlMax), rng.Range(WallRangeMin[tier], WallRangeMax[tier]));
-                double err = Math.Abs(PredictFi(p) - ScreenCenter[tier]);
-                if (err <= screen) return p;
-                if (err < bestErr) { bestErr = err; best = p; }
-            }
-            return best;
         }
     }
 }

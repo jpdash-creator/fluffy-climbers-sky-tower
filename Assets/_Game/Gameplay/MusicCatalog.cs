@@ -35,8 +35,11 @@ namespace FluffyClimbers.Gameplay
         public static string Choice
         {
             get { return Normalize(PlayerPrefs.GetString(ChoiceKey, Random)); }
-            set { PlayerPrefs.SetString(ChoiceKey, Normalize(value)); PlayerPrefs.Save(); AudioManager.Refresh(); }
+            set { PlayerPrefs.SetString(ChoiceKey, Normalize(value)); PlayerPrefs.Save(); AudioManager.Refresh(); GameSettings.CaptureToSave(); }
         }
+
+        /// <summary>Stores a choice without telling the save or the audio (used while a cloud save is applied; the caller refreshes the audio once).</summary>
+        public static void SetChoiceQuiet(string id) { PlayerPrefs.SetString(ChoiceKey, Normalize(id)); }
 
         /// <summary>The locked track index, or -1 while the choice is random.</summary>
         public static int LockedIndex { get { return IndexOf(Choice); } }

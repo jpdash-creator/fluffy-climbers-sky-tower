@@ -77,7 +77,7 @@ namespace FluffyClimbers.Simulation.Tests
     /// <summary>
     /// Audit of region 1 (owner report 2026-10-20: "8 to 10 platforms stacked, game over the moment I touched it").
     /// Builds lvl_001_01..15 with the real LevelBuilder under the default config and under the game's runtime config
-    /// (GameSession.ApplyDifficulty: ScrollStepPercent = 20/40/60/80/100, cap 400), scans for stacks, compares the scroll speed with the
+    /// (GameSession.ApplyDifficulty: ScrollStepPercent = 10/20/30/40/50 every 30 s, cap = step x 8), scans for stacks, compares the scroll speed with the
     /// best possible climb and writes Tests/Simulation/REGION1_AUDIT.md. Category Audit.
     /// </summary>
     [Trait("Category", "Audit")]
@@ -90,27 +90,30 @@ namespace FluffyClimbers.Simulation.Tests
         private readonly ITestOutputHelper output;
         public Region1AuditTests(ITestOutputHelper output) { this.output = output; }
 
-        /// <summary>The config the game runs with (GameSession.Cfg after ApplyDifficulty).</summary>
+        /// <summary>The config the game runs with (GameSession.Cfg after ApplyDifficulty) for a step percent: the top speed-up is step x 8 (SimConfig.TopSpeedUpPercent for the game's own steps).</summary>
         public static SimConfig GameConfig(int stepPercent)
         {
             SimConfig c = new SimConfig();
             c.ScrollStepPercent = stepPercent;
-            c.ScrollStepCapPercent = 400;
+            c.ScrollStepCapPercent = stepPercent * SimConfig.DefaultScrollStepMaxSteps;
             return c;
         }
 
         private static string F(double v) { return v.ToString("F2", CultureInfo.InvariantCulture); }
         private static string F(Fx v) { return F(v.Raw / 65536.0); }
 
-        /// <summary>Scroll speed in u/s after t seconds of play, as Sim applies it (base x (100 + min(cap, steps x step)) / 100).</summary>
+        /// <summary>Scroll speed in u/s after t seconds of play, as Sim applies it (base x (100 + min(cap, min(steps, max steps) x step)) / 100, never above the ScrollMaxSpeed ceiling).</summary>
         public static double ScrollSpeedAt(SimConfig c, Fx difficulty, double t)
         {
             double baseSpeed = (c.ScrollSpeedEasy.Raw + (c.ScrollSpeedHard.Raw - c.ScrollSpeedEasy.Raw) * (difficulty.Raw / 65536.0)) / 65536.0;
             baseSpeed = baseSpeed * c.ScrollBasePercent / 100.0;
             int steps = (int)(t / c.ScrollStepSeconds);
+            if (steps > c.ScrollStepMaxSteps) steps = c.ScrollStepMaxSteps;
             int pct = steps * c.ScrollStepPercent;
             if (pct > c.ScrollStepCapPercent) pct = c.ScrollStepCapPercent;
-            return baseSpeed * (100 + pct) / 100.0;
+            double v = baseSpeed * (100 + pct) / 100.0;
+            double ceiling = c.ScrollMaxSpeed.Raw / 65536.0;
+            return v > ceiling ? ceiling : v;
         }
 
         private static LevelSpec FastSpec(LevelSpec spec)
@@ -166,9 +169,9 @@ namespace FluffyClimbers.Simulation.Tests
 
             File.WriteAllText(Path.Combine(root, "Tests", "Simulation", "REGION1_AUDIT.md"), md.ToString());
             md.AppendLine();
-            md.AppendLine("## Scroll speed (u/s) after t seconds of play: base at the level d, game config (base 120 percent, step every 5 s, cap 400 percent)");
+            md.AppendLine("## Scroll speed (u/s) after t seconds of play: base at the level d, game config (base 120 percent, step every " + SimConfig.DefaultScrollStepSeconds + " s, " + SimConfig.DefaultScrollStepMaxSteps + " steps, ceiling 4 u/s)");
             md.AppendLine();
-            md.AppendLine("| level | d | step | 0 s | 10 s | 20 s | 30 s | 40 s | 60 s |");
+            md.AppendLine("| level | d | step | 0 s | 30 s | 60 s | 120 s | 180 s | 240 s |");
             md.AppendLine("|---|---|---|---|---|---|---|---|---|");
             foreach (LoadedLevel ll in levels)
             {
@@ -176,7 +179,7 @@ namespace FluffyClimbers.Simulation.Tests
                 {
                     SimConfig c = GameConfig(StepTable[k]);
                     md.Append("| ").Append(ll.Id).Append(" | ").Append(F(ll.Spec.EffectiveDifficulty(c))).Append(" | ").Append(StepTable[k]);
-                    foreach (int t in new int[] { 0, 10, 20, 30, 40, 60 }) md.Append(" | ").Append(F(ScrollSpeedAt(c, ll.Spec.EffectiveDifficulty(c), t)));
+                    foreach (int t in new int[] { 0, 30, 60, 120, 180, 240 }) md.Append(" | ").Append(F(ScrollSpeedAt(c, ll.Spec.EffectiveDifficulty(c), t)));
                     md.AppendLine(" |");
                 }
             }

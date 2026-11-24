@@ -10,7 +10,7 @@ namespace FluffyClimbers.Economy
     /// </summary>
     public sealed partial class ProgressService
     {
-        /// <summary>At most this many runs wait for upload (one per slot, so this is plenty).</summary>
+        /// <summary>At most this many runs wait for upload (one per level slot, up to three per Endless / Time Attack slot; the oldest go first when it is full).</summary>
         public const int LeaderboardMaxQueue = 12;
         /// <summary>A run with more base64 characters than this is not kept in the queue (the cloud save must stay small); it is only sent right away.</summary>
         public const int LeaderboardMaxRunChars = 120000;
@@ -98,8 +98,10 @@ namespace FluffyClimbers.Economy
         public IReadOnlyList<QueuedRun> LeaderboardQueue { get { return LbState.Queue; } }
 
         /// <summary>
-        /// Adds a run to the persisted queue. Refused (false) without consent, for a run that is too large to keep, or when the same slot already holds a run with an equal or higher crown.
-        /// A better run of a slot replaces the queued one (a lower crown never changes a slot on the server anyway). The queue is bounded: the oldest runs go first.
+        /// Adds a run to the persisted queue. Refused (false) without consent, for a run that is too large to keep, for a run that is already queued (same run id), or when the run cannot count:
+        /// a LEVEL slot keeps one queued run, so an equal or lower crown is refused and a better run replaces the queued one (a lower crown never changes a level slot on the server anyway).
+        /// An ENDLESS or TIME ATTACK slot counts its three best runs of the week (owner 2026-11-22), so up to three runs of one slot wait side by side, also below a higher run that is queued or already
+        /// uploaded; a fourth is refused unless it beats the lowest of the three, which it replaces. The queue stays bounded: the oldest runs go first.
         /// </summary>
         public bool EnqueueLeaderboardRun(QueuedRun run)
         {
@@ -107,12 +109,32 @@ namespace FluffyClimbers.Economy
             if (run.InputsB64 != null && run.InputsB64.Length > LeaderboardMaxRunChars) return false;
             List<QueuedRun> q = LbState.Queue;
             string key = run.SlotKey;
-            for (int i = 0; i < q.Count; i++)
+            if (!string.IsNullOrEmpty(run.RunId))
+                for (int i = 0; i < q.Count; i++) if (q[i].RunId == run.RunId) return false;   // the same run never waits twice
+            if (run.CountsTopRuns)
             {
-                if (q[i].SlotKey != key) continue;
-                if (q[i].Crown >= run.Crown) return false;
-                q.RemoveAt(i);
-                break;
+                int count = 0, lowest = -1;
+                for (int i = 0; i < q.Count; i++)
+                {
+                    if (q[i].SlotKey != key) continue;
+                    count++;
+                    if (lowest < 0 || q[i].Crown < q[lowest].Crown) lowest = i;
+                }
+                if (count >= BreakdownMerge.TopRuns)
+                {
+                    if (q[lowest].Crown >= run.Crown) return false;   // three better (or equal) runs of the slot already wait: this one could never count
+                    q.RemoveAt(lowest);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < q.Count; i++)
+                {
+                    if (q[i].SlotKey != key) continue;
+                    if (q[i].Crown >= run.Crown) return false;
+                    q.RemoveAt(i);
+                    break;
+                }
             }
             q.Add(run);
             while (q.Count > LeaderboardMaxQueue) q.RemoveAt(0);

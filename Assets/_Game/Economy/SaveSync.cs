@@ -73,14 +73,17 @@ namespace FluffyClimbers.Economy
             return TryParseTime(text, out t) ? t : DateTime.MinValue;
         }
 
-        /// <summary>Counts levels with at least one clear or star, the wallet and the hero copies (owned characters without an explicit count weigh 1).</summary>
+        /// <summary>
+        /// Counts levels with at least one clear or star in ANY Gameplay setting (each level once, whatever the number of settings it was cleared in: the same count an
+        /// older build makes from the aggregate fields), the wallet and the hero copies (owned characters without an explicit count weigh 1).
+        /// </summary>
         public static SaveSummary Summarize(SaveData d)
         {
             var s = new SaveSummary();
             if (d == null) return s;
             if (d.Levels != null)
                 foreach (var kv in d.Levels)
-                    if (kv.Value != null && (kv.Value.Clears > 0 || kv.Value.Stars > 0)) s.LevelsCleared++;
+                    if (kv.Value != null && kv.Value.ClearedAny()) s.LevelsCleared++;   // ClearedAny covers "a star without a clear" too (stars need a completed run)
             s.Gems = d.Gems;
             s.Coins = d.Coins;
             int copies = 0;
@@ -141,22 +144,54 @@ namespace FluffyClimbers.Economy
             if (cloud == null) return IsFresh(local) ? SyncDecision.Nothing : SyncDecision.UploadLocal;
             if (!IsReadable(cloud)) return SyncDecision.Nothing;
             SaveSummary ls = Summarize(local), cs = cloud.Summary ?? Summarize(cloud.Data);
-            if (ls.SameProgress(cs)) return SyncDecision.Nothing;
-            if (ls.IsEmpty) return SyncDecision.UseCloud;
-            if (cs.IsEmpty) return SyncDecision.UploadLocal;
-
+            bool sameCore = ls.SameProgress(cs);
             bool linked = local != null && local.AccountMode == ModeGoogle && !string.IsNullOrEmpty(accountId) && local.AccountId == accountId;
-            if (!linked) return SyncDecision.AskPlayer;   // first link, or another Google account than before: never overwrite either side silently
+            if (sameCore && !linked) return SyncDecision.Nothing;   // first link with the same progress: nothing to choose
+            if (!sameCore)
+            {
+                if (ls.IsEmpty) return SyncDecision.UseCloud;
+                if (cs.IsEmpty) return SyncDecision.UploadLocal;
+                if (!linked) return SyncDecision.AskPlayer;   // first link, or another Google account than before: never overwrite either side silently
+            }
 
             DateTime lastSync = TimeOrMin(local.LastCloudSyncUtc);
             DateTime localChanged = TimeOrMin(local.LastPlayedUtc);
             DateTime cloudChanged = TimeOrMin(cloud.SavedUtc);
-            bool localNew = localChanged > lastSync;
+            // Final Change 3: the durable CloudDirty marker also counts as "this device changed" (a kill before the 6 s upload, or a quiet save)
+            bool localNew = localChanged > lastSync || local.CloudDirty;
             bool cloudNew = cloudChanged > lastSync;
+            // the four summary numbers can agree while a power-up, a reward claim, a purchase or the chosen hero differs: compare the wider fingerprint as well
+            bool same = sameCore && Fingerprint(local) == Fingerprint(cloud.Data);
+            if (same) return localNew && !cloudNew ? SyncDecision.UploadLocal : SyncDecision.Nothing;
             if (localNew && cloudNew) return SyncDecision.AskPlayer;
             if (cloudNew) return SyncDecision.UseCloud;
             if (localNew) return SyncDecision.UploadLocal;
             return SyncDecision.Nothing;
+        }
+
+        /// <summary>
+        /// Final Change 3: a wider comparison than the four numbers of <see cref="Summarize"/>: power-up counts, stars over all settings, reward claims, purchases, Remove Ads,
+        /// the subscription, the chosen hero and copy and the hero roll counter. Equal fingerprints (and equal summaries) = the same save for the sync rules.
+        /// </summary>
+        public static string Fingerprint(SaveData d)
+        {
+            if (d == null) return "";
+            long powerups = 0;
+            if (d.Inventory != null && d.Inventory.Powerups != null)
+                foreach (var kv in d.Inventory.Powerups) if (kv.Value > 0) powerups += kv.Value;
+            int stars = 0;
+            if (d.Levels != null)
+                foreach (var kv in d.Levels) if (kv.Value != null) stars += kv.Value.TotalStars();
+            int claims = 0;
+            if (d.Rewards != null)
+            {
+                claims = d.Rewards.Claims;
+                if (d.Rewards.GoalsClaimed != null) claims += d.Rewards.GoalsClaimed.Count;
+                if (d.Rewards.MainClaimed != null) claims += d.Rewards.MainClaimed.Count;
+            }
+            string sub = d.Subscription != null ? d.Subscription.Type + "/" + d.Subscription.ExpiryUtcTicks + "/" + d.Subscription.MonthlyClaims : "";
+            return powerups + "|" + stars + "|" + claims + "|" + (d.Purchases != null ? d.Purchases.Count : 0) + "|" + (d.AdsRemoved ? 1 : 0) + "|" + sub
+                + "|" + (d.SelectedHero ?? "") + "/" + d.SelectedCopy + "|" + d.HeroRollCount;
         }
 
         /// <summary>
@@ -187,6 +222,7 @@ namespace FluffyClimbers.Economy
             to.AccountId = from.AccountId;
             to.LastCloudSyncUtc = from.LastCloudSyncUtc;
             to.LoginChosen = from.LoginChosen;
+            to.Settings = from.Settings != null ? from.Settings.Clone() : null;   // settings are the player's, not progress: a reset keeps them
         }
 
         /// <summary>The cloud save becomes the device save: it takes over this device's account fields.</summary>
@@ -197,6 +233,7 @@ namespace FluffyClimbers.Economy
             d.AccountId = accountId ?? "";
             d.LoginChosen = true;
             d.LastCloudSyncUtc = NowText();
+            d.CloudDirty = false;   // the dirty marker of the writing device means nothing here
             return d;
         }
 

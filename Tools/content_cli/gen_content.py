@@ -80,6 +80,12 @@ LEVELS = {
 MIGRATED_REGIONS = 5
 
 
+def coin_factor(n):
+    """Region coin factor (owner Final Change 1, 2026-11-22): ONE table for the level clear coins and the Main reward coins.
+    Region 1 = 1.00, 2 to 5 = 1.05, 6 to 15 = 1.10, 16 to 25 = 1.15, 26 to 30 = 1.20 (code: CoinPayoutRules.RegionFactorPercent; validator: content.py)."""
+    return 1.0 if n <= 1 else 1.05 if n <= 5 else 1.1 if n <= 15 else 1.15 if n <= 25 else 1.2
+
+
 def slug(text):
     return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
 
@@ -162,7 +168,7 @@ def main():
             "rules": {"signatureModule": mod_id,
                       "difficultyOffset": round(0.25 * (n - 1) / 29, 4),
                       "hazards": []},
-            "coinFactor": round(1 + 0.03 * (n - 1), 2),
+            "coinFactor": coin_factor(n),
             "levels": ["lvl_%03d_%02d" % (n, i) for i in range(1, 16)],
             "availableFrom": None,
         }

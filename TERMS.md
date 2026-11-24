@@ -80,9 +80,9 @@ We grant you a personal, limited, non-exclusive, non-transferable, non-sublicens
 
 | Item | Paid with | Contents | Hero card odds (current) |
 |---|---|---|---|
-| Iron Chest | 100 gems | 1 power-up, 800 to 1,200 coins, 1 hero card | Common 70 %, Uncommon 20 %, Rare 10 % |
-| Gold Chest | 300 gems | 3 power-ups, 3,000 to 4,200 coins, 1 hero card | Uncommon 50 %, Rare 40 %, Elite 10 % |
-| Gem bundles | gems | The listed items plus one hidden hero card of Uncommon rarity or better, drawn when you buy | Shown on the bundle |
+| Iron Chest | 400 gems | 1 power-up, 800 to 1,200 coins, 1 hero card | Common 50 %, Uncommon 30 %, Rare 20 % |
+| Gold Chest | 1,500 gems | 3 power-ups, 3,000 to 4,200 coins, 1 hero card | Rare 60 %, Elite 30 %, Legendary 10 % |
+| Gem bundles | 200 to 1,000 gems, shown on the bundle | The listed items plus one hidden hero card, drawn when you buy | Common 50 %, Uncommon 40 %, Rare 10 % |
 
 Hero cards come only from regions you have unlocked. A hero you already own is granted as another copy, which the Game uses for merging; duplicates are not refunded. "Open 10" is ten independent draws. Odds are the same for every player and do not depend on how much you have spent. The contents and odds shown inside the Game at the time you open a chest or buy a bundle are authoritative and prevail over this table if they differ. Chests and bundles are bought with gems and nothing in the Game can be cashed out, so they are not gambling and no winnings exist.
 

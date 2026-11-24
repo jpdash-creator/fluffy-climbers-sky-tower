@@ -19,11 +19,32 @@ namespace FluffyClimbers.Simulation
 
         /// <summary>
         /// True when the goal can no longer be met whatever the player does next, although the player is still alive: a NoWallBounce run
-        /// after its first wall bounce. The run ends there instead of letting the player climb to a top that no longer counts.
+        /// after its first wall bounce (the run ends there instead of letting the player climb to a top that no longer counts), and a ComboChain
+        /// (Combo Climb) run that stands on the top row without the combo jumps asked for (the combo ladder lies below and cannot be reached again).
         /// </summary>
         public static bool IsFailed(LevelSpec spec, SimState s)
         {
+            if (spec.Goal.Type == GoalType.ComboChain) return s.Row >= spec.TargetRow() && !ComboJumpsDone(spec, s);
             return spec.Goal.Type == GoalType.NoWallBounce && s.WallBounces > 0 && !IsComplete(spec, s);
+        }
+
+        /// <summary>Combo jumps a ComboChain goal asks for (Goal.Count, at least 1).</summary>
+        public static int ComboJumpsNeeded(LevelSpec spec)
+        {
+            return spec.Goal.Count > 0 ? spec.Goal.Count : 1;
+        }
+
+        /// <summary>Combo jumps of a ComboChain goal landed so far (landings that gained at least Goal.Value floors in one jump), never above the number asked for. HUD progress, no allocation.</summary>
+        public static int ComboJumpsMade(LevelSpec spec, SimState s)
+        {
+            int have = JumpsWithFloors(s, spec.Goal.Value), need = ComboJumpsNeeded(spec);
+            return have > need ? need : have;
+        }
+
+        /// <summary>True once the combo jumps of a ComboChain goal are landed (the level is cleared when the top row is reached as well).</summary>
+        public static bool ComboJumpsDone(LevelSpec spec, SimState s)
+        {
+            return JumpsWithFloors(s, spec.Goal.Value) >= ComboJumpsNeeded(spec);
         }
 
         public static bool IsComplete(LevelSpec spec, SimState s)
@@ -37,7 +58,9 @@ namespace FluffyClimbers.Simulation
                 case GoalType.CollectCoins:
                     return s.Coins >= g.Count;
                 case GoalType.ComboChain:
-                    return JumpsWithFloors(s, g.Value) >= (g.Count > 0 ? g.Count : 1);
+                    // Combo Climb (owner Final Change 1, 2026-11-22): the combo jumps AND the top row. The jumps count anywhere in the level (a launcher jump of enough
+                    // floors too); the combo ladder under the top makes them possible on every layout. Before this the goal ended the run on the last combo jump.
+                    return ComboJumpsDone(spec, s) && s.Row >= spec.TargetRow();
                 case GoalType.NoWallBounce:
                     return s.Row >= spec.TargetRow() && s.WallBounces == 0;
                 case GoalType.FindHiddenGem:

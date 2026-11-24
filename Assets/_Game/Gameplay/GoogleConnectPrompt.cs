@@ -29,12 +29,12 @@ namespace FluffyClimbers.Gameplay
 
         public static void ResetForTests() { ShownThisSession = false; AutoShow = true; }
 
-        /// <summary>True once any level has been completed (the first finished run).</summary>
+        /// <summary>True once any level has been completed in ANY Gameplay setting (the first finished run; stars and clears are kept per setting since Final Change 1).</summary>
         public static bool HasCompletedALevel(SaveData data)
         {
             if (data == null || data.Levels == null) return false;
             foreach (LevelProgress p in data.Levels.Values)
-                if (p != null && p.Clears > 0) return true;
+                if (p != null && p.ClearedAny()) return true;
             return false;
         }
 

@@ -15,6 +15,11 @@ namespace FluffyClimbers.Economy
         [JsonProperty("stats")] public Dictionary<string, int> Stats = new Dictionary<string, int>();
         /// <summary>Ids of the rewards already claimed in this period.</summary>
         [JsonProperty("claimed")] public List<string> Claimed = new List<string>();
+        /// <summary>
+        /// Special levels cleared in this period (owner Final Change 1, 2026-11-22): level id to a bit mask of the Gameplay settings it was cleared in (bit 0 = Relaxed ... bit 4 = Insane).
+        /// Feeds the "clear a special level / N different special levels / the X level / all 6 types" tasks. Additive field, no version bump; an old save has none.
+        /// </summary>
+        [JsonProperty("special", NullValueHandling = NullValueHandling.Ignore)] public Dictionary<string, int> Special = new Dictionary<string, int>();
     }
 
     /// <summary>Lifetime counters of the play inside ONE region (Main goals, docs/39). Counted from the build that introduced them; never reset.</summary>
@@ -29,6 +34,8 @@ namespace FluffyClimbers.Economy
         [JsonProperty("powerUps")] public int PowerUps;
         /// <summary>Levels cleared on Hard or Insane.</summary>
         [JsonProperty("hardClears")] public int HardClears;
+        /// <summary>Time Attack runs finished in the region (at least RewardStat.MinRunFloors floors): the Main "finish N Time Attack runs" goals. Additive field (2026-11-22): old saves start at 0.</summary>
+        [JsonProperty("taRuns", DefaultValueHandling = DefaultValueHandling.Ignore)] public int TimeAttackRuns;
     }
 
     /// <summary>Everything the Rewards screen needs from the save (docs/26 section 4). Additive part of SaveData, no version bump.</summary>
@@ -38,7 +45,7 @@ namespace FluffyClimbers.Economy
         [JsonProperty("week")] public RewardPeriod Week = new RewardPeriod();
         /// <summary>Obsolete since Bug List 5 (the star cards and region rewards are gone): old claimed ids stay here untouched and are ignored.</summary>
         [JsonProperty("mainClaimed")] public List<string> MainClaimed = new List<string>();
-        /// <summary>Ids of the region goals already claimed (g_region_type_tier; claimed once, never reset). Additive field, no version bump.</summary>
+        /// <summary>Ids of the region goals already claimed (g2_region_token; claimed once, never reset). Ids of the table before Final Change 1 (g_region_type_tier) may still be in an older save: they match no goal and are ignored. Additive field, no version bump.</summary>
         [JsonProperty("goalsClaimed")] public List<string> GoalsClaimed = new List<string>();
         /// <summary>Per-region activity counters, key = region index ("1" ... "5"). Additive field: old saves start every counter at 0 (stars, clears and best endless floor are read from the existing save fields).</summary>
         [JsonProperty("regions")] public Dictionary<string, RegionStats> Regions = new Dictionary<string, RegionStats>();
@@ -50,8 +57,7 @@ namespace FluffyClimbers.Economy
         [JsonProperty("playTotalSec", DefaultValueHandling = DefaultValueHandling.Ignore)] public long PlayTotalSeconds;
         /// <summary>Admin "Main rewards" test switch (docs/38): every Main reward counts as complete (not claimed, nothing paid). Cleared when System Test goes off.</summary>
         [JsonProperty("testMainReady", DefaultValueHandling = DefaultValueHandling.Ignore)] public bool TestMainReady;
-        /// <summary>Stored outcomes of the hero-or-coins gifts (Daily 200 points, weekly hard-clear tasks): key "d:&lt;dayKey&gt;:&lt;id&gt;" or "w:&lt;weekKey&gt;:&lt;id&gt;", 1 = hero, 0 = coins. Written when the gift is claimed, so a reload can never roll it again. Only the current day and week are kept. Additive field, no version bump.</summary>
-        [JsonProperty("heroRolls", DefaultValueHandling = DefaultValueHandling.Ignore)] public Dictionary<string, int> HeroRolls = new Dictionary<string, int>();
+        // The old "heroRolls" field (stored outcomes of the hero-or-coins gifts) is gone with Final Change 1 (2026-11-22: no reward gives a hero); an older save that still has it loads fine, the value is dropped.
     }
 
     public enum RewardClaimResult
@@ -68,7 +74,7 @@ namespace FluffyClimbers.Economy
         public RewardClaimResult Result;
         public int Gems, Coins;
         public readonly List<string> PowerUpIds = new List<string>();
-        /// <summary>Hero copies granted (one entry per copy: the id of the Common hero). Empty for most rewards.</summary>
+        /// <summary>Hero copies granted (one entry per copy). Always empty for Main, Daily and Weekly rewards since 2026-11-22 (no reward gives a hero); only the weekly leaderboard prizes (chests, bundles) fill it.</summary>
         public readonly List<string> HeroIds = new List<string>();
     }
 
@@ -136,12 +142,13 @@ namespace FluffyClimbers.Economy
                 if (r.Week.Stats == null) r.Week.Stats = new Dictionary<string, int>();
                 if (r.Day.Claimed == null) r.Day.Claimed = new List<string>();
                 if (r.Week.Claimed == null) r.Week.Claimed = new List<string>();
+                if (r.Day.Special == null) r.Day.Special = new Dictionary<string, int>();
+                if (r.Week.Special == null) r.Week.Special = new Dictionary<string, int>();
                 if (r.Day.Key == null) r.Day.Key = "";
                 if (r.Week.Key == null) r.Week.Key = "";
                 if (r.MainClaimed == null) r.MainClaimed = new List<string>();
                 if (r.GoalsClaimed == null) r.GoalsClaimed = new List<string>();
                 if (r.Regions == null) r.Regions = new Dictionary<string, RegionStats>();
-                if (r.HeroRolls == null) r.HeroRolls = new Dictionary<string, int>();
                 return r;
             }
         }
@@ -233,19 +240,14 @@ namespace FluffyClimbers.Economy
             if (pending > 0) { playFraction -= pending; AddPlaySeconds(pending, false, playRegion); }
             if (!playDirty) return;
             playDirty = false;
-            store.Save(Data);
+            CommitQuiet();   // play time is a quiet change: rate-limited cloud upload (Final Change 3)
         }
 
-        /// <summary>A campaign level was started on this difficulty setting (3 or more counts as a hard level). Saves when it counted.</summary>
-        public void RecordLevelStarted(int difficultySetting)
-        {
-            startedDifficulty = difficultySetting;   // the clear of this level counts as a hard clear when it was started on Hard or Insane
-            if (difficultySetting < RewardStat.HardDifficulty) return;
-            RolloverRewards();
-            if (StatOf(Rw.Day, RewardStat.Hard) > 0) return;   // already counted today: no save at every retry
-            AddBoth(RewardStat.Hard, 1);
-            Commit();
-        }
+        /// <summary>
+        /// Kept for the run controller: it records nothing any more. Since Final Change 1 (2026-11-22) the Gameplay setting of a run comes with its result
+        /// (<see cref="RunOutcome.Mode"/>), and every setting task counts completed runs, not started ones.
+        /// </summary>
+        public void RecordLevelStarted(int difficultySetting) { }
 
         /// <summary>
         /// Run statistics that do not need a completed level: combo chains, best combo and power-ups used (the new ones since the last report,
@@ -256,9 +258,6 @@ namespace FluffyClimbers.Economy
             RolloverRewards();
             if (ApplyRunDelta(run, run.Region)) Commit();
         }
-
-        /// <summary>Difficulty setting of the campaign level started last (RecordLevelStarted); a clear reads it to count hard clears. Not saved.</summary>
-        int startedDifficulty;
 
         /// <summary>The counters of one region (null when none exists and <paramref name="create"/> is false, or the index is not a region).</summary>
         RegionStats RegionStatsFor(int regionIndex, bool create)
@@ -306,44 +305,93 @@ namespace FluffyClimbers.Economy
                 if (run.BestCombo > r.BestCombo) { r.BestCombo = run.BestCombo; any = true; }
             }
             if (run.PowerUpsUsed > 0) { AddBoth(RewardStat.PowerUps, run.PowerUpsUsed); any = true; }
-            if (run.Jumps > 0) { AddBoth(RewardStat.Jumps, run.Jumps); any = true; }   // Main Bug List 2: the weekly jumps task
+            if (run.Jumps > 0) { AddBoth(RewardStat.Jumps, run.Jumps); any = true; }   // a statistic only (no task reads it since 2026-11-22)
             return any;
         }
 
-        /// <summary>Called by ApplyRun for a completed run, before its save: the completion counters plus the run statistics.</summary>
+        /// <summary>
+        /// Called by ApplyRun for a completed run, before its save: the completion counters plus the run statistics.
+        /// <paramref name="firstClear"/> = the first clear of the level IN THE GAMEPLAY SETTING OF THE RUN (Final Change 1, 2026-11-22: every setting has its own path, so a
+        /// first clear on Hard counts in full even when the level was cleared on Relaxed before); any later clear in that setting is a replay under the daily replay limit.
+        /// The level counters are kept in total and per Gameplay setting (run.Mode), and a special level also marks its id with the setting in the day and the week.
+        /// </summary>
         void TrackCompletedRun(LevelDef level, RunOutcome run, bool firstClear, int coinsPaid = 0)
         {
             RolloverRewards();
             int regionIndex = repo.GetRegion(level.Region).Index;   // a completed run always counts for the level's own region
             ApplyRunDelta(run, regionIndex);
-            if (coinsPaid > 0) AddBoth(RewardStat.CoinsEarned, coinsPaid);   // Main Bug List 2: the daily "earn coins" task (replays too, they pay half)
+            if (coinsPaid > 0) AddBoth(RewardStat.CoinsEarned, coinsPaid);   // the daily "earn coins" task (replays too, they pay less)
             if (coinsPaid > 0 && regionIndex > 0) { RegionStats rs = RegionStatsFor(regionIndex, true); if (rs != null) rs.Coins = SaturatingAdd(rs.Coins, coinsPaid); }
+            RewardsData r = Rw;
             if (!firstClear)
             {
-                // a replay of a cleared level: the level counters take at most 3 such replays per day, across all levels
-                RewardPeriod day = Rw.Day;
+                // a replay of a level already cleared in this setting: the level counters take at most MaxCountedReplaysPerDay (10) such replays per day, across all levels and settings
+                RewardPeriod day = r.Day;
                 if (StatOf(day, RewardStat.Replays) >= RewardStat.MaxCountedReplaysPerDay) return;   // replays beyond the daily limit count nothing
                 day.Stats[RewardStat.Replays] = StatOf(day, RewardStat.Replays) + 1;
             }
+            int mode = TimeRecords.ClampMode(run.Mode);
             AddBoth(RewardStat.Levels, 1);
-            if (startedDifficulty >= RewardStat.HardDifficulty)
+            AddBoth(RewardStat.PerMode(RewardStat.Levels, mode), 1);   // "clear N levels on Easy / Normal / Hard or harder", "N different settings"
+            if (mode >= RewardStat.HardDifficulty && regionIndex > 0) { RegionStats hs = RegionStatsFor(regionIndex, true); if (hs != null) hs.HardClears = SaturatingAdd(hs.HardClears, 1); }   // a lifetime statistic of the region
+            int stars = run.Stars;   // star pickups are never stripped on replays, so the star counters work on every level
+            if (stars > 0)
             {
-                AddBoth(RewardStat.HardClear, 1);   // daily "clear a hard level", weekly "clear 5 hard levels"
-                if (regionIndex > 0) { RegionStats hs = RegionStatsFor(regionIndex, true); if (hs != null) hs.HardClears = SaturatingAdd(hs.HardClears, 1); }
+                AddBoth(RewardStat.StarsEarned, stars);
+                AddBoth(RewardStat.PerMode(RewardStat.StarsEarned, mode), stars);
             }
-            if (level.Index == RegionGoalTable.NoWallLevelIndex) AddBoth(RewardStat.NoWall, 1);
-            if (GemLevels.IsGemLevel(level.Index, level.Goal == null ? null : level.Goal.Type) || level.LevelClass == LevelDef.ClassHighlyComplex) AddBoth(RewardStat.GemLevel, 1);
-            int stars = run.Stars;   // star pickups are never stripped on replays, so these two counters work on every level
-            if (stars >= 2) AddBoth(RewardStat.Stars2, 1);
-            if (stars > 0) AddBoth(RewardStat.StarsEarned, stars);
             if ((run.StarMask & 7) == 7) AddBoth(RewardStat.Stars3, 1);
+            if (level.SpecialType != SpecialLevelType.None)
+            {
+                MarkSpecial(r.Day, level.Id, mode);
+                MarkSpecial(r.Week, level.Id, mode);
+            }
+        }
+
+        static void MarkSpecial(RewardPeriod p, string levelId, int mode)
+        {
+            int mask;
+            p.Special.TryGetValue(levelId, out mask);
+            p.Special[levelId] = mask | (1 << mode);
         }
 
         // ---- reading ----
 
-        /// <summary>Value of a counter for the Daily (today) or Weekly (this week) tab. Derived counters: weekly login days and play minutes.</summary>
+        /// <summary>A parsed task counter name ("levels@2" = base "levels", settings 2 and harder).</summary>
+        struct StatQuery
+        {
+            public string Base;
+            public int MinMode;
+            /// <summary>True for a "name@N" counter (reads the per-setting counters N .. 4).</summary>
+            public bool Filtered;
+            /// <summary>The special type of a "specialType.N" counter; None otherwise.</summary>
+            public SpecialLevelType SpecialType;
+        }
+
+        static readonly Dictionary<string, StatQuery> statQueries = new Dictionary<string, StatQuery>();
+
+        /// <summary>Parses a counter name once and keeps the result (reading a counter builds no string after the first time).</summary>
+        static StatQuery QueryOf(string stat)
+        {
+            StatQuery q;
+            lock (statQueries)
+            {
+                if (statQueries.TryGetValue(stat, out q)) return q;
+                string b; int min;
+                if (!RewardStat.TrySplit(stat, out b, out min)) { b = stat; min = 0; }
+                q = new StatQuery { Base = b, MinMode = min, Filtered = b.Length != stat.Length, SpecialType = RewardStat.SpecialTypeOf(stat) };
+                statQueries[stat] = q;
+            }
+            return q;
+        }
+
+        /// <summary>
+        /// Value of a counter for the Daily (today) or Weekly (this week) tab. Derived counters: weekly login days, play minutes, the number of different settings played,
+        /// the special level counters, and every "name@N" counter (the Gameplay settings N and harder: added up, or the best value for the Endless floor).
+        /// </summary>
         public int RewardStatValue(RewardTab tab, string stat)
         {
+            if (stat == null) return 0;
             RolloverRewards();
             RewardsData r = Rw;
             RewardPeriod p = tab == RewardTab.Weekly ? r.Week : r.Day;
@@ -354,23 +402,112 @@ namespace FluffyClimbers.Economy
                 return n;
             }
             if (stat == RewardStat.PlayMinutes) return StatOf(p, RewardStat.PlaySeconds) / 60;
+            if (stat == RewardStat.Settings)
+            {
+                int n = 0;
+                for (int m = 0; m < TimeRecords.ModeCount; m++) if (StatOf(p, RewardStat.PerMode(RewardStat.Levels, m)) > 0) n++;
+                return n;
+            }
+            if (stat == RewardStat.SpecialTypes) return SpecialTypesIn(p);
+            StatQuery q = QueryOf(stat);
+            if (q.SpecialType != SpecialLevelType.None) return SpecialTypeClearedIn(p, q.SpecialType) ? 1 : 0;
+            if (q.Base == RewardStat.Special) return SpecialLevelsIn(p, q.MinMode);
+            if (q.Filtered)
+            {
+                bool best = q.Base == RewardStat.EndlessFloor;   // a floor is a best value, everything else is a count
+                string stored = q.Base == RewardStat.GoldMedals ? RewardStat.Gold : q.Base;
+                long sum = 0;
+                for (int m = q.MinMode; m < TimeRecords.ModeCount; m++)
+                {
+                    int v = StatOf(p, RewardStat.PerMode(stored, m));
+                    if (best) { if (v > sum) sum = v; } else sum += v;
+                }
+                return sum > int.MaxValue ? int.MaxValue : (int)sum;
+            }
             int timed;
             if (TryTimedGoalStat(stat, out timed)) return timed;
             return StatOf(p, stat);
         }
 
-        /// <summary>Main Bug List 2: a counted Time Attack run (called by RecordTimeAttack before its save): the best floors of one run today, for the daily Time Attack task.</summary>
-        void TrackTimeAttackReward(int floors)
+        // ---- special levels of the period ----
+
+        Dictionary<string, SpecialLevelType> specialTypeById;
+
+        /// <summary>The special type of a level id (None for a Regular Run, a gem level or an id the content does not know). Built once from the content.</summary>
+        public SpecialLevelType SpecialTypeOfLevel(string levelId)
+        {
+            if (levelId == null) return SpecialLevelType.None;
+            if (specialTypeById == null)
+            {
+                var map = new Dictionary<string, SpecialLevelType>();
+                foreach (RegionDef region in repo.Regions)
+                    foreach (LevelDef l in repo.LevelsOf(region.Id))
+                    {
+                        SpecialLevelType t = l.SpecialType;
+                        if (t != SpecialLevelType.None) map[l.Id] = t;
+                    }
+                specialTypeById = map;
+            }
+            SpecialLevelType type;
+            return specialTypeById.TryGetValue(levelId, out type) ? type : SpecialLevelType.None;
+        }
+
+        /// <summary>Different special levels cleared in the period on the setting <paramref name="minMode"/> or harder.</summary>
+        int SpecialLevelsIn(RewardPeriod p, int minMode)
+        {
+            int n = 0;
+            foreach (KeyValuePair<string, int> kv in p.Special)
+                if ((kv.Value >> minMode) != 0 && SpecialTypeOfLevel(kv.Key) != SpecialLevelType.None) n++;
+            return n;
+        }
+
+        bool SpecialTypeClearedIn(RewardPeriod p, SpecialLevelType type)
+        {
+            foreach (KeyValuePair<string, int> kv in p.Special)
+                if (kv.Value != 0 && SpecialTypeOfLevel(kv.Key) == type) return true;
+            return false;
+        }
+
+        /// <summary>Different special level types cleared in the period (0..6).</summary>
+        int SpecialTypesIn(RewardPeriod p)
+        {
+            int seen = 0, n = 0;
+            foreach (KeyValuePair<string, int> kv in p.Special)
+            {
+                if (kv.Value == 0) continue;
+                int bit = 1 << (int)SpecialTypeOfLevel(kv.Key);
+                if (bit == 1 || (seen & bit) != 0) continue;   // bit 1 = None
+                seen |= bit;
+                n++;
+            }
+            return n;
+        }
+
+        /// <summary>
+        /// A counted Time Attack run (called by RecordTimeAttack before its save): the best floors of one run today (the daily "Time Attack: 60 floors" task; the week's
+        /// best is in the TimedCounters), and, from RewardStat.MinRunFloors floors on, one finished run for the day, the week and the region (the Main "finish N Time Attack runs" goals).
+        /// </summary>
+        void TrackTimeAttackReward(RegionDef region, int floors)
         {
             RolloverRewards();
             MaxStat(Rw.Day, RewardStat.TimeAttackRun, floors);
+            if (floors < RewardStat.MinRunFloors) return;   // an instant fall is not a run (the same rule as Endless)
+            AddBoth(RewardStat.TimeAttackRuns, 1);
+            RegionStats s = region != null ? RegionStatsFor(region.Index, true) : null;
+            if (s != null) s.TimeAttackRuns = SaturatingAdd(s.TimeAttackRuns, 1);
         }
 
-        /// <summary>Main Bug List 2: a level medal that is new or higher was earned (called by TrackTimedLevel before its save): the daily and weekly "earn medals" tasks.</summary>
-        void TrackMedalEarned()
+        /// <summary>
+        /// A level medal that is new or higher was earned in a Gameplay setting (called by TrackTimedLevel before its save): the "earn medals" tasks, in total and per setting;
+        /// a new Gold medal also counts for the "gold medals on Normal or harder" task.
+        /// </summary>
+        void TrackMedalEarned(int mode, bool gold)
         {
             RolloverRewards();
+            mode = TimeRecords.ClampMode(mode);
             AddBoth(RewardStat.Medals, 1);
+            AddBoth(RewardStat.PerMode(RewardStat.Medals, mode), 1);
+            if (gold) AddBoth(RewardStat.PerMode(RewardStat.Gold, mode), 1);
         }
 
         /// <summary>Best combo chain ever reached.</summary>
@@ -384,14 +521,14 @@ namespace FluffyClimbers.Economy
             return points;
         }
 
-        /// <summary>Levels of the region with this index that are cleared.</summary>
+        /// <summary>
+        /// Levels of the region with this index that are cleared, counted in the BEST single Gameplay setting (Final Change 1, 2026-11-22: clears are per setting; the
+        /// "clear N levels" goals and the Rewards header follow the setting the player got furthest in, so 25 means the region is complete in one setting).
+        /// </summary>
         public int RegionLevelsCleared(int regionIndex)
         {
             RegionDef region = repo.TryGetRegionByIndex(regionIndex);
-            if (region == null) return 0;
-            int n = 0;
-            foreach (string id in region.Levels) if (IsLevelCleared(id)) n++;
-            return n;
+            return region == null ? 0 : BestLevelsClearedInRegion(region);
         }
 
         /// <summary>The value an entry needs to be complete: its target.</summary>
@@ -504,78 +641,17 @@ namespace FluffyClimbers.Economy
             return outcome;
         }
 
-        /// <summary>Saves a finished claim once. Hero copies go through AddCopies (the existing API: it saves), after the wallet and the claimed marks are already set, so that one save holds everything.</summary>
+        /// <summary>Saves a finished claim once (wallet, power-up stock and claimed marks together).</summary>
         void FinishClaim(RewardClaimOutcome outcome)
         {
-            if (outcome.HeroIds.Count == 0) { Commit(); return; }
-            for (int i = 0; i < outcome.HeroIds.Count; i++) AddCopies(outcome.HeroIds[i], 1);
-        }
-
-        /// <summary>The starter Common hero of a region (the one the region hands over, Momo for region 1), null when none exists.</summary>
-        static CharacterSpec CommonHeroOf(int regionIndex)
-        {
-            foreach (CharacterSpec c in CharacterDefs.All) if (c.RegionStarter && c.Region == regionIndex) return c;
-            return null;
-        }
-
-        /// <summary>
-        /// One random Common hero of an OPEN region (region 1, or a region the player unlocked): repeatable from the per-account seed (the bundle seed) and the claim
-        /// counter, never UnityEngine.Random. Null when no such hero exists.
-        /// </summary>
-        CharacterSpec RandomOpenCommonHero()
-        {
-            var open = new List<CharacterSpec>(5);
-            foreach (CharacterSpec c in CharacterDefs.All)
-            {
-                if (!c.IsRegionHero) continue;
-                RegionDef rd = c.Region > 1 ? repo.TryGetRegionByIndex(c.Region) : null;
-                if (c.Region <= 1 || (rd != null && IsRegionUnlocked(rd))) open.Add(c);
-            }
-            if (open.Count == 0) return null;
-            BundleSaveData b = Data.Bundles ?? (Data.Bundles = new BundleSaveData());
-            EnsureBundleSeed(b);
-            ulong roll = BundleMix(((ulong)(uint)b.Seed << 32) ^ (ulong)(uint)Rw.Claims ^ 0x4845524FUL);
-            return open[(int)(roll % (ulong)open.Count)];
-        }
-
-        /// <summary>
-        /// The deterministic 50 percent roll of a hero-or-coins gift: a pure function of the per-account seed (the bundle seed), the period key (day for Daily, Monday for Weekly) and the entry id
-        /// (integer mixing like ChestRolls, never UnityEngine.Random). The outcome is stored in the save the first time it is decided, so it never changes and cannot be re-rolled by reloading.
-        /// </summary>
-        public bool HeroOrCoinsWins(RewardTab tab, RewardEntry e)
-        {
-            RewardsData r = Rw;
-            string period = tab == RewardTab.Daily ? r.Day.Key : r.Week.Key;
-            string key = (tab == RewardTab.Daily ? "d:" : "w:") + period + ":" + e.Id;
-            int stored;
-            if (r.HeroRolls.TryGetValue(key, out stored)) return stored != 0;
-            BundleSaveData b = Data.Bundles ?? (Data.Bundles = new BundleSaveData());
-            EnsureBundleSeed(b);
-            ulong roll = BundleMix(BundleMix(((ulong)(uint)b.Seed << 32) ^ (ulong)(uint)StableHash(period + "|" + e.Id)) ^ 0x484F43UL);
-            bool win = (int)(roll % 100UL) < RewardEntry.HeroOrCoinsPercent;
-            // keep only the current day and week, then store this outcome
-            var stale = new List<string>();
-            foreach (KeyValuePair<string, int> kv in r.HeroRolls)
-                if (!kv.Key.StartsWith("d:" + r.Day.Key + ":", StringComparison.Ordinal) && !kv.Key.StartsWith("w:" + r.Week.Key + ":", StringComparison.Ordinal)) stale.Add(kv.Key);
-            for (int i = 0; i < stale.Count; i++) r.HeroRolls.Remove(stale[i]);
-            r.HeroRolls[key] = win ? 1 : 0;
-            return win;
+            Commit();
         }
 
         /// <summary>Pays one reward into the wallet and the power-up stock and marks it claimed, without saving (the caller saves once).</summary>
         void PayReward(RewardTab tab, RewardEntry e, RewardClaimOutcome outcome)
         {
             RewardsData r = Rw;
-            int coins = Math.Max(0, e.Coins);
-            bool heroOrCoins = e.IsHeroOrCoins && tab != RewardTab.Main;
-            bool heroWon = !heroOrCoins || HeroOrCoinsWins(tab, e);
-            CharacterSpec rolledHero = null;
-            if (heroOrCoins && heroWon)
-            {
-                rolledHero = RandomOpenCommonHero();
-                if (rolledHero == null) heroWon = false;   // no open Common hero exists: the coins are paid instead
-            }
-            if (heroOrCoins && !heroWon) coins = SaturatingAdd(coins, e.HeroOrCoins);
+            int coins = Math.Max(0, e.Coins);   // gems, coins and random power-up units only: no reward gives a hero (owner Final Change 1, 2026-11-22)
             Data.Gems = SaturatingAdd(Data.Gems, Math.Max(0, e.Gems));
             Data.Coins = SaturatingAdd(Data.Coins, coins);
             outcome.Gems = SaturatingAdd(outcome.Gems, Math.Max(0, e.Gems));
@@ -596,15 +672,6 @@ namespace FluffyClimbers.Economy
                         }
                     }
                 }
-            }
-            if (heroOrCoins)
-            {
-                if (rolledHero != null) outcome.HeroIds.Add(rolledHero.Id);   // granted by FinishClaim
-            }
-            else if (e.HeroRegion != 0 || !string.IsNullOrEmpty(e.HeroId))
-            {
-                CharacterSpec hero = !string.IsNullOrEmpty(e.HeroId) ? CharacterDefs.Get(e.HeroId) : e.HeroRegion > 0 ? CommonHeroOf(e.HeroRegion) : RandomOpenCommonHero();
-                if (hero != null) outcome.HeroIds.Add(hero.Id);   // granted by FinishClaim
             }
             if (tab == RewardTab.Main) r.GoalsClaimed.Add(e.Id);
             else if (tab == RewardTab.Daily) r.Day.Claimed.Add(e.Id);

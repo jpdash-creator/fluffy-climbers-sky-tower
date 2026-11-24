@@ -20,8 +20,13 @@ Indent 2, LF, no timestamps. Regions ordered by index, levels by id (ordinal); i
 - Models (`Models.cs`): RegionDef, UnlockDef, ThemeDef, RegionRulesDef, LevelDef (`LevelClass` = JSON `class`; constants `ClassSimple/ClassComplex/ClassHighlyComplex`), GoalDef, StarDef, LevelOverridesDef, RewardsDef, GemRewardDef, ModuleDef, GemPackDef, ItemDef, RemoteConfigDef (+ Ramp/Generator/Score/Economy sections). Content layer uses `double`; convert to `Fx` only at the Simulation boundary.
 - Errors: `ContentException` (`ContentId`, message prefixed `[id]`).
 
+## Special level types (owner Final Change 1, 2026-11-22)
+- Level JSON: optional `special` (`noPowerUps`, `oneLife`, `keepMoving`; `LevelDef.Special`) and `overrides.rows` (`LevelOverridesDef.Rows`, the floor count of a Combo Climb level). Schema: `Content/schemas/level.schema.json`. `LevelSpecFactory.Build` maps them to `LevelSpec.Special` and `LevelSpec.Rows`; an unknown `special` id throws `ContentException`.
+- `LevelDef.SpecialType` (not serialised) = `SpecialLevels.TypeOf(goal type, special)`: the one lookup for level tiles, popups and rewards (None = Regular Run). Names, rule sentences and tile glyphs: `FluffyClimbers.Simulation.SpecialLevels`.
+- Source of truth of the level files of regions 1 to 5: `python Tools/content_cli/migrate_levels_25.py` (placement table `SPECIAL_PLACEMENT`); `python Tools/content_cli/content.py validate` checks the shipped JSON against it. Rebuild the manifest afterwards (menu or headless builder above; the merger is plain C#, so any .NET host that calls `ContentManifestMerger.Build` writes the same text).
+
 ## Validation on load (no silent defaults)
-Manifest version == 1; contentHash present; every required field present (Newtonsoft `Required.Always`); unknown JSON members rejected (`MissingMemberHandling.Error`); exactly 30 regions with indexes 1..30; 15 levels each; every referenced level exists, belongs to its region and its `index` equals its position; no duplicate ids; no unlisted (orphan) levels; `unlock.requires` references an existing region; status is live or teaser.
+Manifest version == 1; contentHash present; every required field present (Newtonsoft `Required.Always`); unknown JSON members rejected (`MissingMemberHandling.Error`); exactly 30 regions with indexes 1..30; 25 levels in regions 1 to 5 and 15 in regions 6 to 30 (`ContentRepository.ExpectedLevelsFor`); every referenced level exists, belongs to its region and its `index` equals its position; no duplicate ids; no unlisted (orphan) levels; `unlock.requires` references an existing region; status is live or teaser.
 
 ## Assumptions
 - Nullable by design (not required): `unlock.requires/gemSkip` (null for region 1), `theme.music`, `availableFrom/To`, level `overrides`, `rewards.gems` and its optional fields, goal `value/count/timeSec`, star `value`, item `tags`.

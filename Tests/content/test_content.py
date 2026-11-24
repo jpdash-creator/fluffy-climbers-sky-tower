@@ -44,6 +44,53 @@ class ShippedContent(unittest.TestCase):
         coins = [(p["coins"], p["gemsList"]) for p in content.load("economy/coin_packs.json")]
         self.assertEqual(coins, [(1000, 50), (2000, 100), (5000, 250), (10000, 500), (20000, 900), (50000, 2200), (100000, 4000)])
 
+    def test_special_levels_follow_the_approved_placement(self):
+        # owner Final Change 1 (2026-11-22): six special types, one level each per region, never on a gem level; levels 10, 15, 20 are plain reachFloor levels
+        approved = {
+            1: {6: "noWallTouch", 9: "oneLife", 14: "noPowerUps", 16: "keepMoving", 21: "chase", 24: "comboClimb"},
+            2: {4: "noWallTouch", 7: "oneLife", 13: "noPowerUps", 16: "comboClimb", 18: "keepMoving", 23: "chase"},
+            3: {3: "chase", 6: "oneLife", 11: "noPowerUps", 17: "comboClimb", 21: "noWallTouch", 23: "keepMoving"},
+            4: {4: "noPowerUps", 6: "keepMoving", 11: "comboClimb", 14: "chase", 19: "noWallTouch", 24: "oneLife"},
+            5: {4: "noWallTouch", 6: "chase", 9: "keepMoving", 14: "comboClimb", 18: "oneLife", 24: "noPowerUps"},
+        }
+        rows = {1: 60}
+        rows.update({i: 75 for i in range(2, 6)})
+        rows.update({i: 90 for i in range(6, 11)})
+        rows.update({i: 105 for i in range(11, 16)})
+        rows.update({i: 120 for i in range(16, 21)})
+        rows.update({i: 150 for i in range(21, 26)})
+        import glob
+        import os
+        for n in range(1, 6):
+            path = glob.glob(os.path.join(content.CONTENT, "levels", "region_%03d_*_levels.json" % n))[0]
+            levels = content.load_abs(path)
+            self.assertEqual(len(levels), 25)
+            found = {}
+            for lv in levels:
+                t = content.special_type_of(lv)
+                if t:
+                    found[lv["index"]] = t
+                i = lv["index"]
+                if t == "comboClimb":
+                    self.assertEqual(lv["goal"], {"type": "comboChain", "value": 3, "count": 3})
+                    self.assertEqual(lv["overrides"], {"rows": rows[i]})
+                elif t == "chase":
+                    self.assertEqual(lv["goal"], {"type": "bossChase", "value": rows[i]})
+                    self.assertEqual(lv["overrides"], {"ramp": True})
+                elif t == "noWallTouch":
+                    self.assertEqual(lv["goal"], {"type": "noWallBounce", "value": rows[i]})
+                else:
+                    self.assertEqual(lv["goal"], {"type": "reachFloor", "value": rows[i]})   # floor counts did not change
+                    self.assertNotIn("overrides", lv)
+                if i % 5 == 0:
+                    self.assertEqual(t, "", "%s is a gem level" % lv["id"])
+            self.assertEqual(found, approved[n])
+            self.assertEqual(sorted(found.values()), sorted(content.SPECIAL_TYPES))
+        # the legacy regions carry no rule field
+        for path in glob.glob(os.path.join(content.CONTENT, "levels", "region_0[0-3][0-9]_*_levels.json")):
+            if int(os.path.basename(path)[7:10]) > 5:
+                self.assertTrue(all("special" not in lv for lv in content.load_abs(path)))
+
     def test_gem_skip_formula(self):
         # owner 2026-11-13: 500 gems for every region from 2 on
         self.assertIsNone(content.expected_gem_skip(1))

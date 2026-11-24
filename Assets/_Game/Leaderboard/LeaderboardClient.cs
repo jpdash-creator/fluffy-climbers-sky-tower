@@ -105,7 +105,7 @@ namespace FluffyClimbers.Leaderboard
             Call("GET", cfg.Url("/my-week" + (withPrizes ? "?prizes=1" : "")), null, r => done(r.Ok ? LbJson.ParseMyWeek(r.Body) : null));
         }
 
-        /// <summary>GET /my-week?slots=1: the same standing plus the slot list (the best crown of the week per level x setting, Endless and Time Attack region x setting) for the own-row calculation popup. null on failure.</summary>
+        /// <summary>GET /my-week?slots=1: the same standing plus the slot list (the best crown of the week per level x setting; per Endless and Time Attack region x setting the sum of the three best runs, listed as "runs") for the own-row calculation popup. null on failure.</summary>
         public void MySlots(Action<MyWeekData> done)
         {
             Call("GET", cfg.Url("/my-week?slots=1"), null, r => done(r.Ok ? LbJson.ParseMyWeek(r.Body) : null));

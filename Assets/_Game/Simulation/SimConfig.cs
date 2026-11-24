@@ -70,7 +70,6 @@ namespace FluffyClimbers.Simulation
         public Fx KillDistance = Fx.FromInt(10);
         /// <summary>Distance below the start platform of the bottom edge (danger line) before the first jump.</summary>
         public Fx StartKillDistance = Fx.FromInt(5);
-        /// <summary>Scroll speed steps up by ScrollStepPercent every ScrollStepSeconds after the first jump, up to ScrollStepCapPercent.</summary>
         /// <summary>Base scroll speed as a percent of the difficulty-blended speed (owner, 2026-10-19: +20 percent).</summary>
         public int ScrollBasePercent = 120;
         /// <summary>Chance, in per mille, that a gem spot (one per row of a campaign level) holds a gem. See <see cref="DifficultyGemPermille"/>.</summary>
@@ -94,29 +93,50 @@ namespace FluffyClimbers.Simulation
         /// </summary>
         public static readonly int[] DifficultyGemPermille = { 0, 0, 0, 0, 0 };
         /// <summary>
-        /// Scroll speed-up step in percent per Gameplay setting (Relaxed, Easy, Normal, Hard, Insane) every ScrollStepSeconds: 10, 20, 25, 40, 50.
-        /// Owner decision 2026-11-12 (was 20/22/25/28/30). The same percents are the crown bonus of <c>CrownScore</c> (Economy), so a harder setting pays more crown.
+        /// Scroll speed-up step in percent OF THE START SPEED per Gameplay setting (Relaxed, Easy, Normal, Hard, Insane): 10, 20, 30, 40, 50, added every
+        /// <see cref="DefaultScrollStepSeconds"/> (30 s) after the first jump, additive (never compounding), <see cref="DefaultScrollStepMaxSteps"/> (8) times.
+        /// Owner Final Change 1 (2026-11-22); it was 10/20/25/40/50 every 5 s since 2026-11-12. The crown and coin bonus is a separate table since that day
+        /// (<see cref="DifficultyRewardPercent"/>).
         /// </summary>
-        public static readonly int[] DifficultyStepPercent = { 10, 20, 25, 40, 50 };
-        /// <summary>Speed-up steps that are applied at most (owner 2026-11-12: 8, so the top speed-up is step x 8 = 80, 160, 200, 320, 400 percent for Relaxed .. Insane, 40 s after the first jump). There is NO global percent cap any more; the cap of a setting is <see cref="TopSpeedUpPercent"/>.</summary>
+        public static readonly int[] DifficultyStepPercent = { 10, 20, 30, 40, 50 };
+        /// <summary>
+        /// Crown AND coin bonus in percent per Gameplay setting (Relaxed, Easy, Normal, Hard, Insane): 0, 5, 10, 15, 25 (owner Final Change 1, 2026-11-22).
+        /// Separate from the speed steps since that day. Crown: <c>CrownScore</c>; coins: <see cref="CoinPayoutRules.ApplySettingBonus"/>.
+        /// </summary>
+        public static readonly int[] DifficultyRewardPercent = { 0, 5, 10, 15, 25 };
+        /// <summary>The crown and coin bonus percent of a Gameplay setting (clamped to a valid setting).</summary>
+        public static int RewardBonusPercent(int mode)
+        {
+            int m = mode < 0 ? 0 : (mode >= DifficultyRewardPercent.Length ? DifficultyRewardPercent.Length - 1 : mode);
+            return DifficultyRewardPercent[m];
+        }
+        /// <summary>Seconds between two speed-up steps (owner Final Change 1, 2026-11-22: 30 s; it was 5 s).</summary>
+        public const int DefaultScrollStepSeconds = 30;
+        /// <summary>Speed-up steps that are applied at most: 8, so the top speed-up is step x 8 = 80, 160, 240, 320, 400 percent for Relaxed .. Insane, 4 minutes (8 x 30 s) after the first jump. There is NO global percent cap; the cap of a setting is <see cref="TopSpeedUpPercent"/>. The real speed is still held at <see cref="ScrollMaxSpeed"/>.</summary>
         public const int DefaultScrollStepMaxSteps = 8;
-        /// <summary>Highest stepped speed-up of a Gameplay setting in percent: DifficultyStepPercent x DefaultScrollStepMaxSteps (80, 160, 200, 320, 400). GameSession sets ScrollStepCapPercent to it.</summary>
+        /// <summary>Highest stepped speed-up of a Gameplay setting in percent: DifficultyStepPercent x DefaultScrollStepMaxSteps (80, 160, 240, 320, 400). GameSession sets ScrollStepCapPercent to it.</summary>
         public static int TopSpeedUpPercent(int mode)
         {
             int m = mode < 0 ? 0 : (mode >= DifficultyStepPercent.Length ? DifficultyStepPercent.Length - 1 : mode);
             return DifficultyStepPercent[m] * DefaultScrollStepMaxSteps;
         }
-        public int ScrollStepSeconds = 5;
+        /// <summary>
+        /// The scroll speed steps up by ScrollStepPercent of the start speed every ScrollStepSeconds after the first jump (additive), at most ScrollStepMaxSteps times and
+        /// never above ScrollStepCapPercent. It applies on every level (ramp levels too, the row ramp is multiplied on top) and in Endless (on top of the cycle-level speed).
+        /// The defaults 4 / 50 are the neutral test config; a run gets the Gameplay setting's values from GameSession.ApplyDifficulty.
+        /// </summary>
+        public int ScrollStepSeconds = DefaultScrollStepSeconds;
         public int ScrollStepPercent = 4;
         public int ScrollStepCapPercent = 50;
         /// <summary>
         /// Number of speed steps that are applied; later steps are skipped, so the speed flattens after ScrollStepMaxSteps x ScrollStepSeconds
-        /// (40 s with 8 steps, owner 2026-11-12; it was 6 steps = 30 s). Without a limit the screen outruns the best possible climb after 30 to 40 s.
+        /// (8 x 30 s = 4 minutes since owner Final Change 1, 2026-11-22; it was 8 x 5 s = 40 s).
         /// </summary>
         public int ScrollStepMaxSteps = DefaultScrollStepMaxSteps;
         /// <summary>
-        /// Hard ceiling of the campaign scroll speed in u/s (not applied to endless). 4.0 u/s is about 60 percent of the fastest bot climb
-        /// on the hardest region 1 level (6.6 u/s), the most a good human can sustain; the base speed of the hardest level is 2.4 u/s.
+        /// Hard ceiling of the scroll speed in u/s, on levels AND in Endless (owner Final Change 1, 2026-11-22: it stays). 4.0 u/s is about 60 percent of the fastest bot climb
+        /// on the hardest region 1 level (6.6 u/s), the most a good human can sustain; the base speed of the hardest level is 2.4 u/s. When the real speed reaches it the HUD
+        /// shows "MAX" once instead of an odd percent (Sim.NextScrollCue).
         /// </summary>
         public Fx ScrollMaxSpeed = Fx.FromInt(4);
 
@@ -511,6 +531,12 @@ namespace FluffyClimbers.Simulation
         // Revive (minimal): see Sim.Revive
         public Fx ReviveKillDistance = Fx.FromInt(6);
         public int ReviveInvulnTicks = 120;
+
+        // Keep Moving levels (owner Final Change 1, 2026-11-22; LevelSpec.KeepMoving): see Sim.KeepMovingTicksLeft
+        /// <summary>Ticks the hero may stand on ONE platform (3 s). One tick more ends the run like a fall. Counted only while grounded, after the first jump, without invulnerability.</summary>
+        public int KeepMovingLimitTicks = 180;
+        /// <summary>The HUD countdown ring shows while this many ticks or fewer are left (the last 2 s).</summary>
+        public int KeepMovingWarnTicks = 120;
 
         // ---------------------------------------------------------------------------------------
         // Power-ups (docs/15 FR-PWR; owner decisions 2026-10-20). Player effects only: they never change the layout.

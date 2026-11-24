@@ -284,13 +284,9 @@ namespace FluffyClimbers.LeaderboardService.Tests
         [Fact]
         public void ConfigDefaultJsonCarriesTheSameEntryLimitsAsTheCodeDefaults()
         {
-            string dir = AppContext.BaseDirectory, file = null;
-            for (int i = 0; i < 10 && dir != null && file == null; i++, dir = System.IO.Path.GetDirectoryName(dir))
-            {
-                string f = System.IO.Path.Combine(dir, "Tools", "leaderboard_service", "config.default.json");
-                if (System.IO.File.Exists(f)) file = f;
-            }
-            Assert.NotNull(file);
+            // the repo root comes from the test source path (Harness.Root), so the test also finds the file when the build output lives outside the repo (an artifacts path)
+            string file = System.IO.Path.Combine(Harness.Root, "Tools", "leaderboard_service", "config.default.json");
+            Assert.True(System.IO.File.Exists(file), file);
             using (var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(file)))
             {
                 var lim = new Limits();

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FluffyClimbers.Economy;
+using FluffyClimbers.Simulation;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,7 +16,7 @@ namespace FluffyClimbers.Gameplay
         // The card is 136 px on the 1080 reference (it was 214) and the gap 10 (it was 49). It cannot be as low as 90: a ready card carries a real Claim button
         // and every button must be at least 48 dp (UiKit.MinTouchPx, about 126 px), so the card is that button plus 5 px above and below.
         const float IconW = 104f, CardPadX = 20f, CardCorner = 48f, RewardCorner = 30f;
-        const float CardPadY = 8f, ItemIcon = 48f, ItemGap = 12f, PlatePad = 14f, CheckW = 44f, HeroFaceSize = 72f;
+        const float CardPadY = 8f, ItemIcon = 48f, ItemGap = 12f, PlatePad = 14f, CheckW = 44f;
         /// <summary>Space between cards.</summary>
         public const float CardGap = 10f;
         /// <summary>Base height of a card; it grows (never shrinks) with the text size and a wrapped title.</summary>
@@ -107,101 +108,89 @@ namespace FluffyClimbers.Gameplay
         // ---------------- task pictures ----------------
 
         /// <summary>
-        /// The picture of a task id: the new named slot (task_*.png) when the file is there, else the older OpenArt icon, else a UI kit icon.
+        /// The picture of a task or goal: the new named slot (task_*.png) when the file is there, else the older OpenArt icon, else a UI kit icon.
         /// slot = the Resources/Art/Rewards file (null = no new art for this task), icon = the older icon_* name, kit = the Art/Ui fallback.
+        /// Chosen by what the row counts (its counter, or the family of a region goal), never by its id, so a new row of a known kind gets its picture with no change here.
         /// </summary>
-        public static void TaskSources(string id, out string slot, out string icon, out string kit)
+        public static void TaskSources(RewardEntry e, out string slot, out string icon, out string kit)
         {
             slot = null; icon = "star1"; kit = "icon_star";
-            switch (id)
+            if (e == null) return;
+            RegionGoal goal = e as RegionGoal;
+            if (goal != null) { GoalSources(goal, out slot, out icon, out kit); return; }
+            string stat; int minMode;
+            if (!RewardStat.TrySplit(e.Stat, out stat, out minMode)) return;
+            switch (stat)
             {
-                case "d_login": slot = "task_key"; icon = "key"; kit = "icon_daily"; break;                                   // log in: key
-                case "d_play10": case "d_play25": case "d_play60": case "w_play250": slot = "task_hourglass"; icon = "hourglass"; kit = "icon_dial"; break;   // play minutes: hourglass
-                case "d_level3": case "d_level6": case "d_level10": slot = "task_flag"; icon = "flag3"; kit = "icon_flag"; break;   // complete levels: flag
-                case "d_combo10": case "d_combo30": case "w_combos300": slot = "task_flame"; icon = "flame"; kit = "icon_flame"; break;   // combos: flame
-                case "d_stars9": case "w_stars40": icon = "star1"; kit = "icon_star"; break;                                    // earn stars: star
-                case "d_endless50": case "d_endless100": case "d_endlessruns": case "w_endless150": case "w_endless200": case "w_endlessruns20": icon = null; kit = "icon_tower"; break;   // Endless: tower
-                case "d_powerups": case "w_powerups20": icon = "bolt"; kit = "icon_bolt"; break;                                // use power-ups: bolt
-                case "d_medal": case "w_medals8": icon = "medal"; kit = "icon_crown"; break;                                    // earn medals: medal (any colour)
-                case "d_coins": slot = "task_coins"; icon = "coinbag"; kit = "icon_coin"; break;                                // earn coins: coin
-                case "d_ta": icon = "clock"; kit = "icon_tower"; break;                                                         // Time Attack floors: clock
-                case "w_jumps8000": slot = "task_upgrade"; icon = "bolt"; kit = "icon_speed"; break;                            // jumps: up arrow
-                case "w_login7": slot = "task_calendar"; icon = "calendar"; kit = "icon_daily"; break;                          // log in every day: calendar
-                case "w_levels40": slot = "task_flag"; icon = "levels"; kit = "icon_flag"; break;
-                case "w_hard10": slot = "task_boss_skull"; icon = "helmet"; kit = "icon_bolt"; break;
-                case "d_hard": slot = "task_boss_skull"; icon = "helmet"; kit = "icon_bolt"; break;                             // hard levels: boss skull
-                case "w_login5": slot = "task_calendar"; icon = "calendar"; kit = "icon_daily"; break;                          // log in on days: calendar
-                case "w_play100": slot = "task_hourglass"; icon = "hourglass"; kit = "icon_dial"; break;
-                case "w_powerups10": icon = "bolt"; kit = "icon_bolt"; break;                                                   // use power-ups: bolt
-                case "w_stars20": icon = "star1"; kit = "icon_star"; break;                                                     // earn stars: star
-                case "w_levels20": slot = "task_flag"; icon = "levels"; kit = "icon_flag"; break;
-                case "w_nowall2": icon = "wall"; kit = "icon_hand"; break;                                                      // no-wall: wall
-                case "w_endless100": icon = null; kit = "icon_tower"; break;                                                    // endless floor: tower
-                case "w_combos150": slot = "task_flame"; icon = "flame"; kit = "icon_flame"; break;
-                case "w_hard5": slot = "task_boss_skull"; icon = "helmet"; kit = "icon_bolt"; break;
-                case "d_pace2": case "w_pace3": icon = "clock"; kit = "icon_speed"; break;                                      // pace goals: clock
-                case "d_floor100": icon = null; kit = "icon_tower"; break;                                                      // endless floor 100 in 3:00: tower
-                case "w_ta100": icon = "clock"; kit = "icon_tower"; break;                                                      // Time Attack floors: clock
-                case "w_gold5": icon = "medal"; kit = "icon_crown"; break;                                                      // gold medals: gold medal (TaskIcon draws MedalIcons gold)
+                case RewardStat.Login: slot = "task_key"; icon = "key"; kit = "icon_daily"; break;                                   // log in today: key
+                case RewardStat.LoginDays: slot = "task_calendar"; icon = "calendar"; kit = "icon_daily"; break;                     // log in on days: calendar
+                case RewardStat.PlaySeconds: case RewardStat.PlayMinutes: slot = "task_hourglass"; icon = "hourglass"; kit = "icon_dial"; break;   // play minutes: hourglass
+                case RewardStat.PowerUps: icon = "bolt"; kit = "icon_bolt"; break;                                                   // use power-ups: bolt
+                case RewardStat.CoinsEarned: slot = "task_coins"; icon = "coinbag"; kit = "icon_coin"; break;                        // earn coins: coin
+                case RewardStat.Levels: slot = "task_flag"; icon = "flag3"; kit = "icon_flag"; break;                                // clear levels (any setting filter): flag
+                case RewardStat.Settings: icon = "levels"; kit = "icon_dial"; break;                                                 // different Gameplay settings: the level list
+                case RewardStat.StarsEarned: icon = "star1"; kit = "icon_star"; break;                                               // earn stars: star
+                case RewardStat.Stars3: icon = "star3"; kit = "icon_star"; break;                                                    // 3-star runs: three stars
+                case RewardStat.Combos: slot = "task_flame"; icon = "flame"; kit = "icon_flame"; break;                              // combos: flame
+                case RewardStat.Medals: case RewardStat.GoldMedals: icon = "medal"; kit = "icon_crown"; break;                       // medals (TaskIcon draws the gold one for gold tasks)
+                case RewardStat.EndlessRuns: case RewardStat.EndlessFloor: icon = null; kit = "icon_tower"; break;                   // Endless: tower
+                case RewardStat.TimeAttackRuns: case RewardStat.TimeAttackRun: case RewardStat.TimeAttackFloors: icon = "clock"; kit = "icon_tower"; break;   // Time Attack: clock
+                case RewardStat.Special: case RewardStat.SpecialTypes: SpecialSources(SpecialLevelType.None, out slot, out icon, out kit); break;
                 default:
-                    if (id != null && id.StartsWith("g_", StringComparison.Ordinal)) GoalSources(id, out slot, out icon, out kit);
+                    SpecialLevelType type = RewardStat.SpecialTypeOf(stat);
+                    if (type != SpecialLevelType.None) SpecialSources(type, out slot, out icon, out kit);
                     break;
             }
         }
 
-        /// <summary>Icon of a region goal by the type token inside its id (g_&lt;region&gt;_&lt;token&gt;_&lt;tier&gt;).</summary>
-        static void GoalSources(string id, out string slot, out string icon, out string kit)
+        /// <summary>Special levels: the challenge skull; the No Wall Touch level shows the wall.</summary>
+        static void SpecialSources(SpecialLevelType type, out string slot, out string icon, out string kit)
         {
-            string[] parts = id.Split('_');
-            string token = parts.Length > 2 ? parts[2] : "";
+            if (type == SpecialLevelType.NoWallTouch) { slot = null; icon = "wall"; kit = "icon_hand"; }
+            else { slot = "task_boss_skull"; icon = "helmet"; kit = "icon_bolt"; }
+        }
+
+        /// <summary>Icon of a region goal by its family.</summary>
+        static void GoalSources(RegionGoal g, out string slot, out string icon, out string kit)
+        {
             slot = null; icon = "star1"; kit = "icon_star";
-            switch (token)
+            switch (g.Type)
             {
-                case "stars": break;                                                                              // stars: star
-                case "levels": slot = "task_flag"; icon = "flag1"; kit = "icon_flag"; break;                     // levels: flag
-                case "stars3": icon = "star3"; kit = "icon_star"; break;                                          // 3-star levels: three stars (icon_star3)
-                case "jumps": slot = "task_upgrade"; icon = "bolt"; kit = "icon_speed"; break;                   // jumps: up arrow
-                case "combos": slot = "task_flame"; icon = "flame"; kit = "icon_flame"; break;                   // combos: flame
-                case "time": slot = "task_hourglass"; icon = "hourglass"; kit = "icon_dial"; break;              // play time: hourglass
-                case "coins": slot = "task_coins"; icon = "coinbag"; kit = "icon_coin"; break;                   // coins: coin
-                case "powerups": icon = "bolt"; kit = "icon_bolt"; break;                                         // power-ups: bolt
-                case "hard": slot = "task_boss_skull"; icon = "helmet"; kit = "icon_bolt"; break;                // hard levels: boss skull
-                case "nowall": icon = "wall"; kit = "icon_hand"; break;                                           // no-wall: wall
-                case "endless": icon = null; kit = "icon_tower"; break;                                           // endless floors: tower
-                case "gold": icon = "medal"; kit = "icon_crown"; break;                                           // gold medal levels: gold medal (TaskIcon draws MedalIcons gold)
+                case RegionGoalType.ClearLevels: case RegionGoalType.SettingClears: slot = "task_flag"; icon = "flag1"; kit = "icon_flag"; break;   // levels: flag
+                case RegionGoalType.Stars: case RegionGoalType.SettingStars: break;                                                               // stars: star
+                case RegionGoalType.ThreeStarLevels: case RegionGoalType.SpecialThreeStars: icon = "star3"; kit = "icon_star"; break;             // 3-star levels: three stars
+                case RegionGoalType.GoldMedalLevels: case RegionGoalType.SettingMedals: icon = "medal"; kit = "icon_crown"; break;                // medals (gold ones: TaskIcon draws MedalIcons gold)
+                case RegionGoalType.EndlessFloor: case RegionGoalType.EndlessFloorSetting: icon = null; kit = "icon_tower"; break;                // Endless floors: tower
+                case RegionGoalType.TimeAttackFloors: case RegionGoalType.TimeAttackRuns: icon = "clock"; kit = "icon_tower"; break;              // Time Attack: clock
+                case RegionGoalType.SpecialClear: SpecialSources(g.Special, out slot, out icon, out kit); break;
+                case RegionGoalType.SpecialAll: case RegionGoalType.SpecialAllSettings: SpecialSources(SpecialLevelType.None, out slot, out icon, out kit); break;
             }
         }
 
-        /// <summary>True for the tasks that count gold medals (w_gold5 and the region goals g_*_gold_*): they show the code-drawn gold medal.</summary>
-        public static bool IsGoldMedalTask(string id)
+        /// <summary>True for the rows that count GOLD medals (the weekly gold tasks and the region goals "gold medals on N levels"): they show the code-drawn gold medal.</summary>
+        public static bool IsGoldMedalTask(RewardEntry e)
         {
-            if (string.IsNullOrEmpty(id)) return false;
-            if (id == "w_gold5" || id == "w_gold10") return true;
-            if (!id.StartsWith("g_", StringComparison.Ordinal)) return false;
-            string[] parts = id.Split('_');
-            return parts.Length > 2 && parts[2] == "gold";
+            if (e == null) return false;
+            RegionGoal goal = e as RegionGoal;
+            if (goal != null) return goal.Type == RegionGoalType.GoldMedalLevels;
+            string stat; int minMode;
+            return RewardStat.TrySplit(e.Stat, out stat, out minMode) && stat == RewardStat.GoldMedals;
         }
 
-        static Sprite TaskIcon(string id)
+        static Sprite TaskIcon(RewardEntry e)
         {
-            if (IsGoldMedalTask(id)) { Sprite gold = MedalIcons.For(MedalLevel.Gold, true); if (gold != null) return gold; }
+            if (IsGoldMedalTask(e)) { Sprite gold = MedalIcons.For(MedalLevel.Gold, true); if (gold != null) return gold; }
             string slot, icon, kit;
-            TaskSources(id, out slot, out icon, out kit);
-            Sprite s = RewardArt.Slot(slot) ?? RewardArt.Task(id) ?? RewardArt.Icon(icon) ?? ToyKit.Get(kit);
+            TaskSources(e, out slot, out icon, out kit);
+            Sprite s = RewardArt.Slot(slot) ?? RewardArt.Task(e != null ? e.Id : null) ?? RewardArt.Icon(icon) ?? ToyKit.Get(kit);
             return s;
         }
 
         // ---------------- reward plate ----------------
 
-        struct RItem { public Sprite Icon; public string Text; public string HeroId; public bool IsHero; }
+        struct RItem { public Sprite Icon; public string Text; }
 
-        /// <summary>Id of the Common hero of a region (the hero a region goal gives), null when the region has none.</summary>
-        static string RegionHeroId(int region)
-        {
-            foreach (CharacterSpec c in CharacterDefs.All) if (c.RegionStarter && c.Region == region) return c.Id;
-            return null;
-        }
-
+        /// <summary>What a row pays, as icon + amount items: gems, coins, power-up units (no reward gives a hero since 2026-11-22). A daily task shows its points.</summary>
         List<RItem> RewardItems(RewardEntry e, bool pointsOnly)
         {
             var l = new List<RItem>(4);
@@ -209,16 +198,13 @@ namespace FluffyClimbers.Gameplay
             if (e.Gems > 0) l.Add(new RItem { Icon = GemSprite, Text = Compact(e.Gems) });
             if (e.Coins > 0) l.Add(new RItem { Icon = CoinSprite, Text = Compact(e.Coins) });
             if (e.PowerUps > 0) l.Add(new RItem { Icon = BoltSprite, Text = "x" + e.PowerUps });
-            // a hero reward shows the hero's face; the random weekly hero (HeroRegion -1) is not known before the claim and shows the generic heroes icon
-            if (e.GivesHero) l.Add(new RItem { IsHero = true, HeroId = !string.IsNullOrEmpty(e.HeroId) ? e.HeroId : e.HeroRegion > 0 ? RegionHeroId(e.HeroRegion) : null, Icon = ToyKit.Get("icon_heroes"), Text = "" });
-            // hero-or-coins gift (Daily 200 points, weekly hard-clear tasks): the hero face, then "or" + the coins paid when the 50 percent roll misses
-            if (e.IsHeroOrCoins) l.Add(new RItem { Icon = CoinSprite, Text = "or " + Compact(e.HeroOrCoins) });
             return l;
         }
 
         /// <summary>
         /// A hero face chip: a round cream disc with the top of the hero doll (the same parts the hero reveal draws) cropped by a circle mask.
-        /// Without a hero id (the random weekly hero) it shows the generic heroes icon. The caller sets the size (layout element or Place).
+        /// Only the small reward card of a weekly leaderboard prize uses it (a chest or bundle card); no Main, Daily or Weekly reward gives a hero.
+        /// Without a hero id it shows the generic heroes icon. The caller sets the size (layout element or Place).
         /// </summary>
         RectTransform HeroFace(Transform parent, string name, string heroId, float size)
         {
@@ -264,46 +250,50 @@ namespace FluffyClimbers.Gameplay
         static float CardPlateWidth(List<RItem> items, bool claim)
         {
             float w = 2f * PlatePad + (claim ? CheckW + ItemGap : 0f);
-            for (int i = 0; i < items.Count; i++) w += (items[i].IsHero ? HeroFaceSize : ItemIcon + 6f + AmountW(items[i].Text)) + (i > 0 ? ItemGap : 0f);
+            for (int i = 0; i < items.Count; i++) w += ItemIcon + 6f + AmountW(items[i].Text) + (i > 0 ? ItemGap : 0f);
             return Mathf.Max(w, claim ? ClaimButtonH : 0f);
         }
 
         /// <summary>
-        /// The reward plate of a card: one row of icon + amount items. Ready cards get the green plate (btn_green) with a check glyph first: it is the Claim button.
+        /// The reward plate of a card: one row of icon + amount items, placed by explicit rectangles (no layout group) so every box is exactly as wide as its text:
+        /// amount box = ceil(preferredWidth) + 4, never narrower than the text at any text scale. Ready cards get the green plate (btn_green) with a check glyph first: it is the Claim button.
+        /// <paramref name="width"/> is the plate width the items need (padding + items + gaps; at least the 48 dp touch size when ready); the caller sizes the plate to it.
         /// </summary>
-        Image CardPlate(Transform parent, List<RItem> items, bool claim)
+        Image CardPlate(Transform parent, List<RItem> items, bool claim, out float width)
         {
             Image p = Plate(parent, "RewardPlate", claim ? "btn_green" : "plate_chip", Color.white, RewardCorner);
-            var hl = p.gameObject.AddComponent<HorizontalLayoutGroup>();
-            hl.padding = new RectOffset((int)PlatePad, (int)PlatePad, 6, 6);
-            hl.spacing = ItemGap;
-            hl.childAlignment = TextAnchor.MiddleCenter;
-            hl.childControlWidth = hl.childControlHeight = true;
-            hl.childForceExpandWidth = hl.childForceExpandHeight = false;
+            var texts = new List<Text>(items.Count);
+            var boxW = new float[items.Count];
+            float total = 0f;
+            if (claim) total += CheckW + ItemGap;
+            for (int i = 0; i < items.Count; i++)
+            {
+                RectTransform row = UiKit.Rect(p.transform, "Item");
+                Image ic = UiKit.AddImage(row, "Icon", items[i].Icon, Color.white);
+                Text t = UiKit.AddText(row, "Amount", items[i].Text, BodyPx, Color.white, TextAnchor.MiddleCenter, true);
+                t.horizontalOverflow = HorizontalWrapMode.Overflow;
+                if (claim) UiKit.OnPanel(t).color = UiKit.ButtonInk;
+                texts.Add(t);
+                boxW[i] = Mathf.Ceil(t.preferredWidth) + 4f;
+                total += ItemIcon + 6f + boxW[i] + (i > 0 ? ItemGap : 0f);
+            }
+            width = Mathf.Max(2f * PlatePad + total, claim ? ClaimButtonH : 0f);
+            float x = -total * 0.5f;   // x of the left edge of the next element, from the plate's centre
             if (claim)
             {
                 Image tick = UiKit.AddImage(p.transform, "Check", RewardArt.Icon("check") ?? Glyphs.Check, Color.white);
-                SetPref(tick.gameObject, CheckW, CheckW);
+                UiKit.Place(tick.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(x + CheckW * 0.5f, 0f), new Vector2(CheckW, CheckW));
+                x += CheckW + ItemGap;
             }
-            foreach (RItem it in items)
+            for (int i = 0; i < items.Count; i++)
             {
-                if (it.IsHero)
-                {
-                    RectTransform face = HeroFace(p.transform, "Hero", it.HeroId, HeroFaceSize);
-                    SetPref(face.gameObject, HeroFaceSize, HeroFaceSize);
-                    continue;
-                }
-                RectTransform row = UiKit.Rect(p.transform, "Item");
-                var rl = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-                rl.spacing = 6f;
-                rl.childAlignment = TextAnchor.MiddleCenter;
-                rl.childControlWidth = rl.childControlHeight = true;
-                rl.childForceExpandWidth = rl.childForceExpandHeight = false;
-                Image ic = UiKit.AddImage(row, "Icon", it.Icon, Color.white);
-                SetPref(ic.gameObject, ItemIcon, ItemIcon);
-                Text t = UiKit.AddText(row, "Amount", it.Text, BodyPx, Color.white, TextAnchor.MiddleCenter, true);
-                t.horizontalOverflow = HorizontalWrapMode.Overflow;
-                if (claim) UiKit.OnPanel(t).color = UiKit.ButtonInk;
+                Transform row = texts[i].transform.parent;
+                var rrt = (RectTransform)row;
+                float rw = ItemIcon + 6f + boxW[i];
+                UiKit.Place(rrt, new Vector2(0.5f, 0.5f), new Vector2(x + rw * 0.5f, 0f), new Vector2(rw, Mathf.Max(ItemIcon, Mathf.Ceil(texts[i].preferredHeight) + 2f)));
+                UiKit.Place((RectTransform)row.Find("Icon"), new Vector2(0f, 0.5f), Vector2.zero, new Vector2(ItemIcon, ItemIcon));
+                UiKit.Place(texts[i].rectTransform, new Vector2(1f, 0.5f), Vector2.zero, new Vector2(boxW[i], Mathf.Ceil(texts[i].preferredHeight) + 2f));
+                x += rw + ItemGap;
             }
             return p;
         }
@@ -342,16 +332,48 @@ namespace FluffyClimbers.Gameplay
         }
 
         /// <summary>
-        /// The card title: the table title, shortened where the icon already says it (a tower for Endless) so a title stays on one line next to the reward plate and the
-        /// compact 136 px card holds ("Reach floor 100 in Endless" becomes "Reach floor 100"). Screen readers get the same short words plus the reward.
+        /// Height a text needs for <paramref name="s"/> when wrapped at <paramref name="width"/> canvas units, at its full font size (best fit never counts as room).
+        /// It is the larger of two measures: the true one (the width scaled by pixelsPerUnit, like <see cref="MeasureTitle"/>) and the one Text.preferredHeight itself
+        /// uses (the width unscaled), so a rectangle of this height holds the text whatever the canvas scale and the layout audit agrees with it.
+        /// </summary>
+        static float MeasureWrapped(Text t, string s, float width)
+        {
+            if (string.IsNullOrEmpty(s)) return 0f;
+            float ppu = Mathf.Max(0.01f, t.pixelsPerUnit);
+            float scaled = t.cachedTextGeneratorForLayout.GetPreferredHeight(s, t.GetGenerationSettings(new Vector2(width * ppu, 0f))) / ppu;
+            float plain = t.cachedTextGeneratorForLayout.GetPreferredHeight(s, t.GetGenerationSettings(new Vector2(width, 0f))) / ppu;
+            return Mathf.Ceil(Mathf.Max(scaled, plain));
+        }
+
+        /// <summary>Estimated width of a card in the list while the list has no width yet (the card fitter re-measures at the real one).</summary>
+        float ListCardWidth()
+        {
+            float listW = screen != null && screen.rect.width > 200f ? screen.rect.width : 1080f;
+            return listW - 2f * Side;
+        }
+
+        /// <summary>Width of the text column of a wide card that has a button of <paramref name="buttonW"/> at its right (the ad power-up card, the weekly prize cards).</summary>
+        float ButtonCardTextWidth(float buttonW)
+        {
+            float listW = screen != null && screen.rect.width > 200f ? screen.rect.width : 1080f;
+            return Mathf.Max(1f, listW - 2f * Side - CardPadX - (buttonW + CardPadX * 2f) - 4f);
+        }
+
+        /// <summary>
+        /// The card title: the table title, shortened where the icon and the group heading already say it, so a title needs fewer lines next to the reward plate:
+        /// "Reach floor 100 in Endless" becomes "Reach floor 100", "Reach floor 50 in Endless on Normal or harder" becomes "Reach floor 50 on Normal or harder",
+        /// "Get 3 stars on 2 levels" becomes "3 stars on 2 levels", "Gold medals on 25 levels" becomes "Gold on 25 levels". Screen readers get the same short words plus the reward.
         /// </summary>
         public static string ShortTitle(string title)
         {
             string t = title ?? "";
-            const string endless = " in Endless", noWall = "Clear the no-wall level ", times = " times", threeStar = "Get 3 stars on ";
+            const string endless = " in Endless", endlessOn = " in Endless on ", threeStar = "Get 3 stars on ";
             if (t.EndsWith(endless, StringComparison.Ordinal)) t = t.Substring(0, t.Length - endless.Length);
-            if (t.StartsWith(noWall, StringComparison.Ordinal) && t.EndsWith(times, StringComparison.Ordinal) && t.Length > noWall.Length + times.Length)
-                t = "No-wall level x" + t.Substring(noWall.Length, t.Length - noWall.Length - times.Length);
+            else
+            {
+                int at = t.IndexOf(endlessOn, StringComparison.Ordinal);
+                if (at > 0) t = t.Substring(0, at) + " on " + t.Substring(at + endlessOn.Length);
+            }
             if (t.StartsWith(threeStar, StringComparison.Ordinal)) t = "3 stars on " + t.Substring(threeStar.Length);
             const string goldMedals = "Gold medals on ";   // the gold medal icon already says "medals": "Gold on 25 levels" stays on one line next to the plate (owner Bug List 10)
             if (t.StartsWith(goldMedals, StringComparison.Ordinal)) t = "Gold on " + t.Substring(goldMedals.Length);
@@ -360,6 +382,66 @@ namespace FluffyClimbers.Gameplay
 
         string TitleOf(RewardEntry e) { return ShortTitle(e.Title); }
 
+        // ---------------- card fitting ----------------
+
+        /// <summary>
+        /// Sizes a task card for a card of <paramref name="cardW"/> canvas units. Text column width = cardW - MidL - MidR - 4 (the room between the icon and the reward plate);
+        /// title height = the wrapped height at that width (never below one line); card height = <see cref="CardHeightFor"/> (compact base, or 8 + title + 6 + bar + 8, whichever is more,
+        /// and never below room for two title lines). The title sits on top, the bar right under it, the pair centred when the card is taller; the plate is centred. No text shrinks: a long title grows the card.
+        /// </summary>
+        internal static void FitCard(RewardCardFit f, float cardW)
+        {
+            float plateW = f.PlateW;   // measured from the amount texts in CardPlate
+            float midR = CardPadX + plateW + 14f;
+            float textW = Mathf.Max(1f, cardW - f.MidL - midR - 4f);
+            float titleH = Mathf.Max(LineH(BodyPx), MeasureWrapped(f.Title, f.Title.text, textW) + 2f);
+            float h = CardHeightFor(titleH);
+            f.Row.minHeight = f.Row.preferredHeight = h;
+            float stack = titleH + TitleBarGap + CardBarH;
+            float top = Mathf.Max(CardPadY, (h - stack) * 0.5f);
+            RectTransform trt = f.Title.rectTransform;
+            trt.offsetMin = new Vector2(f.MidL, -(top + titleH));
+            trt.offsetMax = new Vector2(-midR, -top);
+            if (f.Bar != null)
+            {
+                f.Bar.offsetMin = new Vector2(f.MidL, -(top + titleH + TitleBarGap + CardBarH));
+                f.Bar.offsetMax = new Vector2(-midR, -(top + titleH + TitleBarGap));
+            }
+            if (f.Plate != null)
+            {
+                float plateH = f.Ready ? ClaimButtonH : Mathf.Max(PlateRowH, h - 28f);
+                UiKit.Place(f.Plate, new Vector2(1f, 0.5f), new Vector2(-CardPadX, 0f), new Vector2(plateW, plateH));
+            }
+        }
+
+        /// <summary>
+        /// Sizes a wide card with a button at its right (ad power-up card, weekly prize cards) for a card of <paramref name="cardW"/>: text column = cardW - 20 - (button + 40) - 4,
+        /// title = at least two lines, body = at least BodyMinLines lines and the longest swap-in message, card = 2 x 8 + title + 6 + body + TailExtra (or the button when that is more).
+        /// </summary>
+        internal static void FitButtonCard(RewardCardFit f, float cardW)
+        {
+            float textW = Mathf.Max(1f, cardW - CardPadX - (f.BtnW + CardPadX * 2f) - 4f);
+            float line = LineH(BodyPx);
+            float titleH = Mathf.Max(line * 2f, MeasureWrapped(f.Title, f.Title.text, textW));
+            float bodyH = Mathf.Max(line * f.BodyMinLines, MeasureWrapped(f.Body, f.Body.text, textW));
+            if (f.Alts != null) for (int i = 0; i < f.Alts.Length; i++) bodyH = Mathf.Max(bodyH, MeasureWrapped(f.Body, f.Alts[i], textW));
+            RectTransform trt = f.Title.rectTransform;
+            trt.offsetMin = new Vector2(CardPadX, -(CardPadY + titleH)); trt.offsetMax = new Vector2(-(f.BtnW + CardPadX * 2f), -CardPadY);
+            float bodyTop = CardPadY + titleH + 6f;
+            RectTransform brt = f.Body.rectTransform;
+            brt.offsetMin = new Vector2(CardPadX, -(bodyTop + bodyH)); brt.offsetMax = new Vector2(-(f.BtnW + CardPadX * 2f), -bodyTop);
+            f.Row.minHeight = f.Row.preferredHeight = Mathf.Max(CardPadY * 2f + titleH + 6f + bodyH + f.TailExtra, f.MinH);
+        }
+
+        /// <summary>Completed (small) card: the title may wrap to any number of lines; the card grows to title + 24 (at least the header height).</summary>
+        internal static void FitCompleted(RewardCardFit f, float cardW)
+        {
+            float textW = Mathf.Max(1f, cardW - f.MidL - f.MidR);
+            float titleH = Mathf.Max(LineH(BodyPx), MeasureWrapped(f.Title, f.Title.text, textW) + 2f);
+            float h = Mathf.Max(CompletedHeaderH, titleH + 24f);
+            f.Row.minHeight = f.Row.preferredHeight = h;
+        }
+
         // ---------------- the card ----------------
 
         /// <summary>
@@ -367,7 +449,7 @@ namespace FluffyClimbers.Gameplay
         /// <paramref name="claimable"/> cards (stars, weekly tasks) are ready when complete and unclaimed: the card turns yellow and its reward plate becomes a BIG GREEN
         /// CLAIM BUTTON (check glyph + the reward, at least 48 dp, "Claim 20 gems" for screen readers) that claims exactly that reward; tapping the rest of the card claims it too
         /// (button and card both claim). Claimed cards turn green with a check badge. Daily action cards only show points (green when done).
-        /// Region goals (Main) use the same card; a goal that gives a hero adds the hero's face to the plate. The card height is the compact base or the measured title + bar when that is more.
+        /// Region goals (Main) use the same card. The card height is the compact base or the measured title + bar when that is more.
         /// </summary>
         void AddCard(RectTransform list, RewardEntry e, bool claimable)
         {
@@ -400,31 +482,16 @@ namespace FluffyClimbers.Gameplay
             Text title = UiKit.AddText(card, "Title", TitleOf(e), BodyPx, Theme.Ink, TextAnchor.MiddleCenter, true);
             UiKit.OnPanel(title);
             title.horizontalOverflow = HorizontalWrapMode.Wrap;
-            float textW = Mathf.Max(1f, cardW - midL - midR - 4f);
-            float titleH = Mathf.Max(LineH(BodyPx), MeasureTitle(title, textW));   // same measure for the card height and the title rect
-            {
-                // Owner follow-up: a title may take TWO lines (the card has room for them). Only a title that needs more than two lines shrinks (down to the 16 sp minimum);
-                // one that still wraps beyond two lines at the minimum makes its own card taller, so nothing is ever clipped.
-                int minFs = Mathf.CeilToInt(UiKit.MinBodyTextPx);
-                while (titleH > 2f * Mathf.Ceil(title.fontSize * 1.3f) && title.fontSize - 2 >= minFs)
-                {
-                    title.fontSize -= 2;
-                    titleH = Mathf.Max(Mathf.Ceil(title.fontSize * 1.22f), MeasureTitle(title, textW));
-                }
-            }
-            float h = CardHeightFor(titleH);
-            FixedHeight(row, h);
-            // Text column = title over the bar, one stack from the top (they cannot overlap); extra card height is split above and below.
-            float stack = titleH + TitleBarGap + CardBarH;
-            float top = Mathf.Max(CardPadY, (h - stack) * 0.5f);
+            RewardCardFit fit = card.gameObject.AddComponent<RewardCardFit>();
+            fit.Mode = RewardCardFit.Kind.Card; fit.Card = card; fit.Title = title; fit.MidL = midL; fit.MidR = midR; fit.PlateW = plateW; fit.Ready = ready;
+            fit.Row = row.gameObject.AddComponent<LayoutElement>();
+            fit.Row.flexibleHeight = 0f;
             RectTransform trt = title.rectTransform;
             trt.anchorMin = new Vector2(0f, 1f);
             trt.anchorMax = new Vector2(1f, 1f);
             trt.pivot = new Vector2(0.5f, 1f);
-            trt.offsetMin = new Vector2(midL, -(top + titleH));
-            trt.offsetMax = new Vector2(-midR, -top);
 
-            Image icon = UiKit.AddImage(card, "Icon", TaskIcon(e.Id), Color.white);
+            Image icon = UiKit.AddImage(card, "Icon", TaskIcon(e), Color.white);
             UiKit.Place(icon.rectTransform, new Vector2(0f, 0.5f), new Vector2(CardPadX, 0f), new Vector2(IconW, IconW));
             if (claimed)
             {
@@ -439,12 +506,14 @@ namespace FluffyClimbers.Gameplay
             bar.anchorMin = new Vector2(0f, 1f);
             bar.anchorMax = new Vector2(1f, 1f);
             bar.pivot = new Vector2(0.5f, 1f);
-            bar.offsetMin = new Vector2(midL, -(top + titleH + TitleBarGap + CardBarH));
-            bar.offsetMax = new Vector2(-midR, -(top + titleH + TitleBarGap));
+            fit.Bar = bar;
 
-            Image plate = CardPlate(card, items, ready);
-            float plateH = ready ? ClaimButtonH : Mathf.Max(PlateRowH, h - 28f);
-            UiKit.Place(plate.rectTransform, new Vector2(1f, 0.5f), new Vector2(-CardPadX, 0f), new Vector2(plateW, plateH));
+            float realPlateW;
+            Image plate = CardPlate(card, items, ready, out realPlateW);
+            fit.Plate = plate.rectTransform;
+            fit.PlateW = realPlateW;
+            FitCard(fit, cardW);   // estimate now; the component re-fits at the real width when the layout gives it
+            fit.enabled = true;
 
             if (ready)
             {

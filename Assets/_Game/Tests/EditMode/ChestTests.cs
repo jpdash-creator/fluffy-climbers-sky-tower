@@ -6,7 +6,7 @@ namespace FluffyClimbers.Tests
 {
     /// <summary>
     /// Treasure chest rules of docs/22 point 3 as reworked by Bug List 5 F3: loot ranges, equal power-up chances, exactly one hero card per chest (odds 50/30/20 and 60/30/10, open regions only,
-    /// tier fallback), no refunds for duplicates, the worth band 2 to 6 (owner 2026-11-13), Buy 10 and spending. The odds themselves are also tested in Tests/Simulation/ChestCardTests.cs.
+    /// tier fallback), no refunds for duplicates, the worth band 2 to 6 (owner 2026-11-13), the gem prices 400 and 1,500 (owner Final Change 1, 2026-11-22), Buy 10 and spending. The odds themselves are also tested in Tests/Simulation/ChestCardTests.cs.
     /// </summary>
     public class ChestTests
     {
@@ -34,10 +34,10 @@ namespace FluffyClimbers.Tests
         [Test]
         public void PricesAndLootRulesMatchTheSpec()
         {
-            Assert.AreEqual(100, ChestRolls.Price(ChestKind.Iron, 1));
-            Assert.AreEqual(1000, ChestRolls.Price(ChestKind.Iron, 10));
-            Assert.AreEqual(300, ChestRolls.Price(ChestKind.Golden, 1));
-            Assert.AreEqual(3000, ChestRolls.Price(ChestKind.Golden, 10));
+            Assert.AreEqual(400, ChestRolls.Price(ChestKind.Iron, 1));      // owner Final Change 1 (2026-11-22): Iron 100 -> 400, Gold 300 -> 1,500
+            Assert.AreEqual(4000, ChestRolls.Price(ChestKind.Iron, 10));    // Open 10 = ten times the price, no discount
+            Assert.AreEqual(1500, ChestRolls.Price(ChestKind.Golden, 1));
+            Assert.AreEqual(15000, ChestRolls.Price(ChestKind.Golden, 10));
             Assert.AreEqual(0, ChestRolls.Price(ChestKind.Iron, 5));
             Assert.AreEqual(1, ChestRolls.PowerUpCount(ChestKind.Iron));
             Assert.AreEqual(3, ChestRolls.PowerUpCount(ChestKind.Golden));
@@ -58,37 +58,39 @@ namespace FluffyClimbers.Tests
             Simulate(ChestKind.Golden, 3000, 4200, 3);
         }
 
-        /// <summary>Every chest is worth 2 to 6 times its Open 1 gems INCLUDING the expected hero card, at the average and at the extremes (was 1.5 to 2.5; the owner accepts richer chests, 2026-11-13: about x3.6 Iron, x5.3 Gold).</summary>
+        /// <summary>Every chest is worth 2 to 6 times its Open 1 gems INCLUDING the expected hero card, at the average and at the extremes (Final Change 1, 2026-11-22: about x3.7 Iron, x5.5 Gold).</summary>
         [Test]
         public void WorthIsBetween2And6ForEveryChest()
         {
             PowerUpCatalog catalog = PowerUpCatalog.BuiltIn();
-            Assert.AreEqual(58.33, ChestRolls.AveragePowerUpGems(catalog), 0.01, "average gem price of one random power-up");
+            Assert.AreEqual(144.44, ChestRolls.AveragePowerUpGems(catalog), 0.01, "average gem price of one random power-up: (3 x 100 + 4 x 150 + 2 x 200) / 9");
             foreach (ChestKind kind in new[] { ChestKind.Iron, ChestKind.Golden })
             {
                 Assert.That(ChestRolls.Worth(kind, catalog), Is.InRange(2.0, 6.0), kind + " worth at the average");
                 double cards = ChestRolls.ExpectedCardGems(kind), price = ChestRolls.Price(kind, 1), n = ChestRolls.PowerUpCount(kind);
-                double low = (ChestRolls.MinCoins(kind) / 20.0 + n * 50.0 + cards) / price, high = (ChestRolls.MaxCoins(kind) / 20.0 + n * 75.0 + cards) / price;
+                double low = (ChestRolls.MinCoins(kind) / 20.0 + n * 100.0 + cards) / price, high = (ChestRolls.MaxCoins(kind) / 20.0 + n * 200.0 + cards) / price;
                 Assert.That(low, Is.InRange(2.0, 6.0), kind + " worst coins and cheapest power-ups");
                 Assert.That(high, Is.InRange(2.0, 6.0), kind + " best coins and dearest power-ups");
             }
-            Assert.AreEqual(3.53, ChestRolls.Worth(ChestKind.Iron, catalog), 0.02);
-            Assert.AreEqual(5.32, ChestRolls.Worth(ChestKind.Golden, catalog), 0.02);
-            Assert.AreEqual("Worth x3.5", ChestRolls.WorthLabel(ChestKind.Iron, catalog));
-            Assert.AreEqual("Worth x5.3", ChestRolls.WorthLabel(ChestKind.Golden, catalog));
+            Assert.AreEqual(3.686, ChestRolls.Worth(ChestKind.Iron, catalog), 0.005);     // (50 + 144.44 + 1,280) / 400
+            Assert.AreEqual(5.516, ChestRolls.Worth(ChestKind.Golden, catalog), 0.005);   // (180 + 433.33 + 7,660) / 1,500
+            Assert.AreEqual("Worth x3.7", ChestRolls.WorthLabel(ChestKind.Iron, catalog));
+            Assert.AreEqual("Worth x5.5", ChestRolls.WorthLabel(ChestKind.Golden, catalog));
+            Assert.AreEqual("Worth x3.7", ChestRolls.WorthLabel(ChestKind.Iron), "the built-in catalog is the default");
         }
 
         [Test]
         public void TheHeroCardTableIsTheHeroCoinPriceOver20()
         {
-            Assert.AreEqual(100, ChestRolls.CardGems(CharacterRarity.Common));
-            Assert.AreEqual(1600, ChestRolls.CardGems(CharacterRarity.Epic));
-            Assert.AreEqual(4000, ChestRolls.CardGems(CharacterRarity.Legendary));
-            Assert.AreEqual(BundleCards.TierGems[0], ChestRolls.CardGems(CharacterRarity.Uncommon));
-            Assert.AreEqual(BundleCards.TierGems[1], ChestRolls.CardGems(CharacterRarity.Rare));
-            Assert.AreEqual(BundleCards.TierGems[2], ChestRolls.CardGems(CharacterRarity.Epic));
-            Assert.AreEqual(245.0, ChestRolls.ExpectedCardGems(ChestKind.Iron), 1e-9);
-            Assert.AreEqual(1240.0, ChestRolls.ExpectedCardGems(ChestKind.Golden), 1e-9);
+            Assert.AreEqual(400, ChestRolls.CardGems(CharacterRarity.Common));      // 8,000 coins / 20 (owner Final Change 1, 2026-11-22)
+            Assert.AreEqual(1200, ChestRolls.CardGems(CharacterRarity.Uncommon));   // 24,000
+            Assert.AreEqual(3600, ChestRolls.CardGems(CharacterRarity.Rare));       // 72,000
+            Assert.AreEqual(10000, ChestRolls.CardGems(CharacterRarity.Epic));      // 200,000
+            Assert.AreEqual(25000, ChestRolls.CardGems(CharacterRarity.Legendary)); // 500,000
+            Assert.AreEqual(ChestRolls.CommonCardGems, HeroPurchase.CoinPrice(CharacterRarity.Common) / ChestRolls.CoinsPerGem);
+            for (int i = 0; i < BundleCards.Tiers.Length; i++) Assert.AreEqual(BundleCards.TierGems[i], ChestRolls.CardGems(BundleCards.Tiers[i]), "chests and bundles value a card identically");
+            Assert.AreEqual(1280.0, ChestRolls.ExpectedCardGems(ChestKind.Iron), 1e-9);     // 0.5 x 400 + 0.3 x 1,200 + 0.2 x 3,600
+            Assert.AreEqual(7660.0, ChestRolls.ExpectedCardGems(ChestKind.Golden), 1e-9);   // 0.6 x 3,600 + 0.3 x 10,000 + 0.1 x 25,000
         }
 
         static void Simulate(ChestKind kind, int minCoins, int maxCoins, int units)
@@ -216,7 +218,7 @@ namespace FluffyClimbers.Tests
             foreach (ChestKind kind in new[] { ChestKind.Iron, ChestKind.Golden })
             {
                 ProgressService ten = NewService(), one = NewService();
-                ten.Data.Gems = one.Data.Gems = 5000;
+                ten.Data.Gems = one.Data.Gems = 20000;   // ten Gold chests cost 15,000 gems
                 List<ChestContents> a;
                 Assert.AreEqual(ChestOpenResult.Ok, ten.TryOpenChests(kind, 10, out a));
                 Assert.AreEqual(10, a.Count);
@@ -238,7 +240,7 @@ namespace FluffyClimbers.Tests
                 }
                 Assert.AreEqual(coinsB, coinsA);
                 Assert.AreEqual(one.Gems, ten.Gems, "ten openings cost exactly ten single prices");
-                Assert.AreEqual(5000 - ChestRolls.Price(kind, 10), ten.Gems);
+                Assert.AreEqual(20000 - ChestRolls.Price(kind, 10), ten.Gems);
                 Assert.AreEqual(one.Coins, ten.Coins);
                 foreach (PowerUpDef d in ten.PowerUpDefs.Implemented) Assert.AreEqual(one.PowerUpCount(d.Id), ten.PowerUpCount(d.Id), d.Id);
                 Assert.AreEqual(one.Data.ChestOpens, ten.Data.ChestOpens);

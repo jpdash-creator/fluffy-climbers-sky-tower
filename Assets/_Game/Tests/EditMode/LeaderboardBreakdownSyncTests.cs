@@ -336,6 +336,117 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(1000L, r.LineSum());
         }
 
+        // ---------------- Endless and Time Attack: the three best runs of the week travel as parts (owner 2026-11-22) ----------------
+
+        void PlayEndless(int score, int seed, RunKind kind = RunKind.Endless, int mode = 3)
+        {
+            RecordResult rr;
+            progress.FinishEndlessRun(new RunRecord { Kind = kind, RegionId = "region_001_meadow_springs", Floors = score / 2, Ticks = 3000 + seed, LayoutSeed = seed, Mode = mode, Score = score, BestCombo = 3 }, "20261111", out rr);
+        }
+
+        [Test]
+        public void TheUploadCarriesTheCountedRunsOfAnEndlessSlotAndTheAnswerComesBackWithThem()
+        {
+            foreach (int score in new[] { 400, 900, 100, 600 }) PlayEndless(score, score);
+            progress.ApplyRun("lvl_001_01", Run(100, 2));
+            WeekSlotInfo mine = Local("e.region_001_meadow_springs.3");
+            long sum = (long)CrownScore.FromScore(900, 3) + CrownScore.FromScore(600, 3) + CrownScore.FromScore(400, 3);
+            Assert.AreEqual(sum, mine.Crown);
+            Assert.AreEqual(3, mine.Parts.Count);
+
+            string body = LbBreakdownJson.BuildBody("2026-11-09", progress.LocalBreakdown());
+            Newtonsoft.Json.Linq.JObject sent = Newtonsoft.Json.Linq.JObject.Parse(body);
+            Newtonsoft.Json.Linq.JToken slot = null, level = null;
+            foreach (Newtonsoft.Json.Linq.JToken s in (Newtonsoft.Json.Linq.JArray)sent["slots"])
+            {
+                if ((string)s["id"] == "e.region_001_meadow_springs.3") slot = s;
+                if ((string)s["id"] == "c.lvl_001_01.2") level = s;
+            }
+            Assert.IsNotNull(slot);
+            Assert.AreEqual(sum, (long)slot["crown"]);
+            Newtonsoft.Json.Linq.JArray parts = (Newtonsoft.Json.Linq.JArray)slot["parts"];
+            Assert.AreEqual(3, parts.Count);
+            Assert.AreEqual(900, (int)parts[0]["score"]);
+            Assert.AreEqual(600, (int)parts[1]["score"]);
+            Assert.AreEqual(400, (int)parts[2]["score"]);
+            Assert.IsNull(level["parts"], "a level slot has no parts");
+
+            // the answer of the service (the same slot with its parts) parses back into the same shape
+            BreakdownReply reply = LbBreakdownJson.ParseReply("{\"weekKey\":\"2026-11-09\",\"receivedAt\":5,\"slots\":[{\"id\":\"e.region_001_meadow_springs.3\",\"crown\":" + sum + ",\"floors\":450,\"score\":900,\"at\":9,"
+                + "\"parts\":[{\"crown\":1,\"floors\":450,\"score\":900,\"chains\":[2],\"at\":7},{\"crown\":1,\"floors\":300,\"score\":600,\"at\":9},{\"crown\":1,\"floors\":200,\"score\":400,\"at\":8}]}]}");
+            Assert.AreEqual(3, reply.Slots[0].Parts.Count);
+            Assert.AreEqual(600, reply.Slots[0].Parts[1].Score);
+            CollectionAssert.AreEqual(new[] { 2 }, reply.Slots[0].Parts[0].Chains);
+            Assert.IsNull(LbBreakdownJson.ParseReply("{\"weekKey\":\"w\",\"slots\":[{\"id\":\"c.a.1\",\"crown\":3}]}").Slots[0].Parts);
+        }
+
+        [Test]
+        public void ANewerCloudVersionOfAnEndlessSlotReplacesItsRunListAndAnOlderOneDoesNot()
+        {
+            PlayEndless(500, 1);
+            PlayEndless(300, 2);
+            string id = "e.region_001_meadow_springs.3";
+            long mine = Local(id).At;
+            int rev = progress.BreakdownRevision;
+
+            var older = new WeekSlotInfo { SlotId = id, Parts = new List<WeekSlotPart> { new WeekSlotPart { Score = 9000, Floors = 100, At = mine - 50 }, new WeekSlotPart { Score = 8000, Floors = 100, At = mine - 60 } } };
+            Assert.IsFalse(progress.MergeCloudBreakdown("2026-11-09", new[] { older }), "an older version never replaces the phone's, however high");
+            Assert.AreEqual(2, progress.EndlessWeekRuns("region_001_meadow_springs", 3).Count);
+            Assert.AreEqual(500, progress.EndlessCrownRun("region_001_meadow_springs", 3).BaseScore);
+
+            // a newer version (three runs played on another device): the whole list is taken, the crown recomputed from the scores, a claimed crown ignored
+            var newer = new WeekSlotInfo
+            {
+                SlotId = id, Crown = 999999999,
+                Parts = new List<WeekSlotPart> { new WeekSlotPart { Score = 700, Floors = 60, At = mine + 10, Crown = 5 }, new WeekSlotPart { Score = 800, Floors = 70, At = mine + 30 }, new WeekSlotPart { Score = 200, Floors = 20, At = mine + 20 }, new WeekSlotPart { Score = 100, Floors = 10, At = mine + 5 } }
+            };
+            Assert.IsTrue(progress.MergeCloudBreakdown("2026-11-09", new[] { newer }));
+            var runs = progress.EndlessWeekRuns("region_001_meadow_springs", 3);
+            Assert.AreEqual(3, runs.Count, "the best three of the cloud's list");
+            Assert.AreEqual(800, runs[0].BaseScore);
+            Assert.AreEqual(700, runs[1].BaseScore);
+            Assert.AreEqual(200, runs[2].BaseScore);
+            Assert.AreEqual(CrownScore.FromScore(800, 3) + CrownScore.FromScore(700, 3) + CrownScore.FromScore(200, 3), progress.EndlessWeekCrown("region_001_meadow_springs", 3));
+            Assert.AreEqual(CrownScore.FromScore(800, 3), progress.EndlessBestCrown("region_001_meadow_springs", 3), "the Endless pop-up shows the best of them");
+            Assert.AreEqual(mine + 30, Local(id).At, "the version time is the newest counted run");
+            Assert.AreEqual(rev, progress.BreakdownRevision, "what came down is not an upload for the next tick");
+
+            // the very same version again changes nothing; it is in the save
+            Assert.IsFalse(progress.MergeCloudBreakdown("2026-11-09", new[] { Local(id) }));
+            Assert.AreEqual(3, new ProgressService(repo, store, 5) { WeekClock = () => now }.EndlessWeekRuns("region_001_meadow_springs", 3).Count, "saved");
+
+            // a cloud slot from before the rule (no parts) reads as one run
+            Assert.IsTrue(progress.MergeCloudBreakdown("2026-11-09", new[] { Cloud("t.region_001_meadow_springs.1", 450, 40, mine + 40) }));
+            Assert.AreEqual(1, progress.TimeAttackWeekRuns("region_001_meadow_springs", 1).Count);
+            Assert.AreEqual(CrownScore.FromScore(450, 1), progress.TimeAttackWeekCrown("region_001_meadow_springs", 1));
+        }
+
+        [Test]
+        public void TheServiceRunListWinsInThePopupAndItsRunsAreShown()
+        {
+            GoLive();
+            PlayEndless(500, 1);
+            net.Handler = (m, u, b) => Json("{\"weekKey\":\"2026-11-09\",\"totals\":{\"overall\":7000,\"levels\":0,\"endless\":7000},"
+                + "\"slots\":[{\"slotId\":\"e.region_001_meadow_springs.3\",\"crown\":7000,\"floors\":90,\"mode\":3,\"score\":800,\"at\":" + Unix(T0) + ",\"runs\":[{\"crown\":4000,\"floors\":90,\"score\":800},{\"crown\":3000,\"floors\":70,\"score\":600}]}]}");
+            MyWeekData got = null;
+            LeaderboardHub.LoadSlots(x => got = x);
+            Assert.IsNotNull(got);
+            LbSlot s = got.Slots.Find(x => x.SlotId == "e.region_001_meadow_springs.3");
+            Assert.AreEqual(7000L, s.Crown, "the service's replay sum wins over the phone's single run");
+            Assert.IsTrue(s.Verified);
+            Assert.AreEqual(2, s.Runs.Count);
+            Assert.AreEqual(4000L, s.Runs[0].Crown);
+            BreakdownResult r = LeaderboardBreakdown.Build(got.Slots, LbBoards.Endless, repo, got.Totals[2]);
+            Assert.AreEqual(7000L, r.Total);
+            Assert.AreEqual(r.Total, r.LineSum());
+            CollectionAssert.AreEqual(new long[] { 4000, 3000 }, r.Groups[0].Lines[0].Runs);
+
+            // the answer is kept for the offline popup, with its run list
+            MyWeekData known = LeaderboardHub.KnownSlots();
+            Assert.AreEqual(2, known.Slots.Find(x => x.SlotId == "e.region_001_meadow_springs.3").Runs.Count);
+            Assert.AreEqual(7000L, known.Slots.Find(x => x.SlotId == "e.region_001_meadow_springs.3").Crown);
+        }
+
         // ---------------- the shared merge rules ----------------
 
         [Test]

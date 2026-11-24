@@ -141,9 +141,13 @@ namespace FluffyClimbers.Economy
             return added;
         }
 
-        /// <summary>Admin: clears every level of the playable regions with 3 stars (in order, so each one is unlocked when it is played). Returns how many levels were cleared.</summary>
-        public int AdminCompleteAllLevels()
+        /// <summary>
+        /// Admin: clears every level of the playable regions with 3 stars IN ONE GAMEPLAY SETTING (<paramref name="mode"/> 0..4, default Relaxed; Final Change 1, 2026-11-22),
+        /// in order, so each one is unlocked in that setting when it is played. The other settings stay as they are. Returns how many levels were cleared.
+        /// </summary>
+        public int AdminCompleteAllLevels(int mode = 0)
         {
+            mode = TimeRecords.ClampMode(mode);
             int n = 0;
             foreach (FluffyClimbers.Content.RegionDef r in repo.Regions)
             {
@@ -151,7 +155,7 @@ namespace FluffyClimbers.Economy
                 if (r.Index != 1 && !Data.UnlockedRegions.Contains(r.Id)) Data.UnlockedRegions.Add(r.Id);
                 foreach (FluffyClimbers.Content.LevelDef l in repo.LevelsOf(r.Id))
                 {
-                    ApplyRun(l.Id, new RunOutcome { Completed = true, StarMask = 7, Score = 1000, CoinsCollected = 0 });
+                    ApplyRun(l.Id, new RunOutcome { Completed = true, StarMask = 7, Score = 1000, CoinsCollected = 0, Mode = mode });
                     n++;
                 }
             }

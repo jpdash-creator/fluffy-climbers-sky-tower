@@ -149,7 +149,7 @@ namespace FluffyClimbers.Tests
                 Assert.AreEqual(common.Stats.RunBonusGems + row.RunGemsAdd, spec.Stats.RunBonusGems);
                 Assert.LessOrEqual(MergeRules.ShownGainLines(common.ShownValues(), spec.ShownValues()).Count, 6, row.Id + " gain lines fit the result card");
                 Assert.GreaterOrEqual(spec.Stats.LaunchTenths, common.Stats.LaunchTenths);   // Jump rises with the rarity; Speed and Control are independent draws balanced by the Forgiveness Index (docs/44)
-                Assert.AreEqual(1, spec.Powers.Length, "Uncommon has 1 hero power");
+                Assert.AreEqual(0, spec.Powers.Length, "Uncommon has no hero power (owner Final Change 2)");
                 Assert.IsNull(TierRules.ValidatePowers(row.LineId, row.Rarity, spec.Powers), row.Id);
             }
         }
@@ -201,7 +201,7 @@ namespace FluffyClimbers.Tests
         [Test]
         public void ThePowerCountsAndNamesFollowTheOwnerLadder()
         {
-            CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4 }, CharacterDefs.PowerCount);
+            CollectionAssert.AreEqual(new[] { 0, 0, 1, 1, 2 }, CharacterDefs.PowerCount);   // owner Final Change 2: Uncommon none, Rare one, Elite one, Legendary two
             Assert.AreEqual("Elite", CharacterDefs.RarityNames[(int)CharacterRarity.Epic]);
         }
 

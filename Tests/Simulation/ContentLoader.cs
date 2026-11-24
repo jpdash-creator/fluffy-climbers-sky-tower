@@ -124,6 +124,14 @@ namespace FluffyClimbers.Simulation.Tests
                             }
                             JsonElement ramp;
                             if (ov.TryGetProperty("ramp", out ramp)) spec.Ramp = ramp.GetBoolean();
+                            JsonElement rows;
+                            if (ov.TryGetProperty("rows", out rows)) spec.Rows = rows.GetInt32();
+                        }
+                        JsonElement special;
+                        if (lv.TryGetProperty("special", out special))
+                        {
+                            spec.Special = SpecialLevels.RuleFromId(special.GetString());
+                            if (spec.Special == SpecialLevelType.None) throw new InvalidOperationException(ll.Id + ": unknown special level rule " + special.GetString());
                         }
                         ll.Spec = spec;
                         result.Add(ll);

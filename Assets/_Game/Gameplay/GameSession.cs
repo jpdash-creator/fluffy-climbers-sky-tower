@@ -48,24 +48,52 @@ namespace FluffyClimbers.Gameplay
         public static ArtCatalog Art { get; private set; }
         public static readonly SimConfig Cfg = new SimConfig();
 
-        /// <summary>Copies the player's difficulty setting into the simulation config (scroll growth per 5 s and gem chance).</summary>
+        /// <summary>
+        /// Copies the player's Gameplay setting into the simulation config: the scroll step in percent of the start speed (10/20/30/40/50; owner Final Change 1, 2026-11-22),
+        /// its top value and the gem chance. The step interval (30 s) and the step count (8) are the SimConfig defaults (DefaultScrollStepSeconds, DefaultScrollStepMaxSteps).
+        /// The leaderboard service mirrors these lines (RunReplayer.ConfigFor; a test compares the source text).
+        /// </summary>
         public static void ApplyDifficulty()
         {
             int d = GameSettings.Difficulty;
             Cfg.ScrollStepPercent = GameSettings.DifficultyStepPercent[d];
             Cfg.GemSpotPermille = GameSettings.DifficultyGemPermille[d];
-            Cfg.ScrollStepCapPercent = SimConfig.TopSpeedUpPercent(d);   // owner 2026-11-12: the top speed-up of a setting is step x 8 (80/160/200/320/400 percent), no global cap
+            Cfg.ScrollStepCapPercent = SimConfig.TopSpeedUpPercent(d);   // the top speed-up of a setting is step x 8 (80/160/240/320/400 percent), no global percent cap
         }
 
         /// <summary>The config a run uses: a copy of the shared <see cref="Cfg"/> with the chosen character's stats applied (docs/44).</summary>
-        public static SimConfig BuildRunCfg()
+        public static SimConfig BuildRunCfg() { return BuildRunCfg(0); }
+
+        /// <summary>
+        /// Region penalty (owner Final Change 2): <paramref name="playRegion"/> is the region index (1..5) of the level, or of the Endless / Time Attack tower, about to be played (0 = no penalty,
+        /// sweeps and tools). A non-Common hero away from its home region plays with the stat gain over its line's Common hero cut (<see cref="HeroRegionPenalty"/>); the server replay does the same.
+        /// </summary>
+        public static SimConfig BuildRunCfg(int playRegion)
         {
             SimConfig run = Cfg.Clone();
             CharacterSpec info = CharacterCatalog.Selected.Info;
             // docs/44 section 11 (one roll per copy, owner 2026-11-17): the stats of the CHOSEN copy of a tier hero (Common heroes and the default are fixed)
             CharacterStats stats = info == null ? null : (Progress != null ? Progress.StatsOf(info, CharacterCatalog.SelectedCopy) : info.Stats);
-            (stats ?? CharacterStats.Default).ApplyTo(run);
+            stats = stats ?? CharacterStats.Default;
+            if (playRegion > 0) stats = HeroRegionPenalty.StatsIn(info, stats, playRegion);
+            stats.ApplyTo(run);
             return run;
+        }
+
+        /// <summary>Region index (1..5) of a campaign level id, or 0 when unknown (no penalty then).</summary>
+        public static int RegionIndexOfLevel(string levelId)
+        {
+            if (Repo == null || levelId == null) return 0;
+            try { return Repo.GetRegion(Repo.GetLevel(levelId).Region).Index; }
+            catch (ContentException) { return 0; }
+        }
+
+        /// <summary>Region index (1..5) of a region id (Endless, Time Attack), or 0 when unknown.</summary>
+        public static int RegionIndexOf(string regionId)
+        {
+            if (Repo == null || regionId == null) return 0;
+            try { return Repo.GetRegion(regionId).Index; }
+            catch (ContentException) { return 0; }
         }
 
         public static string CurrentLevelId;
@@ -190,6 +218,16 @@ namespace FluffyClimbers.Gameplay
             RegionDef next = Repo.TryGetRegionByIndex(region.Index + 1);
             if (next == null || !Progress.CanEnterRegion(next)) return null;
             return Repo.GetLevel(next.Levels[0]);
+        }
+
+        /// <summary>
+        /// The level the "Next level" button of a run played in Gameplay setting <paramref name="mode"/> leads to (Final Change 1, owner 2026-11-22: every setting has its
+        /// own path): the next level in play order when it is open IN THAT SETTING, else null (the button is then not offered).
+        /// </summary>
+        public static LevelDef NextLevel(LevelDef level, int mode)
+        {
+            LevelDef next = NextLevel(level);
+            return next != null && Progress != null && Progress.IsLevelUnlocked(next, mode) ? next : null;
         }
     }
 }

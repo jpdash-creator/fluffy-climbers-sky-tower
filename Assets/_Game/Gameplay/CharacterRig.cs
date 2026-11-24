@@ -239,20 +239,49 @@ namespace FluffyClimbers.Gameplay
             return p == null ? new List<HeroCard>() : HeroCards.Mergeable(AvailableSpecs(p), id => p.Copies(id));
         }
 
+        /// <summary>
+        /// The stored choice (Final Change 3, owner 2026-11-23): the hero id and the 0-based copy live in the SAVE (so they travel with the cloud save). An older save without them takes the
+        /// PlayerPrefs value once (migration, saved quietly). PlayerPrefs stays the fast local mirror and the fallback while there is no save (editor tests, boot).
+        /// </summary>
+        static void ReadStored(out string id, out int copy)
+        {
+            ProgressService p = GameSession.Progress;
+            if (p != null)
+            {
+                if (p.StoredSelectedHero == null) p.InitSelection(PlayerPrefs.GetString(SelectedKey, Momo.Id), PlayerPrefs.GetInt(SelectedCopyKey, 0));
+                id = p.StoredSelectedHero ?? Momo.Id;
+                copy = p.StoredSelectedCopy;
+                return;
+            }
+            id = PlayerPrefs.GetString(SelectedKey, Momo.Id);
+            copy = PlayerPrefs.GetInt(SelectedCopyKey, 0);
+        }
+
+        static void WriteStored(string id, int copy)
+        {
+            copy = Mathf.Max(0, copy);
+            PlayerPrefs.SetString(SelectedKey, id);
+            PlayerPrefs.SetInt(SelectedCopyKey, copy);
+            PlayerPrefs.Save();
+            if (GameSession.Progress != null) GameSession.Progress.SetSelection(id, copy);   // a real change: Commit, so the cloud upload runs
+        }
+
         /// <summary>The chosen character (Momo until another is picked; when the chosen one is not owned, the best owned hero).</summary>
         public static CharacterDef Selected
         {
             get
             {
-                CharacterDef c = Get(PlayerPrefs.GetString(SelectedKey, Momo.Id));
+                string id; int copy;
+                ReadStored(out id, out copy);
+                CharacterDef c = Get(id);
                 return Owns(GameSession.Progress, c) ? c : BestOwned(GameSession.Progress);
             }
             set
             {
                 string id = value != null ? value.Id : Momo.Id;
-                if (PlayerPrefs.GetString(SelectedKey, Momo.Id) != id) PlayerPrefs.SetInt(SelectedCopyKey, 0);   // another hero: its first card; the same hero keeps its chosen copy
-                PlayerPrefs.SetString(SelectedKey, id);
-                PlayerPrefs.Save();
+                string cur; int curCopy;
+                ReadStored(out cur, out curCopy);
+                WriteStored(id, cur != id ? 0 : curCopy);   // another hero: its first card; the same hero keeps its chosen copy
             }
         }
 
@@ -260,23 +289,23 @@ namespace FluffyClimbers.Gameplay
 
         /// <summary>
         /// The chosen COPY (0-based card of the chosen hero; Bug List 5 item 4). Two copies of one hero are two cards on the Heroes screen and either can be chosen; the hero (and with it
-        /// the roll, <see cref="ProgressService.HeroVariant"/>) is the same. Additive: a missing key (old installs) means copy 0. Clamped to the copies held.
+        /// the roll, <see cref="ProgressService.HeroVariant"/>) is the same. Additive: a missing value (old installs) means copy 0. Clamped to the copies held.
         /// </summary>
         public static int SelectedCopy
         {
             get
             {
+                string id; int copy;
+                ReadStored(out id, out copy);
                 int held = Mathf.Max(1, Copies(GameSession.Progress, Selected));
-                return Mathf.Clamp(PlayerPrefs.GetInt(SelectedCopyKey, 0), 0, Mathf.Min(MergeRules.MaxCopies, held) - 1);
+                return Mathf.Clamp(copy, 0, Mathf.Min(MergeRules.MaxCopies, held) - 1);
             }
         }
 
-        /// <summary>Chooses one card: hero <paramref name="who"/>, copy <paramref name="copy"/> (0-based).</summary>
+        /// <summary>Chooses one card: hero <paramref name="who"/>, copy <paramref name="copy"/> (0-based). One save write.</summary>
         public static void Select(CharacterDef who, int copy)
         {
-            Selected = who;
-            PlayerPrefs.SetInt(SelectedCopyKey, Mathf.Max(0, copy));
-            PlayerPrefs.Save();
+            WriteStored(who != null ? who.Id : Momo.Id, copy);
         }
 
         /// <summary>True when the card carries the chosen tick (see <see cref="HeroCards.IsChosen"/>).</summary>

@@ -38,6 +38,22 @@ namespace FluffyClimbers.Gameplay
 
         static string N0(long v) { return v.ToString("N0", CultureInfo.InvariantCulture); }
 
+        /// <summary>
+        /// "3,000 + 2,000 + 1,495": the counted runs of an Endless / Time Attack line (owner 2026-11-22: the three best runs of the week are added up), written under the line whose crown is their sum.
+        /// Empty for a level line and for a line with a single run (the line itself is that run).
+        /// </summary>
+        public static string RunsText(BreakdownLine l)
+        {
+            if (l == null || l.Runs == null || l.Runs.Length < 2) return "";
+            var sb = new System.Text.StringBuilder(48);
+            for (int i = 0; i < l.Runs.Length; i++)
+            {
+                if (i > 0) sb.Append(" + ");
+                sb.Append(N0(l.Runs[i]));
+            }
+            return sb.ToString();
+        }
+
         /// <summary>Tap on the own row (list or pinned card).</summary>
         void OnOwnRowTapped() { OpenBreakdown(); }
 
@@ -201,9 +217,10 @@ namespace FluffyClimbers.Gameplay
             big.resizeTextForBestFit = true; big.resizeTextMinSize = Mathf.RoundToInt(UiKit.MinBodyTextPx); big.resizeTextMaxSize = big.fontSize;
             UiKit.Place((RectTransform)big.transform, new Vector2(0f, 1f), new Vector2(iconS * 1.2f + 12f, -y), new Vector2(inner - iconS * 1.2f - 12f, bigH));
             y += bigH + 8f;
-            string how = board == LbBoards.Overall ? "Levels and Endless added up. Each level or region counts your best crown of the week once per setting."
+            // owner 2026-11-22: a level counts its best crown per setting; Endless and Time Attack count the three best runs of the week per region and setting
+            string how = board == LbBoards.Overall ? "Levels and Endless added up. Each level counts your best crown of the week once per setting. Endless and Time Attack count your 3 best runs of the week in each region and setting."
                 : board == LbBoards.Levels ? "Your best crown of the week in each level and setting, added up."
-                : "Your best Endless and Time Attack crown of the week in each region and setting, added up.";
+                : "Your 3 best Endless runs and your 3 best Time Attack runs of the week in each region and setting, added up.";
             y += PopupText(pc, "TotalHow", how, 40, TextAnchor.UpperCenter, 0f, y, inner, false) + 20f;
 
             if (!br.HasLines)
@@ -249,6 +266,8 @@ namespace FluffyClimbers.Gameplay
                     float b = PopupText(pc, "LineSetting", l.Setting, body, TextAnchor.UpperLeft, labelW + gap, y, settingW, false);
                     float c = PopupText(pc, "LineCrown", N0(l.Crown), body, TextAnchor.UpperRight, inner - crownW, y, crownW, false);
                     y += Mathf.Max(a, Mathf.Max(b, c)) + 8f;
+                    string runs = RunsText(l);   // Endless / Time Attack: the runs that make the sum above, on their own full-width row under the line (wraps, never overlaps the columns)
+                    if (runs.Length > 0) y += PopupText(pc, "LineRuns", runs, 40, TextAnchor.UpperLeft, 44f, y - 4f, inner - 44f, false) + 4f;
                 }
                 y += 12f;
             }

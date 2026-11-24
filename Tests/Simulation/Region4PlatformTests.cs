@@ -504,8 +504,8 @@ namespace FluffyClimbers.Simulation.Tests
         public void PinwheelGustIsNeverOfferedInTheNoWallBounceLevel()
         {
             List<LoadedLevel> levels = Region4();
-            LoadedLevel lvl7 = levels.First(l => l.Spec.LevelIndex == 10);   // the no-wall level moved from 7 to 10 (Bug List 6 item 4)
-            Assert.Equal(GoalType.NoWallBounce, lvl7.Spec.Goal.Type);
+            LoadedLevel lvl7 = levels.First(l => l.Spec.Goal.Type == GoalType.NoWallBounce);   // the No Wall Touch level of the region (Final Change 1: the approved placement, SpecialLevelTests)
+            Assert.Equal(SpecialLevelType.NoWallTouch, SpecialLevels.TypeOf(lvl7.Spec));
             Assert.DoesNotContain(PlatformKind.PinwheelGust, SpecialPlatforms.Options(lvl7.Spec, PlatformKind.Sticky));
             SimConfig cfg = new SimConfig();
             for (int i = 0; i < 30; i++)

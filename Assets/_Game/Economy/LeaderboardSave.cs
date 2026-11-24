@@ -44,8 +44,10 @@ namespace FluffyClimbers.Economy
         /// <summary>Earliest time of the next attempt (unix seconds, 0 = now).</summary>
         [JsonProperty("nextTry")] public long NextTryUnix;
 
-        /// <summary>The slot this run competes in (kind + target + setting): only the best queued run of a slot is kept.</summary>
+        /// <summary>The slot this run competes in (kind + target + setting). A level slot keeps only its best queued run; an Endless or Time Attack slot keeps its best <see cref="BreakdownMerge.TopRuns"/> (owner 2026-11-22: the top 3 runs of the week count).</summary>
         public string SlotKey { get { return Kind + "|" + (Kind == "level" ? LevelId : RegionId) + "|" + Mode; } }
+        /// <summary>True for an Endless or Time Attack run: its slot counts the sum of the three best runs of the week, so up to three runs of one slot wait in the queue.</summary>
+        public bool CountsTopRuns { get { return Kind != "level"; } }
     }
 
     /// <summary>Device-side leaderboard state (additive save field <c>leaderboard</c>, no version bump).</summary>
@@ -63,10 +65,34 @@ namespace FluffyClimbers.Economy
         [JsonProperty("bdSent", DefaultValueHandling = DefaultValueHandling.Ignore)] public string BreakdownSent = "";
     }
 
-    /// <summary>One counted slot of the week: the best crown in one level, or one Endless / Time Attack region, in one Gameplay setting. Ids are the service ids (<c>c.lvl_001_06.1</c>, <c>e.region_001_meadow_springs.4</c>, <c>t....</c>).</summary>
+    /// <summary>
+    /// One counted run of an Endless or Time Attack slot (owner 2026-11-22: the three best runs of the week per region and Gameplay setting count, the slot's crown is their sum). Same numbers as a slot: floors, base
+    /// score, chains, the crown made from the score, and the time the run was recorded.
+    /// </summary>
+    public sealed class WeekSlotPart
+    {
+        [JsonProperty("crown")] public long Crown;
+        [JsonProperty("floors")] public int Floors;
+        [JsonProperty("score", DefaultValueHandling = DefaultValueHandling.Ignore)] public int Score;
+        [JsonProperty("combo", DefaultValueHandling = DefaultValueHandling.Ignore)] public int Combo;
+        [JsonProperty("ch", NullValueHandling = NullValueHandling.Ignore)] public int[] Chains;
+        [JsonProperty("at", DefaultValueHandling = DefaultValueHandling.Ignore)] public long At;
+        [JsonProperty("hero", NullValueHandling = NullValueHandling.Ignore)] public string HeroId;
+
+        public WeekSlotPart Copy()
+        {
+            return new WeekSlotPart { Crown = Crown, Floors = Floors, Score = Score, Combo = Combo, Chains = Chains == null ? null : (int[])Chains.Clone(), At = At, HeroId = HeroId };
+        }
+    }
+
+    /// <summary>
+    /// One counted slot of the week in one Gameplay setting: the best crown in one level, or (owner 2026-11-22) the SUM of the three best runs of one Endless / Time Attack region (<see cref="Parts"/>).
+    /// Ids are the service ids (<c>c.lvl_001_06.1</c>, <c>e.region_001_meadow_springs.4</c>, <c>t....</c>).
+    /// </summary>
     public sealed class WeekSlotInfo
     {
         [JsonProperty("id")] public string SlotId = "";
+        /// <summary>The crown the slot counts: the best run of a level slot, the sum of <see cref="Parts"/> of an Endless / Time Attack slot.</summary>
         [JsonProperty("crown")] public long Crown;
         [JsonProperty("floors")] public int Floors;
         [JsonProperty("mode")] public int Mode;
@@ -83,10 +109,19 @@ namespace FluffyClimbers.Economy
         [JsonProperty("ra", DefaultValueHandling = DefaultValueHandling.Ignore)] public long ReceivedAt;
         /// <summary>True when the numbers come from the service's replay of a run (the authoritative result), false for display-only data uploaded by a phone.</summary>
         [JsonProperty("v", DefaultValueHandling = DefaultValueHandling.Ignore)] public bool Verified;
+        /// <summary>
+        /// Endless / Time Attack slots only (owner 2026-11-22): the up to three counted runs of the week, best first; <see cref="Crown"/> is their sum and floors, score, combo and chains of the slot are those of the best
+        /// run. Null for a level slot and in data written before the top-3 rule (the slot is then one run made of its own numbers, see <see cref="BreakdownMerge.PartsOf"/>). Additive.
+        /// </summary>
+        [JsonProperty("parts", NullValueHandling = NullValueHandling.Ignore)] public List<WeekSlotPart> Parts;
 
         public WeekSlotInfo Copy()
         {
-            return new WeekSlotInfo { SlotId = SlotId, Crown = Crown, Floors = Floors, Mode = Mode, HeroId = HeroId, Score = Score, Combo = Combo, Chains = Chains == null ? null : (int[])Chains.Clone(), At = At, ReceivedAt = ReceivedAt, Verified = Verified };
+            return new WeekSlotInfo
+            {
+                SlotId = SlotId, Crown = Crown, Floors = Floors, Mode = Mode, HeroId = HeroId, Score = Score, Combo = Combo, Chains = Chains == null ? null : (int[])Chains.Clone(), At = At, ReceivedAt = ReceivedAt,
+                Verified = Verified, Parts = BreakdownMerge.CopyParts(Parts)
+            };
         }
     }
 

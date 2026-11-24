@@ -335,6 +335,13 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(0, svc.AdminUnlockAllRegions(), "second call finds nothing to unlock");
             Assert.AreEqual(125, svc.AdminCompleteAllLevels(), "5 playable regions x 25 levels");
             Assert.IsTrue(svc.IsLevelCleared("lvl_001_01"));
+            // Final Change 1: the admin clear works in ONE Gameplay setting (no argument = Relaxed) and leaves the others alone
+            Assert.IsTrue(svc.IsLevelCleared("lvl_005_25", 0));
+            Assert.IsFalse(svc.IsLevelCleared("lvl_001_01", 3));
+            Assert.AreEqual(125, svc.AdminCompleteAllLevels(3));
+            Assert.IsTrue(svc.IsLevelCleared("lvl_005_25", 3));
+            Assert.AreEqual(3, svc.StarsOf("lvl_005_25", 3));
+            Assert.IsFalse(svc.IsLevelCleared("lvl_001_01", 4));
         }
 
         // ---- Main rewards test switch (Bug List 4 E3) ----
@@ -362,8 +369,8 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(stars, svc.TotalStars(), "real progress untouched");
             Assert.IsTrue(svc.HasClaimable(RewardTab.Main));
 
-            Assert.AreEqual(RewardClaimResult.Ok, svc.TryClaimRegionGoal("g_1_levels_5").Result, "claiming works afterwards");
-            Assert.IsTrue(svc.IsRewardClaimed(RewardTab.Main, svc.RewardDefs.Find(RewardTab.Main, "g_1_levels_5")));
+            Assert.AreEqual(RewardClaimResult.Ok, svc.TryClaimRegionGoal("g2_1_clear_25").Result, "claiming works afterwards");
+            Assert.IsTrue(svc.IsRewardClaimed(RewardTab.Main, svc.RewardDefs.Find(RewardTab.Main, "g2_1_clear_25")));
             Assert.AreEqual(RewardClaimResult.Ok, svc.ClaimAll(RewardTab.Main).Result);
             Assert.IsFalse(svc.HasClaimable(RewardTab.Main), "everything claimed");
         }

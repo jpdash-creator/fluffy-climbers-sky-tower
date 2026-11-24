@@ -53,7 +53,7 @@ namespace FluffyClimbers.Tests
         // ---- the data ----
 
         [Test]
-        public void TwoThousandBundlesCost200To500GemsAndAreWorth1_85To3_6Times()
+        public void TwoThousandBundlesCost200To1000GemsAndAreWorth3To6Times()
         {
             Assert.AreEqual(2000, catalog.Count);
             PowerUpCatalog pw = PowerUpCatalog.BuiltIn();
@@ -61,30 +61,38 @@ namespace FluffyClimbers.Tests
             foreach (BundleDef b in catalog.All)
             {
                 Assert.That(b.Id, Does.StartWith("bnd_"), "no old bundle_NNNN left");
-                Assert.That(b.PriceGems, Is.InRange(200, 500), b.Id);
+                Assert.That(b.PriceGems, Is.InRange(200, 1000), b.Id);   // owner Final Change 1 (2026-11-22): 200 to 1,000 gems (was 200 to 500)
                 Assert.AreEqual(0, b.PriceGems % 10, b.Id);
-                Assert.That(b.PowerUps.Count, Is.InRange(1, 4), b.Id);
+                Assert.That(b.PowerUps.Count, Is.InRange(0, 4), b.Id);   // 0 = a cheap bundle: the card plus coins only
+                Assert.IsTrue(b.Coins > 0 || b.PowerUps.Count > 0, b.Id + " holds coins or a power-up next to the card");
+                Assert.IsTrue(b.Coins == 0 || b.Coins >= 500, b.Id + " has no coins or at least 500");
                 Assert.AreEqual(b.PowerUps.Count, b.PowerUps.Select(p => p.Id).Distinct().Count(), b.Id);
                 foreach (BundlePowerUp p in b.PowerUps) Assert.That(p.Count, Is.InRange(1, 10), b.Id);
                 Assert.IsTrue(b.HiddenCard, b.Id + " holds exactly one hidden card");
-                // Worth (coins at coins / 20 + power-ups at their gem prices + the EXPECTED card gems) over the price is 1.85 to 3.6 since the 2026-11-13 coin cut and card values (was 1.5 to 2.5), and the UI shows the same number
+                // Worth (coins at coins / 20 + power-ups at their gem prices 100 / 150 / 200 + the EXPECTED card gems 1,040) over the price is 3.0 to 6.0 for EVERY bundle (owner Final Change 1), and the UI shows the same number
                 double m = BundleWorth.Multiplier(b, pw, 0);
-                Assert.That(m, Is.InRange(1.8, 3.7), b.Id);
+                Assert.That(m, Is.InRange(3.0, 6.0), b.Id);
                 Assert.AreEqual(b.TotalValueGems(pw) / b.PriceGems, m, 1e-9);
-                Assert.That(BundleWorth.Text(b), Does.Match("^Worth x[123]\\.[0-9]$"), b.Id);
+                Assert.That(BundleWorth.Text(b), Does.Match("^Worth x[3-6]\\.[0-9]$"), b.Id);
                 Assert.That(b.Joke, Is.Not.Empty, b.Id + " has a joke");
                 Assert.That(b.Joke.Length, Is.InRange(10, 140), b.Id);
                 ratios.Add(m);
             }
-            Assert.Greater(ratios.Max() - ratios.Min(), 0.8, "the multiplier is varied, not constant");
+            Assert.Greater(ratios.Max() - ratios.Min(), 2.8, "the multiplier is spread over the whole band, not constant");
+            Assert.That(ratios.Average(), Is.InRange(4.4, 4.6), "average about 4.5");
+            Assert.AreEqual(200, catalog.All.Min(b => b.PriceGems));
+            Assert.AreEqual(1000, catalog.All.Max(b => b.PriceGems));
         }
 
         [Test]
         public void TheCardTableIsTheOneTierGemsTable()
         {
-            Assert.AreEqual(new[] { 70, 20, 10 }, BundleCards.Weights);
-            Assert.AreEqual(new[] { 250, 600, 1600 }, BundleCards.TierGems);
-            Assert.AreEqual(455.0, BundleCards.ExpectedGems, 1e-9);
+            // owner Final Change 1 (2026-11-22): Common 50, Uncommon 40, Rare 10; gem value = hero card coin price / 20
+            Assert.AreEqual(new[] { CharacterRarity.Common, CharacterRarity.Uncommon, CharacterRarity.Rare }, BundleCards.Tiers);
+            Assert.AreEqual(new[] { 50, 40, 10 }, BundleCards.Weights);
+            Assert.AreEqual(new[] { 400, 1200, 3600 }, BundleCards.TierGems);
+            for (int i = 0; i < BundleCards.Tiers.Length; i++) Assert.AreEqual(HeroPurchase.CoinPrice(BundleCards.Tiers[i]) / 20, BundleCards.TierGems[i]);
+            Assert.AreEqual(1040.0, BundleCards.ExpectedGems, 1e-9);
         }
 
         [Test]
@@ -123,9 +131,9 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void EveryBundleHasItsOwnJokeAndThePoolVersionIs4()
+        public void EveryBundleHasItsOwnJokeAndThePoolVersionIs5()
         {
-            Assert.AreEqual(4, BundleCatalog.PoolVersion, "old saved offers redraw (new coin amounts)");
+            Assert.AreEqual(5, BundleCatalog.PoolVersion, "old saved offers redraw (the pool was redrawn from scratch, Final Change 1)");
             Assert.AreEqual(2000, catalog.All.Select(b => b.Joke).Distinct().Count(), "2,000 different one-liners");
         }
 
@@ -174,7 +182,7 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void BuyingAddsExactlyOneUncommonOrBetterCardInTheSameSave()
+        public void BuyingAddsExactlyOneCommonUncommonOrRareCardInTheSameSave()
         {
             ProgressService svc = NewService();
             svc.AddGems(5000);
@@ -185,9 +193,9 @@ namespace FluffyClimbers.Tests
             CharacterSpec card;
             Assert.AreEqual(BundleResult.Ok, svc.TryBuyBundle(d, out card));
             Assert.NotNull(card);
-            Assert.GreaterOrEqual((int)card.Rarity, (int)CharacterRarity.Uncommon, "Common is never a bundle card");
+            Assert.That((int)card.Rarity, Is.InRange((int)CharacterRarity.Common, (int)CharacterRarity.Rare), "a bundle card is Common, Uncommon or Rare");
             Assert.AreEqual(before + 1, TotalCopies(svc), "exactly one copy added");
-            Assert.AreEqual(1, svc.Copies(card.Id));
+            Assert.AreEqual(card.Id == "momo" ? 2 : 1, svc.Copies(card.Id), "a Common card of the starter hero is one more copy of Momo");
             Assert.AreEqual(1, saves, "wallet, contents and the card in one save");
             Assert.AreEqual(4400, svc.Gems);
         }
@@ -216,7 +224,7 @@ namespace FluffyClimbers.Tests
                 CharacterSpec card;
                 svc.TryBuyBundle(CardBundle("c" + i, 600), out card);
                 Assert.IsTrue(region1.Contains(card.LineId), card.Id + ": only region 1 is open, so only the region 1 lines can be the card");
-                Assert.IsTrue(card.Rarity >= CharacterRarity.Uncommon && card.Rarity <= CharacterRarity.Epic, card.Id + ": a bundle card is Uncommon, Rare or Elite");
+                Assert.IsTrue(card.Rarity >= CharacterRarity.Common && card.Rarity <= CharacterRarity.Rare, card.Id + ": a bundle card is Common, Uncommon or Rare");
             }
             Assert.AreEqual(copiesBefore + 40, TotalCopies(svc), "every purchase added exactly one copy");
 
@@ -234,12 +242,14 @@ namespace FluffyClimbers.Tests
         {
             ProgressService svc = NewService();
             Assert.AreEqual(1, svc.BundleOpenRegionCount());
+            CollectionAssert.AreEquivalent(new[] { "momo" }, svc.BundleCardPool(CharacterRarity.Common).Select(c => c.Id));   // a Common card = the base hero of an open region
             CollectionAssert.AreEquivalent(new[] { "momo_u" }, svc.BundleCardPool(CharacterRarity.Uncommon).Select(c => c.Id));
             CollectionAssert.AreEquivalent(new[] { "momo_r" }, svc.BundleCardPool(CharacterRarity.Rare).Select(c => c.Id));
             CollectionAssert.AreEquivalent(new[] { "momo_e" }, svc.BundleCardPool(CharacterRarity.Epic).Select(c => c.Id));
             svc.Data.UnlockedRegions.Add(repo.GetRegionByIndex(2).Id);
             svc.Data.UnlockedRegions.Add(repo.GetRegionByIndex(3).Id);
             Assert.AreEqual(3, svc.BundleOpenRegionCount());
+            CollectionAssert.AreEquivalent(new[] { "momo", "forestgirl", "beachotter" }, svc.BundleCardPool(CharacterRarity.Common).Select(c => c.Id));
             CollectionAssert.AreEquivalent(new[] { "momo_u", "forestgirl_u", "beachotter_u" }, svc.BundleCardPool(CharacterRarity.Uncommon).Select(c => c.Id));
             svc.AddGems(600 * 60);
             var seen = new HashSet<string>();

@@ -39,74 +39,47 @@ namespace FluffyClimbers.Economy
         public static readonly TierRule[] Rules =
         {
             null,   // Common: no tier rule
-            new TierRule { Rarity = CharacterRarity.Uncommon, RunCoinsMin = 50, RunCoinsMax = 100, RunGemsMin = 1, RunGemsMax = 5, PowerCount = 1, CooldownSeconds = 30 },
-            new TierRule { Rarity = CharacterRarity.Rare, RunCoinsMin = 200, RunCoinsMax = 500, RunGemsMin = 5, RunGemsMax = 10, PowerCount = 2, CooldownSeconds = 22 },
-            new TierRule { Rarity = CharacterRarity.Epic, RunCoinsMin = 500, RunCoinsMax = 1000, RunGemsMin = 5, RunGemsMax = 10, PowerCount = 3, CooldownSeconds = 15 },
-            new TierRule { Rarity = CharacterRarity.Legendary, RunCoinsMin = 1000, RunCoinsMax = 2000, RunGemsMin = 5, RunGemsMax = 10, PowerCount = 4, CooldownSeconds = 10 },
+            new TierRule { Rarity = CharacterRarity.Uncommon, RunCoinsMin = 50, RunCoinsMax = 100, RunGemsMin = 1, RunGemsMax = 5, PowerCount = 0, CooldownSeconds = 30 },
+            new TierRule { Rarity = CharacterRarity.Rare, RunCoinsMin = 200, RunCoinsMax = 500, RunGemsMin = 5, RunGemsMax = 10, PowerCount = 1, CooldownSeconds = 22 },
+            new TierRule { Rarity = CharacterRarity.Epic, RunCoinsMin = 500, RunCoinsMax = 1000, RunGemsMin = 5, RunGemsMax = 10, PowerCount = 1, CooldownSeconds = 15 },
+            new TierRule { Rarity = CharacterRarity.Legendary, RunCoinsMin = 1000, RunCoinsMax = 2000, RunGemsMin = 5, RunGemsMax = 10, PowerCount = 2, CooldownSeconds = 10 },
         };
 
         /// <summary>
-        /// Hero power pools, one per line, themed on the hero's region and ordered: tier n uses the first n entries (Uncommon 1, Rare 2, Elite 3, Legendary 4), so a
-        /// higher tier keeps the earlier powers and adds the next one. Only power-ups that exist in the simulation (PowerUpCatalog.Implemented) appear.
+        /// The hero powers a tier can roll (owner Final Change 2, 2026-11-23, docs/44 section 14), in a FIXED order that the roll encoding depends on (never reorder):
+        /// Uncommon none, Rare ONE of six, Elite ONE of six, Legendary TWO of the six Elite powers. The line does not matter any more: every copy of every hero rolls its own power(s) with its stats
+        /// (<see cref="HeroRolls"/>). Index = <see cref="CharacterRarity"/>.
         /// </summary>
-        public static readonly Dictionary<string, PowerUp[]> Pools = new Dictionary<string, PowerUp[]>
+        public static readonly PowerUp[][] PowerChoices =
         {
-            // Meadow Springs (R1): bouncy hops and forgiving falls
-            { "momo", new[] { PowerUp.DoubleJump, PowerUp.SafetyNet, PowerUp.Shield, PowerUp.Rocket } },
-            // Mushroom Grove (R2): clinging to trunks and walls, safe footing
-            { "forestgirl", new[] { PowerUp.WallStick, PowerUp.Shield, PowerUp.Glide, PowerUp.SlowTime } },
-            // Sunny Beach (R3): sea breeze lift and floating
-            { "beachotter", new[] { PowerUp.Glide, PowerUp.DoubleJump, PowerUp.Flight, PowerUp.Shield } },
-            // Candy Canyon (R4): sticky sweets, springy jumps, sugar rush
-            { "candygirl", new[] { PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.WidePlatforms, PowerUp.Rocket } },
-            // Bamboo Temple (R5): calm focus, wall mastery, guardian
-            { "monk", new[] { PowerUp.WallStick, PowerUp.SlowTime, PowerUp.Shield, PowerUp.Flight } },
-            // Meadow Springs extra heroes (F4.1): the first power is the hero's identity, the rest follow the theme
-            // Bumble the bee (mage): speed + Flight, then a Glide Cape flutter and a spell shield
-            { "bumble", new[] { PowerUp.Flight, PowerUp.Glide, PowerUp.SlowTime, PowerUp.Shield } },
-            // Ribbi the frog: jump + Double Jump, then clinging and leaping
-            { "ribbi", new[] { PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.SafetyNet, PowerUp.Rocket } },
-            // Dandy the dandelion puff: slow fall + Slow Time, then soft landings
-            { "dandy", new[] { PowerUp.SlowTime, PowerUp.Shield, PowerUp.Glide, PowerUp.DoubleJump } },
-            // Pip the ladybug: wall bounce + Shield, then wall mastery
-            { "pip", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.SafetyNet } },
-            // Mushroom Grove extra heroes (F4.2): the first power is the hero's identity
-            // Nib the squirrel: Glide Cape (a gliding squirrel, plus a flat coin find stat), then leaps and a rocket
-            { "nib", new[] { PowerUp.Glide, PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Rocket } },
-            // Spike the hedgehog: Shield, then a Safety Net and calm
-            { "spike", new[] { PowerUp.Shield, PowerUp.SafetyNet, PowerUp.SlowTime, PowerUp.Rocket } },
-            // Moss the snail kid: Wall Stick, then a shield shell
-            { "moss", new[] { PowerUp.WallStick, PowerUp.Shield, PowerUp.SlowTime, PowerUp.DoubleJump } },
-            // Fenn the fox kit: the run bonus is the identity; quick power-ups and wide landings
-            { "fenn", new[] { PowerUp.Rocket, PowerUp.WidePlatforms, PowerUp.DoubleJump, PowerUp.Shield } },
-            // Sunny Beach extra heroes (F4.3): the first power is the hero's identity (Otto keeps his pool above)
-            // Pinch the crab: Shield (claws up), then a clinging claw grip and calm tides
-            { "pinch", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.WidePlatforms } },
-            // Shelly the sea turtle: Slow Time (a calm swimmer), then a shell shield and a gentle glide
-            { "shelly", new[] { PowerUp.SlowTime, PowerUp.Shield, PowerUp.Glide, PowerUp.DoubleJump } },
-            // Bloop the pufferfish kid: Double Jump (bounces off the water), then a rocket pop
-            { "bloop", new[] { PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Rocket, PowerUp.Shield } },
-            // Coco the monkey: Safety Net (a vine catches him) and a coin find stat, then leaps and a rocket
-            { "coco", new[] { PowerUp.SafetyNet, PowerUp.DoubleJump, PowerUp.Rocket, PowerUp.SlowTime } },
-            // Candy Canyon extra heroes (F4.4): the first power is the hero's identity (Bonbon keeps her pool above)
-            // Gummi the gummy bear: Shield (a bouncy gummy hide), then sticky wall grip, calm and wide sticky platforms
-            { "gummi", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.WidePlatforms } },
-            // Choco the chocolate bunny: Double Jump (hops), then a rocket pop
-            { "choco", new[] { PowerUp.DoubleJump, PowerUp.Rocket, PowerUp.Shield, PowerUp.SlowTime } },
-            // Marsh the marshmallow kid: Slow Time (soft and floaty), then a toasty shield
-            { "marsh", new[] { PowerUp.SlowTime, PowerUp.Shield, PowerUp.DoubleJump, PowerUp.Glide } },
-            // Cookie the cookie kid: Wide Platforms (big cookie landings) and a coin find stat, then leaps and a rocket
-            { "cookie", new[] { PowerUp.WidePlatforms, PowerUp.DoubleJump, PowerUp.Rocket, PowerUp.Shield } },
-            // Bamboo Temple extra heroes (F4.5): the first power is the hero's identity (Bao keeps his pool above)
-            // Sprout the bamboo sprout: Shield (a leafy guard), then wall grip and calm
-            { "sprout", new[] { PowerUp.Shield, PowerUp.WallStick, PowerUp.SlowTime, PowerUp.DoubleJump } },
-            // Tora the tiger cub: Double Jump (pounce), then a wall claw grip and a rocket
-            { "tora", new[] { PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Rocket, PowerUp.Shield } },
-            // Rusu the red panda: Safety Net and a coin find stat, then leaps and calm
-            { "rusu", new[] { PowerUp.SafetyNet, PowerUp.DoubleJump, PowerUp.SlowTime, PowerUp.Rocket } },
-            // Ryu the wingless dragon pup: Rocket (a fiery dash, no wings), then a scale shield
-            { "ryu", new[] { PowerUp.Rocket, PowerUp.Shield, PowerUp.SafetyNet, PowerUp.DoubleJump } },
+            new PowerUp[0],   // Common
+            new PowerUp[0],   // Uncommon
+            new[] { PowerUp.WidePlatforms, PowerUp.Shield, PowerUp.SafetyNet, PowerUp.WallStick, PowerUp.Glide, PowerUp.SlowTime },       // Rare: one of
+            new[] { PowerUp.SafetyNet, PowerUp.DoubleJump, PowerUp.Glide, PowerUp.SlowTime, PowerUp.Flight, PowerUp.Rocket },             // Elite: one of
+            new[] { PowerUp.SafetyNet, PowerUp.DoubleJump, PowerUp.Glide, PowerUp.SlowTime, PowerUp.Flight, PowerUp.Rocket },             // Legendary: two of
         };
+
+        /// <summary>
+        /// Every power combination a tier can roll, in roll order: Rare and Elite one power each (6 combinations), Legendary every unordered pair of the six (15 combinations, lower list index first),
+        /// Common and Uncommon the single empty combination. Index 0 is the DEFAULT combination (the first power(s) of the list), the one a static spec carries.
+        /// </summary>
+        public static readonly PowerUp[][][] PowerCombos = BuildCombos();
+
+        static PowerUp[][][] BuildCombos()
+        {
+            var all = new PowerUp[HeroIndex.Tiers][][];
+            for (int t = 0; t < HeroIndex.Tiers; t++)
+            {
+                PowerUp[] list = PowerChoices[t];
+                int n = Rules[t] == null ? 0 : Rules[t].PowerCount;
+                var combos = new List<PowerUp[]>();
+                if (n == 0) combos.Add(new PowerUp[0]);
+                else if (n == 1) for (int i = 0; i < list.Length; i++) combos.Add(new[] { list[i] });
+                else for (int i = 0; i < list.Length; i++) for (int j = i + 1; j < list.Length; j++) combos.Add(new[] { list[i], list[j] });
+                all[t] = combos.ToArray();
+            }
+            return all;
+        }
 
         /// <summary>The rule of a tier, or null for Common.</summary>
         public static TierRule RuleFor(CharacterRarity r)
@@ -115,17 +88,16 @@ namespace FluffyClimbers.Economy
             return i >= 0 && i < Rules.Length ? Rules[i] : null;
         }
 
-        /// <summary>The powers of a tier hero: the first PowerCount entries of the line's pool (empty when the line or tier is unknown).</summary>
+        /// <summary>The DEFAULT powers of a tier hero (combination 0: the first PowerCount powers of the tier list). A hero copy's real powers come from its roll (<see cref="HeroRolls.PowersFor"/>). The line is not used any more (kept for the callers).</summary>
         public static PowerUp[] PowersFor(string lineId, CharacterRarity r)
         {
-            TierRule rule = RuleFor(r);
-            PowerUp[] pool;
-            if (rule == null || lineId == null || !Pools.TryGetValue(lineId, out pool)) return new PowerUp[0];
-            int n = rule.PowerCount < pool.Length ? rule.PowerCount : pool.Length;
-            var list = new PowerUp[n];
-            for (int i = 0; i < n; i++) list[i] = pool[i];
-            return list;
+            int t = (int)r;
+            if (t < 0 || t >= PowerCombos.Length) return new PowerUp[0];
+            return (PowerUp[])PowerCombos[t][0].Clone();
         }
+
+        /// <summary>Number of power combinations a tier can roll (1 for Common and Uncommon).</summary>
+        public static int ComboCount(int tier) { return tier >= 0 && tier < PowerCombos.Length ? PowerCombos[tier].Length : 1; }
 
         /// <summary>Null when the row obeys its tier rule (run bonus ranges and steps), else a short reason. The physics are checked by <see cref="ValidatePhysics"/>. Pure; used by the tests.</summary>
         public static string Validate(TierRow r)
@@ -138,25 +110,35 @@ namespace FluffyClimbers.Economy
             return null;
         }
 
-        /// <summary>Null when the hero row obeys the index rules (<see cref="HeroIndex.Validate"/>: legal limits, the tier's Jump band and wall range), else a short reason with the id. Pure; used by the tests.</summary>
+        /// <summary>
+        /// Null when the hero row obeys the index rules (<see cref="HeroIndex.ValidateBands"/>: all four numbers inside the band over its reference hero and the legal limits), else a short reason with the id.
+        /// The reference is Momo Common (<see cref="HeroIndex.MomoCommon"/>) for a Common row and the line's Common row otherwise. Pure; used by the tests. Only the five active lines follow these rules (the other rows are data).
+        /// </summary>
         public static string ValidatePhysics(HeroRow r)
         {
             if (r == null) return "no row";
             if (r.Tier < 0 || r.Tier >= HeroIndex.Tiers) return r.Id + ": tier " + r.Tier + " outside 0.." + (HeroIndex.Tiers - 1);
-            string why = HeroIndex.Validate(r.Tier, new HeroPhysics(r.LaunchTenths, r.Speed, r.Control, r.Wall));
+            HeroPhysics reference = HeroIndex.MomoCommon;
+            if (r.Tier > 0)
+            {
+                HeroRow common = HeroTable.Of(r.Line, 0);
+                if (common == null) return r.Id + ": no Common row for the line";
+                reference = new HeroPhysics(common.LaunchTenths, common.Speed, common.Control, common.Wall);
+            }
+            string why = HeroIndex.ValidateBands(r.Tier, new HeroPhysics(r.LaunchTenths, r.Speed, r.Control, r.Wall), reference);
             return why == null ? null : r.Id + ": " + why;
         }
 
         /// <summary>
-        /// The Jump band of a tier as the "i" popup and the hero list print it: "+6 to +10% Jump" (launch speed over the default 19.0, <see cref="HeroIndex.JumpPctMin"/> / <see cref="HeroIndex.JumpPctMax"/>).
-        /// Common is "0 to +5% Jump".
+        /// The stat band of a tier as the "i" popup and the hero list print it: "+3 to +7% on every stat" (percent over the Common hero of the line, owner Final Change 2). Common is "-3 to +3% of Momo".
         /// </summary>
         public static string JumpBandText(CharacterRarity r)
         {
             int t = (int)r;
             if (t < 0 || t >= HeroIndex.Tiers) return "";
-            int lo = HeroIndex.JumpPctMin[t];
-            return (lo == 0 ? "0" : "+" + lo) + " to +" + HeroIndex.JumpPctMax[t] + "% Jump";
+            int lo = HeroIndex.BandPctMin[t], hi = HeroIndex.BandPctMax[t];
+            string lows = lo > 0 ? "+" + lo : lo.ToString();
+            return t == 0 ? lows + " to +" + hi + "% of Momo" : lows + " to +" + hi + "% on every stat";
         }
 
         /// <summary>Gain lines between two shown stat blocks ("Jump +17%", "Run coins +60"); the percent is the whole percent between the printed numbers, a line only when the stat rose. Used by the merge screen (MergeRules.ShownGainLines).</summary>
@@ -181,15 +163,21 @@ namespace FluffyClimbers.Economy
             if (pct > 0) lines.Add(label + " +" + pct + "%");
         }
 
-        /// <summary>Null when <paramref name="powers"/> is exactly the pool prefix of the line for that tier (right count, right order, each power in the pool), else a reason.</summary>
+        /// <summary>Null when <paramref name="powers"/> is a legal combination of the tier (right count, every power in the tier list, no power twice, list order), else a reason. The line is not used any more.</summary>
         public static string ValidatePowers(string lineId, CharacterRarity r, PowerUp[] powers)
         {
-            PowerUp[] want = PowersFor(lineId, r);
-            if (want.Length == 0 && RuleFor(r) != null) return lineId + ": no power pool";
-            if (powers == null || powers.Length != want.Length) return lineId + " " + r + ": " + (powers == null ? 0 : powers.Length) + " powers, rule says " + want.Length;
-            for (int i = 0; i < want.Length; i++)
-                if (powers[i] != want[i]) return lineId + " " + r + ": power " + i + " is " + powers[i] + ", pool says " + want[i];
-            return null;
+            int t = (int)r;
+            if (t < 0 || t >= PowerCombos.Length) return lineId + ": unknown rarity";
+            foreach (PowerUp[] combo in PowerCombos[t])
+            {
+                if (powers != null && combo.Length == powers.Length)
+                {
+                    bool same = true;
+                    for (int i = 0; i < combo.Length; i++) if (combo[i] != powers[i]) { same = false; break; }
+                    if (same) return null;
+                }
+            }
+            return lineId + " " + r + ": " + (powers == null ? 0 : powers.Length) + " powers are not one of the " + PowerCombos[t].Length + " legal combinations of the tier";
         }
     }
 }

@@ -122,15 +122,24 @@ namespace FluffyClimbers.Economy
         public void ResetAll() { ResetAll(SubscriptionClock()); }
 
         /// <summary>Same with an explicit clock (the subscription is rebuilt from the purchase records as of this time).</summary>
-        public void ResetAll(DateTime nowUtc)
+        public void ResetAll(DateTime nowUtc) { ResetAll(nowUtc, false); }
+
+        /// <summary>
+        /// DEVELOPMENT ONLY (Settings > Reset progress shows the button in development builds only, owner Final Change 3, 2026-11-23, "fresh start"): the same reset, but the shop and store purchases are wiped too:
+        /// the ledger, the purchase records, the first-purchase flags and Remove Ads are cleared, so coins, gems, power-ups and heroes of earlier purchases are gone as well (cloud and leaderboard are wiped like in a normal reset).
+        /// A real player never gets this: a normal reset keeps what was paid for (docs/38).
+        /// </summary>
+        public void ResetEverything() { ResetAll(SubscriptionClock(), true); }
+
+        void ResetAll(DateTime nowUtc, bool wipePurchases)
         {
             SaveData old = Data;
-            PurchaseLedger kept = (old.Ledger ?? new PurchaseLedger()).Clone();
+            PurchaseLedger kept = wipePurchases ? new PurchaseLedger() : (old.Ledger ?? new PurchaseLedger()).Clone();
             Data = new SaveData();
             SaveSync.CarryAccount(old, Data);   // resetting progress keeps the login choice and the linked account (docs/35)
-            Data.Purchases = old.Purchases ?? new List<PurchaseRecord>();   // paid purchases are never lost by a reset (docs/38)
-            Data.FirstPurchase = old.FirstPurchase ?? new List<string>();   // a once-only first-purchase bonus stays used
-            Data.AdsRemoved = old.AdsRemoved;   // a bought "Remove Ads" is a purchase: a reset never takes it away (the purchase record is kept too)
+            Data.Purchases = wipePurchases ? new List<PurchaseRecord>() : (old.Purchases ?? new List<PurchaseRecord>());   // paid purchases are never lost by a reset (docs/38)
+            Data.FirstPurchase = wipePurchases ? new List<string>() : (old.FirstPurchase ?? new List<string>());   // a once-only first-purchase bonus stays used
+            Data.AdsRemoved = !wipePurchases && old.AdsRemoved;   // a bought "Remove Ads" is a purchase: a reset never takes it away (the purchase record is kept too)
             Data.LeaderboardConsent = old.LeaderboardConsent;   // consent, name and granted claims are account settings, not progress
             Data.LeaderboardDisplayName = old.LeaderboardDisplayName;
             Data.Leaderboard = new LeaderboardSaveData();
@@ -138,10 +147,13 @@ namespace FluffyClimbers.Economy
             bool wasOnBoards = old.LeaderboardWipePending || (old.LeaderboardConsent != null && old.LeaderboardConsent.V >= LeaderboardConsent.CurrentVersion);
             Data.LeaderboardWipePending = wasOnBoards;   // the hub deletes the cloud entries as soon as the player is signed in; until then no run is uploaded
             Data.CloudResetPending = old.AccountMode == SaveSync.ModeGoogle || old.CloudResetPending;   // the reset save must reach the cloud save before any download is applied
+            Data.SelectedHero = "momo";   // the chosen hero is progress too: a reset goes back to Momo, copy 0 (Final Change 3); the settings were carried with the account fields
+            Data.SelectedCopy = 0;
+            Data.HeroRollRules = SaveData.HeroRollRulesCurrent;   // the ledger rolls are of the current rules already: no second re-roll on the next load
             EnsurePowerUpFields();
             EnsureChestFields();
             ApplyLedger(kept);
-            RestoreFromRecords(nowUtc);   // a subscription that still runs is a purchase too (instant gems are in the ledger already, restore never pays them twice)
+            if (!wipePurchases) RestoreFromRecords(nowUtc);   // a subscription that still runs is a purchase too (instant gems are in the ledger already, restore never pays them twice)
             Commit();
         }
 
@@ -186,7 +198,7 @@ namespace FluffyClimbers.Economy
         {
             if (!Data.LeaderboardWipePending) return;
             Data.LeaderboardWipePending = false;
-            store.Save(Data);
+            CommitQuiet();
         }
     }
 }

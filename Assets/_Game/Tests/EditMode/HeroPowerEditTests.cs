@@ -46,7 +46,7 @@ namespace FluffyClimbers.Tests
         public void CooldownSecondsFollowTheRarityConstants()
         {
             Assert.AreEqual(new[] { 0, 30, 22, 15, 10 }, CharacterDefs.CooldownSeconds);
-            foreach (CharacterRarity r in new[] { CharacterRarity.Uncommon, CharacterRarity.Rare, CharacterRarity.Epic, CharacterRarity.Legendary })
+            foreach (CharacterRarity r in new[] { CharacterRarity.Rare, CharacterRarity.Epic, CharacterRarity.Legendary })   // Uncommon has no power since Final Change 2
             {
                 var run = new RunSession(repo, new SimConfig(), "lvl_001_01");
                 run.ApplyHeroPowers(HeroOf(r));
@@ -57,9 +57,9 @@ namespace FluffyClimbers.Tests
         // ---- button count per tier ----
 
         [Test]
-        public void ButtonCountPerTier_CommonNone_UncommonOne_RareTwo_EliteThree_LegendaryFour()
+        public void ButtonCountPerTier_CommonAndUncommonNone_RareOne_EliteOne_LegendaryTwo()
         {
-            int[] want = { 0, 1, 2, 3, 4 };
+            int[] want = { 0, 0, 1, 1, 2 };
             for (int r = 0; r <= 4; r++)
             {
                 var run = new RunSession(repo, new SimConfig(), "lvl_001_01");
@@ -91,7 +91,7 @@ namespace FluffyClimbers.Tests
         {
             var cfg = new SimConfig();
             var run = new RunSession(repo, cfg, "lvl_001_01");
-            CharacterSpec hero = HeroOf(CharacterRarity.Uncommon);
+            CharacterSpec hero = HeroOf(CharacterRarity.Rare);   // owner Final Change 2: Uncommon has no power, Rare has one
             PowerUp p = hero.Powers[0];
             run.ApplyStock(new int[PowerUps.MaxType + 1]);
             run.ApplyHeroPowers(hero);
@@ -120,11 +120,11 @@ namespace FluffyClimbers.Tests
             run.ApplyStock(stock);
             CharacterSpec hero = HeroOf(CharacterRarity.Legendary);
             run.ApplyHeroPowers(hero);
-            PowerUp p = hero.Powers[0];
+            PowerUp p = hero.Powers.First(t => PowerUps.TotalTicks(cfg, t) > 0);   // a timed one: the default Legendary pair is Safety Net (armed, not timed) + Double Jump
             int idx = run.Hero.IndexOf(p);
             int[] before = Enumerable.Range(0, PowerUps.MaxType + 1).Select(i => run.PowerStock((PowerUp)i)).ToArray();
 
-            run.Step(PowerUps.HeroInputBit(p));
+            run.Step(PowerUps.InputBit(p));   // the HUD press: the merged button takes the free use first (HeroInputBit is 0 for Safety Net, Glide and Wide Platforms)
             Assert.IsTrue(PowerUps.IsActive(in run.State, p));
             Assert.AreEqual(PowerUps.TotalTicks(cfg, p) - 1, PowerUps.ActiveTicks(in run.State, p), "Bug List 6: same duration as the bought power-up, no 60 percent");
             int[] after = Enumerable.Range(0, PowerUps.MaxType + 1).Select(i => run.PowerStock((PowerUp)i)).ToArray();
@@ -139,16 +139,16 @@ namespace FluffyClimbers.Tests
         {
             var cfg = new SimConfig();
             var run = new RunSession(repo, cfg, "lvl_001_01");
-            CharacterSpec hero = HeroOf(CharacterRarity.Uncommon);
+            CharacterSpec hero = HeroOf(CharacterRarity.Rare);   // owner Final Change 2: Uncommon has no power, Rare has one
             run.ApplyHeroPowers(hero);
             PowerUp mine = hero.Powers[0];
             PowerUp foreign = System.Enum.GetValues(typeof(PowerUp)).Cast<PowerUp>().First(t => PowerUps.IsImplemented(t) && t != mine);
-            run.Step(PowerUps.HeroInputBit(foreign));
-            Assert.AreEqual(0, run.State.PwUsed, "a hero cannot use a type it does not have");
-            run.Step(PowerUps.HeroInputBit(mine));
+            run.Step(PowerUps.InputBit(foreign));
+            Assert.AreEqual(0, run.State.PwUsed, "a hero cannot use a type it does not have (no free use, no stock)");
+            run.Step(PowerUps.InputBit(mine));
             Assert.AreEqual(1, run.State.PwUsed);
             int ticks = PowerUps.ActiveTicks(in run.State, mine);
-            run.Step(PowerUps.HeroInputBit(mine));
+            run.Step(PowerUps.InputBit(mine));
             Assert.AreEqual(1, run.State.PwUsed, "free use spent, no stock");
             Assert.AreEqual(ticks - 1, PowerUps.ActiveTicks(in run.State, mine));
         }
@@ -169,7 +169,7 @@ namespace FluffyClimbers.Tests
         {
             var cfg = new SimConfig();
             var run = new RunSession(repo, cfg, "lvl_001_01");
-            CharacterSpec hero = HeroOf(CharacterRarity.Uncommon);
+            CharacterSpec hero = HeroOf(CharacterRarity.Rare);   // owner Final Change 2: Uncommon has no power, Rare has one
             PowerUp p = hero.Powers[0];
             var stock = new int[PowerUps.MaxType + 1];
             stock[(int)p] = 2;
@@ -194,7 +194,7 @@ namespace FluffyClimbers.Tests
         {
             var cfg = new SimConfig();
             var run = new RunSession(repo, cfg, "lvl_001_01");
-            CharacterSpec hero = HeroOf(CharacterRarity.Uncommon);
+            CharacterSpec hero = HeroOf(CharacterRarity.Rare);   // owner Final Change 2: Uncommon has no power, Rare has one
             PowerUp p = hero.Powers[0];
             run.ApplyStock(new int[PowerUps.MaxType + 1]);
             run.ApplyHeroPowers(hero);

@@ -295,7 +295,7 @@ namespace FluffyClimbers.Tests
                 Assert.AreEqual(c.Stats.RunBonusCoins, s.RunBonusCoins, c.Id + " run bonus stays the hero's own");
                 Assert.AreEqual(c.Stats.RunBonusGems, s.RunBonusGems, c.Id);
                 Assert.IsNull(s.ValidateTier(), c.Id);
-                Assert.IsNull(HeroIndex.Validate(row.Tier, new HeroPhysics(s.LaunchTenths, s.MaxSpeed, s.Control, s.WallBoostHundredths)), c.Id);
+                Assert.IsNull(TierRules.ValidatePhysics(row), c.Id);   // bands over the line's Common (owner Final Change 2)
                 ShownStats shown = svc.ShownOf(c);
                 Assert.IsNotNull(shown, c.Id);
                 Assert.AreEqual(ShownStats.From(s, new SimConfig()).Jump, shown.Jump, 1e-9, c.Id);
@@ -314,6 +314,112 @@ namespace FluffyClimbers.Tests
                 seen.Add(svc.Data.HeroCopyRolls["momo_u"][0]);
             }
             Assert.Greater(seen.Count, HeroRolls.PoolSize("momo_u") / 2, "accounts spread over the pool");
+        }
+
+        // ---- hero powers rolled per copy and the one-time re-roll (owner Final Change 2, 2026-11-23) ----
+
+        [Test]
+        public void TheHeroPowersOfACopyFollowItsOwnRoll()
+        {
+            ProgressService svc = NewService();
+            svc.AddCopies("momo_r", 2);
+            int k = HeroRolls.ComboCount("momo_r");
+            Assert.AreEqual(6, k, "Rare: one of six powers");
+            svc.Data.HeroCopyRolls["momo_r"][0] = HeroRolls.Compose("momo_r", 0, 0);
+            svc.Data.HeroCopyRolls["momo_r"][1] = HeroRolls.Compose("momo_r", 1, k - 1);
+            CollectionAssert.AreEqual(TierRules.PowerCombos[(int)CharacterRarity.Rare][0], svc.HeroPowers("momo_r", 0));
+            CollectionAssert.AreEqual(TierRules.PowerCombos[(int)CharacterRarity.Rare][k - 1], svc.HeroPowers("momo_r", 1));
+            CharacterSpec spec = CharacterDefs.Get("momo_r");
+            CharacterSpec rolled = svc.RolledSpec(spec, 1);
+            CollectionAssert.AreEqual(svc.HeroPowers("momo_r", 1), rolled.Powers, "the run applies the powers of the chosen copy");
+            Assert.AreEqual(svc.StatsOf(spec, 1).Control, rolled.Stats.Control);
+            Assert.AreSame(spec, svc.RolledSpec(spec, 0), "copy 0 on the default roll is the spec itself");
+
+            svc.AddCopies("momo_u", 1);
+            Assert.AreEqual(0, svc.HeroPowers("momo_u", 0).Length, "Uncommon has no power");
+            svc.AddCopies("momo_l", 1);
+            Assert.AreEqual(2, svc.HeroPowers("momo_l", 0).Length, "Legendary has two powers");
+            Assert.AreEqual(0, svc.HeroPowers("momo", 0).Length, "Common has none");
+        }
+
+        [Test]
+        public void EveryCopyRollsItsOwnPowerAndTheyDifferAcrossCopies()
+        {
+            ProgressService svc = NewService();
+            svc.AddCopies("momo_e", MergeRules.MaxCopies);
+            var combos = new HashSet<string>();
+            for (int i = 0; i < MergeRules.MaxCopies; i++) combos.Add(string.Join("+", svc.HeroPowers("momo_e", i)));
+            Assert.GreaterOrEqual(combos.Count, 2, "independent rolls per copy give different powers");
+        }
+
+        [Test]
+        public void TheNewRulesReRollEveryOwnedCopyOnceKeepingTierLineCopiesAndTheLedger()
+        {
+            ProgressService a = NewService();
+            a.AddBoughtCopy("momo_u"); a.AddBoughtCopy("momo_u");   // two bought copies: the purchase ledger holds their rolls
+            a.AddCopies("forestgirl_r", 1);
+            a.AddCopies("momo_l", 1);
+            int count = a.Data.HeroRollCount;
+            var oldRolls = new List<int>(a.Data.HeroCopyRolls["momo_u"]);
+            var o = JObject.Parse(JsonConvert.SerializeObject(a.Data));
+            o.Remove("heroRollRules");   // a save made under the old rules
+            var store = new MemorySaveStore();
+            store.Save(JsonConvert.DeserializeObject<SaveData>(o.ToString()));
+            var b = new ProgressService(repo, store, 5);
+            Assert.AreEqual(SaveData.HeroRollRulesCurrent, b.Data.HeroRollRules);
+            Assert.AreEqual(2, b.Copies("momo_u"), "tier and copies are kept");
+            Assert.AreEqual(1, b.Copies("forestgirl_r"));
+            Assert.AreEqual(1, b.Copies("momo_l"));
+            foreach (string id in new[] { "momo_u", "forestgirl_r", "momo_l" })
+            {
+                List<int> rolls = b.Data.HeroCopyRolls[id], nos = b.Data.HeroCopyRollNos[id];
+                Assert.AreEqual(b.Copies(id), rolls.Count, id);
+                for (int i = 0; i < rolls.Count; i++)
+                {
+                    Assert.GreaterOrEqual(nos[i], count, id + " copy " + i + " is dealt a NEW roll counter");
+                    Assert.AreEqual(HeroRolls.Pick(b.Data.Bundles.Seed, id, nos[i]), rolls[i], id + " copy " + i + " is the pure pick of its counter");
+                }
+            }
+            Assert.AreEqual(count + 2 + 1 + 1, b.Data.HeroRollCount);
+            // the ledger keeps one roll per bought copy and follows the copies to their new rolls
+            LedgerHero h = b.Data.Ledger.Heroes["momo_u"];
+            Assert.AreEqual(2, h.Copies);
+            CollectionAssert.AreEqual(b.Data.HeroCopyRolls["momo_u"], h.Rolls);
+            CollectionAssert.AreEqual(b.Data.HeroCopyRollNos["momo_u"], h.RollNos);
+            // the selected copy stays a valid card
+            Assert.IsTrue(HeroRolls.IsValidVariant("momo_u", b.HeroVariant("momo_u", 1)));
+
+            // once: saved and loaded again, nothing is rolled a second time
+            store.Save(b.Data);
+            var c = new ProgressService(repo, store, 5);
+            CollectionAssert.AreEqual(b.Data.HeroCopyRolls["momo_u"], c.Data.HeroCopyRolls["momo_u"]);
+            Assert.AreEqual(b.Data.HeroRollCount, c.Data.HeroRollCount);
+        }
+
+        [Test]
+        public void ACloudSaveOfTheOldRulesIsReRolledOnReplace()
+        {
+            ProgressService a = NewService();
+            a.AddCopies("monk_r", 2);
+            int count = a.Data.HeroRollCount;
+            var o = JObject.Parse(JsonConvert.SerializeObject(a.Data));
+            o.Remove("heroRollRules");
+            ProgressService b = NewService(null, 777);
+            b.ReplaceData(JsonConvert.DeserializeObject<SaveData>(o.ToString()));
+            Assert.AreEqual(SaveData.HeroRollRulesCurrent, b.Data.HeroRollRules);
+            Assert.AreEqual(2, b.Data.HeroCopyRolls["monk_r"].Count);
+            Assert.GreaterOrEqual(b.Data.HeroCopyRollNos["monk_r"][0], count);
+        }
+
+        [Test]
+        public void ResetProgressKeepsTheLedgerRollsWithoutASecondReRoll()
+        {
+            ProgressService a = NewService();
+            a.AddBoughtCopy("momo_r");
+            var before = new List<int>(a.Data.HeroCopyRolls["momo_r"]);
+            a.ResetAll();
+            Assert.AreEqual(SaveData.HeroRollRulesCurrent, a.Data.HeroRollRules);
+            CollectionAssert.AreEqual(before, a.Data.HeroCopyRolls["momo_r"]);
         }
     }
 }

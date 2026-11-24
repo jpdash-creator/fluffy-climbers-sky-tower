@@ -27,7 +27,27 @@ namespace FluffyClimbers.LeaderboardService
         [FirestoreProperty("createdAt")] public DateTime CreatedAt { get; set; } = Epoch.Utc;
     }
 
-    /// <summary>weeks/{weekKey}/slots/{uid}_{slotId}: the best crown of the week in one slot. A lower or equal run never changes it.</summary>
+    /// <summary>One verified run counted in an Endless or Time Attack slot (owner 2026-11-22: the three best runs of the week count). Lives in <see cref="SlotDoc.Runs"/>.</summary>
+    [FirestoreData]
+    public sealed class SlotRun
+    {
+        [FirestoreProperty("crown")] public long Crown { get; set; }
+        [FirestoreProperty("floors")] public int Floors { get; set; }
+        [FirestoreProperty("ticks")] public int Ticks { get; set; }
+        [FirestoreProperty("score")] public int Score { get; set; }
+        [FirestoreProperty("revives")] public int Revives { get; set; }
+        [FirestoreProperty("heroId")] public string HeroId { get; set; }
+        [FirestoreProperty("variant")] public int Variant { get; set; }
+        [FirestoreProperty("seed")] public int Seed { get; set; }
+        [FirestoreProperty("runId")] public string RunId { get; set; }
+        [FirestoreProperty("at")] public DateTime At { get; set; } = Epoch.Utc;
+    }
+
+    /// <summary>
+    /// weeks/{weekKey}/slots/{uid}_{slotId}: what one slot counts this week. A LEVEL slot (c.) is the best run of the week: a lower or equal run never changes it and <see cref="Runs"/> stays null.
+    /// An ENDLESS or TIME ATTACK slot (e., t.; owner 2026-11-22) holds its three best verified runs in <see cref="Runs"/> (best first) and <see cref="Crown"/> is their SUM; floors, ticks, score, hero, seed and runId
+    /// of the document are those of the best run. A document written before that rule has no list and reads as a list of one (<see cref="SlotMath.RunsOf"/>).
+    /// </summary>
     [FirestoreData]
     public sealed class SlotDoc
     {
@@ -51,6 +71,8 @@ namespace FluffyClimbers.LeaderboardService
         [FirestoreProperty("runId")] public string RunId { get; set; }
         [FirestoreProperty("at")] public DateTime At { get; set; } = Epoch.Utc;
         [FirestoreProperty("expireAt")] public DateTime ExpireAt { get; set; } = Epoch.Utc;
+        /// <summary>Endless / Time Attack slots only: the up to <see cref="FluffyClimbers.Economy.BreakdownMerge.TopRuns"/> counted runs, best first; <see cref="Crown"/> is their sum. Null in a level slot and in a document written before 2026-11-22.</summary>
+        [FirestoreProperty("runs")] public List<SlotRun> Runs { get; set; }
     }
 
     /// <summary>weeks/{weekKey}/totals/{uid}: the three weekly totals. overall = levels + endless. The *At fields are when the total last increased (tie-break: earlier wins).</summary>

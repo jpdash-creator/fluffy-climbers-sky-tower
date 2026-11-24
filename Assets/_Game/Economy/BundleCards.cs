@@ -4,32 +4,33 @@ namespace FluffyClimbers.Economy
 {
     /// <summary>
     /// The hidden hero card inside every bundle (owner Bug List 1 B4.a.iii, docs/37-bundles.md). Pure rules, no Unity types, so the simulation test project compiles it too.
-    /// Exactly ONE card per bundle, drawn when the bundle is BOUGHT (never shown before): weights Uncommon 70, Rare 20, Epic 10 (shown to players as "Elite"),
-    /// then a character picked uniformly among those of that tier whose REGION IS OPEN for the player (a merge tier counts for the region of its base hero;
-    /// Momo and the Common line are region 1, always open). A tier with no character in an open region falls back to the next lower tier; Uncommon must exist.
-    /// Characters are read from <see cref="CharacterDefs.All"/> (or any list passed in), so a new Rare or Elite hero is picked up the moment its row exists.
+    /// Exactly ONE card per bundle, drawn when the bundle is BOUGHT (never shown before): weights Common 50, Uncommon 40, Rare 10 (owner Final Change 1, 2026-11-22;
+    /// before Uncommon 70, Rare 20, Elite 10), then a character picked uniformly among those of that tier whose REGION IS OPEN for the player (a Common card is the base
+    /// hero of an open region, like a Common chest card; a merge tier counts for the region of its base hero; Momo and his line are region 1, always open).
+    /// A tier with no character in an open region falls back to the next lower tier; Momo (Common, region 1) always exists.
+    /// Characters are read from <see cref="CharacterDefs.All"/> (or any list passed in), so a new hero is picked up the moment its row exists.
     /// </summary>
     public static class BundleCards
     {
-        /// <summary>The tiers a bundle card can be, lowest first. (CharacterRarity.Epic is shown to players as "Elite".)</summary>
-        public static readonly CharacterRarity[] Tiers = { CharacterRarity.Uncommon, CharacterRarity.Rare, CharacterRarity.Epic };
+        /// <summary>The tiers a bundle card can be, lowest first: Common, Uncommon, Rare (owner Final Change 1, 2026-11-22). Elite and Legendary are never a bundle card.</summary>
+        public static readonly CharacterRarity[] Tiers = { CharacterRarity.Common, CharacterRarity.Uncommon, CharacterRarity.Rare };
 
-        /// <summary>Draw weights per tier, same order as <see cref="Tiers"/> (they add up to 100, so they are also the percentages). Common is never drawn.</summary>
-        public static readonly int[] Weights = { 70, 20, 10 };
+        /// <summary>Draw weights per tier, same order as <see cref="Tiers"/> (they add up to 100, so they are also the percentages): Common 50, Uncommon 40, Rare 10.</summary>
+        public static readonly int[] Weights = { 50, 40, 10 };
 
         /// <summary>
-        /// THE ONE TABLE: gem value of one hero card per tier (Uncommon, Rare, Epic) = the coin price of the card / 20 (<see cref="HeroPurchase.Prices"/>, owner 2026-11-13: 5,000 / 12,000 / 32,000 coins). The owner may change the numbers here only; the generator reads the same numbers
+        /// THE ONE TABLE: gem value of one hero card per tier (Common, Uncommon, Rare) = the coin price of the card / 20 (<see cref="HeroPurchase.Prices"/>, owner Final Change 1, 2026-11-22: 8,000 / 24,000 / 72,000 coins). The owner may change the numbers here only; the generator reads the same numbers
         /// from Tools/content_cli/gen_bundles.py (keep both in step: a test compares them). The EXPECTED value of the card (<see cref="ExpectedGems"/>) is part of every
         /// bundle's worth, so a bundle shows its worth with the card at its expected value.
         /// </summary>
-        public static readonly int[] TierGems = { 250, 600, 1600 };
+        public static readonly int[] TierGems = { 400, 1200, 3600 };
 
         public static int WeightTotal
         {
             get { int t = 0; for (int i = 0; i < Weights.Length; i++) t += Weights[i]; return t; }
         }
 
-        /// <summary>Expected gem value of the hidden card: sum of weight x tier gems / total weight (455 with the table above). The same for every bundle.</summary>
+        /// <summary>Expected gem value of the hidden card: sum of weight x tier gems / total weight (1,040 = 0.5 x 400 + 0.4 x 1,200 + 0.1 x 3,600 with the table above). The same for every bundle.</summary>
         public static double ExpectedGems
         {
             get
@@ -40,7 +41,7 @@ namespace FluffyClimbers.Economy
             }
         }
 
-        /// <summary>Chance in whole percent of tier index <paramref name="tierIndex"/> (0 Uncommon, 1 Rare, 2 Epic) as the info popup shows it: 70, 20, 10.</summary>
+        /// <summary>Chance in whole percent of tier index <paramref name="tierIndex"/> (0 Common, 1 Uncommon, 2 Rare) as the info popup shows it: 50, 40, 10.</summary>
         public static int ChancePercent(int tierIndex)
         {
             return tierIndex >= 0 && tierIndex < Weights.Length ? (int)System.Math.Round(100.0 * Weights[tierIndex] / WeightTotal) : 0;
@@ -77,17 +78,26 @@ namespace FluffyClimbers.Economy
             return regionOpen == null || region <= 1 || regionOpen(region);
         }
 
-        /// <summary>The characters of exactly this rarity that can be a bundle card, in id order (region Commons are never cards; merge tiers count). Every region counts.</summary>
+        /// <summary>The characters of exactly this rarity that can be a hero card, in id order (Common: the base hero of each region; above: the merge tiers). Every region counts.</summary>
         public static List<CharacterSpec> Pool(CharacterRarity rarity, IList<CharacterSpec> all)
         {
             return Pool(rarity, all, null);
         }
 
-        /// <summary>Same, only characters whose region is open (<paramref name="regionOpen"/> gets the region index, 2 and up; null = every region is open).</summary>
+        /// <summary>
+        /// Same, only characters whose region is open (<paramref name="regionOpen"/> gets the region index, 2 and up; null = every region is open).
+        /// Common = the base hero of each open region (never a merge tier, never a loose Common without a region), the same rule as a Common chest card (<see cref="ChestRolls.Pool"/>).
+        /// </summary>
         public static List<CharacterSpec> Pool(CharacterRarity rarity, IList<CharacterSpec> all, System.Func<int, bool> regionOpen)
         {
             var list = new List<CharacterSpec>(8);
-            if (all == null || rarity < CharacterRarity.Uncommon) return list;
+            if (all == null || rarity < CharacterRarity.Common) return list;
+            if (rarity == CharacterRarity.Common)
+            {
+                foreach (CharacterSpec c in all) if (c != null && c.IsRegionHero && !c.IsMergeTier && Open(regionOpen, c.Region)) list.Add(c);
+                list.Sort((x, y) => string.CompareOrdinal(x.Id, y.Id));
+                return list;
+            }
             foreach (CharacterSpec c in all) if (c != null && c.Rarity == rarity && Open(regionOpen, RegionOf(c, all))) list.Add(c);
             list.Sort((x, y) => string.CompareOrdinal(x.Id, y.Id));   // stable: a draw does not change when the list order of CharacterDefs changes
             return list;
@@ -100,8 +110,8 @@ namespace FluffyClimbers.Economy
 
         /// <summary>
         /// The tier that is really used for a drawn tier. When the drawn tier has no character in an open region, the HIGHEST tier at or below it that has one is used
-        /// (Epic with nothing open at Epic or Rare gives Uncommon). If nothing exists at or below, the lowest tier above it. Returns false when no
-        /// Uncommon-or-better character exists in an open region at all.
+        /// (Rare with nothing open at Rare or Uncommon gives Common). If nothing exists at or below, the lowest tier above it. Returns false when no
+        /// card hero (Common, Uncommon or Rare) exists in an open region at all.
         /// </summary>
         public static bool TryResolveTier(CharacterRarity drawn, IList<CharacterSpec> all, System.Func<int, bool> regionOpen, out CharacterRarity resolved)
         {
@@ -115,7 +125,7 @@ namespace FluffyClimbers.Economy
             return false;
         }
 
-        /// <summary>One card from two rolls (tier, then character), every region open. Null only when no Uncommon-or-better character exists.</summary>
+        /// <summary>One card from two rolls (tier, then character), every region open. Null only when no card hero exists.</summary>
         public static CharacterSpec Draw(ulong tierRoll, ulong characterRoll, IList<CharacterSpec> all)
         {
             return Draw(tierRoll, characterRoll, all, null);

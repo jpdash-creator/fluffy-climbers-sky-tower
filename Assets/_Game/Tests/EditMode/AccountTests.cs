@@ -64,6 +64,26 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
+        public void SummaryCountsALevelOnceHoweverManySettingsItWasClearedIn()
+        {
+            // Final Change 1 (owner 2026-11-22): clears are stored per Gameplay setting; the summary still counts LEVELS, so an old and a new save of the same progress compare equal
+            SaveData d = Played(2, 0, 0);
+            var p = new LevelProgress();
+            p.AddClear(0, 1);
+            p.AddClear(3, 7);
+            p.AddClear(4, 1);
+            d.Levels["lvl_001_03"] = p;
+            d.Levels["lvl_001_04"] = new LevelProgress { BestScore = 5 };   // an entry without a clear
+            Assert.AreEqual(3, SaveSync.Summarize(d).LevelsCleared);
+            SaveEnvelope e = SaveSync.TryDeserialize(SaveSync.Serialize(d));
+            Assert.AreEqual(3, e.Summary.LevelsCleared);
+            Assert.AreEqual(7, e.Data.Levels["lvl_001_03"].MaskIn(3), "the per-setting stars travel in the cloud save");
+            Assert.AreEqual(1, e.Data.Levels["lvl_001_03"].StarsIn(0));
+            Assert.AreEqual(0, e.Data.Levels["lvl_001_03"].StarsIn(1));
+            Assert.AreEqual(3, e.Data.Levels["lvl_001_03"].Clears, "the legacy field holds the total for older builds");
+        }
+
+        [Test]
         public void BytesRoundTripWithHeader()
         {
             SaveData d = Played(4, 10, 20);

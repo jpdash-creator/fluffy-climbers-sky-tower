@@ -4,6 +4,8 @@ Source: the nine additional rules from the product owner, plus the clarifying an
 
 > **2026-11-01 (economy and gear update):** all coin, gem, price, reward, chest and revive numbers in this document were re-checked against the code (build v0.38.0.40). The authoritative economy tables, with gems, coins and dollars for every item, are in [27-economy-tables-from-code.md](27-economy-tables-from-code.md); docs 20, 22 and 26 are the owner sources. Rules now in force: **1 gem = 20 coins (fixed)**, **no gear anywhere**, Iron and Gold chests, a Weekly/Monthly Subscription instead of VIP tiers, revive 5 then 10 gems. Sections 7 and 8 and the economy blocks at the end of this file were rewritten; leaderboards, scroll, jump numbers and the map are unchanged.
 
+> **Final Change 1 (owner 2026-11-22).** Rules now in force, each rewritten or marked in its section below: (1) **scroll**: start speed 100 percent, +10 / 20 / 30 / 40 / 50 percent of the start speed every 30 s by the Gameplay setting, 8 steps, the 4 u/s ceiling stays, the cue shows round steps then MAX (section "Scroll model"); (2) **crown** = (floors + chain squares) x 5 x (1 + setting bonus 0 / 5 / 10 / 15 / 25 percent); the run coins get the same bonus; (3) **stars and clears per Gameplay setting**, 375 stars per region, own path per setting, the next region needs all 25 levels in one setting (doc 45 section 5); (4) **special levels**: six types, one level each per region; levels 5, 10, 15, 20, 25 are plain gem levels (doc 45 section 4b); (5) **shop**: new hero, power-up, chest, bundle and subscription prices (table "Item prices" below, doc 27 section 0); (6) **region coin factor** 100 / 105 / 110 / 115 / 120 percent for regions 1 / 2 to 5 / 6 to 15 / 16 to 25 / 26 to 30; (7) **rewards** redrawn, no heroes (doc 39 section 0); (8) **leaderboard**: Endless and Time Attack count the top 3 runs per setting per region (`Planning/LEADERBOARD-DESIGN.md`). Owner decisions: `.claude/pendingdecisions/decisions-2026-11-22-final-change-1.md` (repo).
+
 > **v2.1 patch:** chest USD value, VIP row and per-region coin totals corrected; docs 02-05 aligned to this doc. The decisions raised by this review (difficulty cap, endless gems and coins, scoring, module scope, etc.) are recorded in [09-decisions-needed.md](09-decisions-needed.md) and applied in this doc.
 
 > **Update 2026-10-20:** the owner's device-test rounds (2026-10-19/20) changed several rules. They are recorded in the last sections of this document (device-test rules, scroll model, jump numbers, economy v2, world map, level screen) and **win over the older text above them**: section 4 gap numbers, section 6 star wording and section 7 in-level coins carry short "superseded" notes. Decision log: game repo `.claude/pendingdecisions/device-feedback-2026-10-19.md`.
@@ -22,7 +24,9 @@ Source: the nine additional rules from the product owner, plus the clarifying an
 | 9 | Generic jumper, no reference to any existing game | Section 9 |
 
 ## 1. Leaderboards (rule 1)
-> **Update 2026-11-12 (owner):** the leaderboard actually built is the weekly CROWN leaderboard: three boards (overall, levels, endless), crown = (floors x 10 + combo^2 x 5) x (1 + setting percent), best crown per slot per week, week = Monday 00:00 India time, Firebase + a replay-verifying Cloud Run service, prizes claimed in Rewards. Everything counts (revived runs, power-ups, the player's own rolled hero stats); there is no neutral Ranked mode. The table below (PlayFab, friends boards, Ranked-only) is the old plan and is history. Source of truth: `Planning/LEADERBOARD-DESIGN.md`.
+> **Update 2026-11-22 (owner, Final Change 1):** crown = (floors + sum of chain_length^2) x 5 x (1 + setting bonus 0 / 5 / 10 / 15 / 25 percent) (formula of 2026-11-16, bonus table of 2026-11-22); week = Monday 00:00 UTC (since 2026-11-16); a level slot (level x setting) keeps its best crown of the week; an Endless or Time Attack slot (region x setting) counts the SUM of its three best runs of the week.
+>
+> **Update 2026-11-12 (owner; formula, week start and the one-best-run rule for Endless are superseded by the note above):** the leaderboard actually built is the weekly CROWN leaderboard: three boards (overall, levels, endless), crown = (floors x 10 + combo^2 x 5) x (1 + setting percent), best crown per slot per week, week = Monday 00:00 India time, Firebase + a replay-verifying Cloud Run service, prizes claimed in Rewards. Everything counts (revived runs, power-ups, the player's own rolled hero stats); there is no neutral Ranked mode. The table below (PlayFab, friends boards, Ranked-only) is the old plan and is history. Source of truth: `Planning/LEADERBOARD-DESIGN.md`.
 | Board | Scope | Ranking |
 |---|---|---|
 | Campaign - per level (30 x 15 = 450) | **Friends** board per level (+ top-100 global for levels 5, 10, 15 only) | Score, then time |
@@ -119,7 +123,7 @@ The old 15-level template (d from 0.05 to 1.00 per level, the L5/L10 "complex" a
 | Target score | 5 | 20 | 26.7 | 33.3 | 40 | 44 to 60 (+4 per level) | 63 to 75 (+3 per level) | 77.5 to 87.5 (+2.5 per level) | 90 to 100 (+2.5 per level) |
 | Class | Simple (1-3), Medium (4-8), Hard (9-15), Complex (16-25) | | | | | | | | |
 
-- **Special-goal levels:** 5, 10, 15 and 20 (combo chain, no wall bounce, hidden gem, speedrun, set per region). Level 25 is the highly complex reach-the-last-platform level.
+- **Level types (owner 2026-11-22):** 25 levels = 14 Regular Run + 5 gem levels (5, 10, 15, 20, 25, plain reach-the-top goals with gems) + 6 special levels, one of each type per region, never on a gem level: No Wall Touch, No Power-ups, Combo Climb, Chase, One Life, Keep Moving (placement and rules: doc 45 section 4b). The old special-goal levels 5, 10, 15, 20 (combo chain, no wall bounce, hidden gem, speedrun) are retired. Level 25 is the highly complex reach-the-last-platform level.
 - **Specials are planned from level 1.** The share of rows with a special platform ramps inside each level (`SimConfig.RampLowPercent/RampHighPercent`: level 1 from 10 to 30 percent of rows, rising in steps of 5 to level 25 at 50 to 70 percent); hazard-type specials (Thorn, Snap) are only left out of level 1. The old "level 1 and 2 have no specials, level 3 introduces them" rule is gone.
 - **Rows per level** (60 / 75 / 90 / 105 / 120 / 150 by band) are in doc 45 section 4a. The builder difficulty d of each level is solved per region to meet its target score (`Content/config/difficulty_curve.json`).
 
@@ -135,7 +139,7 @@ Region difficulty offset: +0.0 (region 1) to +0.25 (region 30). It is used in **
 - Jump-height bonus: +1 coin per extra floor of a multi-floor jump.
 - End-of-level payout (base + star bonus), multiplied by region factor.
 
-**Per-level coin payout (end-of-level base, region 1; scales +3 percent per region index)**
+**Per-level coin payout (end-of-level base, region 1; HISTORY: it scaled +3 percent per region index then; since 2026-11-22 the region coin factor is 100 / 105 / 110 / 115 / 120 percent for regions 1 / 2 to 5 / 6 to 15 / 16 to 25 / 26 to 30)**
 | Level | Base payout | Typical in-level pickups | Gem reward |
 |---|---|---|---|
 | 1-4, 6-9, 11-14 | 60 - 140 (rises with level) | 40 - 120 | 0 (rare 1-gem pickup, 3 percent chance per level) |
@@ -176,32 +180,34 @@ Replays (history, now 50 percent once the level has 3 stars) paid 40 percent of 
 | 50,000 | 2,200 | 22.7 | 1,100 |
 | 100,000 | 4,000 | 25.0 | 2,000 |
 
-### Free-player income (measured by `Tests/Simulation/ECONOMY_TABLES.md`, build v0.38)
+### Free-player income (HISTORY: measured at build v0.38, 15 levels per region; current numbers in doc 27 section 0: a 3-star pass of region 1 pays 5,000 coins on Relaxed, 12 fixed gems per region, Daily 4,000 coins a day, Weekly 15,800 coins and 50 gems)
 - Coins per region, 15 levels at 3 stars, no combo: **3,750 / 3,870 / 3,975 / 4,095 / 4,200** (regions 1 to 5, factors 1.00 to 1.12); 5 regions **19,890 coins** (994.5 gem-equivalents).
 - Gems per region: about 74 to 79 gem value placed on 40 pickups plus 6 to 7 milestone gems; at 60 percent pickup about **51 to 54 gems per region, 260 for the 5 regions** (146 at 30 percent, 413 at 100 percent). Replays of a 3-star level drop no gems.
 - Rewards screen (doc 26 section 4, tables in doc 27 sections 11 to 13): Main (star milestones and region cleared) **580 gems, 14,500 coins, 11 random power-ups** once; Daily (100 points) **45 gems, 1,500 coins, 1 random power-up per day**; Weekly **160 gems, 1,800 coins, 1 random power-up per week**. A random power-up is worth 60.7 gems on average.
 - Time: about 3.4 minutes a level (assumption), a region 41 to 56 minutes, the campaign about 4.3 hours: about **61 gems and 4,650 coins per hour** of first-clear play.
 
-### Item prices (as shipped)
+### Item prices (as shipped since Final Change 1, 2026-11-22; history of every row in doc 27)
 | Item | Coins | Gems | USD at reference rate |
 |---|---|---|---|
-| Double Jump, Wall Stick, Shield, Safety Net, Glide Cape, Wide Platforms | 1,000 | 50 | $0.55 |
-| Flight, Rocket, Slow Time | 1,500 | 75 | $0.82 |
-| 5 power-ups of one type | -10 percent | -10 percent | |
-| 10 or more power-ups | -20 percent | -20 percent | |
-| Iron chest (open 1 / open 10) | - | 100 / 1,000 | $1.10 / $10.99 |
-| Gold chest (open 1 / open 10) | - | 300 / 3,000 | $3.30 / $32.97 |
+| Wall Stick, Shield, Wide Platforms | 2,000 | 100 (value; sold for coins) | $1.10 |
+| Safety Net, Double Jump, Glide Cape, Slow Time | 3,000 | 150 (value) | $1.65 |
+| Flight, Rocket | 4,000 | 200 (value) | $2.20 |
+| 5 power-ups of one type | -10 percent | | |
+| 10 or more power-ups | -20 percent | | |
+| Hero card, Common / Uncommon / Rare / Elite / Legendary | 8,000 / 24,000 / 72,000 / 200,000 / 500,000 | - | |
+| Iron chest (open 1 / open 10) | - | 400 / 4,000 | $4.40 / $43.96 |
+| Gold chest (open 1 / open 10) | - | 1,500 / 15,000 | $16.49 / $164.85 |
 | Revive | - | 5 (first), 10 (second), max 2 per run; the first can be a free rewarded-ad revive | $0.05 / $0.11 |
-| Region skip (regions 2 to 5) | - | 100 / 116 / 133 / 150 | $1.10 to $1.65 |
-| Bundle (1,000 generated bundles) | - | 200 to 500 (average 364; value 1.41 to 1.79 times, average 1.60) | $2.20 to $5.50 |
+| Region skip (regions 2 to 5) | - | 500 | $5.50 |
+| Bundle (2,000 generated bundles, one hidden hero card each) | - | 200 to 1,000 (average 610; worth 3.03 to 5.97 times, average 4.54) | $2.20 to $10.99 |
 | Bundle Refresh | 100 | 5 | $0.05 |
-| Characters (not for sale yet) | - | owner list 150 / 300 / 700 / 1,500 (Uncommon to Legendary) | |
-| Weekly Subscription | - | - | **$1.49** (Rs 149), 7 days |
-| Monthly Subscription | - | - | **$4.99** (Rs 449), 30 days |
+| Weekly Starter / Weekly Plus subscription | - | - | **$1.99** / **$4.99**, 7 days |
+| Monthly Standard / Monthly Premium subscription | - | - | **$6.99** / **$14.99**, 30 days |
+| Remove Ads (one time) | - | - | $2.99 |
 
-Chests: Iron = 1 random power-up + 400 to 600 coins (average value 85.7 gems, 86 percent of the price); Gold = 3 random power-ups + 1,000 to 1,400 coins (242.1 gems, 81 percent). Characters in chests are switched off. **No chest is earned from play or rewards.**
-Subscriptions: Weekly pays 100 gems at once, then 10 gems + 500 coins a day for 7 days; Monthly pays 200 gems at once, then 10 gems + 600 coins a day for 30 days and 1 random power-up on every 5th claim. There are no VIP tiers and no stat bonuses.
-Not in the game: gear (hats, shirts, pants, boots, outfits), Bronze/Silver chests, battle pass, Remove Ads, interstitials, starter pack, daily login streak. Doc 22 point 7 describes a future starter pack ($0.99 = 100 gems + 2,000 coins).
+Chests: Iron = 1 random power-up + 800 to 1,200 coins + 1 hero card (Common 50 / Uncommon 30 / Rare 20 percent), worth x3.7; Gold = 3 random power-ups + 3,000 to 4,200 coins + 1 hero card (Rare 60 / Elite 30 / Legendary 10 percent), worth x5.5. Chests are bought with gems; a subscription and a leaderboard prize can also open chests.
+Subscriptions (four plans, one at a time): Weekly Starter 100 gems at once, then 15 gems + 600 coins a day, 1 power-up; Weekly Plus 250 at once, 20 gems + 1,000 coins a day, 3 power-ups, 1 Iron chest; Monthly Standard 200 at once, 15 gems + 600 coins a day, 6 power-ups; Monthly Premium 300 at once, 20 gems + 1,000 coins a day, 6 power-ups, 2 Gold chests (days 1 and 16). Worth 3.1x / 3.5x / 3.8x / 4.6x. There are no VIP tiers and no stat bonuses.
+Not in the game: gear (hats, shirts, pants, boots, outfits), Bronze/Silver chests, battle pass, starter pack, daily login streak. Doc 22 point 7 describes a future starter pack ($0.99 = 100 gems + 2,000 coins).
 
 ### Targets to confirm in soft launch
 - Payer conversion 2 percent and average spend of a payer $15-25 (assumptions). Money products are only the 9 gem packs and the 2 subscriptions.
@@ -223,19 +229,20 @@ Not in the game: gear (hats, shirts, pants, boots, outfits), Bronze/Silver chest
 
 ## Economy v2 (owner, 2026-10-20)
 - No coin pickups. Each level has 3 collectible stars (side routes and risky spots) and occasional gems (rarity tiers Common 1, Rare 2, Epic 5, Legendary 10 gems at 70/22/7/1 percent).
-- Coins are paid when the level is cleared: **70 for the clear + 60 per star collected + 5 per combo step**, times the region coin factor (economy v3, 2026-10-25; v2 was 30 + 40).
-- After a level has 3 stars, replays pay 50 percent of the coins and drop no gems. Levels below 3 stars pay in full on replay (risk: replay farming; review with the economy check).
+- Coins are paid when the level is cleared: **56 for the clear + 48 per star collected + 4 per combo step**, times the region coin factor, then the Gameplay setting bonus (since 2026-11-13 and 2026-11-22; economy v3 of 2026-10-25 was 70 + 60 + 5, v2 was 30 + 40).
+- After a level has 3 stars in the setting of the run, replays pay 25 percent of the coins (50 before 2026-11-13) and drop no gems. Levels below 3 stars pay in full on replay (risk: replay farming; review with the economy check).
 - Narrow platforms get smaller gaps (full jump height from 3.2 wide, 55 percent at 1.5 wide).
 
 ## Scroll model (owner, 2026-10-19/20; supersedes the earlier "rising danger" wording)
 - The screen scrolls up on its own **after the first jump**: platforms and background slide down, the camera never waits for the player. The bottom edge of the screen is the danger line; falling below it ends the run (revive offer, then retry). There is no red band, hazard or kill zone coming from below.
 - **Base speed** is 120 percent of the difficulty-blended speed (`ScrollBasePercent` 120; the original "+20 percent" request).
-- **Steps:** every 5 seconds the speed rises by the difficulty's step. The five difficulty levels (Settings dropdown) use steps of **20, 40, 60, 80 and 100 percent** per 5 s (owner, list 8: "20 percent factors instead of 8 percent"; the first version used 5/10/15/20/25). The total is capped at **+400 percent**.
+- **Steps (history, see the 2026-11-22 update at the end of this list):** every 5 seconds the speed rises by the difficulty's step. The five difficulty levels (Settings dropdown) use steps of **20, 40, 60, 80 and 100 percent** per 5 s (owner, list 8: "20 percent factors instead of 8 percent"; the first version used 5/10/15/20/25). The total is capped at **+400 percent**.
 - Every step shows a visible **"SPEED UP +N%"** cue (with the SpeedUp sound, doc 12; the cue is its own visual twin for CUX-6).
 - Gem chance per difficulty level: 2.7, 2.7, 2.9, 3.0 and 3.2 percent of rows (2026-11-01, code values; history: 5 to 10 percent). Later in-app purchases may sell extra gem chance.
 - Campaign boss-chase levels use the endless step formula clamped by `CampaignRampCapPercent` (60 percent); endless keeps its own ramp (section 2). Endless mode (an **Endless button on each region's level screen**, owner decision 2026-10-20) is being implemented by another work stream; its final rules will be recorded here and in `Assets/_Game/Simulation/NOTES.md`.
-- **Update 2026-11-12 (owner): the step table is now 10, 20, 25, 40, 50 percent per 5 s for Relaxed, Easy, Normal, Hard, Insane (`SimConfig.DifficultyStepPercent`); the lines above that name 20/40/60/80/100, 20/22/25/28/30 or +400 percent are history. Owner 2026-11-12 (second decision): there is NO global percent cap; the speed-up stops after 8 steps (`SimConfig.DefaultScrollStepMaxSteps`, 40 s), so the top speed-up is step x 8 = 80, 160, 200, 320, 400 percent for Relaxed .. Insane (`SimConfig.TopSpeedUpPercent`, set as `ScrollStepCapPercent` by `GameSession`). The separate campaign speed ceiling `ScrollMaxSpeed` (4 u/s) still applies (doc 45 section 7).**
-- Code: `SimConfig.ScrollBasePercent` (120) and `ScrollStepSeconds`; the step table `SimConfig.DifficultyStepPercent` = {10, 20, 25, 40, 50} (`GameSettings.DifficultyStepPercent` is the same array) and the cap `ScrollStepCapPercent` = `SimConfig.TopSpeedUpPercent(mode)` = step x 8 (80, 160, 200, 320, 400), set in `GameSession` (since 2026-11-12; the earlier values {20,40,60,80,100} and 400 are history; the `SimConfig` field defaults are only the unit-test baseline). The bot proves every level under the scroll.
+- **Update 2026-11-22 (owner, Final Change 1; this is the rule in force):** the start speed is 100 percent. Every **30 s** after the first jump the speed gains **10 / 20 / 30 / 40 / 50 percent of the start speed** (Relaxed / Easy / Normal / Hard / Insane, additive, never compounding). It stops after **8 steps** (4 minutes): top +80 / +160 / +240 / +320 / +400 percent. The ceiling `ScrollMaxSpeed` (4 u/s) stays, on levels and in Endless. The cue shows only round steps ("+N%") and MAX once when the real speed reaches the ceiling (it used to show odd values such as 163 and 213 percent). Endless keeps its growth with height and multiplies the setting steps on top; Chase levels multiply their row ramp on top. Code: `SimConfig.DifficultyStepPercent` = {10, 20, 30, 40, 50}, `DefaultScrollStepSeconds` 30, `DefaultScrollStepMaxSteps` 8, `TopSpeedUpPercent`, `Sim.NextScrollCue`. Every older step number in this section is history.
+- **Update 2026-11-12 (owner; HISTORY since 2026-11-22): the step table was 10, 20, 25, 40, 50 percent every 5 s for Relaxed, Easy, Normal, Hard, Insane (`SimConfig.DifficultyStepPercent`); the lines above that name 20/40/60/80/100, 20/22/25/28/30 or +400 percent are history. Owner 2026-11-12 (second decision): there is NO global percent cap; the speed-up stops after 8 steps (`SimConfig.DefaultScrollStepMaxSteps`, 40 s), so the top speed-up is step x 8 = 80, 160, 200, 320, 400 percent for Relaxed .. Insane (`SimConfig.TopSpeedUpPercent`, set as `ScrollStepCapPercent` by `GameSession`). The separate campaign speed ceiling `ScrollMaxSpeed` (4 u/s) still applies (doc 45 section 7).**
+- Code (state of 2026-11-12, history; current values in the 2026-11-22 update above): `SimConfig.ScrollBasePercent` (120) and `ScrollStepSeconds`; the step table `SimConfig.DifficultyStepPercent` was {10, 20, 25, 40, 50} (`GameSettings.DifficultyStepPercent` is the same array) and the cap `ScrollStepCapPercent` = `SimConfig.TopSpeedUpPercent(mode)` = step x 8 (80, 160, 200, 320, 400), set in `GameSession` (since 2026-11-12; the earlier values {20,40,60,80,100} and 400 are history; the `SimConfig` field defaults are only the unit-test baseline). The bot proves every level under the scroll.
 
 ## Jump numbers (owner retune, lists 6 and 7, 2026-10-20)
 | Value | Number |
@@ -256,7 +263,7 @@ Not in the game: gear (hats, shirts, pants, boots, outfits), Bronze/Silver chest
 - Pickup effects are drawn **at the pickup position**: a gem shows a gem, a star shows a star, never a star at the character.
 - Feet and pickups stand on the walkable surface line of a platform (top of the grass, not the neon rim); nothing collectible sits inside a platform, only on a platform top or in clear air.
 
-## Economy v2 details (owner, 2026-10-20; extends the "Economy v2" section above)
+## Economy v2 details (owner, 2026-10-20; extends the "Economy v2" section above; payout, gem and replay numbers are HISTORY, current rules in doc 27 section 0)
 - 3 collectible **stars** per level on side routes and risky spots; the stars earned are the level's grade (0 to 3). The old star types (clear, coin target, no revive, time) and the CollectCoins goal type are retired.
 - End payout: **70 coins for the clear + 60 per star collected + 5 per combo step**, times the region coin factor 1.00, 1.03, 1.06, 1.09, 1.12 (a 3-star clear pays 250 coins in region 1 and 280 in region 5 before combo; 0 stars 70, 1 star 130, 2 stars 190).
 - **Gem rarity:** Common 1, Rare 2, Epic 5, Legendary 10 gems at 70/22/7/1 percent per gem spot. The difficulty setting raises the share of gem spots (2.7 to 3.2 percent of rows). Milestone gems on first clears: L5 and L10 roll 1 to 3 gems (L10 guarantees 1), L15 pays 5 plus a 2-gem bonus, level 8 pays its hidden gem (up to 2).
@@ -264,7 +271,7 @@ Not in the game: gear (hats, shirts, pants, boots, outfits), Bronze/Silver chest
 - **Revive:** 5 gems the first time, 10 gems the second time, at most 2 per run; one free revive by rewarded ad (first revive only, LevelPlay test ads until the owner supplies the key).
 - Data mismatches fixed in RC 1 (2026-11-01): `Content/config/remote_config.json` `coinsPerGem` is now 20, `vipGemsPerDay` was deleted, and the generator and config both say `replayCoinPercent` 50 (the per-level field was deleted; docs 09, 27 section 17).
 
-## Economy v3 (owner issue lists 24 to 28, 2026-10-25 to 2026-10-31; numbers in doc 27)
+## Economy v3 (owner issue lists 24 to 28, 2026-10-25 to 2026-10-31; HISTORY since the economy review of 2026-11-13 and Final Change 1 of 2026-11-22, current numbers in doc 27 section 0)
 - Coins at the end of a level: clear 70 + 60 per star + 5 per combo step, times the region factor. Replays pay 50 percent only once the level has 3 stars (and drop no gems); below 3 stars full pay (replay farming is an open item).
 - Shop: five tabs Bundles, Chests, Power-ups, Coins, Gems and a Subscription button (doc 26). Chests Iron/Gold for gems; power-ups for coins or gems; coin packs for gems; 9 gem packs for money.
 - Rewards screen (home): Main (stars, regions), Daily (10 actions, 100 points), Weekly (11 tasks). No chests are granted (doc 22 open item 3).
@@ -277,11 +284,12 @@ Not in the game: gear (hats, shirts, pants, boots, outfits), Bronze/Silver chest
 
 ## Level screen (owner, 2026-10-20)
 - The title is centred in its own band. The wallet below it has two columns: **coins, gems, total stars | levels completed, region stars**. The 15-level grid fits the screen on every supported aspect without overlap (CUX-3). Each level opens an info popup (goal, stars, PLAY) with centred content and the display font.
-- The level screen also hosts the region's **Endless button** (decision 2026-10-20, in implementation).
+- The level screen also hosts the region's **Endless button** (decision 2026-10-20).
+- **Layout since 2026-11-22 (Final Change 1):** from the top wallet pills, progress pills (levels n/25 and stars n/75 of the selected Gameplay setting), the row of five Gameplay settings (plate-free larger icons with their names; the selected one has a white ring, a bigger icon and a bold white name, the others are smaller and slightly faded), then the region name with the Endless button (slightly wider, with the infinity and the stopwatch icon), then the 25-level path. Tiles, locks and pills follow the selected setting; the wallet star pill and the world map badge add all settings (n/375 per region).
 - Popups ("You fell!", level clear, pause) are compact cards: big display-font title, a round X icon (OpenArt, 15 credits, approved), a panel only as tall as its content, no big ribbon.
 
 ## Playable scope and testing switch (2026-10-20)
-- The current build plays **5 regions x 15 levels** (Meadow Springs, Mushroom Grove, Sunny Beach, Candy Canyon, Bamboo Temple). The progress service has `playableRegionLimit` = 5; content still marks regions 6-20 live and 21-30 teaser.
+- The current build plays **5 regions x 25 levels** (15 until 2026-11-09; Meadow Springs, Mushroom Grove, Sunny Beach, Candy Canyon, Bamboo Temple). The progress service has `playableRegionLimit` = 5; content still marks regions 6-20 live and 21-30 teaser.
 - **"Test: all levels open"** (Settings, development builds only, default on) treats every level and region of the playable set as unlocked for testing. It is off in tests and release builds.
 - Versioning: every build is vMAJOR.MINOR.BUILD (example v0.52.68; changed 2026-11-09 from vX.Y.Z.B, old build-log rows keep the old format) (game repo `.claude/rules/versioning.md`, `Tools/version.json`, build log `Content/builds/build_log.csv`).
 - Fonts: Lilita One (display) + Nunito Bold (body).

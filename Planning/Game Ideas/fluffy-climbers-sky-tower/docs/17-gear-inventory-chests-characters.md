@@ -8,7 +8,7 @@ What this document once specified, and what became of it:
 |---|---|
 | Gear slots, 240 gear pieces, boosts per power-up, level-clear gear drops, forge | Removed 2026-10-24 (doc 20) and again confirmed 2026-11-01. Nothing replaces them. |
 | Inventory screen and character power screen | Removed. The Chests tab of the shop and the Treasure Chest screen replaced the inventory tab. |
-| Treasure chests | Now **Iron and Gold**, gems only, 100 / 300 gems (open 10 = 1,000 / 3,000). Contents and odds: doc 22 point 3, economy numbers: doc 27 section 10. |
+| Treasure chests | Now **Iron and Gold**, gems only, 400 / 1,500 gems since 2026-11-22 (open 10 = 4,000 / 15,000; before 100 / 300). Contents and odds: doc 22 point 3, economy numbers: doc 27 section 10. |
 | Characters | One character is owned per region (Momo, region 1; Sporeling, region 2); more come later. Characters are just characters (doc 20): a set of full-canvas part pictures listed in a `rig.json`. |
 
 The character rig facts that doc 20 still uses (a character is a set of full-canvas part pictures drawn back to front, listed in `rig.json` with an `order`) are summarised in doc 19.

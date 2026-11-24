@@ -387,13 +387,14 @@ namespace FluffyClimbers.Tests
             Assert.IsNotNull(pop);
             StringAssert.Contains("How to get: Merge 3 Common Momo", FindDeep(pop, "HowToGet").GetComponent<Text>().text);
             StringAssert.Contains("Jump", FindDeep(pop, "StatLines").GetComponent<Text>().text);
-            StringAssert.Contains("Powers:", FindDeep(pop, "Powers").GetComponent<Text>().text);
+            StringAssert.Contains("No special power", FindDeep(pop, "Powers").GetComponent<Text>().text);   // owner Final Change 2: an Uncommon has no power
 
             Object.DestroyImmediate(FindDeep(canvas, "Popup").gameObject);
             Assert.IsTrue(s.OpenInfo("candygirl_r"));   // a real Rare tier, locked
             pop = FindDeep(canvas, AllHeroesScreen.InfoPopupName);
             StringAssert.Contains("Merge 3 Uncommon Bonbon", FindDeep(pop, "HowToGet").GetComponent<Text>().text);
             StringAssert.Contains("Jump", FindDeep(pop, "StatLines").GetComponent<Text>().text);
+            StringAssert.Contains("1 power, rolled per card", FindDeep(pop, "Powers").GetComponent<Text>().text);
 
             Object.DestroyImmediate(FindDeep(canvas, "Popup").gameObject);
             Assert.IsTrue(s.OpenInfo("momo"));   // owned

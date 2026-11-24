@@ -4,10 +4,11 @@ namespace FluffyClimbers.Economy
 {
     /// <summary>
     /// The crown (owner decision 2026-11-16, Bug List 4 item 6, replaces the 2026-11-12 formula): crown = (floors + sum over every chain of chain_length^2) x 5 x (1 + setting percent).
-    /// The setting percents are the scroll step percents of <see cref="SimConfig.DifficultyStepPercent"/> (Relaxed 10, Easy 20, Normal 25, Hard 40, Insane 50). Integer basis-point maths, rounded half up, no floats.
+    /// The setting percents are the reward bonus table <see cref="SimConfig.DifficultyRewardPercent"/> (Relaxed 0, Easy 5, Normal 10, Hard 15, Insane 25; owner Final Change 1, 2026-11-22: its own
+    /// table, no longer the scroll step percents; the run coins get the same bonus, CoinPayoutRules.ApplySettingBonus). Integer basis-point maths, rounded half up, no floats.
     /// The BASE score is <c>SimState.Score</c> (Sim FloorPoints 1 and ComboPointsMultiplier 1: one point per floor, chain_length^2 per chain, see Simulation/NOTES.md); the crown is that base x 5 x the setting bonus.
     /// This is the ONE function behind the level pop-up, the weekly total, the Endless and Time Attack crowns and the server replay (RunReplayer).
-    /// Example: floors 80, one chain of 48, Insane (50 percent): (80 + 2304) x 5 x 1.5 = 17,880.
+    /// Example: floors 80, one chain of 48, Insane (25 percent): (80 + 2304) x 5 x 1.25 = 14,900 (17,880 with the 50 percent of 2026-11-16).
     /// </summary>
     public static class CrownScore
     {
@@ -18,13 +19,13 @@ namespace FluffyClimbers.Economy
         public const int CrownFactor = 5;
         public const int BasisPoints = 10000;
 
-        /// <summary>The bonus of a Gameplay setting in percent (clamped to a valid setting).</summary>
+        /// <summary>The bonus of a Gameplay setting in percent: 0, 5, 10, 15, 25 for Relaxed .. Insane (SimConfig.RewardBonusPercent, clamped to a valid setting).</summary>
         public static int BonusPercent(int mode)
         {
-            return SimConfig.DifficultyStepPercent[TimeRecords.ClampMode(mode)];
+            return SimConfig.RewardBonusPercent(TimeRecords.ClampMode(mode));
         }
 
-        /// <summary>The bonus multiplier in basis points: 10000 + percent x 100 (11000 for Relaxed ... 15000 for Insane). The x5 is <see cref="CrownFactor"/>.</summary>
+        /// <summary>The bonus multiplier in basis points: 10000 + percent x 100 (10000 for Relaxed, 10500, 11000, 11500, 12500 for Insane). The x5 is <see cref="CrownFactor"/>.</summary>
         public static int MultiplierBasisPoints(int mode)
         {
             return BasisPoints + BonusPercent(mode) * 100;
@@ -59,7 +60,7 @@ namespace FluffyClimbers.Economy
         }
 
         /// <summary>
-        /// A base score whose crown in <paramref name="mode"/> is exactly <paramref name="crown"/> (the smallest one), or 0 when none exists (a crown can be skipped by the rounding of a big bonus).
+        /// A base score whose crown in <paramref name="mode"/> is exactly <paramref name="crown"/> (the smallest one), or 0 when none exists (not every number is a crown: the x5 and the rounding of the bonus skip values).
         /// Only a fallback for a crown that has no stored run.
         /// </summary>
         public static int BaseFromCrown(int crown, int mode)

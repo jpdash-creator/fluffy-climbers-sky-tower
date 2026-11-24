@@ -111,6 +111,14 @@ namespace FluffyClimbers.LeaderboardService
             string mismatch = RunReplayer.CompareClaim(sub, rr);
             if (mismatch != null) return ApiResult.Fail(422, "mismatch", mismatch);
 
+            // The durable per-player interval is looked at BEFORE the ticket is burned (the transaction below checks it again): since 2026-11-22 several runs of one Endless / Time Attack slot count, so a phone
+            // that comes back online sends them one after the other, and a run answered "rate_limited" must still be sendable with its ticket a moment later.
+            if (lim.MinSubmitIntervalMs > 0)
+            {
+                PlayerDoc seen = await store.GetPlayerAsync(uid);
+                if (seen != null && seen.LastSubmitAt > Epoch.Utc && (now() - seen.LastSubmitAt).TotalMilliseconds < lim.MinSubmitIntervalMs) return ApiResult.Fail(429, "rate_limited");
+            }
+
             // single use: the ticket is burned once the run is accepted as a valid replay (a run that does not replay leaves it usable)
             if (!await store.ConsumeTicketAsync(tk.Id, uid, tk.ExpiresAt.AddDays(1))) return ApiResult.Fail(409, "ticket_used");
 
@@ -124,9 +132,11 @@ namespace FluffyClimbers.LeaderboardService
             if (!o.Accepted) return ApiResult.Fail(o.Error == "rate_limited" ? 429 : 422, o.Error);
 
             if (o.Improved) await MaybeRebuildAsync(weekKey, o, lim, t);
+            // previousCrown / slotCrown are what the slot counts: the best crown of a level slot, the sum of the three best runs of an Endless / Time Attack slot (slotRuns = how many it holds now)
             return ApiResult.Ok(new
             {
-                accepted = true, counted = true, improved = o.Improved, weekKey, slotId = rr.SlotId, crown = rr.Crown, previousCrown = o.PreviousCrown, slotCrown = o.SlotCrown, floors = rr.Floors, ticks = rr.Ticks,
+                accepted = true, counted = true, improved = o.Improved, weekKey, slotId = rr.SlotId, crown = rr.Crown, previousCrown = o.PreviousCrown, slotCrown = o.SlotCrown, slotRuns = o.SlotRuns, duplicate = o.Duplicate,
+                floors = rr.Floors, ticks = rr.Ticks,
                 totals = o.Totals == null ? null : new { overall = o.Totals.Overall, levels = o.Totals.Levels, endless = o.Totals.Endless }
             });
         }
@@ -203,7 +213,8 @@ namespace FluffyClimbers.LeaderboardService
                 weekKey, pid = PidOf(uid), weekEndsAt = WeekMath.WeekEndUtc(t), serverTime = t,
                 totals = w.Totals == null ? new { overall = 0L, levels = 0L, endless = 0L } : new { overall = w.Totals.Overall, levels = w.Totals.Levels, endless = w.Totals.Endless },
                 ranks,
-                slots = withSlots ? w.Slots.ConvertAll(s => (object)new { s.SlotId, s.Crown, s.Floors, s.HeroId, s.Mode, s.Score, at = ToUnix(s.At) }) : null,
+                // Crown of an Endless / Time Attack slot is the SUM of its counted runs, listed in "runs" (best first; null for a level slot); floors, hero and score are those of the best run
+                slots = withSlots ? w.Slots.ConvertAll(s => (object)new { s.SlotId, s.Crown, s.Floors, s.HeroId, s.Mode, s.Score, at = ToUnix(s.At), runs = RunsView(s) }) : null,
                 breakdown,
                 pendingPrizes = pending
             });
@@ -211,9 +222,29 @@ namespace FluffyClimbers.LeaderboardService
 
         static long ToUnix(DateTime t) { return new DateTimeOffset(DateTime.SpecifyKind(t, DateTimeKind.Utc)).ToUnixTimeSeconds(); }
 
+        /// <summary>The counted runs of an Endless / Time Attack slot for GET /my-week (an old document without a list is one run); null for a level slot.</summary>
+        static List<object> RunsView(SlotDoc s)
+        {
+            if (!SlotMath.CountsTopRuns(s.Board)) return null;
+            return SlotMath.RunsOf(s).ConvertAll(r => (object)new { crown = r.Crown, floors = r.Floors, score = r.Score, heroId = r.HeroId ?? "", at = ToUnix(r.At) });
+        }
+
+        /// <summary>A replay-verified slot as a display slot: an Endless / Time Attack slot carries its counted runs as parts (crown = their sum).</summary>
+        static WeekSlotInfo VerifiedSlot(SlotDoc s)
+        {
+            var v = new WeekSlotInfo { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId ?? "", Score = s.Score, At = ToUnix(s.At), ReceivedAt = ToUnix(s.At), Verified = true };
+            if (SlotMath.CountsTopRuns(s.Board))
+                v.Parts = SlotMath.RunsOf(s).ConvertAll(r => new WeekSlotPart { Crown = r.Crown, Floors = r.Floors, Score = r.Score, At = ToUnix(r.At), HeroId = string.IsNullOrEmpty(r.HeroId) ? null : r.HeroId });
+            return v;
+        }
+
         static object Project(WeekSlotInfo s)
         {
-            return new { id = s.SlotId, crown = s.Crown, floors = s.Floors, mode = s.Mode, hero = s.HeroId ?? "", score = s.Score, combo = s.Combo, chains = s.Chains, at = s.At, ra = s.ReceivedAt, verified = s.Verified };
+            return new
+            {
+                id = s.SlotId, crown = s.Crown, floors = s.Floors, mode = s.Mode, hero = s.HeroId ?? "", score = s.Score, combo = s.Combo, chains = s.Chains, at = s.At, ra = s.ReceivedAt, verified = s.Verified,
+                parts = s.Parts == null ? null : s.Parts.ConvertAll(p => (object)new { crown = p.Crown, floors = p.Floors, score = p.Score, combo = p.Combo, chains = p.Chains, at = p.At })
+            };
         }
 
         // ------------------------------------------------------------------ crown calculation (breakdown): display only, owner 2026-11-17
@@ -226,12 +257,19 @@ namespace FluffyClimbers.LeaderboardService
         {
             BreakdownDoc doc = await store.GetBreakdownAsync(weekKey, uid);
             var verified = new List<WeekSlotInfo>(w.Slots.Count);
-            foreach (SlotDoc s in w.Slots) verified.Add(new WeekSlotInfo { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId ?? "", Score = s.Score, At = ToUnix(s.At), ReceivedAt = ToUnix(s.At), Verified = true });
+            foreach (SlotDoc s in w.Slots) verified.Add(VerifiedSlot(s));
             List<WeekSlotInfo> merged = BreakdownMerge.ApplyVerified(BreakdownCodec.Read(doc == null ? null : doc.SlotsJson), verified);
             return new { weekKey, receivedAt = doc == null ? 0L : ToUnix(doc.ReceivedAt), slots = merged.ConvertAll(Project) };
         }
 
-        public sealed class BreakdownSlotIn { public string Id { get; set; } public long Crown { get; set; } public int Floors { get; set; } public int Score { get; set; } public int Combo { get; set; } public int[] Chains { get; set; } public long At { get; set; } }
+        /// <summary>One counted run of an uploaded Endless / Time Attack slot (owner 2026-11-22: up to three per slot).</summary>
+        public sealed class BreakdownPartIn { public long Crown { get; set; } public int Floors { get; set; } public int Score { get; set; } public int Combo { get; set; } public int[] Chains { get; set; } public long At { get; set; } }
+        public sealed class BreakdownSlotIn
+        {
+            public string Id { get; set; } public long Crown { get; set; } public int Floors { get; set; } public int Score { get; set; } public int Combo { get; set; } public int[] Chains { get; set; } public long At { get; set; }
+            /// <summary>Endless / Time Attack slots: the counted runs (the slot's own numbers are then ignored). Missing = the slot is one run (an app from before the top-3 rule).</summary>
+            public List<BreakdownPartIn> Parts { get; set; }
+        }
         public sealed class BreakdownRequest { public string WeekKey { get; set; } public List<BreakdownSlotIn> Slots { get; set; } }
 
         readonly ConcurrentDictionary<string, long> lastBreakdownMs = new ConcurrentDictionary<string, long>();
@@ -260,7 +298,20 @@ namespace FluffyClimbers.LeaderboardService
             var raw = new List<WeekSlotInfo>(req.Slots == null ? 0 : req.Slots.Count);
             if (req.Slots != null)
                 foreach (BreakdownSlotIn s in req.Slots)
-                    if (s != null) raw.Add(new WeekSlotInfo { SlotId = s.Id, Crown = s.Crown, Floors = s.Floors, Score = s.Score, Combo = s.Combo, Chains = s.Chains, At = s.At });
+                {
+                    if (s == null) continue;
+                    var slot = new WeekSlotInfo { SlotId = s.Id, Crown = s.Crown, Floors = s.Floors, Score = s.Score, Combo = s.Combo, Chains = s.Chains, At = s.At };
+                    if (s.Parts != null && s.Parts.Count > 0)
+                    {
+                        slot.Parts = new List<WeekSlotPart>(Math.Min(s.Parts.Count, BreakdownMerge.MaxPartsRead));
+                        foreach (BreakdownPartIn p in s.Parts)
+                        {
+                            if (slot.Parts.Count >= BreakdownMerge.MaxPartsRead) break;   // Sanitize keeps the best three of what it reads
+                            if (p != null) slot.Parts.Add(new WeekSlotPart { Crown = p.Crown, Floors = p.Floors, Score = p.Score, Combo = p.Combo, Chains = p.Chains, At = p.At });
+                        }
+                    }
+                    raw.Add(slot);
+                }
             List<WeekSlotInfo> upload = BreakdownMerge.Sanitize(raw, ToUnix(t), ToUnix(WeekMath.WeekStartUtc(t)), true);
             BreakdownDoc doc = await store.MergeBreakdownAsync(wk, uid, upload, t, WeekMath.WeekEndUtc(t).AddDays(lim.RetentionDays));
             List<WeekSlotInfo> slots = BreakdownCodec.Read(doc.SlotsJson);

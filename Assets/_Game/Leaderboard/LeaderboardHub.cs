@@ -464,8 +464,20 @@ namespace FluffyClimbers.Leaderboard
         {
             if (progress == null || d == null) return;
             var list = new List<WeekSlotInfo>(d.Slots.Count);
-            foreach (LbSlot s in d.Slots) list.Add(new WeekSlotInfo { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId, Score = s.Score, At = s.At, Verified = true });
+            foreach (LbSlot s in d.Slots) list.Add(ToVerifiedSlot(s));
             progress.StoreLeaderboardSlots(string.IsNullOrEmpty(d.WeekKey) ? CurrentWeekKey : d.WeekKey, list, d.Totals, d.TotalsKnown);
+        }
+
+        /// <summary>A slot of the service's replay list as a week slot; an Endless / Time Attack slot keeps its counted runs as parts (crown = their sum).</summary>
+        static WeekSlotInfo ToVerifiedSlot(LbSlot s)
+        {
+            var v = new WeekSlotInfo { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId, Score = s.Score, At = s.At, Verified = true };
+            if (s.Runs != null && s.Runs.Count > 0)
+            {
+                v.Parts = new List<WeekSlotPart>(s.Runs.Count);
+                foreach (LbSlotRun r in s.Runs) v.Parts.Add(new WeekSlotPart { Crown = r.Crown, Floors = r.Floors, Score = r.Score, At = r.At });
+            }
+            return v;
         }
 
         /// <summary>The slots of this week built from the phone alone (the local weekly crown store, written after every run). Never null; <c>SlotsKnown</c> is true when at least one slot exists.</summary>
@@ -480,7 +492,14 @@ namespace FluffyClimbers.Leaderboard
 
         static LbSlot ToLbSlot(WeekSlotInfo s)
         {
-            return new LbSlot { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId ?? "", Score = s.Score, At = s.At, Verified = s.Verified };
+            var slot = new LbSlot { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId ?? "", Score = s.Score, At = s.At, Verified = s.Verified };
+            if (s.Parts != null && s.Parts.Count > 0)
+            {
+                // Endless / Time Attack: the counted runs behind the sum (the calculation popup lists them under the line)
+                slot.Runs = new List<LbSlotRun>(s.Parts.Count);
+                foreach (WeekSlotPart p in s.Parts) if (p != null) slot.Runs.Add(new LbSlotRun { Crown = p.Crown, Floors = p.Floors, Score = p.Score, At = p.At });
+            }
+            return slot;
         }
 
         /// <summary>
@@ -493,7 +512,7 @@ namespace FluffyClimbers.Leaderboard
             string wk = string.IsNullOrEmpty(d.WeekKey) ? CurrentWeekKey : d.WeekKey;
             if (d.Display != null && wk == CurrentWeekKey) progress.MergeCloudBreakdown(wk, d.Display);
             var verified = new List<WeekSlotInfo>(d.Slots.Count);
-            foreach (LbSlot s in d.Slots) verified.Add(new WeekSlotInfo { SlotId = s.SlotId, Crown = s.Crown, Floors = s.Floors, Mode = s.Mode, HeroId = s.HeroId, Score = s.Score, At = s.At, Verified = true });
+            foreach (LbSlot s in d.Slots) verified.Add(ToVerifiedSlot(s));
             List<WeekSlotInfo> shown = BreakdownMerge.ApplyVerified(wk == CurrentWeekKey ? progress.LocalBreakdown() : null, verified);
             d.Slots.Clear();
             foreach (WeekSlotInfo s in shown) d.Slots.Add(ToLbSlot(s));

@@ -1,3 +1,4 @@
+using FluffyClimbers.Economy;
 using UnityEngine;
 
 namespace FluffyClimbers.Gameplay
@@ -52,12 +53,19 @@ namespace FluffyClimbers.Gameplay
             return bottom <= scrollY + Eps || top >= scrollY + visibleH - Eps;
         }
 
-        /// <summary>Index into the plate sprite names: 0 gold, 1 silver, 2 bronze, 3 light green (the player's own row from rank 4 and the pin), 4 grey/blue (everyone else from rank 4).</summary>
-        public static int PlateIndex(int rank, bool own, bool pinned)
+        /// <summary>
+        /// Index into the plate sprite names: 0 gold, 1 silver, 2 bronze, 3 light green (the own row and the pinned card), 4 grey/blue (everyone else). Owner Final Change 2 (2026-11-23): gold, silver and bronze only for a
+        /// <paramref name="medalPlace"/> of 1 to 3, which <see cref="MedalPlace"/> gives to the top three players who REACHED the board's entry limit; every other row is plain (own row green, others grey).
+        /// </summary>
+        public static int PlateIndex(int medalPlace, bool own, bool pinned)
         {
-            if (pinned) return 3;
-            if (rank >= 1 && rank <= 3) return rank - 1;
-            return own ? 3 : 4;
+            return LeaderboardPlates.PlateIndex(medalPlace, own, pinned);
+        }
+
+        /// <summary>Medal place (1 to 3) of a row of the given board rank and crowns for the board's entry limit, 0 = plain row. See <see cref="LeaderboardPlates.MedalPlace"/>.</summary>
+        public static int MedalPlace(int rank, long crowns, long limit)
+        {
+            return LeaderboardPlates.MedalPlace(rank, crowns, limit);
         }
     }
 }

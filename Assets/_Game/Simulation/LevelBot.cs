@@ -177,7 +177,8 @@ namespace FluffyClimbers.Simulation
                 case GoalType.FindHiddenGem:
                     return data != null && data.HiddenGemRow >= 0 && c.HiddenGems == 0 && c.Row > data.HiddenGemRow + 1;
                 case GoalType.ComboChain:
-                    return data != null && data.LadderEndRow >= 0 && c.Row > data.LadderEndRow + 1 && !Done(c);
+                    // above the combo ladder without the combo jumps: the top row no longer clears the level (GoalEvaluator.IsFailed)
+                    return data != null && data.LadderEndRow >= 0 && c.Row > data.LadderEndRow + 1 && !GoalEvaluator.ComboJumpsDone(spec, c);
                 default:
                     return false;
             }
@@ -380,6 +381,7 @@ namespace FluffyClimbers.Simulation
         private bool SearchWithPowerUps(SimState s, int sameRow, int[] targets, int tc, int[] waits)
         {
             if (PowerBudget <= 0 || PowerSet == null || s.PwUsed >= PowerBudget || !UseHoming) return false;
+            if (sim.NoPowerUps) return false;   // a No Power-ups level ignores every activation: the branch could only repeat the plain jumps
             for (int pi = 0; pi < PowerSet.Length; pi++)
             {
                 PowerUp pu = PowerSet[pi];

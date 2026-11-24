@@ -2,7 +2,7 @@
 
 Rewrites Content/levels/region_00N_*_levels.json and the 'levels' list of Content/regions/region_00N_*.json for the MIGRATED regions:
 levels 1..15 keep their ids and seeds, levels 16..25 are new (seed formula of gen_content.py). Goals, classes, rewards and the
-'difficulty' field follow the new curve; the difficulty values come from Content/config/difficulty_curve.json (written by the
+'difficulty' field follow the new curve; the six special level types of every region come from SPECIAL_PLACEMENT (owner Final Change 1, 2026-11-22); the difficulty values come from Content/config/difficulty_curve.json (written by the
 Simulation test DifficultyCurveTests.Calibrate with CALIBRATE_CURVE=1; a provisional straight line is used where it has no entry).
 
 Run from the repo root:  python Tools/content_cli/migrate_levels_25.py
@@ -16,11 +16,24 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 CONTENT = os.path.join(ROOT, "Content")
 MIGRATED_REGIONS = 5          # TODO(regions 6-30 migration): raise to 30 when the other regions are migrated
 LEVELS = 25
-SPECIAL = (5, 10, 15, 20)
+# Gem levels (GemLevels in Simulation): plain Regular Run goals, never a special type.
+GEM_LEVELS = (5, 10, 15, 20, 25)
+# Owner Final Change 1 (2026-11-22): the six special level types, exactly ONE level each per region, never on a gem level, the same for all five Gameplay settings.
+# type -> level index, per region. Every other level is a Regular Run (reachFloor). Keep in step with Tools/content_cli/content.py (SPECIAL_PLACEMENT is imported there).
+SPECIAL_TYPES = ("noWallTouch", "oneLife", "noPowerUps", "keepMoving", "chase", "comboClimb")
+SPECIAL_PLACEMENT = {
+    1: {"noWallTouch": 6, "oneLife": 9, "noPowerUps": 14, "keepMoving": 16, "chase": 21, "comboClimb": 24},
+    2: {"noWallTouch": 4, "oneLife": 7, "noPowerUps": 13, "comboClimb": 16, "keepMoving": 18, "chase": 23},
+    3: {"chase": 3, "oneLife": 6, "noPowerUps": 11, "comboClimb": 17, "noWallTouch": 21, "keepMoving": 23},
+    4: {"noPowerUps": 4, "keepMoving": 6, "comboClimb": 11, "chase": 14, "noWallTouch": 19, "oneLife": 24},
+    5: {"noWallTouch": 4, "chase": 6, "keepMoving": 9, "comboClimb": 14, "oneLife": 18, "noPowerUps": 24},
+}
+# Combo Climb: 3 combo jumps of 3 floors or more (the chain the combo ladder was built for: one 6 u wide column, 1.2 u rungs), then the top row.
+COMBO_FLOORS, COMBO_JUMPS = 3, 3
 # Target difficulty score per level (Bug List 6 item 4), see Tests/Simulation/DIFFICULTY_CURVE_REPORT.md
 TARGET = [5, 20, 26.7, 33.3, 40, 44, 48, 52, 56, 60, 63, 66, 69, 72, 75, 77.5, 80, 82.5, 85, 87.5, 90, 92.5, 95, 97.5, 100]
 # Owner Bug List 8 item 3: rows per level L1 60, L2-5 75, L6-10 90, L11-15 105, L16-20 120, L21-25 150 (speedrun time scaled 75 s per 90 rows -> 100 s per 120 rows)
-SPEEDRUN_VALUE, SPEEDRUN_TIME = 120, 100
+SPEEDRUN_VALUE, SPEEDRUN_TIME = 120, 100   # history: no level of regions 1 to 5 is a speedrun since Final Change 1 (2026-11-22)
 
 
 def rows(i):
@@ -32,12 +45,29 @@ def rows(i):
     return 150
 
 
-def goal(i):
-    if i == 5: return {"type": "reachFloor", "value": rows(i)}   # Bug List 4 item 10: plain reach floor 75, no combo chain, no ladder
-    if i == 20: return {"type": "speedrun", "value": SPEEDRUN_VALUE, "timeSec": SPEEDRUN_TIME}
-    if i == 10: return {"type": "noWallBounce", "value": rows(i)}
-    if i == 15: return {"type": "findHiddenGem", "value": rows(i)}
+def special_of(n, i):
+    """The special type of level i in region n ("" for a Regular Run)."""
+    for t, idx in SPECIAL_PLACEMENT[n].items():
+        if idx == i: return t
+    return ""
+
+
+def goal(n, i):
+    """Goal of level i in region n. Levels 10, 15 and 20 lost noWallBounce, findHiddenGem and speedrun (Final Change 1): every gem level is a plain reachFloor with its old floor count."""
+    t = special_of(n, i)
+    if t == "noWallTouch": return {"type": "noWallBounce", "value": rows(i)}
+    if t == "chase": return {"type": "bossChase", "value": rows(i)}
+    if t == "comboClimb": return {"type": "comboChain", "value": COMBO_FLOORS, "count": COMBO_JUMPS}
     return {"type": "reachFloor", "value": rows(i)}
+
+
+def extras(n, i):
+    """Optional level fields of the special types: the rule id of the three rule-only types, the row ramp of a Chase level, the explicit height of a Combo Climb level."""
+    t = special_of(n, i)
+    if t in ("noPowerUps", "oneLife", "keepMoving"): return {"special": t}
+    if t == "chase": return {"overrides": {"ramp": True}}
+    if t == "comboClimb": return {"overrides": {"rows": rows(i)}}   # the goal value is the floors per combo jump, so the floor count is written out
+    return {}
 
 
 def cls(i):
@@ -91,11 +121,15 @@ def main():
             lid = "lvl_%03d_%02d" % (n, i)
             prev = old.get(i)
             seed = prev["seed"] if prev else (n * 7919 + i * 104729 + 12345) % 2147483647
-            out.append({
+            lv = {
                 "id": lid, "region": region["id"], "index": i, "seed": seed, "class": cls(i),
-                "difficulty": curve.get(lid, provisional_d(i)), "goal": goal(i),
-                "rewards": {"gems": gem_rewards(i)},
-            })
+                "difficulty": curve.get(lid, provisional_d(i)), "goal": goal(n, i),
+            }
+            ex = extras(n, i)
+            if "overrides" in ex: lv["overrides"] = ex["overrides"]
+            lv["rewards"] = {"gems": gem_rewards(i)}
+            if "special" in ex: lv["special"] = ex["special"]
+            out.append(lv)
         region["levels"] = [lv["id"] for lv in out]
         if n >= 2:
             region["unlock"]["gemSkip"] = GEM_SKIP

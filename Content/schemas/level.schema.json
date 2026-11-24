@@ -27,9 +27,11 @@
       "additionalProperties": false,
       "properties": {
         "fixedChunks": {"type": "array", "items": {"type": "string"}},
-        "ramp": {"type": "boolean"}
+        "ramp": {"type": "boolean"},
+        "rows": {"type": "integer", "minimum": 30}
       }
     },
+    "special": {"type": "string", "enum": ["noPowerUps", "oneLife", "keepMoving"]},
     "rewards": {
       "type": "object",
       "required": ["gems"],

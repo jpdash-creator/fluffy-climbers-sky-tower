@@ -5,6 +5,9 @@
     <!-- Fluffy Climbers: analytics is off (POLICY.md), so drop the install-referrer permission the Firebase measurement library adds. Must live in the main manifest to win the merge. -->
     <uses-permission android:name="com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE" tools:node="remove" />
 
+    <!-- Owner Final Change 2 (2026-11-23): the game is portrait, but the portrait feature is not required, so the store does not hide it from devices that report no portrait screen (the Unity activities set screenOrientation portrait, which Android would otherwise turn into a REQUIRED feature). -->
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
+
     <application>
         <!--Used when Application Entry is set to Activity, otherwise remove this activity block-->
         <activity android:name="com.unity3d.player.UnityPlayerActivity"

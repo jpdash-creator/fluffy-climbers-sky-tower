@@ -29,6 +29,8 @@ All descriptions are at most 80 characters. The first-purchase double (packs up 
 
 ## 2. Subscriptions
 
+> **Final Change 1 (owner 2026-11-22): new prices and contents for all four plans. OWNER STEP, still open: set these four prices in the Play Console** (Monetize > Subscriptions > the product > base plan > Prices) for `com.jdlabs.fluffyclimbers.sub.weekly`, `.sub.weekly_plus`, `.sub.monthly` and `.sub.monthly_premium`, and update the benefit lines. The ids do not change. The game shows the store price at run time, so the store and the table below must agree before the build ships. Before: 1.49 / 2.99 / 4.99 / 9.99 USD (149 / 299 / 449 / 899 INR).
+
 Play Console > **Monetize > Products > Subscriptions > Create subscription**. The **product ID is the subscription id** the game asks for. One base plan per subscription. **Four subscriptions since 2026-11-13** (owner economy review; the first two keep their existing ids).
 
 | Field | Weekly Starter | Weekly Plus | Monthly Standard | Monthly Premium |
@@ -37,10 +39,10 @@ Play Console > **Monetize > Products > Subscriptions > Create subscription**. Th
 | Name | Weekly Starter | Weekly Plus | Monthly Standard | Monthly Premium |
 | Base plan ID (suggested) | `weekly-autorenew` | `weekly-plus-autorenew` | `monthly-autorenew` | `monthly-premium-autorenew` |
 | Base plan type | Auto-renewing, 1 week | Auto-renewing, 1 week | Auto-renewing, 1 month | Auto-renewing, 1 month |
-| Price USD / INR | 1.49 / 149 | 2.99 / 299 | 4.99 / 449 | 9.99 / 899 |
-| Benefits (up to 4 lines, max 40 chars each) | 100 gems right away; 10 gems + 500 coins daily; Daily rewards for 7 days; Free power-up on claim 4 | 250 gems right away; 20 gems + 1,000 coins daily; Free power-up every 2nd claim; Iron chest on the first claim | 200 gems right away; 10 gems + 600 coins daily; Daily rewards for 30 days; Free power-up every 5th claim | 300 gems right away; 20 gems + 1,000 coins daily; Free power-up every 5th claim; Gold chest on claims 1, 11, 21 |
+| Price USD (INR: set in the console, no owner number yet) | 1.99 | 4.99 | 6.99 | 14.99 |
+| Benefits (up to 4 lines, max 40 chars each) | 100 gems right away; 15 gems + 600 coins daily; Daily rewards for 7 days; Free power-up on claim 4 | 250 gems right away; 20 gems + 1,000 coins daily; Free power-up every 2nd claim; Iron chest on the first claim | 200 gems right away; 15 gems + 600 coins daily; Daily rewards for 30 days; Free power-up every 5th claim | 300 gems right away; 20 gems + 1,000 coins daily; Free power-up every 5th claim; Gold chest on claims 1 and 16 |
 
-Only one plan runs at a time in the game (it refuses another plan while one runs); the store does not know that rule, so a player who buys two plans in the store gets the second one refused in the game (not confirmed, so the store refunds it). INR prices for the two new plans are suggestions; set the final ones in the Console.
+Only one plan runs at a time in the game (it refuses another plan while one runs); the store does not know that rule, so a player who buys two plans in the store gets the second one refused in the game (not confirmed, so the store refunds it). The owner has not set INR prices for the 2026-11-22 USD prices; set them in the Console.
 
 The in-game screen is called VIP; the store names above match `SubscriptionCatalog`.
 

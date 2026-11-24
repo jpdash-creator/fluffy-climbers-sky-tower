@@ -64,6 +64,48 @@ namespace FluffyClimbers.Tests
             Assert.IsFalse(l1.Ramp);
         }
 
+        /// <summary>Owner Final Change 1 (2026-11-22): the level JSON fields of the special level types reach the spec (goal, overrides.ramp, overrides.rows, special).</summary>
+        [Test]
+        public void SpecialLevelFieldsAreMappedAndAnUnknownRuleIsAContentError()
+        {
+            var repo = ContentRepository.LoadFromResources();
+            LevelSpec chase = LevelSpecFactory.Build(repo, "lvl_001_21");
+            Assert.AreEqual(GoalType.BossChase, chase.Goal.Type);
+            Assert.IsTrue(chase.Ramp, "a Chase level carries the row ramp");
+            Assert.AreEqual(150, chase.TargetRow());
+            Assert.AreEqual(SpecialLevelType.Chase, SpecialLevels.TypeOf(chase));
+
+            LevelSpec combo = LevelSpecFactory.Build(repo, "lvl_001_24");
+            Assert.AreEqual(GoalType.ComboChain, combo.Goal.Type);
+            Assert.AreEqual(3, combo.Goal.Value);
+            Assert.AreEqual(3, combo.Goal.Count);
+            Assert.AreEqual(150, combo.Rows, "the floor count of a Combo Climb level is written out (overrides.rows)");
+            Assert.AreEqual(150, combo.RowsFor());
+            Assert.AreEqual(150, combo.TargetRow());
+
+            Assert.AreEqual(SpecialLevelType.OneLife, LevelSpecFactory.Build(repo, "lvl_001_09").Special);
+            Assert.AreEqual(SpecialLevelType.NoPowerUps, LevelSpecFactory.Build(repo, "lvl_001_14").Special);
+            Assert.AreEqual(SpecialLevelType.KeepMoving, LevelSpecFactory.Build(repo, "lvl_001_16").Special);
+            Assert.IsTrue(LevelSpecFactory.Build(repo, "lvl_001_09").OneLife);
+            LevelSpec noWall = LevelSpecFactory.Build(repo, "lvl_001_06");
+            Assert.AreEqual(GoalType.NoWallBounce, noWall.Goal.Type);
+            Assert.AreEqual(SpecialLevelType.None, noWall.Special, "a goal-based type is told by its goal, not by the rule field");
+            Assert.AreEqual(SpecialLevelType.NoWallTouch, SpecialLevels.TypeOf(noWall));
+            foreach (string id in new[] { "lvl_001_10", "lvl_001_15", "lvl_001_20" })
+            {
+                LevelSpec plain = LevelSpecFactory.Build(repo, id);
+                Assert.AreEqual(GoalType.ReachFloor, plain.Goal.Type, id + " is a plain gem level now");
+                Assert.AreEqual(SpecialLevelType.None, SpecialLevels.TypeOf(plain), id);
+            }
+            // an attempt layout keeps the rule
+            Assert.AreEqual(SpecialLevelType.KeepMoving, LevelSpecFactory.Build(repo.GetLevel("lvl_001_16"), repo.GetRegion(repo.GetLevel("lvl_001_16").Region), 12345).Special);
+
+            var fresh = ContentRepository.LoadFromResources();   // its own objects: the edit below must not leak into other tests
+            LevelDef broken = fresh.GetLevel("lvl_001_09");
+            broken.Special = "flying";
+            Assert.Throws<ContentException>(() => LevelSpecFactory.Build(broken, fresh.GetRegion(broken.Region)));
+        }
+
         [Test]
         public void BuiltLevelIsPlayableFromTheStartPlatform()
         {

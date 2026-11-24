@@ -19,10 +19,10 @@ namespace FluffyClimbers.Simulation.Tests
             // run coins min, max, run gems min, max, powers
             int[][] want =
             {
-                new[] { 50, 100, 1, 5, 1 },
-                new[] { 200, 500, 5, 10, 2 },
-                new[] { 500, 1000, 5, 10, 3 },
-                new[] { 1000, 2000, 5, 10, 4 },
+                new[] { 50, 100, 1, 5, 0 },      // owner Final Change 2 (2026-11-23): powers Uncommon 0, Rare 1, Elite 1, Legendary 2
+                new[] { 200, 500, 5, 10, 1 },
+                new[] { 500, 1000, 5, 10, 1 },
+                new[] { 1000, 2000, 5, 10, 2 },
             };
             for (int i = 0; i < Tiers.Length; i++)
             {
@@ -33,35 +33,41 @@ namespace FluffyClimbers.Simulation.Tests
                 Assert.Equal(CharacterDefs.CooldownSeconds[(int)Tiers[i]], r.CooldownSeconds);
             }
             Assert.Null(TierRules.RuleFor(CharacterRarity.Common));
-            Assert.Equal(new[] { 0, 1, 2, 3, 4 }, CharacterDefs.PowerCount);
+            Assert.Equal(new[] { 0, 0, 1, 1, 2 }, CharacterDefs.PowerCount);
             Assert.Equal("Elite", CharacterDefs.RarityNames[(int)CharacterRarity.Epic]);
             for (int i = 1; i < 4; i++) Assert.True(CharacterDefs.CooldownSeconds[i + 1] < CharacterDefs.CooldownSeconds[i], "cooldown shortens with rarity");
         }
 
         [Fact]
-        public void PowerPoolsUseOnlyImplementedPowersAndAreOrderedPrefixes()
+        public void PowerChoicesAreTheOwnersListsAndUseOnlyImplementedPowers()
         {
             var implemented = new HashSet<PowerUp> { PowerUp.Flight, PowerUp.Rocket, PowerUp.DoubleJump, PowerUp.WallStick, PowerUp.Shield, PowerUp.SafetyNet, PowerUp.Glide, PowerUp.WidePlatforms, PowerUp.SlowTime };
-            Assert.Equal(TierRules.Lines.Length, TierRules.Pools.Count);
-            foreach (string line in TierRules.Lines)
+            // owner Final Change 2 (2026-11-23): Rare ONE of Wide Platforms, Shield, Safety Net, Wall Stick, Glide Cape, Slow Time; Elite ONE of Safety Net, Double Jump, Glide Cape, Slow Time, Flight, Rocket; Legendary TWO of the Elite list
+            Assert.Equal(new[] { PowerUp.WidePlatforms, PowerUp.Shield, PowerUp.SafetyNet, PowerUp.WallStick, PowerUp.Glide, PowerUp.SlowTime }, TierRules.PowerChoices[(int)CharacterRarity.Rare]);
+            Assert.Equal(new[] { PowerUp.SafetyNet, PowerUp.DoubleJump, PowerUp.Glide, PowerUp.SlowTime, PowerUp.Flight, PowerUp.Rocket }, TierRules.PowerChoices[(int)CharacterRarity.Epic]);
+            Assert.Equal(TierRules.PowerChoices[(int)CharacterRarity.Epic], TierRules.PowerChoices[(int)CharacterRarity.Legendary]);
+            Assert.Empty(TierRules.PowerChoices[(int)CharacterRarity.Common]);
+            Assert.Empty(TierRules.PowerChoices[(int)CharacterRarity.Uncommon]);
+            foreach (CharacterRarity r in Tiers)
             {
-                PowerUp[] pool = TierRules.Pools[line];
-                Assert.Equal(4, pool.Length);
-                Assert.Equal(4, new HashSet<PowerUp>(pool).Count);
-                foreach (PowerUp p in pool) Assert.Contains(p, implemented);
-                PowerUp[] prev = new PowerUp[0];
-                foreach (CharacterRarity r in Tiers)
+                PowerUp[][] combos = TierRules.PowerCombos[(int)r];
+                Assert.Equal(r == CharacterRarity.Uncommon ? 1 : (r == CharacterRarity.Legendary ? 15 : 6), combos.Length);
+                Assert.Equal(combos.Length, combos.Select(c => string.Join("+", c)).Distinct().Count());
+                foreach (PowerUp[] combo in combos)
                 {
-                    PowerUp[] now = TierRules.PowersFor(line, r);
-                    Assert.Equal(CharacterDefs.PowerCount[(int)r], now.Length);
-                    Assert.Null(TierRules.ValidatePowers(line, r, now));
-                    for (int i = 0; i < prev.Length; i++) Assert.Equal(prev[i], now[i]);   // a higher tier keeps the earlier powers
-                    prev = now;
+                    Assert.Equal(CharacterDefs.PowerCount[(int)r], combo.Length);
+                    Assert.Equal(combo.Length, new HashSet<PowerUp>(combo).Count);
+                    foreach (PowerUp p in combo) { Assert.Contains(p, implemented); Assert.Contains(p, TierRules.PowerChoices[(int)r]); }
+                    Assert.Null(TierRules.ValidatePowers("momo", r, combo));
                 }
+                Assert.Equal(CharacterDefs.PowerCount[(int)r], TierRules.PowersFor("momo", r).Length);   // the default combination
+                Assert.Equal(combos[0], TierRules.PowersFor("momo", r));
             }
             Assert.Empty(TierRules.PowersFor("momo", CharacterRarity.Common));
-            Assert.NotNull(TierRules.ValidatePowers("momo", CharacterRarity.Rare, new[] { PowerUp.DoubleJump }));
-            Assert.NotNull(TierRules.ValidatePowers("momo", CharacterRarity.Uncommon, new[] { PowerUp.SafetyNet }));
+            Assert.NotNull(TierRules.ValidatePowers("momo", CharacterRarity.Rare, new[] { PowerUp.DoubleJump }));        // Double Jump is not on the Rare list
+            Assert.NotNull(TierRules.ValidatePowers("momo", CharacterRarity.Uncommon, new[] { PowerUp.SafetyNet }));     // Uncommon has no power
+            Assert.NotNull(TierRules.ValidatePowers("momo", CharacterRarity.Legendary, new[] { PowerUp.Flight }));       // Legendary has two
+            Assert.NotNull(TierRules.ValidatePowers("momo", CharacterRarity.Legendary, new[] { PowerUp.Flight, PowerUp.Flight }));
         }
 
         [Fact]
@@ -132,17 +138,12 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void EveryGeneratedTableRowObeysTheHeroIndexRules()
+        public void EveryActiveTableRowObeysTheBandsOverItsLinesCommon()
         {
-            // Rows listed in HeroTable.Legacy still carry the old hand-tuned stats until the generator tool replaces them; every other row must pass HeroIndex.Validate.
+            // owner Final Change 2: the 25 heroes of the five active lines are bands over the line's Common (Commons over Momo Common); the 100 rows of the inactive lines are data only
             foreach (HeroRow row in HeroTable.Rows)
-                if (!HeroTable.IsLegacy(row.Id)) Assert.Null(TierRules.ValidatePhysics(row));
-            foreach (string id in HeroTable.Legacy)
-            {
-                Assert.NotNull(HeroTable.Find(id));
-                Assert.False(id.StartsWith("momo"), "Momo's five tiers are fixed (HeroIndex.LadderFinal), never legacy");
-            }
-            Assert.Empty(HeroTable.Legacy);   // every hero has been generated and measured (the whole roster, 25 lines x 5 tiers)
+                if (row.Active) Assert.Null(TierRules.ValidatePhysics(row));
+            Assert.Empty(HeroTable.Legacy);
         }
 
         [Fact]
@@ -160,36 +161,33 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void TheIndexValidatorRejectsRowsOutsideTheBandsAndLimits()
         {
-            Assert.Null(TierRules.ValidatePhysics(new HeroRow("x", "x", 0, 190, 9, 30, 77)));
-            Assert.NotNull(TierRules.ValidatePhysics(new HeroRow("x", "x", 0, 200, 9, 30, 77)));     // Common is 0 to 5 percent over 19.0
-            Assert.NotNull(TierRules.ValidatePhysics(new HeroRow("x", "x", 1, 190, 9, 30, 77)));     // Uncommon is 6 to 10 percent
-            Assert.NotNull(TierRules.ValidatePhysics(new HeroRow("x", "x", 4, 228, 13, 30, 100)));   // speed over the limit
-            Assert.NotNull(TierRules.ValidatePhysics(new HeroRow("x", "x", 4, 228, 11, 46, 100)));   // control over the limit
-            Assert.NotNull(TierRules.ValidatePhysics(new HeroRow("x", "x", 4, 228, 11, 41, 84)));    // wall below the Legendary range
-            Assert.NotNull(TierRules.ValidatePhysics(new HeroRow("x", "x", 5, 228, 11, 41, 100)));   // no such tier
+            HeroPhysics m = HeroIndex.MomoCommon;
+            Assert.Null(TierRules.ValidatePhysics(new HeroRow("x", "momo", 0, m.LaunchTenths, m.Speed, m.Control, m.Wall)));
+            Assert.NotNull(TierRules.ValidatePhysics(new HeroRow("x", "momo", 0, m.LaunchTenths + 20, m.Speed, m.Control, m.Wall)));   // Common is -3 to +3 percent of Momo
+            Assert.NotNull(TierRules.ValidatePhysics(new HeroRow("x", "momo", 1, m.LaunchTenths, m.Speed, m.Control, m.Wall)));        // Uncommon is +3 to +7 percent on every stat
+            Assert.NotNull(TierRules.ValidatePhysics(new HeroRow("x", "momo", 4, 228, 13, 30, 100)));
+            Assert.NotNull(TierRules.ValidatePhysics(new HeroRow("x", "momo", 5, 228, 11, 41, 100)));   // no such tier
             Assert.NotNull(TierRules.ValidatePhysics(null));
+            Assert.NotNull(HeroIndex.ValidateLimits(new HeroPhysics(HeroIndex.LaunchMinTenths - 1, 9, 29, 77)));
+            Assert.Null(HeroIndex.ValidateLimits(new HeroPhysics(HeroIndex.LaunchMinTenths, 9, 29, 77)));
+            Assert.Equal(184, HeroIndex.LaunchMinTenths);
         }
 
         [Fact]
-        public void MomosFiveRowsAreTheLadderFinal()
+        public void MomoCommonIsTheAnchorAndTheTableAndTheGameAgree()
         {
-            Assert.Equal(HeroIndex.Tiers, HeroIndex.LadderFinal.Length);
-            for (int t = 0; t < HeroIndex.Tiers; t++)
-            {
-                HeroRow row = HeroTable.Of("momo", t);
-                HeroPhysics want = HeroIndex.LadderFinal[t];
-                Assert.Equal(want.LaunchTenths, row.LaunchTenths);
-                Assert.Equal(want.Speed, row.Speed);
-                Assert.Equal(want.Control, row.Control);
-                Assert.Equal(want.Wall, row.Wall);
-                Assert.Null(TierRules.ValidatePhysics(row));
-                // and the hero the game plays has exactly these numbers
-                CharacterStats s = CharacterDefs.GetIncludingInactive(row.Id).Stats;
-                Assert.Equal(want.LaunchTenths, s.LaunchTenths);
-                Assert.Equal(want.Speed, s.MaxSpeed);
-                Assert.Equal(want.Control, s.Control);
-                Assert.Equal(want.Wall, s.WallBoostHundredths);
-            }
+            HeroRow row = HeroTable.Of("momo", 0);
+            HeroPhysics want = HeroIndex.MomoCommon;
+            Assert.Equal(want.LaunchTenths, row.LaunchTenths);
+            Assert.Equal(want.Speed, row.Speed);
+            Assert.Equal(want.Control, row.Control);
+            Assert.Equal(want.Wall, row.Wall);
+            CharacterStats s = CharacterDefs.Momo.Stats;
+            Assert.Equal(want.LaunchTenths, s.LaunchTenths);
+            Assert.Equal(want.Speed, s.MaxSpeed);
+            Assert.Equal(want.Control, s.Control);
+            Assert.Equal(want.Wall, s.WallBoostHundredths);
+            for (int t = 1; t < HeroIndex.Tiers; t++) Assert.Null(TierRules.ValidatePhysics(HeroTable.Of("momo", t)));   // Momo's tiers are generated like every other line's
         }
 
         [Fact]
@@ -270,11 +268,11 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void TheJumpBandTextReadsTheIndexBands()
         {
-            Assert.Equal("0 to +5% Jump", TierRules.JumpBandText(CharacterRarity.Common));
-            Assert.Equal("+6 to +10% Jump", TierRules.JumpBandText(CharacterRarity.Uncommon));
-            Assert.Equal("+10 to +15% Jump", TierRules.JumpBandText(CharacterRarity.Rare));
-            Assert.Equal("+15 to +20% Jump", TierRules.JumpBandText(CharacterRarity.Epic));
-            Assert.Equal("+20 to +25% Jump", TierRules.JumpBandText(CharacterRarity.Legendary));
+            Assert.Equal("-3 to +3% of Momo", TierRules.JumpBandText(CharacterRarity.Common));
+            Assert.Equal("+3 to +7% on every stat", TierRules.JumpBandText(CharacterRarity.Uncommon));
+            Assert.Equal("+6 to +10% on every stat", TierRules.JumpBandText(CharacterRarity.Rare));
+            Assert.Equal("+10 to +14% on every stat", TierRules.JumpBandText(CharacterRarity.Epic));
+            Assert.Equal("+14 to +18% on every stat", TierRules.JumpBandText(CharacterRarity.Legendary));
         }
 
         [Fact]
@@ -324,17 +322,17 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void BotProofsAndGoldenHashesStayOnTheBaselineConfig()
         {
-            // Levels and bot proofs use new SimConfig(); the default hero (Momo Common, taken from the hero table) reproduces it bit for bit.
+            // Levels and bot proofs use new SimConfig(); the BARE default stats (CharacterStats.Default, 19.0 / 9 / 30 / 77) reproduce it bit for bit. Momo Common (the Forgiveness Index anchor, owner Final Change 2: 19.2 / 9 / 29 / 77) is a hero row of the table and differs from it.
             SimConfig baseline = new SimConfig();
             SimConfig viaMomo = baseline.Clone();
             viaMomo.JumpBase = Fx.Zero; viaMomo.MaxSpeed = Fx.Zero; viaMomo.Accel = Fx.Zero; viaMomo.WallBoost = Fx.Zero;
-            CharacterDefs.Momo.Stats.ApplyTo(viaMomo);
+            CharacterStats.Default.ApplyTo(viaMomo);
             Assert.Equal(baseline.JumpBase.Raw, viaMomo.JumpBase.Raw);
             Assert.Equal(baseline.MaxSpeed.Raw, viaMomo.MaxSpeed.Raw);
             Assert.Equal(baseline.Accel.Raw, viaMomo.Accel.Raw);
             Assert.Equal(baseline.WallBoost.Raw, viaMomo.WallBoost.Raw);
             Assert.Equal(190, CharacterStats.Default.LaunchTenths);
-            Assert.Equal(190, CharacterDefs.Momo.Stats.LaunchTenths);
+            Assert.Equal(HeroIndex.MomoCommon.LaunchTenths, CharacterDefs.Momo.Stats.LaunchTenths);
             Assert.Equal(9, CharacterStats.Default.MaxSpeed);
             Assert.Equal(30, CharacterStats.Default.Control);
             Assert.Equal(77, CharacterStats.Default.WallBoostHundredths);
