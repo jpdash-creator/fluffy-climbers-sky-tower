@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- Weekly crown leaderboard service (Cloud Run, region asia-south1). Plain .NET 10 minimal API.
+       The Simulation, hero and crown sources are COMPILED FROM Assets/ (linked, never copied), so the server replays a run with exactly the code the game ships.
+       Cloud Build / `gcloud run deploy with source upload` layout: this folder holds the .csproj; the linked ../../Assets files must be in the upload (see .gcloudignore). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>FluffyClimbers.LeaderboardService</RootNamespace>
+    <AssemblyName>FluffyClimbers.LeaderboardService</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- the deterministic simulation, level generator, bot-free parts -->
+    <Compile Include="../../Assets/_Game/Simulation/**/*.cs" Link="Linked/Simulation/%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- content models and the level spec factory; ContentRepository only touches UnityEngine in LoadFromResources, satisfied by Replay/UnityShim.cs -->
+    <Compile Include="../../Assets/_Game/Content/ContentException.cs;../../Assets/_Game/Content/ContentRepository.cs;../../Assets/_Game/Content/LevelSpecFactory.cs;../../Assets/_Game/Content/Models.cs;../../Assets/_Game/Content/ContentManifestMerger.cs" Link="Linked/Content/%(Filename)%(Extension)" />
+    <!-- hero tables and rolls, crown formula, input codec, the crown-calculation (breakdown) merge rules and their slot type (pure C#, shared with the game) -->
+    <Compile Include="../../Assets/_Game/Economy/HeroTable.cs;../../Assets/_Game/Economy/HeroVariants.cs;../../Assets/_Game/Economy/HeroRolls.cs;../../Assets/_Game/Economy/TierRules.cs;../../Assets/_Game/Economy/MergeTierDefs.cs;../../Assets/_Game/Economy/Characters.cs;../../Assets/_Game/Economy/TimeRecords.cs;../../Assets/_Game/Economy/CrownScore.cs;../../Assets/_Game/Economy/BreakdownMerge.cs;../../Assets/_Game/Economy/LeaderboardSave.cs;../../Assets/_Game/Economy/HeroRegionPenalty.cs" Link="Linked/Economy/%(Filename)%(Extension)" />
+    <!-- the shipped content manifest, next to the binary (override with CONTENT_MANIFEST) -->
+    <Content Include="../../Assets/Resources/Content/content_manifest.json" Link="content_manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="config.default.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Cloud.Firestore" Version="3.*" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.*" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.*" />
+  </ItemGroup>
+
+</Project>
