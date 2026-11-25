@@ -136,6 +136,9 @@ namespace FluffyClimbers.Gameplay
             vp.anchorMin = Vector2.zero; vp.anchorMax = Vector2.one;
             vp.offsetMin = new Vector2(pad, pad); vp.offsetMax = new Vector2(-pad, -top);
             vp.gameObject.AddComponent<RectMask2D>();
+            // an invisible raycast target over the whole viewport, so a drag starting in a gap between lines scrolls too
+            var hit = vp.gameObject.AddComponent<Image>();
+            hit.color = new Color(0f, 0f, 0f, 0f); hit.raycastTarget = true;
             RectTransform pc = UiKit.Rect(vp, "Content");
             pc.anchorMin = new Vector2(0f, 1f); pc.anchorMax = new Vector2(1f, 1f); pc.pivot = new Vector2(0.5f, 1f);
             pc.anchoredPosition = Vector2.zero;
@@ -260,9 +263,17 @@ namespace FluffyClimbers.Gameplay
                 band.rectTransform.SetAsFirstSibling();
                 y += bandH + 8f;
                 if (other) { y += 12f; continue; }
+                if (g.Section == BreakdownGroup.SectionLevels)
+                {
+                    // owner 2026-11-25: one wrapped line per Gameplay setting the player has crowns in: "Hard: Levels 1, 2, 3, 4"
+                    foreach (LeaderboardBreakdown.SettingLevelsRow row in LeaderboardBreakdown.LevelsBySetting(g))
+                        y += PopupText(pc, "LevelsLine", row.Text, body, TextAnchor.UpperLeft, 18f, y, inner - 18f, false) + 8f;
+                    y += 12f;
+                    continue;
+                }
                 foreach (BreakdownLine l in g.Lines)
                 {
-                    float a = PopupText(pc, "LineLabel", l.Label, body, TextAnchor.UpperLeft, 18f, y, labelW - 18f, false);
+                    float a =PopupText(pc, "LineLabel", l.Label, body, TextAnchor.UpperLeft, 18f, y, labelW - 18f, false);
                     float b = PopupText(pc, "LineSetting", l.Setting, body, TextAnchor.UpperLeft, labelW + gap, y, settingW, false);
                     float c = PopupText(pc, "LineCrown", N0(l.Crown), body, TextAnchor.UpperRight, inner - crownW, y, crownW, false);
                     y += Mathf.Max(a, Mathf.Max(b, c)) + 8f;

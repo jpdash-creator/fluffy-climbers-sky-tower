@@ -38,6 +38,12 @@ namespace FluffyClimbers.Monetization
             return consent && adReady && IntervalPassed(shownBefore, lastShownAt, now);
         }
 
+        /// <summary>
+        /// The player leaves a run through the Home or Shop button (owner 2026-11-25: players skipped the restart ad by tapping those). It uses the SAME counter and the same rules as
+        /// <see cref="OnRestart"/> (every 3rd restart-or-exit, 4 minutes apart, consent, an ad loaded), so the two together never show more than one ad per 3 events.
+        /// </summary>
+        public bool OnExit(float now, bool consent, bool adReady) { return OnRestart(now, consent, adReady); }
+
         /// <summary>The interstitial was shown and closed at this time (starts the 4 minute pause).</summary>
         public void MarkShown(float now) { shownBefore = true; lastShownAt = now; }
 

@@ -139,15 +139,17 @@ namespace FluffyClimbers.Gameplay
             UiKit.Place((RectTransform)saveButton.transform, new Vector2(0f, 1f), new Vector2(0f, -y), new Vector2(contentW, saveH));
             y += saveH + gap;
 
-            // ---- one small row: Reset (restart icon, confirm step) and Restore purchases (shop bag) ----
-            float halfW = (contentW - gap) * 0.5f;
-            Button reset = SettingsIconButton(c, "Reset", "Reset", "icon_restart", 3, "Reset progress", x: 0f, y: y, w: halfW, h: rowH, onClick: ConfirmReset);
-            Button restore = SettingsIconButton(c, "RestorePurchases", "Restore", "icon_shop", 0, "Restore purchases", x: halfW + gap, y: y, w: halfW, h: rowH, onClick: RestorePurchases);
+            // ---- two small rows of THREE equal buttons (owner 2026-11-25: the Help controls must not add a row, the popup stays under 1500) ----
+            // Row 1: Reset, Restore, Show help again. Row 2: Privacy, Terms, the Help switch. Word-only labels (no icons) so "Restore" fits a third of the width at 130 percent text.
+            float w3 = (contentW - 2f * gap) / 3f, xa = w3 + gap, xb = 2f * (w3 + gap);
+            SettingsWordButton(c, "Reset", "Reset", 3, "Reset progress", 0f, y, w3, rowH, ConfirmReset);
+            SettingsWordButton(c, "RestorePurchases", "Restore", 0, "Restore purchases", xa, y, w3, rowH, RestorePurchases);
+            AddSettingsHelpAgain(c, xb, y, w3, rowH);
             y += rowH + gap;
 
-            // ---- one small row: Privacy policy and Terms of use (owner 2026-11-09). Blue plates: they leave the game for the hosted pages in the browser. ----
-            SettingsLinkButton(c, "PrivacyPolicy", LegalLinks.PrivacyLabel, LegalLinks.PrivacyA11y, x: 0f, y: y, w: halfW, h: rowH, onClick: LegalLinks.OpenPrivacy);
-            SettingsLinkButton(c, "TermsOfUse", LegalLinks.TermsLabel, LegalLinks.TermsA11y, x: halfW + gap, y: y, w: halfW, h: rowH, onClick: LegalLinks.OpenTerms);
+            SettingsLinkButton(c, "PrivacyPolicy", LegalLinks.PrivacyLabel, LegalLinks.PrivacyA11y, x: 0f, y: y, w: w3, h: rowH, onClick: LegalLinks.OpenPrivacy);
+            SettingsLinkButton(c, "TermsOfUse", LegalLinks.TermsLabel, LegalLinks.TermsA11y, x: xa, y: y, w: w3, h: rowH, onClick: LegalLinks.OpenTerms);
+            AddSettingsHelpSwitch(c, xb, y, w3, rowH);
             y += rowH + gap;
 
             if (privacyChoices)
@@ -224,18 +226,17 @@ namespace FluffyClimbers.Gameplay
             return img;
         }
 
-        void SettingsIconAt(RectTransform c, string name, string icon, float x, float y, float rowH)
+        void SettingsIconAt(RectTransform c, string name, string icon, float x, float y, float rowH, float size = 88f)
         {
             Image ic = UiKit.AddImage(c, name + "Icon", ToyKit.Get(icon), Color.white);
             ic.preserveAspect = true;
-            UiKit.Place(ic.rectTransform, TopLeft, new Vector2(x, -(y + (rowH - 88f) * 0.5f)), new Vector2(88f, 88f));
+            UiKit.Place(ic.rectTransform, TopLeft, new Vector2(x, -(y + (rowH - size) * 0.5f)), new Vector2(size, size));
         }
 
         /// <summary>An on/off cell: the icon at the left and the kit switch at the right (green with the knob right when on, blue with the knob left when off). The label is for screen readers only.</summary>
-        void SettingsSwitchAt(RectTransform c, string label, string icon, float x, float y, float cellW, float rowH, Func<bool> get, Action<bool> set)
+        void SettingsSwitchAt(RectTransform c, string label, string icon, float x, float y, float cellW, float rowH, Func<bool> get, Action<bool> set, float iconSize = 88f, float sw = 200f, float inset = 14f)
         {
-            const float sw = 200f, inset = 14f;
-            SettingsIconAt(c, label, icon, x + inset, y, rowH);
+            SettingsIconAt(c, label, icon, x + inset, y, rowH, iconSize);
             Button b = UiKit.AddButton(c, label + "Toggle", "", ToyKit.Button(get() ? 1 : 2), Color.white, new Vector2(sw, rowH), null);
             UiKit.Place((RectTransform)b.transform, TopLeft, new Vector2(x + cellW - inset - sw, -y), new Vector2(sw, rowH));
             Image knob = UiKit.AddImage(b.transform, "Knob", Theme.RoundSprite, Color.white);
@@ -290,6 +291,17 @@ namespace FluffyClimbers.Gameplay
             trt.anchorMax = Vector2.one;
             trt.offsetMin = new Vector2(20f + icon0 + 6f, 0f);
             trt.offsetMax = new Vector2(-12f, 0f);
+            return b;
+        }
+
+        /// <summary>A kit button with one short word (Reset, Restore) and no icon, for the three-per-row small rows; the label shrinks (never below 16 sp) instead of clipping.</summary>
+        static Button SettingsWordButton(RectTransform c, string name, string label, int role, string a11y, float x, float y, float w, float h, Action onClick)
+        {
+            Button b = UiKit.AddButton(c, name, label, ToyKit.Button(role), Color.white, new Vector2(w, h), onClick, 40);
+            UiKit.Place((RectTransform)b.transform, TopLeft, new Vector2(x, -y), new Vector2(w, h));
+            b.GetComponent<A11yLabel>().Text = a11y;
+            Transform t = b.transform.Find("Label");
+            if (t != null) FitLabel(t.GetComponent<Text>());
             return b;
         }
 

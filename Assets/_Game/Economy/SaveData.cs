@@ -342,6 +342,8 @@ namespace FluffyClimbers.Economy
         [JsonProperty("cloudDirty", DefaultValueHandling = DefaultValueHandling.Ignore)] public bool CloudDirty;
         /// <summary>The player's settings (sound, music, haptics, reduced motion, left-handed, text size, Gameplay setting, pace ghost, menu music). Written when one changes; applied to a device only when the cloud save is adopted (never on upload). Null = never written. Dev and admin flags are never in here. Additive.</summary>
         [JsonProperty("settings", NullValueHandling = NullValueHandling.Ignore)] public SyncedSettings Settings;
+        /// <summary>First-time help (owner 2026-11-25): ids of the help topics (HelpTable) already shown on this phone. See HelpProgress and ProgressService.Help.cs. Additive, no version bump; old saves load empty.</summary>
+        [JsonProperty("helpSeen")] public List<string> HelpSeen = new List<string>();
     }
 
     /// <summary>The player settings that travel with the save (Final Change 3). Plain values, no Unity types; the Gameplay layer converts from and to PlayerPrefs (GameSettings.CaptureToSave / ApplyFromSave).</summary>
@@ -357,11 +359,13 @@ namespace FluffyClimbers.Economy
         [JsonProperty("paceGhost")] public bool PaceGhost;
         /// <summary>Menu music choice: "random" or a track id (MusicCatalog).</summary>
         [JsonProperty("menuMusic")] public string MenuMusic = "random";
+        /// <summary>The Help switch (default OFF): while on, every screen shows its help once the next time it is entered.</summary>
+        [JsonProperty("help")] public bool Help;
 
         public bool SameAs(SyncedSettings o)
         {
             return o != null && Sound == o.Sound && Music == o.Music && Haptics == o.Haptics && ReducedMotion == o.ReducedMotion && LeftHanded == o.LeftHanded
-                && TextPercent == o.TextPercent && Difficulty == o.Difficulty && PaceGhost == o.PaceGhost && MenuMusic == o.MenuMusic;
+                && TextPercent == o.TextPercent && Difficulty == o.Difficulty && PaceGhost == o.PaceGhost && MenuMusic == o.MenuMusic && Help == o.Help;
         }
 
         public SyncedSettings Clone() { return (SyncedSettings)MemberwiseClone(); }

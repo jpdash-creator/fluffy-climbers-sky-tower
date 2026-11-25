@@ -104,6 +104,7 @@ namespace FluffyClimbers.Gameplay
                 SizeMap();
                 mapScroll.verticalNormalizedPosition = norm;   // the window changed shape: keep looking at the same part of the map
             }
+            UpdateHelp();   // MetaController.Help.cs: first-time help, polled four times a second
             if (momo != null && !GameSettings.ReducedMotion) momo.anchoredPosition = momoBase + new Vector2(0f, Mathf.Sin(Time.unscaledTime * 2.2f) * 22f);
         }
 
@@ -169,6 +170,7 @@ namespace FluffyClimbers.Gameplay
         {
             if (screenRoot != null) Destroy(screenRoot.gameObject);
             ClosePopup();
+            CloseHelp();   // MetaController.Help.cs
             momo = null;
             coinText = null;
             gemText = null;
@@ -699,7 +701,7 @@ namespace FluffyClimbers.Gameplay
 
         /// <summary>
         /// The hero sheet of one hero (docs/21, 29): opened by tapping the hero or the (i) next to it on the home screen, and by a hero tile on the Heroes screen.
-        /// Back returns to <paramref name="back"/> (home when null), close always goes home. <paramref name="dataOverride"/> lets tests show a fake hero (for example a Legendary).
+        /// Back AND the red X return to <paramref name="back"/> (home when null): the screen it was opened from (owner 2026-11-25; the X used to go home). <paramref name="dataOverride"/> lets tests show a fake hero (for example a Legendary).
         /// </summary>
         public void ShowHeroSheet(CharacterDef who, Action back = null, HeroSheetData dataOverride = null)
         {
@@ -708,7 +710,7 @@ namespace FluffyClimbers.Gameplay
             NewScreen(HeroSheetScreen.ScreenName);
             SkyBackground();
             CharacterDef pick = who;
-            heroSheet = new HeroSheetScreen(screen, who, art, dataOverride ?? HeroSheetData.For(who), CharacterCatalog.Selected == who, goBack, ShowMenu,
+            heroSheet = new HeroSheetScreen(screen, who, art, dataOverride ?? HeroSheetData.For(who), CharacterCatalog.Selected == who, goBack, goBack,
                 () => { CharacterCatalog.Selected = pick; ShowHeroSheet(pick, goBack, dataOverride); },
                 other => ShowHeroSheet(other, goBack));   // the green arrows step to the previous / next owned hero
         }
@@ -1927,7 +1929,7 @@ namespace FluffyClimbers.Gameplay
         public void StartEndless(RegionDef region)
         {
             GameSession.SelectEndless(region.Id);
-            SceneManager.LoadScene("Run");
+            LoadRunScene();
         }
 
         /// <summary>Name of the medal badge on a level node.</summary>
@@ -2188,7 +2190,7 @@ namespace FluffyClimbers.Gameplay
             {
                 GameSession.CurrentLevelId = level.Id;
                 GameSession.EndlessMode = false;
-                SceneManager.LoadScene("Run");
+                LoadRunScene();
             }, 0f);
             if (penalised != null)
             {

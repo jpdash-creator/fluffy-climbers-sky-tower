@@ -142,6 +142,7 @@ namespace FluffyClimbers.Economy
             Data.AdsRemoved = !wipePurchases && old.AdsRemoved;   // a bought "Remove Ads" is a purchase: a reset never takes it away (the purchase record is kept too)
             Data.LeaderboardConsent = old.LeaderboardConsent;   // consent, name and granted claims are account settings, not progress
             Data.LeaderboardDisplayName = old.LeaderboardDisplayName;
+            Data.HelpSeen = old.HelpSeen != null ? new List<string>(old.HelpSeen) : new List<string>();   // the first-time help marks are a phone setting, not progress
             Data.Leaderboard = new LeaderboardSaveData();
             if (old.Leaderboard != null && old.Leaderboard.GrantedClaims != null) Data.Leaderboard.GrantedClaims.AddRange(old.Leaderboard.GrantedClaims);   // a prize already paid is never paid again
             bool wasOnBoards = old.LeaderboardWipePending || (old.LeaderboardConsent != null && old.LeaderboardConsent.V >= LeaderboardConsent.CurrentVersion);

@@ -176,7 +176,8 @@ namespace FluffyClimbers.Gameplay
             Hud.OnResume = Resume;
             Hud.OnRetry = Restart;
             Hud.OnDoubleCoins = DoubleCoins;
-            Hud.OnMenu = ExitToMeta;
+            Hud.OnMenu = () => ExitWithAd(ExitToMeta);
+            Hud.OnShopGate = go => ExitWithAd(go);
             Hud.OnNext = PlayNext;
             Hud.OnRevive = Revive;
             Hud.OnReviveAd = ReviveByAd;
@@ -370,6 +371,26 @@ namespace FluffyClimbers.Gameplay
             });
         }
 
+        /// <summary>
+        /// Home / Shop buttons of a run (owner 2026-11-25): same shared counter as <see cref="Restart"/>. The ad (when due) shows BEFORE the player goes on; then
+        /// <paramref name="go"/> runs whether the ad showed, failed or was not due, so leaving is never blocked.
+        /// </summary>
+        void ExitWithAd(System.Action go)
+        {
+            if (adBusy || Session == null) return;
+            InterstitialPolicy policy = InterstitialPolicy.Shared;
+            bool show = policy.OnExit(Time.realtimeSinceStartup, Services.ConsentGiven, AdGate.IsInterstitialReady(AdPlacements.RestartInterstitial));
+            if (!show) { go(); return; }
+            adBusy = true;
+            AdGate.ShowInterstitial(AdPlacements.RestartInterstitial, shown =>
+            {
+                adBusy = false;
+                if (shown) policy.MarkShown(Time.realtimeSinceStartup);
+                if (this == null) return;
+                go();
+            });
+        }
+
         bool doubleCoinsUsed;
 
         /// <summary>"Double the coins" on the results screen: a rewarded ad, then the level's payout coins are added once more (saved by ProgressService). One use per result.</summary>
@@ -391,11 +412,17 @@ namespace FluffyClimbers.Gameplay
             });
         }
 
+        /// <summary>
+        /// The revive is applied (state, wallet, ad reward) but play does NOT continue at once (owner 2026-11-25): the simulation stays paused behind the "Get ready" popup
+        /// and goes on only with Resume. View-level only: the same ticks are simulated afterwards, so the replay and the server are unaffected.
+        /// </summary>
         void AfterRevive()
         {
             endHandled = false;
             Hud.CloseOverlay();
             Input.Clear();
+            Paused = true;
+            Hud.ShowPause("Get ready");
         }
 
         /// <summary>Revive for gems (5, then 10). The wallet is charged inside TryRevive only after the revive happened.</summary>

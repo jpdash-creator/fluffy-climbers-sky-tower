@@ -67,6 +67,36 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
+        public void HomeAndShopExitsShareTheRestartCounter()
+        {
+            var p = new InterstitialPolicy();
+            Assert.IsFalse(p.OnRestart(0f, true, true), "1st event: a restart");
+            Assert.IsFalse(p.OnExit(1f, true, true), "2nd event: an exit through Home or Shop");
+            Assert.IsTrue(p.OnExit(2f, true, true), "3rd event, an exit: shared counter, the ad is due");
+            p.MarkShown(2f);
+            Assert.IsFalse(p.OnExit(3f, true, true));
+            Assert.IsFalse(p.OnRestart(4f, true, true));
+            Assert.IsFalse(p.OnExit(5f, true, true), "6th event, but 3 s after the last ad");
+            Assert.IsFalse(p.OnExit(6f, false, true), "no consent: never an ad on exit");
+            Assert.AreEqual(1, p.Restarts, "the 6th event reset the counter, the 7th started the next round");
+        }
+
+        [Test]
+        public void RemoveAdsSkipsTheExitInterstitial()
+        {
+            var old = AdGate.AdsRemoved;
+            try
+            {
+                AdGate.AdsRemoved = () => true;
+                Assert.IsFalse(AdGate.IsInterstitialReady(AdPlacements.RestartInterstitial), "ads removed: the exit policy is never given a ready ad");
+                bool? shown = null;
+                AdGate.ShowInterstitial(AdPlacements.RestartInterstitial, s => shown = s);
+                Assert.AreEqual(false, shown, "the exit callback still runs, so navigation goes on");
+            }
+            finally { AdGate.AdsRemoved = old; }
+        }
+
+        [Test]
         public void IntervalIsFourMinutesAfterTheLastClose()
         {
             Assert.IsTrue(InterstitialPolicy.IntervalPassed(false, 0f, 0f), "nothing shown yet");

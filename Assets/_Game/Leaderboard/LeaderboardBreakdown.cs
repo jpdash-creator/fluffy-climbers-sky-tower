@@ -35,6 +35,10 @@ namespace FluffyClimbers.Leaderboard
         /// <summary>What the line counts: the best crown of a level, or the SUM of the counted runs of an Endless / Time Attack region (owner 2026-11-22: the three best runs of the week).</summary>
         public long Crown;
         public bool IsOther;
+        /// <summary>Gameplay setting index 0..4 (-1 for the "other" line).</summary>
+        public int Mode = -1;
+        /// <summary>Campaign lines: the level number within its region ("6"), or the raw level id when the content no longer knows it. Empty for the other lines.</summary>
+        public string LevelText = "";
         /// <summary>
         /// Endless / Time Attack lines: the crowns of the counted runs (up to three, best first); they add up to <see cref="Crown"/> exactly. Null for a level line, for the "other" line and when the runs behind the
         /// sum are not known (then the line is only its sum).
@@ -153,7 +157,8 @@ namespace FluffyClimbers.Leaderboard
             BreakdownGroup endless = null, attack = null;
             foreach (Item it in items)
             {
-                var line = new BreakdownLine { Label = it.Label, Setting = SettingName(it.Mode), Crown = it.Crown, Runs = it.Runs };
+                var line = new BreakdownLine { Label = it.Label, Setting = SettingName(it.Mode), Crown = it.Crown, Runs = it.Runs, Mode = it.Mode };
+                if (it.Kind == LbSlotId.Campaign) line.LevelText = it.LevelIndex != int.MaxValue ? it.LevelIndex.ToString(System.Globalization.CultureInfo.InvariantCulture) : it.Target;
                 BreakdownGroup g;
                 if (it.Kind == LbSlotId.Campaign)
                 {
@@ -192,6 +197,40 @@ namespace FluffyClimbers.Leaderboard
                 result.Groups.Add(other);
             }
             return result;
+        }
+
+        /// <summary>One line of the region block: a Gameplay setting the player has crowns in and the level numbers (within the region) they have them in.</summary>
+        public sealed class SettingLevelsRow
+        {
+            public int Mode;
+            public string Setting = "";
+            public List<string> Levels = new List<string>();
+            /// <summary>"Hard: Levels 1, 2, 3, 4" ("Hard: Level 3" for a single level).</summary>
+            public string Text = "";
+        }
+
+        /// <summary>
+        /// Groups the campaign lines of one region by Gameplay setting: one row per setting that has at least one line (unplayed settings are skipped), settings in order Relaxed .. Insane, level numbers in the
+        /// order of the lines (already sorted by level) with duplicates dropped. Pure; the popup writes <see cref="SettingLevelsRow.Text"/> as one line each.
+        /// </summary>
+        public static List<SettingLevelsRow> LevelsBySetting(BreakdownGroup g)
+        {
+            var rows = new List<SettingLevelsRow>();
+            if (g == null) return rows;
+            for (int m = 0; m < SettingNames.Length; m++)
+            {
+                SettingLevelsRow row = null;
+                foreach (BreakdownLine l in g.Lines)
+                {
+                    if (l == null || l.IsOther || l.Mode != m || l.LevelText.Length == 0) continue;
+                    if (row == null) row = new SettingLevelsRow { Mode = m, Setting = SettingNames[m] };
+                    if (!row.Levels.Contains(l.LevelText)) row.Levels.Add(l.LevelText);
+                }
+                if (row == null) continue;
+                row.Text = row.Setting + ": " + (row.Levels.Count == 1 ? "Level " : "Levels ") + string.Join(", ", row.Levels);
+                rows.Add(row);
+            }
+            return rows;
         }
 
         static Item MakeItem(char kind, string target, int mode, long crown, ContentRepository content)

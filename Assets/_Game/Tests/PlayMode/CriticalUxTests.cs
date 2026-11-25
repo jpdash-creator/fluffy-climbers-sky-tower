@@ -452,6 +452,13 @@ namespace FluffyClimbers.Tests
             Assert.GreaterOrEqual(((RectTransform)found.transform).rect.width, UiKit.MinTouchPx - 1f, "HeroInfo is smaller than 48 dp");
             found.onClick.Invoke();
             Assert.AreEqual("Hero", meta.CurrentScreen, "HeroInfo must open the hero sheet");
+            // Owner 2026-11-25: the red X on the hero sheet returns to the Heroes screen it was opened from, not to the main screen.
+            Button sheetClose = null;
+            foreach (Button bt in Object.FindObjectsByType<Button>(FindObjectsSortMode.None)) if (bt.name == "Close") sheetClose = bt;
+            Assert.IsNotNull(sheetClose, "the hero sheet has no red X");
+            sheetClose.onClick.Invoke();
+            Assert.AreEqual("Characters", meta.CurrentScreen, "the X on the hero sheet must return to the Heroes screen");
+            yield return null;
 
             // The one-time "New hero joins you!" pop-up (docs/21): card, hero picture, name, rarity and the single OK button on every aspect (and at 130 percent text in the second run).
             yield return CheckScreen("hero-reveal", () => { meta.ShowMenu(); meta.ShowHeroReveal(CharacterCatalog.ForestGirl); }, problems);

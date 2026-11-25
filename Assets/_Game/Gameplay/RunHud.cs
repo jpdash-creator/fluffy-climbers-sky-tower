@@ -661,11 +661,11 @@ namespace FluffyClimbers.Gameplay
             }
         }
 
-        public void ShowPause()
+        public void ShowPause(string title = "Paused")
         {
             // Sized to its content (title + one row of icon buttons with captions, no empty middle) and with ONE way to resume: the Resume button
             // (no extra X). Buttons are at least 48 dp on this device.
-            OpenOverlay("Paused", TitleAndRowHeight(150f), false);
+            OpenOverlay(title, TitleAndRowHeight(150f), false);
             OnClose = () => { if (OnResume != null) OnResume(); };
             // Four equal round buttons (owner issue 15.3): resume, restart, shop (opens over the paused run) and home.
             OverlayRow(
@@ -681,7 +681,14 @@ namespace FluffyClimbers.Gameplay
         ShopScreen shop;
 
         /// <summary>The full Shop on top of the paused run; Back returns to the pause menu and the run continues where it was.</summary>
-        void OpenShop() { OpenShopTab(ShopScreen.TabPowerups); }
+        void OpenShop()
+        {
+            if (OnShopGate != null) OnShopGate(() => OpenShopTab(ShopScreen.TabPowerups));   // shared interstitial counter (owner 2026-11-25), then the shop opens
+            else OpenShopTab(ShopScreen.TabPowerups);
+        }
+
+        /// <summary>Set by RunController: runs the shared interstitial policy, then calls the given action (opening the Shop) whether or not an ad showed.</summary>
+        public Action<Action> OnShopGate;
 
         void OpenShopTab(int tab)
         {

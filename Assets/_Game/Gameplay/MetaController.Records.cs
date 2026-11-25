@@ -90,7 +90,7 @@ namespace FluffyClimbers.Gameplay
         public void StartTimeAttack(RegionDef region)
         {
             GameSession.SelectTimeAttack(region.Id);
-            SceneManager.LoadScene("Run");
+            LoadRunScene();
         }
     }
 }

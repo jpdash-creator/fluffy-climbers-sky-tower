@@ -21,6 +21,7 @@ namespace FluffyClimbers.Gameplay
         const string PromoKey = "settings.launchpromo";
         const string FirstPurchaseKey = "settings.firstpurchasedouble";
         const string PaceGhostKey = "settings.paceghost";
+        const string HelpKey = "settings.help";
 
         /// <summary>True in a development build on a device (not in the editor tests): the testing toggles are offered and default to on.</summary>
         public static bool DevBuild
@@ -192,6 +193,13 @@ namespace FluffyClimbers.Gameplay
         public static bool PaceGhost { get { return PlayerPrefs.GetInt(PaceGhostKey, 0) == 1; } set { PlayerPrefs.SetInt(PaceGhostKey, value ? 1 : 0); PlayerPrefs.Save(); CaptureToSave(); } }
 
         /// <summary>Accessibility text size: 100, 115 or 130 percent. Applied to every text built afterwards.</summary>
+        /// <summary>First-time help switch (owner 2026-11-25, default OFF): while on, each screen shows its help once the next time it is entered; it turns itself off when every topic was seen (HelpState).</summary>
+        public static bool Help
+        {
+            get { return PlayerPrefs.GetInt(HelpKey, 0) == 1; }
+            set { PlayerPrefs.SetInt(HelpKey, value ? 1 : 0); PlayerPrefs.Save(); CaptureToSave(); }
+        }
+
         public static int TextPercent
         {
             get { return PlayerPrefs.GetInt(TextKey, 100); }
@@ -208,7 +216,7 @@ namespace FluffyClimbers.Gameplay
             return new SyncedSettings
             {
                 Sound = Sound, Music = Music, Haptics = Haptics, ReducedMotion = ReducedMotion, LeftHanded = LeftHanded,
-                TextPercent = TextPercent, Difficulty = Difficulty, PaceGhost = PaceGhost, MenuMusic = MusicCatalog.Choice
+                TextPercent = TextPercent, Difficulty = Difficulty, PaceGhost = PaceGhost, MenuMusic = MusicCatalog.Choice, Help = Help
             };
         }
 
@@ -251,6 +259,7 @@ namespace FluffyClimbers.Gameplay
                 PlayerPrefs.SetInt(TextKey, System.Array.IndexOf(TextPercents, s.TextPercent) >= 0 ? s.TextPercent : 100);
                 PlayerPrefs.SetInt(DifficultyKey, Mathf.Clamp(s.Difficulty, 0, DifficultyNames.Length - 1));
                 PlayerPrefs.SetInt(PaceGhostKey, s.PaceGhost ? 1 : 0);
+                PlayerPrefs.SetInt(HelpKey, s.Help ? 1 : 0);
                 MusicCatalog.SetChoiceQuiet(s.MenuMusic);
                 PlayerPrefs.Save();
                 ApplyTextScale();

@@ -150,6 +150,23 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
+        public void RegionBlockHasOneLinePerPlayedSettingWithAllLevelNumbers()
+        {
+            var week = new List<LbSlot>
+            {
+                Slot("c.lvl_001_04.3", 10L), Slot("c.lvl_001_01.3", 10L), Slot("c.lvl_001_12.3", 10L), Slot("c.lvl_001_02.3", 10L),
+                Slot("c.lvl_001_03.0", 10L), Slot("c.lvl_001_09.1", 10L), Slot("c.lvl_001_09.0", 10L)
+            };
+            BreakdownResult r = LeaderboardBreakdown.Build(week, LbBoards.Levels, repo, -1);
+            var rows = LeaderboardBreakdown.LevelsBySetting(r.Groups[0]);
+            Assert.AreEqual(3, rows.Count, "Normal and Insane were never played, so only Relaxed, Easy and Hard have a line");
+            Assert.AreEqual("Relaxed: Levels 3, 9", rows[0].Text);
+            Assert.AreEqual("Easy: Level 9", rows[1].Text);
+            Assert.AreEqual("Hard: Levels 1, 2, 4, 12", rows[2].Text, "level numbers within the region, ascending, comma separated");
+            Assert.AreEqual(0, LeaderboardBreakdown.LevelsBySetting(null).Count);
+        }
+
+        [Test]
         public void ASlotTheServerCountsButNoLineExplainsBecomesAnHonestOtherLine()
         {
             var week = Week();
