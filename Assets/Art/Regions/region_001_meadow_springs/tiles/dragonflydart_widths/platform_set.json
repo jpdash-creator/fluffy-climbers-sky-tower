@@ -1,0 +1,85 @@
+{
+  "asset": "dragonflydart_widths",
+  "kind": "dragonflydart",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 277,
+      "h": 116,
+      "bodyLeft": 8,
+      "bodyRight": 263,
+      "surfaceY": 17,
+      "bodyBottom": 100,
+      "width": 1.5,
+      "file": "reg001_dragonflydart_w1_5.png",
+      "ppu": 170.0,
+      "kind": "dragonflydart",
+      "dir": 0
+    },
+    {
+      "w": 359,
+      "h": 118,
+      "bodyLeft": 16,
+      "bodyRight": 350,
+      "surfaceY": 20,
+      "bodyBottom": 104,
+      "width": 2.0,
+      "file": "reg001_dragonflydart_w2.png",
+      "ppu": 167.0,
+      "kind": "dragonflydart",
+      "dir": 0
+    },
+    {
+      "w": 526,
+      "h": 118,
+      "bodyLeft": 16,
+      "bodyRight": 517,
+      "surfaceY": 20,
+      "bodyBottom": 104,
+      "width": 3.0,
+      "file": "reg001_dragonflydart_w3.png",
+      "ppu": 167.0,
+      "kind": "dragonflydart",
+      "dir": 0
+    },
+    {
+      "w": 693,
+      "h": 117,
+      "bodyLeft": 12,
+      "bodyRight": 680,
+      "surfaceY": 22,
+      "bodyBottom": 106,
+      "width": 4.0,
+      "file": "reg001_dragonflydart_w4.png",
+      "ppu": 167.0,
+      "kind": "dragonflydart",
+      "dir": 0
+    },
+    {
+      "w": 1027,
+      "h": 117,
+      "bodyLeft": 12,
+      "bodyRight": 1014,
+      "surfaceY": 22,
+      "bodyBottom": 106,
+      "width": 6.0,
+      "file": "reg001_dragonflydart_w6.png",
+      "ppu": 167.0,
+      "kind": "dragonflydart",
+      "dir": 0
+    },
+    {
+      "w": 1361,
+      "h": 117,
+      "bodyLeft": 12,
+      "bodyRight": 1348,
+      "surfaceY": 22,
+      "bodyBottom": 106,
+      "width": 8.0,
+      "file": "reg001_dragonflydart_w8.png",
+      "ppu": 167.0,
+      "kind": "dragonflydart",
+      "dir": 0
+    }
+  ]
+}

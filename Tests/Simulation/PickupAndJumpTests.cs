@@ -122,6 +122,7 @@ namespace FluffyClimbers.Simulation.Tests
                 {
                     Platform a = d.Platforms[i];
                     if (a.Kind == PlatformKind.Sticky || a.Kind == PlatformKind.Bounce || a.Kind == PlatformKind.BounceCap) continue;
+                    if (a.Kind == PlatformKind.MoonJellyChain || d.Platforms[i + 1].Kind == PlatformKind.MoonJellyChain) continue;   // Final Change 6: the stepped launches of a jelly chain reach its 4.6 and 5.8 u rows (JellyGap1/2); not a normal gap
                     Fx gap = d.Platforms[i + 1].Y - a.Y;
                     if (gap > largest) largest = gap;
                 }

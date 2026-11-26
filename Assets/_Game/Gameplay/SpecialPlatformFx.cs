@@ -28,11 +28,63 @@ namespace FluffyClimbers.Gameplay
         float stemTopDropPx;
         Sprite logArt;                  // rolling log of region 5 (own painted sprite) or null = tinted placeholder block
         Sprite blank;                   // plain white sprite for the placeholder log
+        // Final Change 6 overlays (Resources/Art/Fc6/r<region>/<name>.png, cut by Tools/art_pipeline/bake_fc6_parts.py); a missing part draws nothing (CUX-10)
+        readonly Dictionary<string, Sprite> fc6 = new Dictionary<string, Sprite>();
+        int fc6Region = -1;
+        RegionArt regionArt;
+        Sprite[] alt = new Sprite[0];   // second animation frame of the overlay of platform i (null = none)
 
         public SpecialPlatformFx(SpriteFactory factory, bool reducedMotion)
         {
             make = factory;
             reduced = reducedMotion;
+        }
+
+        /// <summary>Region art in use: its Final Change 6 parts are loaded once per region (no per-frame lookups that allocate).</summary>
+        public void SetRegion(RegionArt ra)
+        {
+            regionArt = ra;
+            if (ra == null || ra.Index == fc6Region) return;
+            fc6Region = ra.Index;
+            fc6.Clear();
+            Sprite[] all = Resources.LoadAll<Sprite>("Art/Fc6/r" + ra.Index);
+            if (all != null) for (int k = 0; k < all.Length; k++) fc6[all[k].name] = all[k];
+        }
+
+        Sprite Part(string name)
+        {
+            Sprite sp;
+            return fc6.TryGetValue(name, out sp) ? sp : null;
+        }
+
+        /// <summary>The overlay sprite of a Final Change 6 kind (and its second frame in <paramref name="second"/>), or null when the kind has none or the part is missing.</summary>
+        Sprite OverlayFor(Platform p, out Sprite second)
+        {
+            second = null;
+            switch (p.Kind)
+            {
+                case PlatformKind.DewdropMirrorLeaf: return Part("dewdrop");
+                case PlatformKind.DragonflyDart: second = Part("dragonfly_buzz"); return Part("dragonfly_perched");
+                case PlatformKind.SilkSnareWeb: return p.Width.F() <= 2.5f ? Part("web_small") : Part("web_wide");
+                case PlatformKind.FogPuffDrift: return Part("spore_cloud_" + (1 + p.Id % 3));
+                case PlatformKind.SporeFunnel:
+                    if (p.Width.F() < 3.5f) { second = Part("spore_cone_narrow_b"); return Part("spore_cone_narrow_a"); }
+                    second = Part("spore_cone_wide_b");
+                    return Part("spore_cone_wide_a");
+                case PlatformKind.UndertowPad: second = Part("funnel_b"); return Part("funnel_a");
+                case PlatformKind.SeaFoamPad: second = Part("foam_heap_2"); return Part("foam_heap_1");
+                case PlatformKind.CaramelMagnet: second = Part("magnet_pulse"); return Part("magnet_idle");
+                case PlatformKind.SourSprinklerCannon: second = Part("sour_burst_b"); return Part("sour_burst_a");
+                case PlatformKind.ToriiLintel: return Part("torii");
+                case PlatformKind.IncenseMistBank: second = Part("incense_mist_b"); return Part("incense_mist_a");
+                case PlatformKind.SplittingPier:
+                    {
+                        if (regionArt == null) return null;
+                        int k = regionArt.KindPieceIndex(PlatformKind.SplittingPier, 1, p.Width.F() * 0.5f);   // the mirrored right half
+                        return k >= 0 ? regionArt.KindPieces[k].Sprite : null;
+                    }
+                default: return null;
+            }
         }
 
         /// <summary>Seesaw pivot knob of the region art (null = no knob).</summary>
@@ -71,6 +123,11 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.ThornBush: return new Color(0.55f, 0.78f, 0.5f, 1f);
                 case PlatformKind.Ladybug: return new Color(1f, 0.6f, 0.55f, 1f);
                 case PlatformKind.Seesaw: return new Color(0.72f, 1f, 0.72f, 1f);
+                // Final Change 6, region 1 additions (ids 43 to 46): placeholders only (moss-stone green, dragonfly blue, dewdrop silver-green, silk white), no drawn cues (CUX-7), until the painted pieces exist
+                case PlatformKind.GlowwormRelay: return new Color(0.7f, 0.95f, 0.6f, 1f);
+                case PlatformKind.DragonflyDart: return new Color(0.6f, 0.82f, 1f, 1f);
+                case PlatformKind.DewdropMirrorLeaf: return new Color(0.78f, 1f, 0.9f, 1f);
+                case PlatformKind.SilkSnareWeb: return new Color(0.94f, 0.95f, 1f, 1f);
                 // Region 2 placeholders (Mushroom Grove: purple, teal, glow cyan, warm pink) until the painted pieces of the T73 packet exist
                 case PlatformKind.SquishCap: return new Color(0.85f, 0.7f, 1f, 1f);
                 case PlatformKind.SproutLift: return new Color(0.6f, 0.95f, 0.75f, 1f);
@@ -79,6 +136,10 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.OrbitCap: return new Color(0.55f, 0.95f, 0.95f, 1f);
                 case PlatformKind.DizzySpores: return new Color(0.85f, 0.6f, 0.45f, 1f);
                 case PlatformKind.SporePop: return new Color(1f, 0.7f, 0.8f, 1f);
+                // Final Change 6, region 2 additions (ids 47 to 49): placeholders only, no drawn cues, until the painted pieces exist
+                case PlatformKind.TeeterCap: return new Color(1f, 0.82f, 0.6f, 1f);
+                case PlatformKind.FogPuffDrift: return new Color(0.75f, 0.85f, 0.8f, 1f);
+                case PlatformKind.SporeFunnel: return new Color(0.7f, 0.9f, 1f, 1f);
                 // Region 3 placeholders (Sunny Beach: aqua, sand, coral pink, driftwood, sea green, kelp green, pufferfish gold) until the painted pieces are imported
                 case PlatformKind.SurfBoostWave: return new Color(0.55f, 0.9f, 0.95f, 1f);
                 case PlatformKind.SandcastleStep: return new Color(0.98f, 0.86f, 0.62f, 1f);
@@ -87,6 +148,11 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.TurtleShuttle: return new Color(0.55f, 0.85f, 0.5f, 1f);
                 case PlatformKind.KelpTangle: return new Color(0.35f, 0.6f, 0.35f, 1f);
                 case PlatformKind.PufferfishPad: return new Color(1f, 0.88f, 0.45f, 1f);
+                // Final Change 6, region 3 placeholders (moon jelly pale blue, pier weathered wood, undertow deep teal, sea foam white-blue) until the painted pieces are imported
+                case PlatformKind.MoonJellyChain: return new Color(0.7f, 0.85f, 1f, 1f);
+                case PlatformKind.SplittingPier: return new Color(0.78f, 0.62f, 0.45f, 1f);
+                case PlatformKind.UndertowPad: return new Color(0.4f, 0.65f, 0.8f, 1f);
+                case PlatformKind.SeaFoamPad: return new Color(0.9f, 0.97f, 1f, 1f);
                 // Region 4 placeholders (Candy Canyon: pink, mint, cream, caramel, licorice, taffy gold, strawberry jelly) until the painted pieces are imported
                 case PlatformKind.CandyBowl: return new Color(1f, 0.78f, 0.88f, 1f);
                 case PlatformKind.FlossGlide: return new Color(1f, 0.82f, 0.93f, 1f);
@@ -95,6 +161,11 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.TaffyStretch: return new Color(0.98f, 0.8f, 0.42f, 1f);
                 case PlatformKind.JellyWobble: return new Color(1f, 0.5f, 0.55f, 1f);
                 case PlatformKind.PinwheelGust: return new Color(0.96f, 0.92f, 1f, 1f);
+                // Final Change 6 region 4 placeholders (strawberry scoop pink, caramel amber, sour mint, sugar-glass pale pink) until the painted pieces exist; no code-drawn cues (CUX-7)
+                case PlatformKind.MeltingScoop: return new Color(1f, 0.62f, 0.7f, 1f);
+                case PlatformKind.CaramelMagnet: return new Color(0.85f, 0.55f, 0.25f, 1f);
+                case PlatformKind.SourSprinklerCannon: return new Color(0.6f, 0.95f, 0.7f, 1f);
+                case PlatformKind.SugarGlassLedge: return new Color(1f, 0.88f, 0.94f, 1f);
                 // Region 5 placeholders (Bamboo Temple: bamboo green, lantern orange, river stone, plank wood, jade roof, lacquer red, log brown) until the painted pieces are imported
                 case PlatformKind.BambooFlick: return new Color(0.62f, 0.85f, 0.45f, 1f);
                 case PlatformKind.LanternLift: return new Color(1f, 0.62f, 0.3f, 1f);
@@ -103,6 +174,11 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.PagodaRidge: return new Color(0.42f, 0.78f, 0.62f, 1f);
                 case PlatformKind.MalletSmash: return new Color(0.85f, 0.35f, 0.3f, 1f);
                 case PlatformKind.RollingLog: return new Color(0.7f, 0.58f, 0.4f, 1f);
+                // Final Change 6, region 5 placeholders (paper scroll cream, torii vermilion, incense jade, bamboo water green) until the painted pieces exist; no code-drawn cue (CUX-7)
+                case PlatformKind.PrayerScrollRunner: return new Color(0.98f, 0.94f, 0.8f, 1f);
+                case PlatformKind.ToriiLintel: return new Color(0.88f, 0.28f, 0.2f, 1f);
+                case PlatformKind.IncenseMistBank: return new Color(0.6f, 0.82f, 0.7f, 1f);
+                case PlatformKind.WaterBambooTipper: return new Color(0.5f, 0.78f, 0.62f, 1f);
                 default: return Color.white;
             }
         }
@@ -136,14 +212,31 @@ namespace FluffyClimbers.Gameplay
             // The only extra sprite: the painted Seesaw pivot knob (art, not a cue). Nothing else is drawn on top of a special platform.
             Sprite part = !hasArt ? null : (p.Kind == PlatformKind.Seesaw ? knob : (p.Kind == PlatformKind.SproutLift ? stem : null));
             if (p.Kind == PlatformKind.RollingLog) part = hasArt && logArt != null ? logArt : blank;   // the log is a moving object: a tinted block until its sprite exists
+            if (alt.Length < parts.Length) System.Array.Resize(ref alt, parts.Length);
+            alt[i] = null;
+            if (part == null && hasArt)
+            {
+                Sprite second;
+                part = OverlayFor(p, out second);
+                alt[i] = second;
+            }
             if (part == null) return;
             SpriteRenderer sr = pool.Count > 0 ? pool.Pop() : make("fx" + p.Id, part, OverlayOrder);
             sr.gameObject.SetActive(true);
             sr.sprite = part;
-            sr.sortingOrder = p.Kind == PlatformKind.SproutLift ? -1 : OverlayOrder;   // the stem is behind the cap
+            sr.sortingOrder = p.Kind == PlatformKind.SproutLift ? -1 : (BehindPlatforms(p.Kind) ? -2 : (p.Kind == PlatformKind.SplittingPier ? 0 : OverlayOrder));   // the stem is behind the cap; air fields sit behind the platforms
+            sr.flipX = false;
+            sr.enabled = true;
             sr.color = p.Kind == PlatformKind.RollingLog && !(hasArt && logArt != null) ? Tint(PlatformKind.RollingLog) * 0.8f : Color.white;
             sr.transform.rotation = Quaternion.identity;
             parts[i] = sr;
+        }
+
+        /// <summary>Air fields (web, spore clouds and cones, funnels, magnet, jet, mist) are drawn behind the platforms so they never cover the next platform (CUX-3).</summary>
+        static bool BehindPlatforms(PlatformKind k)
+        {
+            return k == PlatformKind.SilkSnareWeb || k == PlatformKind.FogPuffDrift || k == PlatformKind.SporeFunnel || k == PlatformKind.UndertowPad
+                || k == PlatformKind.CaramelMagnet || k == PlatformKind.SourSprinklerCannon || k == PlatformKind.IncenseMistBank;
         }
 
         public void Release(int i)
@@ -169,6 +262,130 @@ namespace FluffyClimbers.Gameplay
             return Mathf.Lerp(0.3f, 1f, 1f + c3 * u * u * u + c1 * u * u);
         }
 
+        /// <summary>Places the painted overlay of a Final Change 6 kind (uniform scale from the part's width in world units, never stretched) and animates it from the Sim clocks.</summary>
+        void UpdateOverlay(int i, Platform p, Sim sim, in SimState s, int tick, float x, float y, SpriteRenderer baseSr)
+        {
+            if (p.Kind == PlatformKind.TeeterCap)
+            {
+                // the cap tilts up to 8 degrees toward the side the hero stands on (a code rotation of the painted level cap, no painted tipped art)
+                if (baseSr != null)
+                {
+                    float ang = 0f;
+                    if (s.GroundId == p.Id && painted[i])
+                    {
+                        float tilt = Mathf.Clamp((s.X.F() - x) / Mathf.Max(0.5f, p.Width.F() * 0.5f), -1f, 1f);
+                        float ease = reduced ? 1f : Mathf.Clamp01((tick - s.LandTick) / 8f);
+                        ang = -tilt * 8f * ease;
+                    }
+                    baseSr.transform.rotation = Quaternion.Euler(0f, 0f, ang);
+                }
+                return;
+            }
+            if (i >= parts.Length || parts[i] == null) return;
+            SpriteRenderer ov = parts[i];
+            Sprite a1 = ov.sprite;
+            Sprite a2 = i < alt.Length ? alt[i] : null;
+            Transform t = ov.transform;
+            switch (p.Kind)
+            {
+                case PlatformKind.DewdropMirrorLeaf: Place(ov, a1, 0.9f, x, y + 0.02f, false); break;
+                case PlatformKind.DragonflyDart:
+                    {
+                        int ph = sim.DartPhase(p.Id, tick, s.CrumbleTick);
+                        Sprite perched = Part("dragonfly_perched");
+                        Sprite pic = (ph == 1 || ph == 2) && a2 != null ? a2 : (perched != null ? perched : a1);
+                        ov.flipX = p.Dir > 0;
+                        Place(ov, pic, 1.3f, x, y + 0.02f, false);
+                        break;
+                    }
+                case PlatformKind.SilkSnareWeb:
+                    {
+                        float target = sim.WebWidthOf(in p).F();
+                        Vector2 sz = a1.bounds.size;
+                        float sc = target / Mathf.Max(0.01f, sz.x);
+                        t.localScale = new Vector3(sc, sc, 1f);
+                        t.position = new Vector3(x, y + sim.Cfg.WebHeight.F(), 0f);   // the web band hangs WebHeight above the slab, as in the Sim
+                        break;
+                    }
+                case PlatformKind.FogPuffDrift: Place(ov, a1, 2.4f, sim.FogX(p.Id, tick).F(), y + 1.6f, true); break;
+                case PlatformKind.SporeFunnel:
+                    {
+                        Sprite f = (!reduced && a2 != null && (tick / 10) % 2 == 1) ? a2 : Part(p.Width.F() < 3.5f ? "spore_cone_narrow_a" : "spore_cone_wide_a");
+                        Place(ov, f != null ? f : a1, 2f * sim.FunnelHalfWidth(in p).F(), x, y + 0.15f, true);
+                        break;
+                    }
+                case PlatformKind.UndertowPad:
+                    {
+                        Sprite f = (!reduced && a2 != null && (tick / 12) % 2 == 1) ? a2 : Part("funnel_a");
+                        Place(ov, f != null ? f : a1, 3.2f, x, y + 0.1f, true);
+                        break;
+                    }
+                case PlatformKind.SeaFoamPad:
+                    {
+                        float fade = 0f;
+                        if (s.GroundId == p.Id) fade = Mathf.Clamp01((float)(s.Tick - s.LandTick) / Mathf.Max(1, sim.Cfg.FoamFadeTicks));   // the heap swells while the footing fades
+                        Sprite f = (a2 != null && p.Width.F() >= 6f && p.Id % 2 == 1) ? a2 : Part("foam_heap_1");
+                        float off = (p.Id % 2 == 0 ? -0.22f : 0.22f) * p.Width.F();
+                        Place(ov, f != null ? f : a1, 1.1f + 0.9f * fade, x + off, y - 0.02f, false);
+                        break;
+                    }
+                case PlatformKind.CaramelMagnet:
+                    {
+                        bool pull = !reduced && s.GroundId != p.Id && Mathf.Abs(s.X.F() - x) < sim.Cfg.MagnetRadius.F() && s.Y.F() > y && s.Y.F() - y < sim.Cfg.MagnetHeight.F();
+                        Place(ov, pull && a2 != null ? a2 : Part("magnet_idle"), 0.9f, x, y + 0.5f, true);
+                        break;
+                    }
+                case PlatformKind.SourSprinklerCannon:
+                    {
+                        bool fire = sim.SprinklerFiring(in p, tick);
+                        ov.enabled = fire;
+                        if (fire) Place(ov, (!reduced && a2 != null && (tick / 5) % 2 == 1) ? a2 : Part("sour_burst_a"), 1.4f, x, y + 0.35f, true);
+                        break;
+                    }
+                case PlatformKind.ToriiLintel:
+                    {
+                        Vector2 sz = a1.bounds.size;
+                        float sc = 2.9f / Mathf.Max(0.01f, sz.y);   // underside of the lintel sits LintelHeight (2.6 u) above the slab
+                        t.localScale = new Vector3(sc, sc, 1f);
+                        t.position = new Vector3(x, y + sz.y * sc * 0.5f, 0f);
+                        break;
+                    }
+                case PlatformKind.IncenseMistBank:
+                    {
+                        Sprite f = (!reduced && a2 != null && (tick / 20) % 2 == 1) ? a2 : Part("incense_mist_a");
+                        Place(ov, f != null ? f : a1, 2.6f, x + (reduced ? 0f : Mathf.Sin(tick * 0.03f) * 0.1f), y + 0.9f, true);
+                        break;
+                    }
+                case PlatformKind.SplittingPier:
+                    {
+                        // the painted halves slide apart by the half gap of the Sim; their inner edges sit at x -/+ halfGap
+                        float half = sim.PierHalfGap(in p, tick).F();
+                        float hw = p.Width.F() * 0.5f;
+                        float sc = baseSr != null ? baseSr.transform.localScale.x : 1f;
+                        t.localScale = new Vector3(sc, sc, 1f);
+                        float by = baseSr != null ? baseSr.transform.position.y : y;
+                        if (baseSr != null) { Vector3 bp = baseSr.transform.position; bp.x = x - half - hw * 0.5f; baseSr.transform.position = bp; }
+                        t.position = new Vector3(x + half + hw * 0.5f, by, 0f);
+                        break;
+                    }
+            }
+        }
+
+        /// <summary>Draws a part uniformly scaled to a world width, centred on x, its bottom edge at yBottom (soft fields get a little transparency).</summary>
+        static void Place(SpriteRenderer sr, Sprite sprite, float worldWidth, float x, float yBottom, bool soft)
+        {
+            if (sprite == null) return;
+            sr.sprite = sprite;
+            Vector2 sz = sprite.bounds.size;
+            float sc = worldWidth / Mathf.Max(0.01f, sz.x);
+            Transform t = sr.transform;
+            t.localScale = new Vector3(sc, sc, 1f);
+            t.position = new Vector3(x, yBottom + sz.y * sc * 0.5f, 0f);
+            Color c = sr.color;
+            c.a = soft ? 0.85f : 1f;
+            sr.color = c;
+        }
+
         /// <summary>
         /// Platform motion that IS the mechanic (no drawn cues): Snap Daisy dims / squashes while it closes, the Seesaw tilts, the Ladybug mirrors
         /// to its running direction. <paramref name="x"/> / <paramref name="y"/> are the current centre and surface height from the Sim.
@@ -177,6 +394,7 @@ namespace FluffyClimbers.Gameplay
         {
             if (i >= painted.Length) return;
             float w = p.Width.F();
+            UpdateOverlay(i, p, sim, in s, tick, x, y, baseSr);
             switch (p.Kind)
             {
                 case PlatformKind.SnapDaisy:
@@ -208,6 +426,10 @@ namespace FluffyClimbers.Gameplay
                         }
                         break;
                     }
+                case PlatformKind.GlowwormRelay:
+                    // the ghost state of the pad (outside its window it does not hold): the plain placeholder fades like a shut Snap Daisy; the painted frame swaps glow on / off instead
+                    if (baseSr != null && !painted[i]) { Color c = baseSr.color; c.a = sim.RelaySolid(p.Id, tick, s.CrumbleTick) ? 1f : 0.25f; baseSr.color = c; }   // painted art swaps its glow frame instead (RunView.PoseOf)
+                    break;
                 case PlatformKind.Ladybug:
                     {
                         if (painted[i] && baseSr != null)

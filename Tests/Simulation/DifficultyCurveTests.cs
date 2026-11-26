@@ -308,9 +308,9 @@ namespace FluffyClimbers.Simulation.Tests
                     // Owner Final Change 1 (2026-11-22): the gem levels 5/10/15/20/25 are plain reach-floor levels; the six special types sit on the approved levels (SpecialLevelTests.Placement)
                     GoalType g = ls[i].Spec.Goal.Type;
                     SpecialLevelType type = SpecialLevels.TypeOf(ls[i].Spec);
-                    GoalType want2 = type == SpecialLevelType.NoWallTouch ? GoalType.NoWallBounce : type == SpecialLevelType.ComboClimb ? GoalType.ComboChain : type == SpecialLevelType.Chase ? GoalType.BossChase : GoalType.ReachFloor;
+                    GoalType want2 = type == SpecialLevelType.NoWallTouch ? GoalType.NoWallBounce : type == SpecialLevelType.ComboGates ? GoalType.ComboGates : type == SpecialLevelType.SkyHoops ? GoalType.SkyHoops : type == SpecialLevelType.RivalRace ? GoalType.RivalRace : GoalType.ReachFloor;
                     Assert.True(g == want2, ls[i].Id + " goal " + g);
-                    if (idx % 5 == 0) Assert.True(type == SpecialLevelType.None && g == GoalType.ReachFloor, ls[i].Id + " is a gem level: Regular Run");
+                    if (idx % 5 == 0) Assert.True((type == SpecialLevelType.None || (idx == 25 && type == SpecialLevelType.BossRise)) && g == GoalType.ReachFloor, ls[i].Id + " is a gem level: Regular Run (level 25: Boss Rise)");
                 }
             }
         }

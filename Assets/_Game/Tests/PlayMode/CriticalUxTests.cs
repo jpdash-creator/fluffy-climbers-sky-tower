@@ -3017,7 +3017,7 @@ namespace FluffyClimbers.Tests
         }
 
         // ---- special level types (owner Final Change 1, 2026-11-22): tile badge, level popup, run intro, One Life (no revive), No Power-ups (no buttons), Keep Moving (ring + cue) ----
-        // Region 1 placement: L6 No Wall Touch, L9 One Life, L14 No Power-ups, L16 Keep Moving, L21 Chase, L24 Combo Climb.
+        // Region 1 placement (Final Change 6): L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L17 Boss Rise, L21 Sprint and Rest, L24 Combo Gates, L25 Boss Rise (a gem level: its tile keeps the gem badge, the popup names the type).
 
         [UnityTest]
         public IEnumerator SpecialLevelTilesAndPopupsFitEveryAspect() { return SpecialLevelMetaAudit(100); }
@@ -3047,7 +3047,7 @@ namespace FluffyClimbers.Tests
             var problems = new List<string>();
             yield return CheckScreen("levels-special-badges", () => meta.ShowLevels(r1), problems);
 
-            // Tiles: a badge on exactly the six special levels, never next to a gem badge, labelled, a corner pip to the right of the level number and clear of the medal and
+            // Tiles: a badge on exactly the nine special levels of 1 to 24, never next to a gem badge, labelled, a corner pip to the right of the level number and clear of the medal and
             // the stars (CUX-3, CUX-6). The gem badge of the gem levels follows the same corner rule.
             meta.ShowLevels(r1);
             yield return null;
@@ -3100,7 +3100,9 @@ namespace FluffyClimbers.Tests
                 StringAssert.Contains(SpecialLevels.Name(type), spoken);
                 StringAssert.Contains(SpecialLevels.RuleText(type), spoken);
                 StringAssert.Contains(SpecialLevels.Name(type), node.GetComponent<A11yLabel>().Text, "the tile itself names the type too");
-                Assert.AreEqual(SpecialLevels.Glyph(type), badge.Find("Glyph").GetComponent<Text>().text, "the type's own glyph (never colour alone)");
+                Transform paintedIcon = badge.Find("Icon");   // Final Change 6: the painted types carry their own round icon, the others the letter glyph (never colour alone)
+                if (paintedIcon != null) Assert.IsNotNull(paintedIcon.GetComponent<Image>().sprite, "level " + level.Index + ": the painted " + SpecialLevels.Name(type) + " icon has its sprite");
+                else Assert.AreEqual(SpecialLevels.Glyph(type), badge.Find("Glyph").GetComponent<Text>().text, "the type's own glyph (never colour alone)");
                 Rect bb = CanvasBox((RectTransform)badge);
                 Transform medal = node.Find(MetaController.MedalBadgeName);
                 if (medal != null) Assert.IsFalse(CanvasBox((RectTransform)medal).Overlaps(bb), "level " + level.Index + ": badge over the medal");
@@ -3110,7 +3112,7 @@ namespace FluffyClimbers.Tests
                     if (star != null) Assert.IsFalse(CanvasBox((RectTransform)star).Overlaps(bb), "level " + level.Index + ": badge over star " + s);
                 }
             }
-            Assert.AreEqual(SpecialLevels.Count, badges, "one tile per special type in the region");
+            Assert.AreEqual(SpecialLevels.Count, badges, "one tile per special type among the open levels 1 to 24 (Boss Rise has its second level on the locked gem level 25)");
             Assert.AreEqual(medalLevels.Length, medalBadges, "the two-digit tiles 16 and 20 show their medal");
             if (GameSession.Art != null && GameSession.Art.GemIcon != null) Assert.AreEqual(4, gemBadges, "the open gem levels 5, 10, 15 and 20 carry the gem badge");
 
@@ -3118,7 +3120,7 @@ namespace FluffyClimbers.Tests
             foreach (LevelDef level in levels)
             {
                 SpecialLevelType type = level.SpecialType;
-                if (type == SpecialLevelType.None) continue;
+                if (type == SpecialLevelType.None || level.Index > 24) continue;   // level 25 stays locked here (no popup); it is a Boss Rise gem level
                 LevelDef l = level;
                 yield return CheckScreen("level-popup-special-" + type, () => { meta.ShowLevels(r1); meta.OnLevelTapped(l); }, problems);
                 RectTransform panel = FindRt("Popup").Find("Panel") as RectTransform;
@@ -3128,7 +3130,7 @@ namespace FluffyClimbers.Tests
                 Assert.GreaterOrEqual(titleText.fontSize, UiKit.MinBodyTextPx - 1f);
                 LevelSpec spec = LevelSpecFactory.Build(l, r1);
                 Assert.AreEqual(RunSession.GoalRule(spec), ruleText.text);
-                if (type != SpecialLevelType.ComboClimb) Assert.AreEqual(SpecialLevels.RuleText(type), ruleText.text);
+                Assert.AreEqual(SpecialLevels.RuleText(type), ruleText.text);
                 Assert.AreEqual(RunSession.DescribeGoal(spec), panel.Find("Goal").GetComponent<Text>().text);
                 Canvas.ForceUpdateCanvases();
                 // stacked top to bottom with real gaps: the boxes of title, goal, rule and stars do not intersect, and each text fits the height of its own box

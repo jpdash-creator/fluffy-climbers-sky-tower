@@ -118,13 +118,13 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Settings: the Help switch, a compact cell (small icon, narrower switch) so it fits a third of the row.</summary>
         void AddSettingsHelpSwitch(RectTransform c, float x, float y, float w, float rowH)
         {
-            SettingsSwitchAt(c, "Help", "lb_icon_info", x, y, w, rowH, () => GameSettings.Help, v => GameSettings.Help = v, 56f, 170f, 8f);
+            SettingsSwitchAt(c, "Help", ToyKit.Get("icon_help") != null ? "icon_help" : "lb_icon_info", x, y, w, rowH, () => GameSettings.Help, v => GameSettings.Help = v, 56f, 170f, 8f);
         }
 
         /// <summary>Settings: the "Show help again" button (a third of the row).</summary>
         void AddSettingsHelpAgain(RectTransform c, float x, float y, float w, float rowH)
         {
-            SettingsWordButton(c, "ShowHelpAgain", "Help again", 0, "Show help again", x, y, w, rowH, () =>
+            SettingsIconWordButton(c, "ShowHelpAgain", "Help again", "icon_help_again", 0, "Show help again", x, y, w, rowH, () =>
             {
                 HelpState.ShowAgain(progress);
                 ShowSettings();   // rebuild so the Help switch shows on

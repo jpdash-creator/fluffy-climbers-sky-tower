@@ -1,0 +1,35 @@
+{
+  "asset": "toriilintel_widths",
+  "kind": "toriilintel",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 808,
+      "h": 152,
+      "bodyLeft": 28,
+      "bodyRight": 780,
+      "surfaceY": 40,
+      "bodyBottom": 124,
+      "width": 4.5,
+      "file": "reg005_toriilintel_slab_w4_5.png",
+      "ppu": 167.111,
+      "kind": "toriilintel",
+      "dir": 0,
+      "pose": "slab"
+    },
+    {
+      "w": 1058,
+      "h": 152,
+      "bodyLeft": 28,
+      "bodyRight": 1030,
+      "surfaceY": 40,
+      "bodyBottom": 124,
+      "width": 6.0,
+      "file": "reg005_toriilintel_slab_w6.png",
+      "ppu": 167.0,
+      "kind": "toriilintel",
+      "dir": 0,
+      "pose": "slab"
+    }
+  ]
+}

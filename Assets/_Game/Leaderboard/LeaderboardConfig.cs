@@ -14,7 +14,7 @@ namespace FluffyClimbers.Leaderboard
         /// <summary>Play Games project web client (OAuth 2.0 client id of type Web) used to get the server auth code for Firebase.</summary>
         public const string WebClientId = "794061115424-kuj7okc9p7c7n07263gonqqngeipvug1.apps.googleusercontent.com";
         /// <summary>Rules version of the simulation this client runs; the service replays only versions it knows (design doc 5.2). Bump with the simulation. 3 = owner Final Change 2 (2026-11-23): hero stat bands, per-copy rolled powers and the region penalty change what a replay computes.</summary>
-        public const int SimVersion = 3;
+        public const int SimVersion = 4;
         /// <summary>The deployed Cloud Run service (public identifier). Used only by the development-build Admin switch LEADERBOARD TEST; releases read the remote config.</summary>
         public const string DefaultBaseUrl = "https://fluffy-leaderboard-763742589585.asia-south1.run.app";
         public const string FirestoreRestRoot = "https://firestore.googleapis.com/v1/";

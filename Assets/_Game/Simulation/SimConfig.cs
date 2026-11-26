@@ -276,8 +276,8 @@ namespace FluffyClimbers.Simulation
         public Fx LadybugAmplitudeMax = Fx.FromRatio(14, 10);
         public Fx LadybugMaxWidth = Fx.FromInt(4);
 
-        /// <summary>Seesaw Leaf: slides the player toward the tilted edge (1.8 u/s); landings within SeesawDeadZone of the centre tilt toward the direction of travel.</summary>
-        public Fx SeesawSlide = Fx.FromRatio(18, 600);
+        /// <summary>Seesaw Leaf: slides the player toward the tilted edge (3.0 u/s since 2026-11-25, was 1.8); landings within SeesawDeadZone of the centre tilt toward the direction of travel, else toward the leaf's seeded side (Platform.Dir).</summary>
+        public Fx SeesawSlide = Fx.FromRatio(30, 600);
         public Fx SeesawDeadZone = Fx.FromRatio(2, 10);
         public Fx SeesawMinWidth = Fx.FromInt(3);
 
@@ -350,6 +350,55 @@ namespace FluffyClimbers.Simulation
         public Fx PufferHopVx = Fx.FromRatio(10, 100);
         public Fx PufferMinWidth = Fx.FromInt(3);
 
+        // ---- Final Change 6: new Region 3 kinds (owner-approved 2026-11-25; Moon Jelly Chain, Splitting Pier, Undertow Pad, Sea Foam Pad) ----
+        /// <summary>Moon Jelly Chain: launch multiplier of the jump speed on pad 0, 1, 2 of a chain (x1.15, x1.30, x1.45). A landing on pad k >= 1 launches only when it follows the takeoff from pad k - 1 within JellyChainWindowTicks (100); otherwise it is a plain landing. The rows below pad 1 and 2 are JellyGap1 (4.6 u) and JellyGap2 (5.8 u) lower (the stepped launches reach them; the layout keeps the next row after pad 2 within BounceNextGapMax).</summary>
+        public Fx JellyLaunch0 = Fx.FromRatio(115, 100);
+        public Fx JellyLaunch1 = Fx.FromRatio(130, 100);
+        public Fx JellyLaunch2 = Fx.FromRatio(145, 100);
+        public int JellyChainWindowTicks = 100;
+        /// <summary>Moon Jelly Chain (integration 2026-11-25): the centre distance between pad k - 1 and pad k (k >= 1) is at most this many units, so the stepped flight lands on the next pad inside JellyChainWindowTicks (random layouts with 4.4 to 6 u between pads had no solution).</summary>
+        public Fx JellyNextDxMax = Fx.FromRatio(15, 10);
+        /// <summary>Moon Jelly Chain: the climb INTO pad 0 is at most this high and at most this far sideways (centre distance); integration 2026-11-25.</summary>
+        public Fx JellyEntryGapMax = Fx.FromRatio(42, 10);
+        public Fx JellyEntryDxMax = Fx.FromRatio(30, 10);
+        /// <summary>Kelp Tangle (integration 2026-11-25): after the 0.6 s jump lock the climb to the next row is at most this high and the sideways step at most KelpNextDxMax beyond the platform edges (a random Boss Rise layout had no solution).</summary>
+        public Fx KelpNextGapMax = Fx.FromRatio(34, 10);
+        public Fx KelpNextDxMax = Fx.FromRatio(15, 10);
+        public Fx JellyGap1 = Fx.FromRatio(46, 10);
+        public Fx JellyGap2 = Fx.FromRatio(58, 10);
+        /// <summary>Moon Jelly Chain: pads of one chain (three consecutive rows).</summary>
+        public const int JellyChainLength = 3;
+        /// <summary>Moon Jelly Chain (integration 2026-11-26): the first pad of a chain is at least this many rows above the last pad of the previous chain (two chains back to back had no solution).</summary>
+        public const int JellySpacingRows = 6;
+        /// <summary>Moon Jelly Chain (integration 2026-11-26): the platform of the row after the last pad is at most this far (edge to edge, u) from the pad; it was BounceNextDxMax (3.0 u), which had no solution at the Insane setting.</summary>
+        public Fx JellyExitDxMax = Fx.FromRatio(20, 10);
+        /// <summary>Moon Jelly Chain (integration 2026-11-26): the main platform of the row after the last pad is at least this wide.</summary>
+        public Fx JellyExitMinWidth = Fx.FromInt(3);
+
+        /// <summary>Launch multiplier of chain member <paramref name="k"/> (0 to 2).</summary>
+        public Fx JellyLaunchOf(int k) { return k <= 0 ? JellyLaunch0 : (k == 1 ? JellyLaunch1 : JellyLaunch2); }
+
+        /// <summary>Splitting Pier: one cycle of PierCycleTicks (240): closed for PierClosedTicks, the gap opens over PierOpenTicks (smoothstep), holds PierHoldTicks, closes over the rest (70). Wide gap: PierGap4 at width 4, PierGap6 at 6, PierGap8 at 8 (any other width interpolates by the same steps). Built 4, 6 or 8 u wide (PierMinWidth).</summary>
+        public int PierCycleTicks = 240;
+        public int PierClosedTicks = 60;
+        public int PierOpenTicks = 70;
+        public int PierHoldTicks = 40;
+        public Fx PierGap4 = Fx.FromRatio(12, 10);
+        public Fx PierGap6 = Fx.FromRatio(16, 10);
+        public Fx PierGap8 = Fx.FromRatio(20, 10);
+        public Fx PierMinWidth = Fx.FromInt(4);
+
+        /// <summary>Undertow Pad: in the column UndertowHalfWidth either side of the pad and up to UndertowHeight above it gravity is UndertowGravityPercent percent while the player moves up. The row above is at most UndertowGapMax higher; the layout reaches it with UndertowReachFactor of the normal jump speed.</summary>
+        public Fx UndertowHalfWidth = Fx.FromRatio(16, 10);
+        public Fx UndertowHeight = Fx.FromRatio(35, 10);
+        public int UndertowGravityPercent = 170;
+        public Fx UndertowGapMax = Fx.FromInt(3);
+        public Fx UndertowReachFactor = Fx.FromRatio(8, 10);
+
+        /// <summary>Sea Foam Pad: after a landing the friction and the steering fade linearly from normal to SlipperyFriction / SlipperyAccel over FoamFadeTicks (1.5 s); a fresh landing starts full again. At least 3 u wide.</summary>
+        public int FoamFadeTicks = 90;
+        public Fx FoamMinWidth = Fx.FromInt(3);
+
         // ---- Region 4 (Candy Canyon) special platforms (doc 30 section 5) ----
         /// <summary>Candy Bowl: 4 to 8 u wide; outside the centre BowlCenterPercent of the width a standing player is pulled back toward the middle at BowlPull per tick (1.5 u/s).</summary>
         public Fx BowlMinWidth = Fx.FromInt(4);
@@ -370,17 +419,75 @@ namespace FluffyClimbers.Simulation
         public Fx TaffyMinWidth = Fx.FromRatio(24, 10);
         public Fx TaffyAmplitude = Fx.FromRatio(14, 10);
         public int TaffyPeriodTicks = 270;
-        /// <summary>Jelly Wobble: after a landing the cube wobbles sideways up to JellyAmplitude (0.6 u), fading over JellyWobbleTicks (1.5 s), with a JellyWaveTicks (20 = 3 Hz) wave. At least JellyMinWidth wide.</summary>
-        public Fx JellyAmplitude = Fx.FromRatio(6, 10);
+        /// <summary>
+        /// Taffy Stretch surprise (owner 2026-11-25): every taffy gets its OWN rhythm from a hash of its Platform.Phase and Period (no extra random draw, so the level layout is unchanged):
+        /// the real period is TaffyPeriodTicks x TaffyPeriodMinPercent..TaffyPeriodMaxPercent percent, the stretch is TaffyStretchMinPercent..100 percent of Platform.Amplitude,
+        /// and the edges move on an eased wave (slow at the ends, quick in the middle). The narrow width (Platform.Width) is what the generator and the bot rely on.
+        /// </summary>
+        public int TaffyPeriodMinPercent = 70;
+        public int TaffyPeriodMaxPercent = 130;
+        public int TaffyStretchMinPercent = 70;
+        /// <summary>
+        /// Taffy Stretch snap: TaffySnapPercent of the taffies (by the same hash) snap shut after a landing: TaffySnapDelayMin + (0..TaffySnapDelaySpan - 1) ticks later (varies by landing)
+        /// the width closes to the narrow width in TaffySnapInTicks, stays narrow TaffySnapHoldTicks, then eases back out over TaffySnapOutTicks to the breathing width. One snap per landing
+        /// episode (a new one needs TaffySnapTotalTicks since the last landing record). A player standing outside the narrow width drops through the edge (coyote jump still works).
+        /// </summary>
+        public int TaffySnapPercent = 45;
+        public int TaffySnapDelayMin = 20;
+        public int TaffySnapDelaySpan = 31;
+        public int TaffySnapInTicks = 8;
+        public int TaffySnapHoldTicks = 50;
+        public int TaffySnapOutTicks = 40;
+        /// <summary>Longest snap sequence, ticks (delay + in + hold + out).</summary>
+        public int TaffySnapTotalTicks { get { return TaffySnapDelayMin + TaffySnapDelaySpan - 1 + TaffySnapInTicks + TaffySnapHoldTicks + TaffySnapOutTicks; } }
+        /// <summary>
+        /// Jelly Wobble (owner 2026-11-25): after a landing the cube sways sideways up to JellyAmplitude (0.9 u) on a smooth sine of JellyWaveTicks (40 = 1.5 Hz), eased in over JellyAttackTicks
+        /// and fading out with a raised-cosine envelope over JellyWobbleTicks (1.5 s; the Keep Moving half-limit test caps it at 90). At least JellyMinWidth wide.
+        /// </summary>
+        public Fx JellyAmplitude = Fx.FromRatio(9, 10);
         public int JellyWobbleTicks = 90;
-        public int JellyWaveTicks = 20;
-        /// <summary>Jelly Wobble: the share (percent) of the cube's sideways movement that carries a standing player along; the rest slides under the feet, so a wobble can shake an edge-standing player off.</summary>
-        public int JellyCarryPercent = 60;
+        public int JellyWaveTicks = 40;
+        public int JellyAttackTicks = 12;
+        /// <summary>Jelly Wobble: the share (percent) of the cube's sideways movement that carries a standing player along (convincing: he rides the cube); the rest is a slight slide under the feet.</summary>
+        public int JellyCarryPercent = 92;
         public Fx JellyMinWidth = Fx.FromRatio(35, 10);
         /// <summary>Pinwheel Gust: airborne players in the column PinwheelHalfWidth either side (2.0 u wide) and up to PinwheelHeight (3.5 u) above it are pushed PinwheelPush (3.0 u/s) along Platform.Dir.</summary>
         public Fx PinwheelHalfWidth = Fx.One;
         public Fx PinwheelHeight = Fx.FromRatio(35, 10);
         public Fx PinwheelPush = Fx.FromRatio(3, 60);
+
+        // ---- Final Change 6 (owner 2026-11-25): four new region 4 kinds. Numbers are the proposals of Planning/FINAL-CHANGE-6-NEW-PLATFORMS-R4-R5.md, kept by the bot proof. ----
+        /// <summary>
+        /// Melting Scoop: while stood on, the usable width shrinks by 1 u per MeltTicksPerUnit ticks (60 = 1 u/s, 0.5 u/s per edge) from the painted width down to MeltCoreWidth (1.0 u), which never melts;
+        /// once empty it refreezes at MeltRefreezePercent (100) percent of that rate. Same clock as the Sprout Lift (SproutLevel). Painted 3, 4 and 6 u; an edge that melts under the feet drops the player.
+        /// </summary>
+        public Fx MeltCoreWidth = Fx.One;
+        public int MeltTicksPerUnit = 60;
+        public int MeltRefreezePercent = 100;
+        /// <summary>Caramel Magnet: an airborne player within MagnetRadius (1.6 u) of the platform's axis and up to MagnetHeight (3.0 u) above its surface is drawn toward the axis at MagnetPull (2.2 u/s, never past it); the air steering (18 u/s squared) always beats it. Painted 2, 3 and 4 u.</summary>
+        public Fx MagnetRadius = Fx.FromRatio(16, 10);
+        public Fx MagnetHeight = Fx.FromInt(3);
+        public Fx MagnetPull = Fx.FromRatio(22, 600);
+        /// <summary>
+        /// Sour Sprinkler Cannon: global cycle of SprinklerCycleTicks (2.5 s), the jet fires for SprinklerOnTicks (36) at the end of it (the lid lifts for SprinklerLidTicks (20) before; the view pose only). While it fires,
+        /// an airborne player within SprinklerHalfWidth (0.5 u either side, 1.0 u wide) and up to SprinklerHeight (3.2 u) above the surface is pushed DOWN at SprinklerPush (5.0 u/s, position only: his own speed is untouched,
+        /// so the steering works and nothing is lost after the burst). Painted 2 and 3 u.
+        /// </summary>
+        public int SprinklerCycleTicks = 150;
+        public int SprinklerOnTicks = 36;
+        public int SprinklerLidTicks = 20;
+        public Fx SprinklerHalfWidth = Fx.Half;
+        public Fx SprinklerHeight = Fx.FromRatio(32, 10);
+        public Fx SprinklerPush = Fx.FromRatio(5, 60);
+        /// <summary>
+        /// Sugar Glass Ledge: painted 4, 6 and 8 u with a glass end of GlassEndWidth (0.8 u) each side (solid centre 2.4, 4.4, 6.4 u). Standing on an end for GlassCrackTicks (20) ticks cracks it: the end drops away
+        /// and re-forms GlassReformTicks (150) ticks later; a player still on it drops (coyote jump works), a quick landing and jump from an end is safe. State: CrumbleTick[id] = crack tick x 2 + (1 for the right end), -1 whole;
+        /// the dwell counter is SimState.GlassDwell.
+        /// </summary>
+        public Fx GlassEndWidth = Fx.FromRatio(8, 10);
+        public int GlassCrackTicks = 20;
+        public int GlassReformTicks = 150;
+        public Fx GlassMinWidth = Fx.FromInt(4);
 
         // ---- Region 5 (Bamboo Temple) special platforms (doc 30 section 15) ----
         /// <summary>Bamboo Flick: a landing sets the launch speed to FlickLaunch (0.8) x the standing jump speed (JumpBase; apex 2.76 u as integrated) and FlickVx (8 u/s) sideways along Platform.Dir (toward the middle of the screen). Always 3 u wide.
@@ -426,6 +533,11 @@ namespace FluffyClimbers.Simulation
         public Fx MalletKnockVx = Fx.FromRatio(8, 60);
         public Fx MalletKnockVy = Fx.FromRatio(131, 1000);
         public int MalletInvulnTicks = 60;
+        /// <summary>
+        /// Owner 2026-11-25: the mallet acts for the whole time it is painted down (MalletSmashStart to MalletDownEnd, 50 ticks), not only the first MalletSmashTicks, and its zone reaches past the end of the
+        /// platform (the rim, the landing margin). Mallet and Log use their own anti-chain counter (SimState.BumpGuard, MalletInvulnTicks / LogInvulnTicks) instead of the shared Invuln, so a gong, revive or
+        /// earlier bump grace never makes them silently do nothing.
+        /// </summary>
         public Fx MalletMinWidth = Fx.FromRatio(45, 10);
         public Fx MalletMaxWidth = Fx.FromInt(6);
         /// <summary>Rolling Log: the platform is LogPlatformWidth (5 u) wide; a LogWidth (1.2 u) log rolls end to end (3.8 u) at 2.4 u/s, LogPeriodTicks = 190 for there and back. Contact within LogContactHalf (0.7 u) of the log centre while grounded, when landing on it, or
@@ -433,11 +545,152 @@ namespace FluffyClimbers.Simulation
         public Fx LogPlatformWidth = Fx.FromInt(5);
         public Fx LogWidth = Fx.FromRatio(12, 10);
         public int LogPeriodTicks = 190;
-        public Fx LogContactHalf = Fx.FromRatio(7, 10);
+        /// <summary>Owner 2026-11-25: 1.0 u (was 0.7). The log is 1.2 u wide and the hero 1.0 u (PlayerHalfWidth 0.5): their bodies overlap from 1.1 u apart, so 0.7 let the log roll visibly through the hero before it bumped.</summary>
+        public Fx LogContactHalf = Fx.FromRatio(10, 10);
         public Fx LogLowAir = Fx.FromRatio(6, 10);
         public Fx LogBumpVy = Fx.FromRatio(155, 1000);
         public Fx LogBumpVx = Fx.FromRatio(72, 1000);
         public int LogInvulnTicks = 60;
+
+        // ---- Final Change 6: new Region 1 (Meadow Springs) kinds (ids 43 to 46). Integer / fixed point; units per tick unless noted (60 ticks per second). ----
+        /// <summary>
+        /// Glowworm Relay (PlatformKind 43): RelayLength (4) platforms on 4 consecutive rows. Landing on the head (Platform.Phase 0) while the relay is idle starts the relay clock; pad k (0 to 3) is
+        /// solid only from tick RelayStepTicks x k to RelayStepTicks x k + RelayHoldTicks after the start (45 ticks per row, 75 ticks held, so neighbouring windows overlap by 30 ticks), a ghost that does not
+        /// hold otherwise. RelayTotalTicks (210) after the start the relay is idle again (only the head is solid). The rows of a relay are RelayGapMin to RelayGapMax apart (a flight of 36 to 54 ticks lands inside the next window
+        /// from any take-off 9 to 65 ticks after the pad opened).
+        /// </summary>
+        public const int RelayLength = 4;
+        /// <summary>Rows a relay keeps clear below the next relay (the plan never places two relays closer than this).</summary>
+        public const int RelaySpacingRows = 8;
+        /// <summary>Endless tower: rows between the heads of two relays (about one per level of 100 floors, like the campaign levels).</summary>
+        public const int EndlessRelaySpacingRows = 45;
+        public int RelayStepTicks = 45;
+        public int RelayHoldTicks = 75;
+        public int RelayTotalTicks { get { return (RelayLength - 1) * RelayStepTicks + RelayHoldTicks; } }
+        public Fx RelayGapMin = Fx.FromRatio(24, 10);
+        public Fx RelayGapMax = Fx.FromRatio(38, 10);
+        /// <summary>Largest sideways distance between two pads of one relay (a run-up and a flight must fit inside the 45-tick step).</summary>
+        public Fx RelayDxMax = Fx.FromInt(3);
+        /// <summary>
+        /// Dragonfly Dart (44): DartDelayTicks (24, 0.4 s of wing buzz) after a landing the platform darts Platform.Amplitude (2.4 u, 1.6 u at widths 1.5 and 2, never more than the room to the wall) along Platform.Dir at DartSpeed
+        /// (0.1 u per tick = 6 u/s), pauses DartPauseTicks (30), then glides back at DartBackSpeed (1 u/s, 144 ticks for 2.4 u) and is idle again. It carries the player. The next row is placed so that it is
+        /// reachable from the resting and from the darted position (SpecialPlatforms.DartNextX).
+        /// </summary>
+        public int DartDelayTicks = 24;
+        public Fx DartSpeed = Fx.FromRatio(10, 100);
+        public int DartPauseTicks = 30;
+        public Fx DartBackSpeed = Fx.FromRatio(1, 60);
+        public Fx DartLength = Fx.FromRatio(24, 10);
+        public Fx DartLengthSmall = Fx.FromRatio(16, 10);
+        /// <summary>
+        /// Dewdrop Mirror Leaf (45): while the hero is airborne, within MirrorRange (6 u) of the leaf horizontally and vertically, the leaf slides toward home + (home - hero x) x factor, limited to Platform.Amplitude
+        /// (1.2 u at widths 1.5 and 2, 1.8 u at 3 and 4, 1.0 u at 6 and 8) either side of home and at most MirrorSpeed (5 u/s); factor = Platform.Period percent (35 at widths 1.5 and 2, else 50). It does not move while the hero stands on
+        /// it and for MirrorFreezeTicks (30) after he left it. The offset is kept in SimState.CrumbleTick in 1/MirrorUnit u (packed with the freeze deadline). Controls are never changed.
+        /// </summary>
+        public Fx MirrorRange = Fx.FromInt(6);
+        public Fx MirrorSpeed = Fx.FromRatio(5, 60);
+        public int MirrorFreezeTicks = 30;
+        public int MirrorFactorPercent = 50;
+        public int MirrorFactorSmallPercent = 35;
+        public Fx MirrorLimitSmall = Fx.FromRatio(12, 10);
+        public Fx MirrorLimitMid = Fx.FromRatio(18, 10);
+        public Fx MirrorLimitWide = Fx.One;
+        /// <summary>
+        /// Silk Snare Web (46): a band WebThickness (0.5 u) thick hangs WebHeight (3.0 u) above the platform, WebWidthSmall (2.5 u) wide at widths 1.5 and 2, else min(WebWidthMax (4 u), width + WebWidthPad (0.75 u)), centred on the platform.
+        /// The first pass UP through it (once per air phase and web) cuts the vertical speed by WebCutPercent (45): a standing jump peaks 4.51 u, 3.46 u after the cut. The row above a web is at most WebGapMax (2.9 u, spec 3.2 u: the integrated cut jump peaks about 3.3 u, so 3.2 left no margin and the bot could not pass) higher.
+        /// </summary>
+        public Fx WebHeight = Fx.FromInt(3);
+        public Fx WebThickness = Fx.FromRatio(5, 10);
+        public Fx WebWidthSmall = Fx.FromRatio(25, 10);
+        public Fx WebWidthMax = Fx.FromInt(4);
+        public Fx WebWidthPad = Fx.FromRatio(75, 100);
+        public int WebCutPercent = 45;
+        public Fx WebGapMax = Fx.FromRatio(29, 10);
+        /// <summary>A web only catches climbs that started at or near the web platform's own level: a jump from a platform more than WebLaunchMargin (0.5 u) above the web platform (the next rows, whose floor sits just under or inside the band) is never cut.</summary>
+        public Fx WebLaunchMargin = Fx.FromRatio(5, 10);
+
+        // ---- Final Change 6: new Region 5 (Bamboo Temple) kinds (owner-approved 2026-11-25). Numbers: Planning/FINAL-CHANGE-6-NEW-PLATFORMS-R4-R5.md, kept by the bot proof. Units per tick unless noted. ----
+        /// <summary>
+        /// Prayer Scroll Runner (painted 3, 4.5, 6 u): the scroll starts open. ScrollOpenTicks (90) after a landing it rolls up from the back end toward the roll end (side Platform.Dir, the middle of the screen)
+        /// at ScrollRetractSpeed (3 u/s) down to a ScrollRollWidth (1.2 u) roll that stays solid, holds ScrollHoldTicks (60), then unfurls at ScrollUnfurlSpeed (4 u/s). One cycle per landing episode
+        /// (CrumbleTick[id] = the landing tick; a landing inside a cycle does not restart it). The retract is slower than the run speed and moves away from the player who walks toward the roll end.
+        /// </summary>
+        public int ScrollOpenTicks = 90;
+        public Fx ScrollRetractSpeed = Fx.FromRatio(3, 60);
+        public Fx ScrollUnfurlSpeed = Fx.FromRatio(4, 60);
+        public Fx ScrollRollWidth = Fx.FromRatio(12, 10);
+        public int ScrollHoldTicks = 60;
+        public Fx ScrollMinWidth = Fx.FromInt(3);
+        public Fx ScrollMaxWidth = Fx.FromInt(6);
+        /// <summary>
+        /// Torii Lintel (painted 4.5 and 6 u): a lintel LintelHeight (2.6 u) above the slab and 2 x LintelHalf (2.0 u) wide in the middle. A hero rising into it (his head, PlayerCenterY x 2 above the feet, reaches the underside)
+        /// is stopped (Vy = 0) and falls; the slab sides beyond LintelHalf stay open. The row above a Torii Lintel is LintelGapMin (3.0 u) to NormalGapMax higher so the lintel never sits in the next platform.
+        /// </summary>
+        public Fx LintelHeight = Fx.FromRatio(26, 10);
+        public Fx LintelHalf = Fx.One;
+        public Fx LintelGapMin = Fx.FromInt(3);
+        public Fx LintelMinWidth = Fx.FromRatio(45, 10);
+        public Fx LintelMaxWidth = Fx.FromInt(6);
+        /// <summary>
+        /// Incense Mist Bank (painted 3 and 4.5 u): in the column MistHalfWidth (1.3 u) either side of the burner and MistHeight (3.0 u) above it an airborne player loses MistDragPercent (4) percent of the horizontal speed per tick
+        /// and has MistSteerPercent (50) percent of the air steering; vertical speed is untouched. The next row sits at most MistNextDxMax (3.2 u) sideways from the burner (a damped jump reaches less).
+        /// </summary>
+        public Fx MistHalfWidth = Fx.FromRatio(13, 10);
+        public Fx MistHeight = Fx.FromInt(3);
+        public int MistDragPercent = 4;
+        public int MistSteerPercent = 50;
+        public Fx MistNextDxMax = Fx.FromRatio(32, 10);
+        public Fx MistMinWidth = Fx.FromInt(3);
+        public Fx MistMaxWidth = Fx.FromRatio(45, 10);
+        /// <summary>
+        /// Water Bamboo Tipper (painted 3 and 4.5 u): standing TipperFillTicks (120) ticks fills and tips the spout; for TipperCarryTicks (24) ticks the player is carried TipperCarrySpeed (3 u/s) along Platform.Dir (toward the middle),
+        /// never past the end of the slab; it rights itself over TipperRightTicks (60). Leaving (or landing) before it tipped restarts the fill. CrumbleTick[id] = the landing tick. Not placed on No Wall Touch levels.
+        /// </summary>
+        public int TipperFillTicks = 120;
+        public int TipperCarryTicks = 24;
+        public int TipperRightTicks = 60;
+        public Fx TipperCarrySpeed = Fx.FromRatio(3, 60);
+        public Fx TipperMinWidth = Fx.FromInt(3);
+        public Fx TipperMaxWidth = Fx.FromRatio(45, 10);
+
+        // ---- Final Change 6: new Region 2 (Mushroom Grove) kinds. All integer / fixed point; units per tick unless noted (60 ticks per second). ----
+        /// <summary>
+        /// Teeter Cap (PlatformKind 47): while grounded the player drifts outward by TeeterGrowth x its offset from the centre per tick (about 1.2 per second: the time from the
+        /// centre zone to the edge is about 1.2 s at every width), at most TeeterDriftMax (1.5 u/s, gentle: the steering of 5 u/s beats it). An exactly centred player is nudged
+        /// TeeterSeed toward Platform.Dir so the balance is never perfectly stable. The jump multiplier is 1.00 inside the centre zone (TeeterCentreSmall 0.3 u at 1.5 wide,
+        /// TeeterCentreMid 0.4 u at 2, TeeterCentreWide 0.5 u from 3 up) and falls linearly to TeeterEdgePercent (78) at the edge. The row above is at most TeeterGapMax (3.4 u) higher,
+        /// which a x0.94 jump (offset about a quarter of the way out) still reaches.
+        /// </summary>
+        public Fx TeeterGrowth = Fx.FromRatio(2, 100);
+        public Fx TeeterDriftMax = Fx.FromRatio(25, 1000);
+        public Fx TeeterSeed = Fx.FromRatio(5, 100);
+        public Fx TeeterCentreSmall = Fx.FromRatio(3, 10);
+        public Fx TeeterCentreMid = Fx.FromRatio(4, 10);
+        public Fx TeeterCentreWide = Fx.FromRatio(5, 10);
+        public int TeeterEdgePercent = 78;
+        public Fx TeeterGapMax = Fx.FromRatio(34, 10);
+        /// <summary>
+        /// Fog Puff Drift (PlatformKind 48): a cloud FogCloudWidth (2.4 u) wide and FogHeight (3.0 u) high sits over the platform and drifts along a triangle path of Platform.Amplitude
+        /// either side of the platform centre at FogSpeed (1.2 u/s). The lane is the platform width plus 1 u, so the amplitude is (width + 1 - 2.4) / 2, at least FogMinAmplitude
+        /// (0.6 u) and at most FogMaxAmplitude (3.0 u); Platform.Period = 4 x amplitude / speed (about 200 ticks per u of amplitude). While an airborne player is inside the cloud the
+        /// horizontal speed is limited to FogSpeedCapPercent (35) of the top speed; vertical motion is untouched. Never pushes, never damages.
+        /// </summary>
+        public Fx FogCloudWidth = Fx.FromRatio(24, 10);
+        public Fx FogHeight = Fx.FromInt(3);
+        public Fx FogSpeed = Fx.FromRatio(2, 100);
+        public Fx FogMinAmplitude = Fx.FromRatio(6, 10);
+        public Fx FogMaxAmplitude = Fx.FromInt(3);
+        public int FogSpeedCapPercent = 35;
+        /// <summary>
+        /// Spore Funnel (PlatformKind 49): in the column FunnelHalfExtra (0.6 u) wider than the platform half width (at least FunnelHalfMin 1.35 u) and FunnelHeight (3.5 u) high above the
+        /// platform an airborne player is pulled toward the column axis (the platform centre) at up to FunnelPull (2.5 u/s; never past the axis). The platform after a funnel sits at most
+        /// FunnelNextDxMax (3.0 u) plus the half widths away, so a counter-steer always reaches it. No Wall Touch levels have none (the pull can carry the player to a wall).
+        /// </summary>
+        public Fx FunnelPull = Fx.FromRatio(25, 600);
+        public Fx FunnelHalfMin = Fx.FromRatio(135, 100);
+        public Fx FunnelHalfExtra = Fx.FromRatio(6, 10);
+        public Fx FunnelHeight = Fx.FromRatio(35, 10);
+        public Fx FunnelNextDxMax = Fx.FromInt(3);
 
         // ---- Generator: how many rows carry a new special platform (percent of free rows), by campaign level ----
         /// <summary>Share of rows with a new special platform: SpecialShareLevel3Percent at level 3 rising linearly to SpecialShareLevel25Percent at level 25 (the top level of the 25-level rule).</summary>
@@ -537,6 +790,37 @@ namespace FluffyClimbers.Simulation
         public int KeepMovingLimitTicks = 180;
         /// <summary>The HUD countdown ring shows while this many ticks or fewer are left (the last 2 s).</summary>
         public int KeepMovingWarnTicks = 120;
+        /// <summary>
+        /// Rival Race levels (Final Change 6): the ghost's pace in percent of the pace the path was baked at (RivalRace.BakedPacePercent, 85 percent of the LevelBot pace). The Gameplay setting sets it
+        /// (RivalRace.PaceByMode: Relaxed 65, Easy 75, Normal 85, Hard 90, Insane 95), GameSession.ApplyDifficulty and RunReplayer.ConfigFor do the same. 85 = the baked path as stored.
+        /// </summary>
+        public int RivalPacePercent = 85;
+
+        // Boss Rise levels (owner Final Change 6, 2026-11-25; LevelSpec.BossRise, Planning/FINAL-CHANGE-6-LEVEL-TYPE-OPTIONS.md H3): see Sim.BossRoarTicksLeft
+        /// <summary>A boss phase starts every this many floors (the first when the hero first reaches that row).</summary>
+        public int BossPhaseRows = 25;
+        /// <summary>Roar telegraph before a lunge (1.5 s).</summary>
+        public int BossRoarTicks = 90;
+        /// <summary>The lunge lasts this many ticks (0.5 s) and moves the danger line up BossLungeDistance in total (on top of the normal scroll).</summary>
+        public int BossLungeTicks = 30;
+        public Fx BossLungeDistance = Fx.FromInt(2);
+        /// <summary>A lunge never carries the line closer than this under the hero's feet (it squeezes the buffer, it never kills by itself: CUX-7 no unavoidable damage).</summary>
+        public Fx BossLungeMinGap = Fx.FromRatio(1, 2);
+        /// <summary>Speed gain per lunge, percent of the speed at that point (cumulative: +8, +16, ...). Applied before the 4 u/s ceiling, multiplied on the setting steps like the Chase row ramp.</summary>
+        public int BossLungeSpeedPercent = 8;
+        /// <summary>The top this many rows of a boss level are the boss arena: wide painted platforms (6 or 8 u), no special platforms, no hazards.</summary>
+        public int BossArenaRows = 10;
+
+        // Sprint and Rest levels (owner Final Change 6, 2026-11-25; LevelSpec.SprintRest, H4): see Sim.ShelterRestTicksLeft and SprintRestRules
+        /// <summary>A shelter platform sits on every this many floors (25, 50, ...), except in the top SprintTopReserveRows rows.</summary>
+        public int ShelterRows = 25;
+        public int ShelterTopReserveRows = 10;
+        /// <summary>Shelter platform width (u), one of the painted widths.</summary>
+        public Fx ShelterWidth = Fx.FromInt(8);
+        /// <summary>Longest rest on a shelter (3 s): the danger line is held while the hero stands on it, once per shelter.</summary>
+        public int ShelterRestTicks = 180;
+        /// <summary>Every shelter taken makes the line this percent faster from then on (cumulative: +15, +30, ...), before the 4 u/s ceiling.</summary>
+        public int ShelterSpeedPercent = 15;
 
         // ---------------------------------------------------------------------------------------
         // Power-ups (docs/15 FR-PWR; owner decisions 2026-10-20). Player effects only: they never change the layout.

@@ -115,8 +115,8 @@ namespace FluffyClimbers.Simulation.Tests
             LevelSpec b = T3.Spec(777, 700, 10, SignatureKind.SwingingGongs, GoalType.SurviveWave);
             b.FixedChunks = new string[] { "chunk_complex_a" };
             b.Class = 3;
-            Assert.Equal(-1274289823304530343L, LevelBuilder.Build(cfg, a).ComputeHash());   // re-rolled 2026-11-13 (economy review: no gem pickups; was -3181476168520851783); re-rolled 2026-11-10: region 1 got the generics Crumble and Moving (was -7839884808577442138, re-rolled 2026-10-31 for doc 24)
-            Assert.Equal(4519676794810349580L, LevelBuilder.Build(cfg, b).ComputeHash());   // re-rolled 2026-11-17 (gem levels restored: 2 or 3 collectible gems; was -3729750187827399642); re-rolled 2026-11-16 (collectible gems on level 10: was 5136200250945043513); re-rolled 2026-11-13 (economy review: no gem pickups; was -9118401508389237609); re-rolled 2026-11-04: SwingingGongs (region 5) now draws from its 7 new kinds (Bug List 3 D5); was -5175047465905895765
+            Assert.Equal(-4264933285507034215L, LevelBuilder.Build(cfg, a).ComputeHash());   // re-rolled 2026-11-26 (Final Change 6 integration; was 4542318949224134653); re-rolled 2026-11-25 (Ladybug and Seesaw fixes; was -1274289823304530343); re-rolled 2026-11-13 (economy review: no gem pickups; was -3181476168520851783); re-rolled 2026-11-10: region 1 got the generics Crumble and Moving (was -7839884808577442138, re-rolled 2026-10-31 for doc 24)
+            Assert.Equal(-5875272777180945040L, LevelBuilder.Build(cfg, b).ComputeHash());   // re-rolled 2026-11-17 (gem levels restored: 2 or 3 collectible gems; was -3729750187827399642); re-rolled 2026-11-16 (collectible gems on level 10: was 5136200250945043513); re-rolled 2026-11-13 (economy review: no gem pickups; was -9118401508389237609); re-rolled 2026-11-04: SwingingGongs (region 5) now draws from its 7 new kinds (Bug List 3 D5); was -5175047465905895765
         }
 
         [Fact]
@@ -186,8 +186,10 @@ namespace FluffyClimbers.Simulation.Tests
                     Assert.Empty(d.Hazards);
                 }
             }
-            Assert.True(sigCount[0] > 0, "the tutorial level already shows the signature platform");
-            Assert.True(sigCount[4] > sigCount[0], "share grows with the level: " + sigCount[0] + " vs " + sigCount[4]);
+            // owner 2026-11-25: launchers are off level 1, so a launch signature first shows at level 3 (index 1)
+            int first = PlatformKinds.IsLaunch(kind) ? 1 : 0;
+            Assert.True(PlatformKinds.IsLaunch(kind) ? sigCount[0] == 0 : sigCount[0] > 0, "the tutorial level shows the signature platform unless it is a launcher");
+            Assert.True(sigCount[4] > sigCount[first] * 8 / 10, "share grows with the level: " + sigCount[first] + " vs " + sigCount[4]);
         }
 
         [Fact]

@@ -1,0 +1,91 @@
+{
+  "asset": "moonjellychain_widths",
+  "kind": "moonjellychain",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 361,
+      "h": 127,
+      "bodyLeft": 13,
+      "bodyRight": 347,
+      "surfaceY": 19,
+      "bodyBottom": 102,
+      "width": 2.0,
+      "file": "reg003_moonjellychain_unarmed_w2.png",
+      "ppu": 167.0,
+      "kind": "moonjellychain",
+      "dir": -1,
+      "pose": "unarmed"
+    },
+    {
+      "w": 520,
+      "h": 140,
+      "bodyLeft": 7,
+      "bodyRight": 513,
+      "surfaceY": 20,
+      "bodyBottom": 103,
+      "width": 3.0,
+      "file": "reg003_moonjellychain_unarmed_w3.png",
+      "ppu": 168.667,
+      "kind": "moonjellychain",
+      "dir": -1,
+      "pose": "unarmed"
+    },
+    {
+      "w": 682,
+      "h": 140,
+      "bodyLeft": 7,
+      "bodyRight": 675,
+      "surfaceY": 20,
+      "bodyBottom": 103,
+      "width": 4.0,
+      "file": "reg003_moonjellychain_unarmed_w4.png",
+      "ppu": 167.0,
+      "kind": "moonjellychain",
+      "dir": -1,
+      "pose": "unarmed"
+    },
+    {
+      "w": 348,
+      "h": 132,
+      "bodyLeft": 7,
+      "bodyRight": 341,
+      "surfaceY": 15,
+      "bodyBottom": 99,
+      "width": 2.0,
+      "file": "reg003_moonjellychain_armed_w2.png",
+      "ppu": 167.0,
+      "kind": "moonjellychain",
+      "dir": 1,
+      "pose": "armed"
+    },
+    {
+      "w": 516,
+      "h": 136,
+      "bodyLeft": 7,
+      "bodyRight": 508,
+      "surfaceY": 16,
+      "bodyBottom": 99,
+      "width": 3.0,
+      "file": "reg003_moonjellychain_armed_w3.png",
+      "ppu": 167.0,
+      "kind": "moonjellychain",
+      "dir": 1,
+      "pose": "armed"
+    },
+    {
+      "w": 682,
+      "h": 134,
+      "bodyLeft": 7,
+      "bodyRight": 675,
+      "surfaceY": 17,
+      "bodyBottom": 100,
+      "width": 4.0,
+      "file": "reg003_moonjellychain_armed_w4.png",
+      "ppu": 167.0,
+      "kind": "moonjellychain",
+      "dir": 1,
+      "pose": "armed"
+    }
+  ]
+}

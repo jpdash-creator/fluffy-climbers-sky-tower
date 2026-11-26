@@ -39,11 +39,11 @@ namespace FluffyClimbers.Simulation.Tests
         {
             switch (region0)
             {
-                case 0: return new[] { PlatformKind.WindPetal, PlatformKind.HiveLift, PlatformKind.SnapDaisy, PlatformKind.Dandelion, PlatformKind.ThornBush, PlatformKind.Ladybug, PlatformKind.Seesaw, PlatformKind.Bounce, PlatformKind.Crumble, PlatformKind.Moving };
-                case 1: return new[] { PlatformKind.SquishCap, PlatformKind.SproutLift, PlatformKind.PuffFloat, PlatformKind.FairyRing, PlatformKind.OrbitCap, PlatformKind.DizzySpores, PlatformKind.SporePop, PlatformKind.BounceCap, PlatformKind.Crumble, PlatformKind.Slippery };
-                case 2: return new[] { PlatformKind.SurfBoostWave, PlatformKind.SandcastleStep, PlatformKind.ClamShellPad, PlatformKind.SinkingRaft, PlatformKind.TurtleShuttle, PlatformKind.KelpTangle, PlatformKind.PufferfishPad, PlatformKind.Moving, PlatformKind.Crumble, PlatformKind.Vanishing };
-                case 3: return new[] { PlatformKind.CandyBowl, PlatformKind.FlossGlide, PlatformKind.FizzVent, PlatformKind.LicoriceBelt, PlatformKind.TaffyStretch, PlatformKind.JellyWobble, PlatformKind.PinwheelGust, PlatformKind.Sticky, PlatformKind.Crumble, PlatformKind.Slippery };
-                default: return new[] { PlatformKind.BambooFlick, PlatformKind.LanternLift, PlatformKind.KoiStone, PlatformKind.SwingPlank, PlatformKind.PagodaRidge, PlatformKind.MalletSmash, PlatformKind.RollingLog, PlatformKind.Moving, PlatformKind.Vanishing };
+                case 0: return new[] { PlatformKind.WindPetal, PlatformKind.HiveLift, PlatformKind.SnapDaisy, PlatformKind.Dandelion, PlatformKind.ThornBush, PlatformKind.Ladybug, PlatformKind.Seesaw, PlatformKind.GlowwormRelay, PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf, PlatformKind.SilkSnareWeb, PlatformKind.Bounce, PlatformKind.Crumble, PlatformKind.Moving };
+                case 1: return new[] { PlatformKind.SquishCap, PlatformKind.SproutLift, PlatformKind.PuffFloat, PlatformKind.OrbitCap, PlatformKind.DizzySpores, PlatformKind.SporePop, PlatformKind.TeeterCap, PlatformKind.FogPuffDrift, PlatformKind.SporeFunnel, PlatformKind.BounceCap, PlatformKind.Crumble, PlatformKind.Slippery };
+                case 2: return new[] { PlatformKind.SurfBoostWave, PlatformKind.SandcastleStep, PlatformKind.ClamShellPad, PlatformKind.SinkingRaft, PlatformKind.TurtleShuttle, PlatformKind.KelpTangle, PlatformKind.PufferfishPad, PlatformKind.MoonJellyChain, PlatformKind.SplittingPier, PlatformKind.UndertowPad, PlatformKind.SeaFoamPad, PlatformKind.Moving, PlatformKind.Crumble, PlatformKind.Vanishing };
+                case 3: return new[] { PlatformKind.CandyBowl, PlatformKind.FlossGlide, PlatformKind.FizzVent, PlatformKind.LicoriceBelt, PlatformKind.TaffyStretch, PlatformKind.JellyWobble, PlatformKind.PinwheelGust, PlatformKind.MeltingScoop, PlatformKind.CaramelMagnet, PlatformKind.SourSprinklerCannon, PlatformKind.SugarGlassLedge, PlatformKind.Sticky, PlatformKind.Crumble, PlatformKind.Slippery };
+                default: return new[] { PlatformKind.BambooFlick, PlatformKind.LanternLift, PlatformKind.KoiStone, PlatformKind.SwingPlank, PlatformKind.PagodaRidge, PlatformKind.MalletSmash, PlatformKind.RollingLog, PlatformKind.PrayerScrollRunner, PlatformKind.ToriiLintel, PlatformKind.IncenseMistBank, PlatformKind.WaterBambooTipper, PlatformKind.Moving, PlatformKind.Vanishing };
             }
         }
 
@@ -131,7 +131,7 @@ namespace FluffyClimbers.Simulation.Tests
                 foreach (PlatformKind k in all)
                 {
                     int unlock = EndlessTower.KindUnlockFloor(cfg, spec, k);
-                    Assert.Equal(PlatformKinds.IsHazardType(k) ? EndlessTower.FloorsPerLevel : 0, unlock);
+                    Assert.Equal(PlatformKinds.NoTutorial(k) ? EndlessTower.FloorsPerLevel : 0, unlock);   // hazard types and the Glowworm Relay (Final Change 6) unlock with level 2
                 }
                 Assert.Equal(-1, EndlessTower.KindUnlockFloor(cfg, spec, PlatformKind.Normal));
             }

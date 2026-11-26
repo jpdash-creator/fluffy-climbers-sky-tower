@@ -7,7 +7,9 @@ namespace FluffyClimbers.Simulation
         /// <summary>The goal item of FindHiddenGem levels.</summary>
         HiddenGem = 2,
         /// <summary>One of the 3 collectible stars of a level (Tag = star index 0..2). Economy v2 (owner, 2026-10-20).</summary>
-        Star = 3
+        Star = 3,
+        /// <summary>One of the rings of a Sky Hoops level (Final Change 6): a big ring in mid-air on the arc of a jump; taking it adds 1 to SimState.Rings.</summary>
+        Ring = 4
     }
 
     /// <summary>A collectable. Collected once when the player centre (X, feet Y + PlayerCenterY) is within Radius.</summary>
@@ -62,6 +64,8 @@ namespace FluffyClimbers.Simulation
         /// <summary>Endless towers only: the exact region difficulty offset of the tower (the Sim would otherwise recover it from its start difficulty with a rounding error of a raw unit); not part of the hash.</summary>
         public Fx EndlessOffset;
         public bool HasEndlessOffset;
+        /// <summary>Rival Race levels only (null elsewhere): the baked ghost row every RivalRace.SampleTicks ticks (LevelSpec.GhostRowAtTick). Part of the hash, so a re-bake shows in the golden file; levels without it keep their hashes.</summary>
+        public int[] GhostRowAtTick;
 
         // Hints for bots and UI (not used by the Sim). -1 = not present.
         public int HiddenGemRow = -1;
@@ -70,6 +74,9 @@ namespace FluffyClimbers.Simulation
         public bool HiddenGemOnSidePlatform;
         public int LadderStartRow = -1;
         public int LadderEndRow = -1;
+        /// <summary>Combo Gates levels only (null elsewhere): first row of each gate (GateRules.StartRow) and the rungs per gate. The Sim sets SimState.GateMask bit k when a landing inside gate k gains GateFloors or more floors. Not part of the hash (the platforms are).</summary>
+        public int[] GateStartRows;
+        public int GateLength, GateFloors;
         public int WaveStartRow = -1;
         public int WaveEndRow = -1;
 
@@ -103,6 +110,11 @@ namespace FluffyClimbers.Simulation
             {
                 Pickup k = Pickups[i];
                 h = Mix(h, (int)k.Kind); h = Mix(h, k.X.Raw); h = Mix(h, k.Y.Raw); h = Mix(h, k.Radius.Raw); h = Mix(h, k.Tag);
+            }
+            if (GhostRowAtTick != null)
+            {
+                h = Mix(h, GhostRowAtTick.Length);
+                for (int i = 0; i < GhostRowAtTick.Length; i++) h = Mix(h, GhostRowAtTick[i]);
             }
             return Mix(h, Rows);
         }

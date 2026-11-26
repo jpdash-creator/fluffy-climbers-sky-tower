@@ -448,14 +448,14 @@ namespace FluffyClimbers.Simulation.Tests
         public void Region3UsesItsSevenKindsWithTheDriftingSignatureTwiceAndTwoGenericsAndEnumValuesAreStable()
         {
             PlatformKind[] set = RegionPlatformSets.For(SignatureKind.DriftingPlatforms);
-            Assert.Equal(7, set.Length);
+            Assert.Equal(11, set.Length);   // 7 + the four Final Change 6 kinds (Region3NewPlatformTests)
             Assert.All(set, k => Assert.True(PlatformKinds.IsRegion3New(k)));
             Assert.Equal(new[] { PlatformKind.Crumble, PlatformKind.Vanishing }, RegionPlatformSets.GenericsFor(SignatureKind.DriftingPlatforms));
-            Assert.Equal(7, RegionPlatformSets.For(SignatureKind.StickyGum).Length);   // region 4 has its own set since D5
-            Assert.Equal(7, RegionPlatformSets.For(SignatureKind.SwingingGongs).Length);   // region 5 got its seven kinds (Region5PlatformTests)
+            Assert.Equal(11, RegionPlatformSets.For(SignatureKind.StickyGum).Length);   // region 4 has its own set since D5
+            Assert.Equal(11, RegionPlatformSets.For(SignatureKind.SwingingGongs).Length);   // region 5 got its seven kinds (Region5PlatformTests)
             LevelSpec spec = Region3().First(l => l.Spec.LevelIndex == 5).Spec;
             PlatformKind[] options = SpecialPlatforms.Options(spec, PlatformKind.Moving);
-            Assert.Equal(11, options.Length);   // 7 new + drifting twice + Crumble + Vanishing
+            Assert.Equal(15, options.Length);   // 11 new + drifting twice + Crumble + Vanishing
             Assert.Equal(2, options.Count(k => k == PlatformKind.Moving));
             Assert.Equal(1, options.Count(k => k == PlatformKind.Crumble));
             Assert.Equal(1, options.Count(k => k == PlatformKind.Vanishing));
@@ -742,7 +742,7 @@ namespace FluffyClimbers.Simulation.Tests
             output.WriteLine("endless special share: floors 5-40 " + ep.ToString("F1") + " percent, floors 200-320 " + lp.ToString("F1") + " percent");
             Assert.InRange(ep, 8, 16);   // endless cycle: floors 5-40 are the start of level 1 (10 to 30 percent ramp over its 100 floors)
             Assert.InRange(lp, 18, 30);   // floors 200-320 are levels 2 to 4 (Bug List 6 curve: 10 to 35 percent ramps)
-            Assert.Equal(10, seen.Count);   // seven new platforms, the drifting platform and the two generics appear
+            Assert.Equal(14, seen.Count);   // eleven new platforms (seven + the four Final Change 6 kinds), the drifting platform and the two generics appear
         }
 
         [Fact]

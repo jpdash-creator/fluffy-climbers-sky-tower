@@ -245,6 +245,7 @@ namespace FluffyClimbers.Gameplay
             BuildHazards();
             BuildPlayer();
             BuildPowerFx();
+            BuildBoss();
             if (!endless) BuildPortal();   // endless towers have no goal
             for (int i = 0; i < pops.Length; i++) pops[i] = MakePop();
 
@@ -455,6 +456,7 @@ namespace FluffyClimbers.Gameplay
         int KindPieceIndexFor(Platform p, float width)
         {
             if (region == null || !SpecialPlatformFx.Handles(p.Kind)) return -1;
+            if (p.Kind == PlatformKind.SplittingPier) return region.KindPieceIndex(p.Kind, -1, width * 0.5f);   // Final Change 6: the painted pier is two halves (left piece = pose -1, its mirror = pose 1), each half the width of the pier
             return region.KindPieceIndex(p.Kind, PosedKind(p.Kind) ? -1 : (p.Dir < 0 ? -1 : 1), width);   // posed kinds start on pose -1; the pose is swapped per frame (see PoseOf)
         }
 
@@ -466,12 +468,18 @@ namespace FluffyClimbers.Gameplay
         {
             return k == PlatformKind.SporePop || k == PlatformKind.ClamShellPad || k == PlatformKind.PufferfishPad
                 || k == PlatformKind.LicoriceBelt || k == PlatformKind.TaffyStretch || k == PlatformKind.JellyWobble || k == PlatformKind.PinwheelGust
-                || k == PlatformKind.BambooFlick || k == PlatformKind.MalletSmash;
+                || k == PlatformKind.BambooFlick || k == PlatformKind.MalletSmash
+                // Final Change 6 painted poses (Tools/art_pipeline/bake_region{1..5}_fc6_platforms.py): relay live / ghost, mirror leaf normal / shimmer, moon jelly unarmed / armed, melting scoop full / melted / core,
+                // sugar glass intact / cracked left / cracked right, sprinkler closed / lid / firing, tipper empty / full / tipped / pour, prayer scroll open / half / rolled
+                || k == PlatformKind.GlowwormRelay || k == PlatformKind.DewdropMirrorLeaf || k == PlatformKind.MoonJellyChain || k == PlatformKind.MeltingScoop
+                || k == PlatformKind.SugarGlassLedge || k == PlatformKind.SourSprinklerCannon || k == PlatformKind.WaterBambooTipper || k == PlatformKind.PrayerScrollRunner;
         }
 
         /// <summary>Walkable width the painted pose of a Taffy Stretch shows (four steps from the narrow 2.4 u to the wide 5.2 u: 2.4, 3.3, 4.3, 5.2); every other kind keeps its Platform.Width.</summary>
         static float PoseWidth(Platform p, int pose)
         {
+            if (p.Kind == PlatformKind.MeltingScoop) return pose == 1 ? Mathf.Floor(p.Width.F() * 6.6f + 0.5f) / 10f : (pose == 2 ? 1f : p.Width.F());   // full, melted (66 percent) and the 1 u core are separate painted pieces
+            if (p.Kind == PlatformKind.PrayerScrollRunner) return pose == 1 ? Mathf.Floor((p.Width.F() + 1.2f) * 5f + 0.5f) / 10f : (pose == 2 ? 1.2f : p.Width.F());   // open, half rolled, the 1.2 u roll
             if (p.Kind != PlatformKind.TaffyStretch) return p.Width.F();
             float narrow = p.Width.F(), span = 2f * p.Amplitude.F();
             return narrow + span * (pose < 0 ? 0 : pose) / 3f;
@@ -492,7 +500,7 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.TaffyStretch:
                     {
                         float span = 2f * p.Amplitude.F();
-                        int step = span < 0.01f ? 0 : Mathf.RoundToInt((session.Sim.WidthAt(p.Id, tick).F() - p.Width.F()) / span * 3f);   // nearest of the four painted widths
+                        int step = span < 0.01f ? 0 : Mathf.RoundToInt((session.Sim.WidthAt(p.Id, tick, s.CrumbleTick).F() - p.Width.F()) / span * 3f);   // nearest of the four painted widths
                         return step <= 0 ? -1 : step;
                     }
                 case PlatformKind.JellyWobble:
@@ -503,6 +511,35 @@ namespace FluffyClimbers.Gameplay
                 // Region 5: the Bamboo Flick is sprung for the half second after it flicked the player (rest -1, sprung 1); the Mallet Smash is down from the smash until it lifts again (raised -1, smashed 1); both read the Sim clocks
                 case PlatformKind.BambooFlick: return s.GroundId == p.Id && tick - s.LandTick < 30 ? 1 : -1;
                 case PlatformKind.MalletSmash: return session.Sim.MalletDown(p.Id, tick) ? 1 : -1;
+                // Final Change 6: the painted state of the new kinds follows the Sim clocks (relay solid window, mirror motion, chain arm window, melt width, glass crack, sprinkler lid, tipper fill, scroll length)
+                case PlatformKind.GlowwormRelay: return session.Sim.RelaySolid(p.Id, tick, s.CrumbleTick) ? -1 : 1;
+                case PlatformKind.DewdropMirrorLeaf: return !session.Sim.MirrorFrozen(p.Id, tick, s.CrumbleTick) && session.Sim.MirrorOffset(p.Id, s.CrumbleTick).Raw != 0 ? 1 : -1;
+                case PlatformKind.MoonJellyChain:
+                    {
+                        int k = session.Sim.JellyIndexOf(p.Id);
+                        return k >= 1 && s.JellyArm == k && s.Tick - s.JellyTick <= session.Sim.Cfg.JellyChainWindowTicks ? 1 : -1;
+                    }
+                case PlatformKind.MeltingScoop:
+                    {
+                        float bw = p.Width.F(), cw = session.Sim.WidthAt(p.Id, tick, s.CrumbleTick).F();
+                        float mw = PoseWidth(p, 1);
+                        return Mathf.Abs(cw - bw) <= Mathf.Abs(cw - mw) && Mathf.Abs(cw - bw) <= Mathf.Abs(cw - 1f) ? -1 : (Mathf.Abs(cw - mw) <= Mathf.Abs(cw - 1f) ? 1 : 2);
+                    }
+                case PlatformKind.SugarGlassLedge: { int side = session.Sim.GlassCrackedSide(p.Id, tick, s.CrumbleTick); return side == 0 ? -1 : (side < 0 ? 1 : 2); }
+                case PlatformKind.SourSprinklerCannon: { int sp = session.Sim.SprinklerPose(in p, tick); return sp == 0 ? -1 : sp; }
+                case PlatformKind.WaterBambooTipper:
+                    {
+                        int ph = session.Sim.TipperPhase(p.Id, tick, s.CrumbleTick);
+                        if (ph == 1) return 2;
+                        if (ph == 2) return 3;
+                        return s.CrumbleTick[p.Id] >= 0 && tick - s.CrumbleTick[p.Id] >= session.Sim.Cfg.TipperFillTicks / 2 ? 1 : -1;
+                    }
+                case PlatformKind.PrayerScrollRunner:
+                    {
+                        float len = session.Sim.ScrollLength(in p, p.Id, tick, s.CrumbleTick).F();
+                        float full = p.Width.F(), half = PoseWidth(p, 1), roll = 1.2f;
+                        return Mathf.Abs(len - full) <= Mathf.Abs(len - half) && Mathf.Abs(len - full) <= Mathf.Abs(len - roll) ? -1 : (Mathf.Abs(len - half) <= Mathf.Abs(len - roll) ? 1 : 2);
+                    }
                 default: return 0;
             }
         }
@@ -569,6 +606,7 @@ namespace FluffyClimbers.Gameplay
                 platformPose = new int[n];
                 platformOffX = new float[n];
                 platformOffY = new float[n];
+                shelterRoofSr = new SpriteRenderer[n];
                 return;
             }
             System.Array.Resize(ref platformSr, n);
@@ -577,6 +615,7 @@ namespace FluffyClimbers.Gameplay
             System.Array.Resize(ref platformPose, n);
             System.Array.Resize(ref platformOffX, n);
             System.Array.Resize(ref platformOffY, n);
+            System.Array.Resize(ref shelterRoofSr, n);
         }
 
         bool wideView;   // Wide Platforms running: every platform view is built x1.2 wide (the Sim lands them x1.2 wide)
@@ -620,7 +659,7 @@ namespace FluffyClimbers.Gameplay
             if (wideView)
             {
                 float target = baseWidth * WideScale;
-                if (kp >= 0 && !PosedKind(p.Kind)) kpDraw = region.KindPieceIndexAtOrAbove(p.Kind, p.Dir < 0 ? -1 : 1, target, baseWidth);
+                if (kp >= 0 && !PosedKind(p.Kind) && p.Kind != PlatformKind.SplittingPier) kpDraw = region.KindPieceIndexAtOrAbove(p.Kind, p.Dir < 0 ? -1 : 1, target, baseWidth);
                 if (kpDraw < 0) kpDraw = kp;
                 if (wp >= 0) { wpDraw = region.WidthPieceIndexAtOrAbove(WidthKindOf(p), target); if (wpDraw < 0) wpDraw = wp; }
             }
@@ -632,7 +671,7 @@ namespace FluffyClimbers.Gameplay
                 Sprite sp = kpc.Sprite;
                 PlatformMetric m = kpc.Metric;
                 float ppu = sp.pixelsPerUnit;
-                float s = baseWidth / ((kpn.Metric.BodyRight - kpn.Metric.BodyLeft) / kpn.Sprite.pixelsPerUnit);
+                float s = (p.Kind == PlatformKind.SplittingPier ? baseWidth * 0.5f : baseWidth) / ((kpn.Metric.BodyRight - kpn.Metric.BodyLeft) / kpn.Sprite.pixelsPerUnit);   // a pier piece is one half
                 sr.sprite = sp;
                 sr.drawMode = SpriteDrawMode.Simple;
                 sr.transform.localScale = new Vector3(s, s, 1f);
@@ -689,6 +728,9 @@ namespace FluffyClimbers.Gameplay
                 platformOffY[i] = -0.2f;
             }
             sr.color = kp >= 0 ? Color.white : PlatformTint(p.Kind);   // painted art keeps its own colours; the tint is only the placeholder
+            bool shelter = session.Sim.IsShelter(p.Id);
+            if (shelter && !AttachShelterRoof(i, p)) sr.color = ShelterTint;   // Sprint and Rest shelter (owner Final Change 6): the painted roof of the region stands on it; without the art the platform is a mint tint (the 8 u width and the HUD cue tell it too)
+            else if (!shelter && shelterRoofSr != null && i < shelterRoofSr.Length && shelterRoofSr[i] != null) shelterRoofSr[i].gameObject.SetActive(false);
             sr.flipX = false;                                          // a pooled ladybug view may still be mirrored
             sr.transform.rotation = Quaternion.identity;   // a pooled seesaw view may still be tilted
             platformSr[i] = sr;
@@ -696,7 +738,7 @@ namespace FluffyClimbers.Gameplay
             platformPose[i] = kp >= 0 && PosedKind(p.Kind) ? -1 : 0;
             if (SpecialPlatformFx.Handles(p.Kind))
             {
-                if (region != null) { specialFx.SetKnob(region.SeesawKnob, region.SeesawKnobTopDropPx); specialFx.SetStem(region.SproutStem, region.SproutStemTopDropPx); specialFx.SetLog(region.RollingLog, white); }
+                if (region != null) { specialFx.SetRegion(region); specialFx.SetKnob(region.SeesawKnob, region.SeesawKnobTopDropPx); specialFx.SetStem(region.SproutStem, region.SproutStemTopDropPx); specialFx.SetLog(region.RollingLog, white); }
                 specialFx.Attach(i, p, kp >= 0);
             }
             else specialFx.Release(i);
@@ -727,6 +769,7 @@ namespace FluffyClimbers.Gameplay
             platPool.Push(platformSr[i]);
             platformSr[i] = null;
             platformTf[i] = null;
+            if (shelterRoofSr != null && i < shelterRoofSr.Length && shelterRoofSr[i] != null) shelterRoofSr[i].gameObject.SetActive(false);
             specialFx.Release(i);
         }
 
@@ -785,6 +828,7 @@ namespace FluffyClimbers.Gameplay
                 ShiftDown(platformPose, dropP);
                 ShiftDown(platformOffX, dropP);
                 ShiftDown(platformOffY, dropP);
+                ShiftDown(shelterRoofSr, dropP);
                 specialFx.ShiftDown(dropP);
                 actLo = actLo > dropP ? actLo - dropP : 0;
                 actHi = actHi > dropP ? actHi - dropP : 0;
@@ -861,6 +905,7 @@ namespace FluffyClimbers.Gameplay
                 case PickupKind.Star: return 1.0f;
                 case PickupKind.Gem: return pk.Tag == SimConfig.DoubleGemTag ? 1.3f : 0.75f + 0.1f * Mathf.Clamp(pk.Tag, 0, 3);   // a double gem (worth 2) is drawn clearly bigger: size, not only colour (CUX-6)
                 case PickupKind.HiddenGem: return pk.Tag == 1 ? 1.35f : 1.1f;
+                case PickupKind.Ring: return RingDiameter;   // Sky Hoops ring (Final Change 6): drawn big, about the size of its 1.1 u collection radius
                 default: return 0.7f;
             }
         }
@@ -876,9 +921,71 @@ namespace FluffyClimbers.Gameplay
             Color.white, new Color(0.65f, 0.9f, 1f), new Color(0.9f, 0.6f, 1f), new Color(1f, 0.85f, 0.3f)
         };
 
+        // ---- Sky Hoops ring art (owner Final Change 6, batch 7: Art/Fc6/rings). One uniform scale for every frame (ring_idle is RingDiameter u wide). Idle and pulse swap slowly, a collected ring plays burst 1-3 then hides,
+        // a ring the danger line left behind turns into ring_spent. Reduced motion: no pulse and no burst, a collected ring just becomes the spent ring. Missing art: the tinted star placeholder.
+        public const float RingDiameter = 2.2f, RingBurstFrameSeconds = 0.12f;
+        public const int RingPulseTicks = 48;
+        Sprite ringIdle, ringPulse, ringSpent;
+        Sprite[] ringBurst;
+        float[] ringAge;
+        float ringScale;
+        Color ringTint = Color.white;
+
+        /// <summary>Per-region tint of the painted ring (the sprite is warm gold, so the tints are light); public for tests.</summary>
+        public static Color RingTintFor(int regionIndex)
+        {
+            switch (regionIndex)
+            {
+                case 1: return new Color(0.88f, 1f, 0.72f, 1f);
+                case 2: return new Color(1f, 0.82f, 1f, 1f);
+                case 3: return new Color(0.72f, 1f, 1f, 1f);
+                case 4: return new Color(1f, 0.78f, 0.92f, 1f);
+                case 5: return new Color(1f, 0.74f, 0.62f, 1f);
+                default: return Color.white;
+            }
+        }
+
+        public bool PaintedRings { get { return ringIdle != null; } }
+
+        void LoadRingArt(int pickupCount)
+        {
+            ringIdle = Resources.Load<Sprite>("Art/Fc6/rings/ring_idle");
+            if (ringIdle == null) return;
+            ringPulse = Resources.Load<Sprite>("Art/Fc6/rings/ring_pulse");
+            ringSpent = Resources.Load<Sprite>("Art/Fc6/rings/ring_spent");
+            var b1 = Resources.Load<Sprite>("Art/Fc6/rings/ring_burst1");
+            var b2 = Resources.Load<Sprite>("Art/Fc6/rings/ring_burst2");
+            var b3 = Resources.Load<Sprite>("Art/Fc6/rings/ring_burst3");
+            ringBurst = b1 != null && b2 != null && b3 != null ? new[] { b1, b2, b3 } : new Sprite[0];
+            if (ringPulse == null) ringPulse = ringIdle;
+            if (ringSpent == null) ringSpent = ringIdle;
+            ringScale = RingDiameter / ringIdle.bounds.size.x;
+            ringTint = RingTintFor(session.Region.Index);
+            ringAge = new float[pickupCount];
+        }
+
+        /// <summary>Per frame for one painted ring. No allocation.</summary>
+        void UpdateRing(int i, SpriteRenderer sr, bool taken, Pickup pk, int tick, float killY, float dt)
+        {
+            if (taken)
+            {
+                if (reduced) { if (sr.sprite != ringSpent) { sr.sprite = ringSpent; sr.color = Color.white; } return; }
+                ringAge[i] += dt;
+                int f = (int)(ringAge[i] / RingBurstFrameSeconds);
+                if (f >= ringBurst.Length) { if (sr.enabled) sr.enabled = false; return; }
+                sr.enabled = true;
+                if (sr.sprite != ringBurst[f]) sr.sprite = ringBurst[f];
+                return;
+            }
+            bool passed = pk.Y.F() + RingDiameter * 0.5f < killY;   // the danger line went past it: it can no longer be collected
+            Sprite want = passed ? ringSpent : (!reduced && (tick / RingPulseTicks) % 2 == 1 ? ringPulse : ringIdle);
+            if (sr.sprite != want) { sr.sprite = want; sr.color = passed ? Color.white : ringTint; }
+        }
+
         void BuildPickups()
         {
             Pickup[] picks = session.Data.Pickups;
+            LoadRingArt(picks.Length);
             pickupSr = new SpriteRenderer[picks.Length];
             pickupSeen = new bool[picks.Length];
             for (int i = 0; i < picks.Length; i++)
@@ -887,7 +994,7 @@ namespace FluffyClimbers.Gameplay
                 Sprite sprite = null;
                 if (art != null)
                 {
-                    if (pk.Kind == PickupKind.Star) sprite = art.StarFilled;
+                    if (pk.Kind == PickupKind.Star || pk.Kind == PickupKind.Ring) sprite = art.StarFilled;
                     else sprite = ArtCatalog.Pick(art.GemSizes, pk.Kind == PickupKind.HiddenGem ? 2 : Mathf.Min(pk.Tag, 2));   // Tag 4 (double) uses the biggest gem
                 }
                 var sr = NewSprite("pick" + pk.Id, sprite, 5);
@@ -899,7 +1006,14 @@ namespace FluffyClimbers.Gameplay
                     sr.transform.localScale = new Vector3(s, s, 1f);
                 }
                 else sr.transform.localScale = new Vector3(diameter, diameter, 1f);
-                if (pk.Kind == PickupKind.HiddenGem) sr.color = new Color(1f, 0.6f, 1f, 1f);
+                if (pk.Kind == PickupKind.Ring && ringIdle != null)
+                {
+                    sr.sprite = ringIdle;
+                    sr.color = ringTint;
+                    sr.transform.localScale = new Vector3(ringScale, ringScale, 1f);
+                }
+                else if (pk.Kind == PickupKind.Ring) sr.color = new Color(0.35f, 0.9f, 1f, 0.9f);
+                else if (pk.Kind == PickupKind.HiddenGem) sr.color = new Color(1f, 0.6f, 1f, 1f);
                 else if (pk.Kind == PickupKind.Gem) sr.color = pk.Tag == SimConfig.DoubleGemTag ? new Color(1f, 0.95f, 0.55f, 1f) : RarityTint[Mathf.Clamp(pk.Tag, 0, 3)];
                 sr.transform.position = new Vector3(pk.X.F(), PickupVisualY(pk), 0f);
                 pickupSr[i] = sr;
@@ -952,6 +1066,17 @@ namespace FluffyClimbers.Gameplay
 
         SpriteRenderer[] partSr = new SpriteRenderer[0];
         CharacterDef who;
+
+        // ---- Rival Race (Final Change 6): the translucent ghost hero of the rival, a tinted copy of the hero's own parts at 40 percent alpha (no new art) ----
+        Transform rivalGhost;
+        SpriteRenderer[] rivalParts = new SpriteRenderer[0];
+        /// <summary>Alpha of the rival ghost (owner Final Change 6: 40 percent) and its cool tint; uniform scale like the hero (CUX-9).</summary>
+        public const float RivalGhostAlpha = 0.4f;
+        public static readonly Color RivalGhostColor = new Color(0.62f, 0.82f, 1f, RivalGhostAlpha);
+        /// <summary>True while the rival ghost is drawn (tests); false on every level without a baked ghost path.</summary>
+        public bool RivalGhostShown { get { return rivalGhost != null && rivalGhost.gameObject.activeSelf; } }
+        /// <summary>World position of the rival ghost's centre (tests, AltTester).</summary>
+        public Vector3 RivalGhostPosition { get { return rivalGhost != null ? rivalGhost.position : Vector3.zero; } }
         /// <summary>Size in world units of the character canvas (every part picture is one full canvas); the player transform is scaled so it is playerHeight tall.</summary>
         Vector2 bodySize = new Vector2(0.9f, 1f);
 
@@ -991,6 +1116,44 @@ namespace FluffyClimbers.Gameplay
             playerSr = partSr.Length > 0 ? partSr[0] : NewSprite("Momo", null, 10, player);
             float s = playerHeight / bodySize.y;
             player.localScale = partSr.Length > 0 ? new Vector3(s, s, 1f) : new Vector3(0.9f, playerHeight, 1f);
+            BuildRivalGhost();
+        }
+
+        /// <summary>Rival Race levels only: a second copy of the hero's parts, tinted and at 40 percent alpha, behind the hero. Built once; moved in <see cref="UpdateRivalGhost"/>. No allocation per frame.</summary>
+        void BuildRivalGhost()
+        {
+            if (session == null || session.Sim == null || session.Sim.Level == null || session.Sim.Level.GhostRowAtTick == null || partSr.Length == 0) return;
+            var go = new GameObject("RivalGhost");
+            go.transform.SetParent(worldRoot, false);
+            rivalGhost = go.transform;
+            var group = go.AddComponent<UnityEngine.Rendering.SortingGroup>();
+            group.sortingOrder = 9;   // just behind the hero (10)
+            List<PartDraw> draws = PartsAssembler.Build(who, art);
+            var all = new List<SpriteRenderer>(draws.Count);
+            for (int i = 0; i < draws.Count; i++)
+            {
+                PartDraw d = draws[i];
+                SpriteRenderer sr = NewSprite("GhostPart" + d.Name, d.Sprite, i, rivalGhost);
+                Vector3 pos, scale;
+                d.LocalTransform(bodySize, out pos, out scale);
+                sr.transform.localScale = scale;
+                sr.transform.localPosition = pos;
+                sr.color = RivalGhostColor;
+                all.Add(sr);
+            }
+            rivalParts = all.ToArray();
+            float s = playerHeight / bodySize.y;
+            rivalGhost.localScale = new Vector3(s, s, 1f);   // uniform scale, never stretched
+        }
+
+        /// <summary>Per frame: puts the ghost on its baked path (RivalRace.GhostPosition, interpolated between the platforms of two samples). The path is the mechanic, so reduced motion changes nothing.</summary>
+        void UpdateRivalGhost()
+        {
+            if (rivalGhost == null) return;
+            SimState st = session.State;
+            if (!RivalRace.GhostPosition(session.Sim, in st, out Fx gx, out Fx gy)) { rivalGhost.gameObject.SetActive(false); return; }
+            if (!rivalGhost.gameObject.activeSelf) rivalGhost.gameObject.SetActive(true);
+            rivalGhost.position = new Vector3(gx.F(), gy.F() + playerHeight * 0.5f, 0f);
         }
 
         void SetPlayerColor(Color c)
@@ -1269,12 +1432,16 @@ namespace FluffyClimbers.Gameplay
                 pickupSeen[i] = true;
                 Pickup pk = picks[i];
                 float x = pk.X.F(), y = pk.Y.F();
-                AudioManager.Play(pk.Kind == PickupKind.Star ? Sfx.Star : (pk.Kind == PickupKind.Gem || pk.Kind == PickupKind.HiddenGem) ? Sfx.Gem : Sfx.Coin);
+                AudioManager.Play(pk.Kind == PickupKind.Star || pk.Kind == PickupKind.Ring ? Sfx.Star : (pk.Kind == PickupKind.Gem || pk.Kind == PickupKind.HiddenGem) ? Sfx.Gem : Sfx.Coin);
                 if (pk.Kind == PickupKind.Gem || pk.Kind == PickupKind.HiddenGem)
                 {
                     Sprite gem = art != null ? ArtCatalog.Pick(art.GemSizes, pk.Kind == PickupKind.HiddenGem ? 2 : Mathf.Min(pk.Tag, 2)) : null;
                     Color tint = pk.Kind == PickupKind.HiddenGem ? new Color(1f, 0.6f, 1f, 1f) : RarityTint[Mathf.Clamp(pk.Tag, 0, 3)];
                     Spawn(x, y, 0.9f, tint, 0.45f, 1.1f, gem);
+                }
+                else if (pk.Kind == PickupKind.Ring)
+                {
+                    if (ringIdle == null) Spawn(x, y, 2.4f, new Color(0.35f, 0.9f, 1f, 1f), 0.45f, 0.6f, art != null ? art.StarFilled : null);   // the painted ring plays its own burst frames instead
                 }
                 else if (pk.Kind == PickupKind.Star)
                     Spawn(x, y, 1.3f, Color.white, 0.5f, 0.9f, art != null ? art.StarFilled : null);
@@ -1342,6 +1509,7 @@ namespace FluffyClimbers.Gameplay
             SetPlayerColor(s.Invuln > 0 && (reduced || (tick / 10) % 2 == 0) ? new Color(1f, 1f, 1f, 0.55f) : Color.white);
             UpdatePowerFx(px, py + h * 0.5f);
             UpdateKeepMovingFx(px, py + playerHeight * 0.5f);   // centred on the unstretched hero so the squash of a landing does not move the ring
+            UpdateRivalGhost();
             UpdateGearFx(px, py + h * 0.5f, h);
 
             // Platforms (moving ones follow the sim, vanishing ones blink, crumbling ones fade).
@@ -1363,10 +1531,12 @@ namespace FluffyClimbers.Gameplay
                     else if (p.Kind == PlatformKind.SproutLift) y = session.Sim.PlatformY(p.Id, tick, s.CrumbleTick).F();                                  // rises while stood on, sinks when empty
                     else if (p.Kind == PlatformKind.SquishCap) y = p.Y.F() - session.Sim.SquishSink(in s, p.Id).F();                                       // sinks under the player
                     else if (p.Kind == PlatformKind.TurtleShuttle) x = session.Sim.PlatformX(p.Id, tick).F();                                              // region 3: stop-and-go glide from the Sim
+                    else if (p.Kind == PlatformKind.DragonflyDart || p.Kind == PlatformKind.DewdropMirrorLeaf) x = session.Sim.PlatformX(p.Id, tick, s.CrumbleTick).F();   // Final Change 6, region 1: the dart / the mirror slide come from the Sim
                     else if (p.Kind == PlatformKind.JellyWobble) x = session.Sim.PlatformX(p.Id, tick, s.CrumbleTick).F();                                 // region 4: the wobble after a landing comes from the Sim
                     else if (p.Kind == PlatformKind.SinkingRaft) y = session.Sim.PlatformY(p.Id, tick, s.CrumbleTick).F();                                 // sinks while stood on, springs back when empty
                     else if (p.Kind == PlatformKind.LanternLift) { x = session.Sim.PlatformX(p.Id, tick).F(); y = session.Sim.PlatformY(p.Id, tick, s.CrumbleTick).F(); }   // region 5: the lantern sways and rises while stood on (Sim)
                     else if (p.Kind == PlatformKind.SwingPlank) { x = session.Sim.PlatformX(p.Id, tick).F(); y = session.Sim.PlatformY(p.Id, tick).F(); }                       // region 5: the pendulum swing from the Sim
+                    else if (p.Kind == PlatformKind.PrayerScrollRunner) x = session.Sim.PlatformX(p.Id, tick, s.CrumbleTick).F();                                           // Final Change 6: the scroll rolls up toward its roll end (Sim)
                 }
                 var sr = platformSr[i];
                 if (platformPose[i] != 0)
@@ -1375,14 +1545,15 @@ namespace FluffyClimbers.Gameplay
                     int pose = PoseOf(p, tick, in s);
                     if (pose != platformPose[i]) SwapPosePiece(i, p, sr, pose);
                 }
-                if (p.Kind == PlatformKind.TaffyStretch && platformPose[i] == 0)
+                if ((p.Kind == PlatformKind.TaffyStretch || p.Kind == PlatformKind.MeltingScoop || p.Kind == PlatformKind.PrayerScrollRunner) && platformPose[i] == 0)   // Melting Scoop (Final Change 6): the placeholder melts with the Sim width until its three baked poses exist
                 {
                     // No painted pieces yet: the tinted normal platform breathes with the Sim width (a placeholder animation; the painted poses replace it)
                     Vector3 ts = platformTf[i].localScale;
                     float baseW = Mathf.Max(0.1f, p.Width.F());
-                    platformTf[i].localScale = new Vector3(platformBaseScaleX[i] * session.Sim.WidthAt(p.Id, tick).F() / baseW, ts.y, ts.z);
+                    platformTf[i].localScale = new Vector3(platformBaseScaleX[i] * session.Sim.WidthAt(p.Id, tick, s.CrumbleTick).F() / baseW, ts.y, ts.z);
                 }
                 platformTf[i].position = new Vector3(x + platformOffX[i], y + platformOffY[i], 0f);
+                if (shelterRoofSr[i] != null) shelterRoofSr[i].transform.position = new Vector3(x, y + shelterRoofLift, 0f);   // the roof follows its shelter (poles on the walking line)
                 if (SpecialPlatformFx.Handles(p.Kind)) specialFx.Update(i, p, session.Sim, in s, tick, x, y, sr);
                 if (p.Kind == PlatformKind.Vanishing || p.Kind == PlatformKind.Crumble)
                 {
@@ -1398,9 +1569,11 @@ namespace FluffyClimbers.Gameplay
             // Pickups (taken ones hide; stars pulse gently, unless reduced motion is on).
             Pickup[] picks = session.Data.Pickups;
             float pulse = reduced ? 1f : 1f + 0.08f * Mathf.Sin(tick * 0.12f);
+            float killNow = Mathf.Lerp(prevKill, curKill, alpha);
             for (int i = 0; i < picks.Length; i++)
             {
                 var sr = pickupSr[i];
+                if (ringIdle != null && picks[i].Kind == PickupKind.Ring) { UpdateRing(i, sr, s.PickupTaken != null && s.PickupTaken[i], picks[i], tick, killNow, deltaTime); continue; }
                 if (s.PickupTaken != null && s.PickupTaken[i]) { if (sr.enabled) sr.enabled = false; continue; }
                 if (picks[i].Kind == PickupKind.Star)
                 {
@@ -1437,6 +1610,7 @@ namespace FluffyClimbers.Gameplay
 
             UpdatePortal(deltaTime);
             UpdateCamera(Mathf.Lerp(prevKill, curKill, alpha));
+            UpdateBoss(Mathf.Lerp(prevKill, curKill, alpha), deltaTime);
             UpdateBackground();
             UpdateWalls();
         }
@@ -1503,6 +1677,125 @@ namespace FluffyClimbers.Gameplay
                 float inset = tiled ? wallWidth * 0.5f - 0.1f : 0.3f;   // the playfield edge is x = 0 / screen width; the wall overlaps it by 0.1
                 if (wallL[i] != null) wallL[i].transform.position = new Vector3(inset, y, 0f);
                 if (wallR[i] != null) wallR[i].transform.position = new Vector3(camHalfW * 2f - inset, y, 0f);
+            }
+        }
+
+        // ---- Boss Rise (owner Final Change 6, 2026-11-25): the region boss fills the bottom of the screen, its head is the danger line ----
+
+        /// <summary>Painted roof of a Sprint and Rest shelter (owner Final Change 6, batch 7: Art/Fc6/shelter/shelter_r1..r5). Drawn behind its platform (order -1, the hero is 10), one uniform scale: the roof is as wide as the platform
+        /// (8 u) but never taller than <see cref="ShelterRoofMaxHeight"/> (the tall pagoda is scaled down as a whole), centred on the platform, its pole bottoms on the walking line (sunk <see cref="ShelterRoofSink"/>).</summary>
+        public const string ShelterRoofName = "ShelterRoof";
+        public const float ShelterRoofMaxHeight = 5f, ShelterRoofSink = 0.05f;
+        SpriteRenderer[] shelterRoofSr;
+        Sprite shelterRoofSprite;
+        bool shelterRoofLoaded;
+        float shelterRoofLift, shelterRoofScale;
+
+        /// <summary>Shows the roof on platform i (true) or false when the art is missing (the caller tints the platform instead).</summary>
+        bool AttachShelterRoof(int i, Platform p)
+        {
+            if (!shelterRoofLoaded)
+            {
+                shelterRoofLoaded = true;
+                shelterRoofSprite = Resources.Load<Sprite>("Art/Fc6/shelter/shelter_r" + session.Region.Index);
+                if (shelterRoofSprite != null)
+                {
+                    Vector2 b = shelterRoofSprite.bounds.size;
+                    shelterRoofScale = Mathf.Min(p.Width.F() / b.x, ShelterRoofMaxHeight / b.y);
+                    shelterRoofLift = b.y * shelterRoofScale * 0.5f - ShelterRoofSink;
+                }
+            }
+            if (shelterRoofSprite == null || shelterRoofSr == null || i >= shelterRoofSr.Length) return false;
+            SpriteRenderer rr = shelterRoofSr[i];
+            if (rr == null)
+            {
+                rr = NewSprite(ShelterRoofName + i, shelterRoofSprite, -1);
+                rr.transform.localScale = new Vector3(shelterRoofScale, shelterRoofScale, 1f);
+                shelterRoofSr[i] = rr;
+            }
+            rr.gameObject.SetActive(true);
+            rr.transform.position = new Vector3(p.X.F(), p.Y.F() + shelterRoofLift, 0f);
+            return true;
+        }
+
+        /// <summary>Tint of a Sprint and Rest shelter platform while no painted shelter art exists (a warm mint, never the only cue: it is the one 8 u wide platform of its row).</summary>
+        static readonly Color ShelterTint = new Color(0.62f, 1f, 0.78f, 1f);
+        public const string BossBodyName = "BossBody", BossHeadName = "BossHead";
+        /// <summary>World height of the boss under the line and the head block of the placeholder; the painted boss keeps its own proportions (uniform scale to the screen width).</summary>
+        const float BossBodyHeight = 6f, BossPlaceholderHeadH = 1.7f, BossPlaceholderHeadW = 4.2f;
+        SpriteRenderer bossBody, bossHead, bossEyeL, bossEyeR;
+        Sprite bossIdle, bossRoar, bossLunge;
+        BossDef bossDef;
+        float bossShake;
+        /// <summary>The pose the boss shows (tests and the HUD tests): 0 idle, 1 roar, 2 lunge; -1 when the level has no boss.</summary>
+        public int BossPose { get; private set; } = -1;
+        /// <summary>True while the boss is drawn (tests).</summary>
+        public bool BossShown { get { return bossBody != null && bossBody.enabled; } }
+        /// <summary>True when the painted boss art was found; false while the plain tinted placeholder is drawn.</summary>
+        public bool BossHasArt { get { return bossIdle != null; } }
+
+        /// <summary>
+        /// Builds the boss of a Boss Rise level once. Art: Resources/Art/Boss/&lt;id&gt;/idle, roar, lunge (one picture each, the head at the top edge, as wide as the screen at most). Missing art is not
+        /// an error (CUX-10): a body block, a head block and two eyes in the boss tint are drawn instead; they are code-drawn shapes under the danger line, not cues on a platform (CUX-7).
+        /// </summary>
+        void BuildBoss()
+        {
+            if (endless || !session.Sim.BossRise) return;
+            bossDef = BossRoster.Of(session.Spec);
+            bossIdle = Resources.Load<Sprite>(bossDef.ArtPath + "/idle");
+            bossRoar = Resources.Load<Sprite>(bossDef.ArtPath + "/roar");
+            bossLunge = Resources.Load<Sprite>(bossDef.ArtPath + "/lunge");
+            if (bossRoar == null) bossRoar = bossIdle;
+            if (bossLunge == null) bossLunge = bossRoar;
+            Color tint = new Color(bossDef.TintR / 255f, bossDef.TintG / 255f, bossDef.TintB / 255f, 0.96f);
+            bossBody = NewSprite(BossBodyName, bossIdle != null ? bossIdle : white, -40);
+            bossBody.color = bossIdle != null ? Color.white : tint;
+            if (bossIdle == null)
+            {
+                bossHead = NewSprite(BossHeadName, white, -39);
+                bossHead.color = Color.Lerp(tint, Color.white, 0.18f);
+                bossEyeL = NewSprite("BossEyeL", white, -38);
+                bossEyeR = NewSprite("BossEyeR", white, -38);
+                bossEyeL.color = bossEyeR.color = new Color(1f, 1f, 1f, 1f);
+            }
+            BossPose = 0;
+        }
+
+        /// <summary>
+        /// Per frame: puts the boss under the interpolated danger line (its head top is the line) and picks the pose from the simulation (idle, roar, lunge). Reduced motion: no shake, the pose
+        /// still changes and the HUD banner carries the warning. The shake follows the simulation tick (frame rate independent), no allocation.
+        /// </summary>
+        void UpdateBoss(float killY, float deltaTime)
+        {
+            if (bossBody == null) return;
+            SimState st = session.State;
+            int roar = session.Sim.BossRoarTicksLeft(in st);
+            bool lunge = session.Sim.BossLunging(in st);
+            BossPose = lunge ? 2 : (roar > 0 ? 1 : 0);
+            bossShake = reduced ? 0f : (BossPose == 1 ? Mathf.Sin(st.Tick * 0.9f) * 0.09f : 0f);
+            float width = camHalfW * 2f;
+            if (bossIdle != null)
+            {
+                Sprite pic = BossPose == 2 ? bossLunge : (BossPose == 1 ? bossRoar : bossIdle);
+                bossBody.sprite = pic;
+                float w = pic.bounds.size.x, h = pic.bounds.size.y;
+                float sc = width / Mathf.Max(0.01f, w);   // one uniform scale (CUX-9)
+                bossBody.transform.localScale = new Vector3(sc, sc, 1f);
+                bossBody.transform.position = new Vector3(camHalfW + bossShake, killY - h * sc * 0.5f, 0f);
+            }
+            else
+            {
+                float lift = BossPose == 2 ? 0.35f : 0f;   // the head rises with the lunge
+                bossBody.transform.localScale = new Vector3(width + 2f, BossBodyHeight, 1f);
+                bossBody.transform.position = new Vector3(camHalfW, killY - BossBodyHeight * 0.5f - BossPlaceholderHeadH * 0.15f, 0f);
+                float headTop = killY + lift;
+                bossHead.transform.localScale = new Vector3(BossPlaceholderHeadW, BossPlaceholderHeadH, 1f);
+                bossHead.transform.position = new Vector3(camHalfW + bossShake, headTop - BossPlaceholderHeadH * 0.5f, 0f);
+                float eyeY = headTop - BossPlaceholderHeadH * (BossPose == 1 ? 0.35f : 0.42f);
+                float eyeS = BossPose == 1 ? 0.55f : 0.4f;   // the eyes widen in the roar: a shape cue next to the banner, never colour alone
+                bossEyeL.transform.localScale = bossEyeR.transform.localScale = new Vector3(eyeS, eyeS, 1f);
+                bossEyeL.transform.position = new Vector3(camHalfW - 0.9f + bossShake, eyeY, 0f);
+                bossEyeR.transform.position = new Vector3(camHalfW + 0.9f + bossShake, eyeY, 0f);
             }
         }
 

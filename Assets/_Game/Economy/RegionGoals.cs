@@ -65,7 +65,7 @@ namespace FluffyClimbers.Economy
     /// groups (Levels 15, Gameplay setting 25, Endless 15, Time Attack 8, Special levels 12). Region 1 pays 19,200 coins, 50 gems and 5 power-ups; the coins of the other
     /// regions use the region coin factor (<see cref="CoinPayoutRules.RegionFactorPercentOf"/>) rounded to the nearest 10; targets, gems and power-ups never scale. NO goal gives a hero.
     /// Retune here only. Regions 1..<see cref="PlayableRegions"/> have goals, the others are Coming Soon and have none.
-    /// Ids: second generation, "g2_&lt;region&gt;_&lt;token&gt;" (for example g2_1_clear_25, g2_3_hard_stars_75, g2_5_special_chase). The ids of the old table ("g_...") are never
+    /// Ids: second generation, "g2_&lt;region&gt;_&lt;token&gt;" (for example g2_1_clear_25, g2_3_hard_stars_75, g2_5_special_bossrise). The ids of the old table ("g_...") are never
     /// reused: an old claimed id left in a save matches nothing and is ignored.
     /// </summary>
     public static class RegionGoalTable
@@ -191,17 +191,17 @@ namespace FluffyClimbers.Economy
             Add(list, region, RewardGroup.TimeAttack, RegionGoalType.TimeAttackFloors, 6, "hardup_ta_100", "Time Attack: 100 floors on Hard or Insane", 100, 350, 0, 0, -1, 3);
 
             // ---- Special levels (12 goals, 2,400 coins, 6 gems) ----
-            for (int i = 0; i < SpecialLevels.All.Length; i++)
+            for (int i = 0; i < SpecialLevels.RewardTypes.Length; i++)
             {
-                SpecialLevelType type = SpecialLevels.All[i];
+                SpecialLevelType type = SpecialLevels.RewardTypes[i];   // Final Change 6: the six reward slots (see SpecialLevels.RewardTypes)
                 Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialClear, i + 1, "special_" + RewardTables.SpecialToken(type), RewardTables.SpecialClearTitle(type), 1, 100, 0, 0, -1, 0, type);
             }
-            Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialAll, 1, "special_all", "Clear all 6 special levels", SpecialLevels.Count, 200, 0, 0);
+            Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialAll, 1, "special_all", "Clear all 6 special levels", SpecialLevels.RewardCount, 200, 0, 0);
             Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialAllSettings, 1, "special_allsettings", "Clear a special level on all 5 settings", modes, 250, 0, 0);
-            Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialThreeStars, 1, "special_stars3", "Get 3 stars on all 6 special levels", SpecialLevels.Count, 300, 2, 0);
-            Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialAll, 2, "normalup_special_all", "Clear all 6 special levels on Normal or harder", SpecialLevels.Count, 300, 0, 0, -1, 2);
-            Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialAll, 3, "hardup_special_all", "Clear all 6 special levels on Hard or Insane", SpecialLevels.Count, 350, 4, 0, -1, 3);
-            Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialAll, 4, "insane_special_all", "Clear all 6 special levels on Insane", SpecialLevels.Count, 400, 0, 0, -1, 4);
+            Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialThreeStars, 1, "special_stars3", "Get 3 stars on all 6 special levels", SpecialLevels.RewardCount, 300, 2, 0);
+            Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialAll, 2, "normalup_special_all", "Clear all 6 special levels on Normal or harder", SpecialLevels.RewardCount, 300, 0, 0, -1, 2);
+            Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialAll, 3, "hardup_special_all", "Clear all 6 special levels on Hard or Insane", SpecialLevels.RewardCount, 350, 4, 0, -1, 3);
+            Add(list, region, RewardGroup.SpecialLevels, RegionGoalType.SpecialAll, 4, "insane_special_all", "Clear all 6 special levels on Insane", SpecialLevels.RewardCount, 400, 0, 0, -1, 4);
             return list;
         }
 

@@ -1,0 +1,35 @@
+{
+  "asset": "incensemistbank_widths",
+  "kind": "incensemistbank",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 571,
+      "h": 174,
+      "bodyLeft": 34,
+      "bodyRight": 535,
+      "surfaceY": 51,
+      "bodyBottom": 134,
+      "width": 3.0,
+      "file": "reg005_incensemistbank_burner_w3.png",
+      "ppu": 167.0,
+      "kind": "incensemistbank",
+      "dir": 0,
+      "pose": "burner"
+    },
+    {
+      "w": 815,
+      "h": 203,
+      "bodyLeft": 31,
+      "bodyRight": 783,
+      "surfaceY": 82,
+      "bodyBottom": 165,
+      "width": 4.5,
+      "file": "reg005_incensemistbank_burner_w4_5.png",
+      "ppu": 167.111,
+      "kind": "incensemistbank",
+      "dir": 0,
+      "pose": "burner"
+    }
+  ]
+}

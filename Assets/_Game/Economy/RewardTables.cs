@@ -111,9 +111,16 @@ namespace FluffyClimbers.Economy
         /// <summary>The special type of a "specialType.N" counter name; None for any other name.</summary>
         public static SpecialLevelType SpecialTypeOf(string stat)
         {
-            if (stat == null || stat.Length != SpecialTypePrefix.Length + 1 || string.CompareOrdinal(stat, 0, SpecialTypePrefix, 0, SpecialTypePrefix.Length) != 0) return SpecialLevelType.None;
-            int d = stat[stat.Length - 1] - '0';
-            return d >= 1 && d <= SpecialLevels.Count ? (SpecialLevelType)d : SpecialLevelType.None;
+            if (stat == null || stat.Length < SpecialTypePrefix.Length + 1 || stat.Length > SpecialTypePrefix.Length + 2 || string.CompareOrdinal(stat, 0, SpecialTypePrefix, 0, SpecialTypePrefix.Length) != 0) return SpecialLevelType.None;
+            int d = 0;
+            for (int i = SpecialTypePrefix.Length; i < stat.Length; i++)
+            {
+                int digit = stat[i] - '0';
+                if (digit < 0 || digit > 9) return SpecialLevelType.None;
+                d = d * 10 + digit;
+            }
+            // every defined type decodes (the retired Combo Climb and Chase too, so an old counter name never reads as "none of the types")
+            return d >= 1 && d <= (int)SpecialLevelType.RivalRace ? (SpecialLevelType)d : SpecialLevelType.None;
         }
     }
 
@@ -214,6 +221,11 @@ namespace FluffyClimbers.Economy
                 case SpecialLevelType.Chase: return "chase";
                 case SpecialLevelType.OneLife: return "onelife";
                 case SpecialLevelType.KeepMoving: return "keepmoving";
+                case SpecialLevelType.ComboGates: return "combogates";
+                case SpecialLevelType.SkyHoops: return "skyhoops";
+                case SpecialLevelType.BossRise: return "bossrise";
+                case SpecialLevelType.SprintRest: return "sprintrest";
+                case SpecialLevelType.RivalRace: return "rivalrace";
                 default: return "none";
             }
         }
@@ -263,9 +275,10 @@ namespace FluffyClimbers.Economy
                 W(E, "w2_ta100", "Time Attack: 100 floors", RewardStat.TimeAttackFloors, 100, 300),
                 W(E, "w2_taruns5", "Finish 5 Time Attack runs", RewardStat.TimeAttackRuns, 5, 300),
             };
-            foreach (SpecialLevelType type in SpecialLevels.All)
+            // Final Change 6: the owner's reward tables keep six slots (SpecialLevels.RewardTypes: Combo Gates took the Combo Climb slot, Boss Rise the Chase slot)
+            foreach (SpecialLevelType type in SpecialLevels.RewardTypes)
                 list.Add(W(X, "w2_special_" + SpecialToken(type), SpecialClearTitle(type), RewardStat.SpecialTypeStat(type), 1, 400));
-            list.Add(W(X, "w2_special_all6", "Clear all 6 special level types", RewardStat.SpecialTypes, SpecialLevels.Count, 600, 5));
+            list.Add(W(X, "w2_special_all6", "Clear all 6 special level types", RewardStat.SpecialTypes, SpecialLevels.RewardCount, 600, 5));
             list.Add(W(X, "w2_hard_special3", "Clear 3 special levels on Hard or Insane", RewardStat.AtLeast(RewardStat.Special, Hard), 3, 600, 5));
             return list;
         }

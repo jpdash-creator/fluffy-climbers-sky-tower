@@ -47,7 +47,8 @@ namespace FluffyClimbers.Content
             goal.TimeSec = level.Goal.TimeSec ?? 0;
             spec.Goal = goal;
 
-            if (attemptSeed != 0) { spec.AttemptSeed = attemptSeed; spec.BaseSeed = level.Seed; spec.Seed = LevelSpec.MixAttemptSeed(level.Seed, attemptSeed); }
+            // Rival Race (Final Change 6): the ghost path is baked on the level's own layout, so a rival level always plays that layout (a retry is a rematch on the same course); the server replay agrees.
+            if (attemptSeed != 0 && goal.Type != GoalType.RivalRace) { spec.AttemptSeed = attemptSeed; spec.BaseSeed = level.Seed; spec.Seed = LevelSpec.MixAttemptSeed(level.Seed, attemptSeed); }
 
             if (level.Overrides != null)
             {
@@ -61,7 +62,12 @@ namespace FluffyClimbers.Content
             {
                 spec.Special = SpecialLevels.RuleFromId(level.Special);
                 if (spec.Special == SpecialLevelType.None) throw new ContentException(level.Id, "Unknown special level rule '" + level.Special + "'.");
+                // Final Change 6: the rules of Boss Rise and Sprint and Rest are flags of the spec (the builder and the Sim read them); the boss follows the region.
+                spec.BossRiseRule = spec.Special == SpecialLevelType.BossRise;
+                spec.SprintRestRule = spec.Special == SpecialLevelType.SprintRest;
+                if (spec.BossRiseRule) spec.BossRegion = region.Index;
             }
+            if (level.GhostRowAtTick != null && level.GhostRowAtTick.Count > 0) spec.GhostRowAtTick = level.GhostRowAtTick.ToArray();   // Rival Race: the baked ghost path
             return spec;
         }
 

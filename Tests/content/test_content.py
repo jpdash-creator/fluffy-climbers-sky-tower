@@ -45,13 +45,13 @@ class ShippedContent(unittest.TestCase):
         self.assertEqual(coins, [(1000, 50), (2000, 100), (5000, 250), (10000, 500), (20000, 900), (50000, 2200), (100000, 4000)])
 
     def test_special_levels_follow_the_approved_placement(self):
-        # owner Final Change 1 (2026-11-22): six special types, one level each per region, never on a gem level; levels 10, 15, 20 are plain reachFloor levels
+        # owner Final Change 6 (2026-11-25): ten special levels per region, nine types (Boss Rise twice, the second on level 25); gem levels 5, 10, 15, 20 are plain reachFloor levels
         approved = {
-            1: {6: "noWallTouch", 9: "oneLife", 14: "noPowerUps", 16: "keepMoving", 21: "chase", 24: "comboClimb"},
-            2: {4: "noWallTouch", 7: "oneLife", 13: "noPowerUps", 16: "comboClimb", 18: "keepMoving", 23: "chase"},
-            3: {3: "chase", 6: "oneLife", 11: "noPowerUps", 17: "comboClimb", 21: "noWallTouch", 23: "keepMoving"},
-            4: {4: "noPowerUps", 6: "keepMoving", 11: "comboClimb", 14: "chase", 19: "noWallTouch", 24: "oneLife"},
-            5: {4: "noWallTouch", 6: "chase", 9: "keepMoving", 14: "comboClimb", 18: "oneLife", 24: "noPowerUps"},
+            1: {6: "noWallTouch", 8: "skyHoops", 9: "oneLife", 12: "rivalRace", 14: "noPowerUps", 16: "keepMoving", 17: "bossRise", 21: "sprintRest", 24: "comboGates", 25: "bossRise"},
+            2: {4: "noWallTouch", 7: "oneLife", 9: "skyHoops", 12: "rivalRace", 13: "noPowerUps", 14: "bossRise", 16: "comboGates", 18: "keepMoving", 23: "sprintRest", 25: "bossRise"},
+            3: {4: "sprintRest", 6: "oneLife", 8: "skyHoops", 11: "noPowerUps", 13: "rivalRace", 17: "comboGates", 18: "bossRise", 21: "noWallTouch", 23: "keepMoving", 25: "bossRise"},
+            4: {4: "noPowerUps", 6: "keepMoving", 7: "skyHoops", 11: "comboGates", 13: "rivalRace", 16: "bossRise", 19: "noWallTouch", 22: "sprintRest", 24: "oneLife", 25: "bossRise"},
+            5: {4: "noWallTouch", 6: "sprintRest", 9: "keepMoving", 12: "skyHoops", 14: "comboGates", 16: "bossRise", 18: "oneLife", 21: "rivalRace", 24: "noPowerUps", 25: "bossRise"},
         }
         rows = {1: 60}
         rows.update({i: 75 for i in range(2, 6)})
@@ -71,21 +71,24 @@ class ShippedContent(unittest.TestCase):
                 if t:
                     found[lv["index"]] = t
                 i = lv["index"]
-                if t == "comboClimb":
-                    self.assertEqual(lv["goal"], {"type": "comboChain", "value": 3, "count": 3})
+                if t == "comboGates":
+                    self.assertEqual(lv["goal"], {"type": "comboGates", "value": 3, "count": 3})
                     self.assertEqual(lv["overrides"], {"rows": rows[i]})
-                elif t == "chase":
-                    self.assertEqual(lv["goal"], {"type": "bossChase", "value": rows[i]})
-                    self.assertEqual(lv["overrides"], {"ramp": True})
+                elif t == "skyHoops":
+                    self.assertEqual(lv["goal"], {"type": "skyHoops", "value": 8, "count": 10})
+                    self.assertEqual(lv["overrides"], {"rows": rows[i]})
+                elif t == "rivalRace":
+                    self.assertEqual(lv["goal"], {"type": "rivalRace", "value": rows[i]})
+                    self.assertNotIn("overrides", lv)
                 elif t == "noWallTouch":
                     self.assertEqual(lv["goal"], {"type": "noWallBounce", "value": rows[i]})
                 else:
                     self.assertEqual(lv["goal"], {"type": "reachFloor", "value": rows[i]})   # floor counts did not change
                     self.assertNotIn("overrides", lv)
                 if i % 5 == 0:
-                    self.assertEqual(t, "", "%s is a gem level" % lv["id"])
+                    self.assertEqual(t, "bossRise" if i == 25 else "", "%s is a gem level" % lv["id"])
             self.assertEqual(found, approved[n])
-            self.assertEqual(sorted(found.values()), sorted(content.SPECIAL_TYPES))
+            self.assertEqual(sorted(set(found.values())), sorted(content.SPECIAL_TYPES))
         # the legacy regions carry no rule field
         for path in glob.glob(os.path.join(content.CONTENT, "levels", "region_0[0-3][0-9]_*_levels.json")):
             if int(os.path.basename(path)[7:10]) > 5:

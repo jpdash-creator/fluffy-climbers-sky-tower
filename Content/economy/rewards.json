@@ -564,18 +564,18 @@
       "coins": 400
     },
     {
-      "id": "w2_special_combo",
-      "title": "Clear the Combo Climb level",
+      "id": "w2_special_combogates",
+      "title": "Clear the Combo Gates level",
       "group": "special",
-      "stat": "specialType.3",
+      "stat": "specialType.7",
       "target": 1,
       "coins": 400
     },
     {
-      "id": "w2_special_chase",
-      "title": "Clear the Chase level",
+      "id": "w2_special_bossrise",
+      "title": "Clear the Boss Rise level",
       "group": "special",
-      "stat": "specialType.4",
+      "stat": "specialType.9",
       "target": 1,
       "coins": 400
     },

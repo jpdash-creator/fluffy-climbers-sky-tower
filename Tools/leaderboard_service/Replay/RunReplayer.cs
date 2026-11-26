@@ -83,6 +83,7 @@ namespace FluffyClimbers.LeaderboardService
             cfg.ScrollStepPercent = SimConfig.DifficultyStepPercent[mode];
             cfg.GemSpotPermille = SimConfig.DifficultyGemPermille[mode];
             cfg.ScrollStepCapPercent = SimConfig.TopSpeedUpPercent(mode);
+            cfg.RivalPacePercent = RivalRace.PaceForMode(mode);   // Rival Race levels: the ghost's pace of the setting (GameSession.ApplyDifficulty)
             return cfg;
         }
 

@@ -37,8 +37,8 @@ namespace FluffyClimbers.LeaderboardService.Tests
         public static RunReplayer Replayer { get { return new RunReplayer(Repo); } }
         public static readonly Limits Lim = new Limits();
 
-        /// <summary>The rules version the client sends (LeaderboardConfig.SimVersion in the Leaderboard assembly, not linkable here; ReplayTests pins the source line). 3 since owner Final Change 2 (2026-11-23; 2 was Final Change 1).</summary>
-        public const int ClientSimVersion = 3;
+        /// <summary>The rules version the client sends (LeaderboardConfig.SimVersion in the Leaderboard assembly, not linkable here; ReplayTests pins the source line). 4 since Final Changes 5 and 6 (2026-11-25; 3 was Final Change 2).</summary>
+        public const int ClientSimVersion = 4;
 
         /// <summary>The config the GAME builds for a run: GameSession.ApplyDifficulty on the shared config, cloned, then the hero's stats (GameSession.BuildRunCfg). Written out here independently of RunReplayer.ConfigFor.</summary>
         public static SimConfig ClientCfg(int mode, CharacterStats stats)
@@ -47,6 +47,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
             shared.ScrollStepPercent = SimConfig.DifficultyStepPercent[mode];
             shared.GemSpotPermille = SimConfig.DifficultyGemPermille[mode];
             shared.ScrollStepCapPercent = SimConfig.TopSpeedUpPercent(mode);
+            shared.RivalPacePercent = RivalRace.PaceForMode(mode);
             SimConfig run = shared.Clone();
             (stats ?? CharacterStats.Default).ApplyTo(run);
             return run;

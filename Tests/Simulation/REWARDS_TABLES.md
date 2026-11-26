@@ -100,8 +100,8 @@ Daily gifts: 100 points = 250 coins (dp2_100), 200 points = 500 coins (dp2_200),
 | w2_taruns5 | Endless and Time Attack | Finish 5 Time Attack runs | taRuns | 5 | 300 | 0 | 0 |
 | w2_special_nowall | Special levels | Clear the No Wall Touch level | specialType.1 | 1 | 400 | 0 | 0 |
 | w2_special_nopowerups | Special levels | Clear the No Power-ups level | specialType.2 | 1 | 400 | 0 | 0 |
-| w2_special_combo | Special levels | Clear the Combo Climb level | specialType.3 | 1 | 400 | 0 | 0 |
-| w2_special_chase | Special levels | Clear the Chase level | specialType.4 | 1 | 400 | 0 | 0 |
+| w2_special_combogates | Special levels | Clear the Combo Gates level | specialType.7 | 1 | 400 | 0 | 0 |
+| w2_special_bossrise | Special levels | Clear the Boss Rise level | specialType.9 | 1 | 400 | 0 | 0 |
 | w2_special_onelife | Special levels | Clear the One Life level | specialType.5 | 1 | 400 | 0 | 0 |
 | w2_special_keepmoving | Special levels | Clear the Keep Moving level | specialType.6 | 1 | 400 | 0 | 0 |
 | w2_special_all6 | Special levels | Clear all 6 special level types | specialTypes | 6 | 600 | 5 | 0 |
@@ -176,8 +176,8 @@ Daily gifts: 100 points = 250 coins (dp2_100), 200 points = 500 coins (dp2_200),
 | g2_1_hardup_ta_100 | Time Attack | Time Attack: 100 floors on Hard or Insane | 100 | 350 | 0 | 0 |
 | g2_1_special_nowall | Special levels | Clear the No Wall Touch level | 1 | 100 | 0 | 0 |
 | g2_1_special_nopowerups | Special levels | Clear the No Power-ups level | 1 | 100 | 0 | 0 |
-| g2_1_special_combo | Special levels | Clear the Combo Climb level | 1 | 100 | 0 | 0 |
-| g2_1_special_chase | Special levels | Clear the Chase level | 1 | 100 | 0 | 0 |
+| g2_1_special_combogates | Special levels | Clear the Combo Gates level | 1 | 100 | 0 | 0 |
+| g2_1_special_bossrise | Special levels | Clear the Boss Rise level | 1 | 100 | 0 | 0 |
 | g2_1_special_onelife | Special levels | Clear the One Life level | 1 | 100 | 0 | 0 |
 | g2_1_special_keepmoving | Special levels | Clear the Keep Moving level | 1 | 100 | 0 | 0 |
 | g2_1_special_all | Special levels | Clear all 6 special levels | 6 | 200 | 0 | 0 |
@@ -256,8 +256,8 @@ Daily gifts: 100 points = 250 coins (dp2_100), 200 points = 500 coins (dp2_200),
 | g2_5_hardup_ta_100 | Time Attack | Time Attack: 100 floors on Hard or Insane | 100 | 370 | 0 | 0 |
 | g2_5_special_nowall | Special levels | Clear the No Wall Touch level | 1 | 110 | 0 | 0 |
 | g2_5_special_nopowerups | Special levels | Clear the No Power-ups level | 1 | 110 | 0 | 0 |
-| g2_5_special_combo | Special levels | Clear the Combo Climb level | 1 | 110 | 0 | 0 |
-| g2_5_special_chase | Special levels | Clear the Chase level | 1 | 110 | 0 | 0 |
+| g2_5_special_combogates | Special levels | Clear the Combo Gates level | 1 | 110 | 0 | 0 |
+| g2_5_special_bossrise | Special levels | Clear the Boss Rise level | 1 | 110 | 0 | 0 |
 | g2_5_special_onelife | Special levels | Clear the One Life level | 1 | 110 | 0 | 0 |
 | g2_5_special_keepmoving | Special levels | Clear the Keep Moving level | 1 | 110 | 0 | 0 |
 | g2_5_special_all | Special levels | Clear all 6 special levels | 6 | 210 | 0 | 0 |

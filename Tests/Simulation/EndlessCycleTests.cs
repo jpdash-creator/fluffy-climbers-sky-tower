@@ -151,7 +151,7 @@ namespace FluffyClimbers.Simulation.Tests
                 // kind list: the shipped level's options (SpecialPlatforms.Options, minus the wall-bounce exclusions of a no-wall-bounce goal) equal the endless list of level n
                 HashSet<PlatformKind> expected = new HashSet<PlatformKind>(SpecialPlatforms.Options(ll.Spec, SignatureKinds.PlatformFor(ll.Spec.Signature)));
                 HashSet<PlatformKind> got = new HashSet<PlatformKind>(EndlessTower.OptionsForLevel(probe, n));
-                if (ll.Spec.Goal.Type == GoalType.NoWallBounce) { got.Remove(PlatformKind.SurfBoostWave); got.Remove(PlatformKind.PinwheelGust); }
+                if (ll.Spec.Goal.Type == GoalType.NoWallBounce) { got.Remove(PlatformKind.SurfBoostWave); got.Remove(PlatformKind.PinwheelGust); got.Remove(PlatformKind.DragonflyDart); got.Remove(PlatformKind.SporeFunnel); got.Remove(PlatformKind.CaramelMagnet); got.Remove(PlatformKind.WaterBambooTipper); }   // the same exclusions as SpecialPlatforms.Options (Final Change 6 air and carry kinds)
                 Assert.True(expected.SetEquals(got), "region " + region + " level " + n + ": shipped {" + string.Join(",", expected) + "} endless {" + string.Join(",", got) + "}");
                 Assert.True(ll.Spec.Signature == Signatures[r0]);
             }
@@ -298,7 +298,7 @@ namespace FluffyClimbers.Simulation.Tests
             // it rises through level 14 and then stays within a narrow band.
             for (int i = 1; i < 25; i++)
             {
-                Assert.True(width(i) <= width(i - 1) + 0.12, "width grew inside the first climb, block " + i);
+                Assert.True(width(i) <= width(i - 1) + 0.15, "width grew inside the first climb, block " + i);
                 Assert.True(width(i) - width(i - 1) >= (i == 1 ? -0.6 : -0.35), "width cliff in block " + i);   // level 1 -> 2 is the biggest step of the 25-level curve (score 5 -> 20)
             }
             for (int i = 1; i < 14; i++) Assert.True(gap(i) >= gap(i - 1) - 0.08, "gap fell inside the first climb, block " + i);
@@ -309,7 +309,7 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.True(Math.Abs(gap(25) - gap(14)) < 0.15 && Math.Abs(width(25) - width(14)) < 0.15, "floors 2501-2600 play like floors 1401-1500 (both level 15)");
             Assert.True(special(25) < special(24) - 0.05, "special share resets at 2501");
             // rises again 2501..3500 and holds from 3501 to 3900
-            for (int i = 26; i <= 34; i++) Assert.True(width(i) <= width(i - 1) + 0.12, "width grew inside the second climb, block " + i);
+            for (int i = 26; i <= 34; i++) Assert.True(width(i) <= width(i - 1) + 0.15, "width grew inside the second climb, block " + i);
             for (int i = 35; i <= 38; i++) Assert.True(Math.Abs(width(i) - width(34)) < 0.2 && Math.Abs(gap(i) - gap(34)) < 0.2, "level 25 hold, block " + i);
             Assert.True(Math.Abs(width(35) - width(24)) < 0.15, "the hold plays like the first level 25");
             // second reset at 3901

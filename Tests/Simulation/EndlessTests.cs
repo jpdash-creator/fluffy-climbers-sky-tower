@@ -186,7 +186,7 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Equal(GoldenR3S12345, d.ComputeHash());
         }
 
-        private const long GoldenR3S12345 = -6597721552106057681L;
+        private const long GoldenR3S12345 = 2451175331482952123L;   // re-rolled 2026-11-26 (Final Change 6 integration; was -1475834776432726591); re-rolled 2026-11-25 (Turtle Shuttle always moves; was -6597721552106057681)
     }
 }
 

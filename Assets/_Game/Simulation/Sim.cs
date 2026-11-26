@@ -88,6 +88,12 @@ namespace FluffyClimbers.Simulation
         /// <summary>Times a thorn bush hopped the player away (it never damages or ends the run).</summary>
         public int ThornKnocks;
 
+        // ---- Final Change 6, region 1 (Silk Snare Web): two plain ints, 0 in every other run, so old replays and goldens are unchanged ----
+        /// <summary>Silk Snare Web: id of the web the current air phase already cut (a web cuts once per pass; cleared by every landing). 0 = none (platform 0 is never a web).</summary>
+        public int WebId;
+        /// <summary>Silk Snare Web: how many times a web cut the vertical speed (diagnostic; it never damages or ends the run).</summary>
+        public int WebCuts;
+
         // ---- Region 2 special platforms (doc 30). Per-platform dynamic state lives in CrumbleTick (Spore Pop: landing tick, Sprout Lift: rise clock). ----
         /// <summary>Dizzy Spores: ticks left in which left/right input is ignored (cleared by every landing).</summary>
         public int SteerLock;
@@ -101,10 +107,14 @@ namespace FluffyClimbers.Simulation
         public int JumpLock;
         /// <summary>Times a Pufferfish Pad hopped the player away (it never damages or ends the run).</summary>
         public int PufferHops;
+        /// <summary>Moon Jelly Chain: the chain member (1 or 2) the next landing continues, or 0 when no chain is running; JellyTick = the tick of the takeoff from the previous pad. Cleared by every landing that is not on a jelly pad.</summary>
+        public int JellyArm, JellyTick;
 
         // ---- Region 4 special platforms (doc 30 section 5). Per-platform dynamic state lives in CrumbleTick (Jelly Wobble: landing tick). ----
         /// <summary>Floss Glide: ticks left of the doubled air steering after a jump from it (cleared by every landing).</summary>
         public int GlideTicks;
+        /// <summary>Sugar Glass Ledge (Final Change 6): ticks the player has stood on a glass end of the platform he is on (reset by every landing and by stepping back onto the solid centre); GlassCrackTicks cracks that end.</summary>
+        public int GlassDwell;
 
         // ---- Region 5 special platforms (doc 30 section 15). Per-platform dynamic state lives in CrumbleTick (Lantern Lift: rise clock, same coding as the Sprout Lift). ----
         /// <summary>Koi Stone: ticks the player has stood still on it (reset by any movement and every landing); KoiStillTicks charges the next jump.</summary>
@@ -113,6 +123,8 @@ namespace FluffyClimbers.Simulation
         public int KoiAir;
         /// <summary>Times a Mallet Smash or Rolling Log bumped the player (they never damage or end the run).</summary>
         public int Bumps;
+        /// <summary>Mallet Smash and Rolling Log: ticks left in which they cannot bump again (set by every bump; the shared Invuln of gongs and revives does not gate them). 0 normally.</summary>
+        public int BumpGuard;
 
         // ---- Keep Moving levels (owner Final Change 1, 2026-11-22). One int; it stays 0 on every other level, so old runs, replays and goldens are unchanged. ----
         /// <summary>
@@ -121,6 +133,36 @@ namespace FluffyClimbers.Simulation
         /// More than SimConfig.KeepMovingLimitTicks ends the run like a fall. Read it through Sim.KeepMovingTicksLeft.
         /// </summary>
         public int StandTicks;
+
+        // ---- Final Change 6 level types Combo Gates and Sky Hoops (registry worker). Two ints; they stay 0 on every other level, so old runs, replays and goldens are unchanged. ----
+        /// <summary>Combo Gates: bit k is set when a landing inside gate k gained at least LevelData.GateFloors floors (GateRules, read through GoalEvaluator.GatesCleared).</summary>
+        public int GateMask;
+        /// <summary>Sky Hoops: rings taken (PickupKind.Ring).</summary>
+        public int Rings;
+        /// <summary>Sky Hoops: rings that can no longer be taken (the danger line rose above them) and the scan position in Sim's ring list; read through GoalEvaluator.RingsStillPossible.</summary>
+        public int RingsGone, RingScan;
+
+        // ---- Boss Rise levels (owner Final Change 6, 2026-11-25). Four ints, all 0 on every other level, so old runs, replays and goldens are unchanged. ----
+        /// <summary>Boss phases started so far (phase n starts when the hero first reaches row n x SimConfig.BossPhaseRows).</summary>
+        public int BossPhase;
+        /// <summary>Lunges that have started: each makes the danger line SimConfig.BossLungeSpeedPercent faster for the rest of the run.</summary>
+        public int BossLunged;
+        /// <summary>Ticks of the roar telegraph left (0 = none); the lunge starts when it reaches 0. Read it through Sim.BossRoarTicksLeft.</summary>
+        public int BossRoar;
+        /// <summary>Ticks of the running lunge left (0 = none).</summary>
+        public int BossLunge;
+
+        // ---- Sprint and Rest levels (owner Final Change 6, 2026-11-25). Three ints, 0 on every other level. ----
+        /// <summary>Bit (n - 1) set = shelter n (row n x SimConfig.ShelterRows) has been taken (landed on).</summary>
+        public int ShelterMask;
+        /// <summary>Shelters taken (the number of bits in ShelterMask): each makes the danger line SimConfig.ShelterSpeedPercent faster from then on.</summary>
+        public int ShelterCount;
+        /// <summary>Ticks of rest left on the shelter the hero stands on (the danger line is held while it is above 0); leaving the shelter forfeits the rest.</summary>
+        public int ShelterLeft;
+
+        // ---- Rival Race levels (Final Change 6). One bool; it stays false on every other level, so old runs, replays and goldens are unchanged. ----
+        /// <summary>Rival Race: the ghost reached the top row before the player did (set by RivalRace.Update). The goal is lost for good: IsComplete is false from then on and GoalEvaluator.IsFailed is true ("Rival won").</summary>
+        public bool RivalWon;
 
         // ---- Power-ups. Plain ints for the stacked timers (no maximum, additions saturate at int.MaxValue); the OWNED STOCK lives outside the
         // state (RunSession counts it and only passes an activation bit while units are left), so the bot, which copies SimState on every
@@ -223,7 +265,15 @@ namespace FluffyClimbers.Simulation
         /// KeepMoving: see <see cref="SimState.StandTicks"/> and <see cref="KeepMovingTicksLeft"/>; its timeout is never rescued by the Safety Net (a real fall still is).
         /// </summary>
         public readonly bool NoPowerUps, OneLife, KeepMoving;
+        /// <summary>
+        /// Boss Rise level (a boss lunges every BossPhaseRows floors, see <see cref="BossRoarTicksLeft"/>) and Sprint and Rest level (shelters hold the danger line, see
+        /// <see cref="ShelterRestTicksLeft"/>); owner Final Change 6, 2026-11-25. Both false in endless and on every plain level. <see cref="LevelRows"/> = the top row of the level.
+        /// </summary>
+        public readonly bool BossRise, SprintRest;
+        public readonly int LevelRows;
         private readonly Fx scrollPerTick;
+        /// <summary>Sky Hoops: pickup indices of the rings, Y ascending (null when none).</summary>
+        private readonly int[] ringIdx;
         /// <summary>Endless: base scroll per tick of campaign level N (index 1..15), the speed of that level (EndlessTower.LevelForFloor); null otherwise.</summary>
         private readonly Fx[] endlessScroll;
         private readonly int endlessLevels;
@@ -234,8 +284,17 @@ namespace FluffyClimbers.Simulation
         private readonly Fx bobMargin;
         /// <summary>True when the level has a Fizz Vent or Pinwheel Gust (the air zones are only scanned then).</summary>
         private readonly bool hasAirZones;
+        /// <summary>True when the level has a Silk Snare Web or a Dewdrop Mirror Leaf (Final Change 6, region 1): the web band and the mirror slide are only scanned then.</summary>
+        private readonly bool hasWebs, hasMirror;
+        /// <summary>Moon Jelly Chain member index per platform id (0 to 2), null when the level has no jelly pad.</summary>
+        private readonly int[] jellyIndex;
         /// <summary>Largest height of an air zone above its platform (scan window below the player).</summary>
         private readonly Fx zoneReach;
+        /// <summary>Final Change 6, region 5: true when the level has an Incense Mist Bank (the drag zone) / a Torii Lintel (the ceiling); both scans are skipped otherwise.</summary>
+        private readonly bool hasMist, hasLintel;
+        /// <summary>True when the level has a Caramel Magnet or a Sour Sprinkler Cannon (Final Change 6; scanned by <see cref="ApplyCandyZones"/> only then) and the tallest of their zones.</summary>
+        private readonly bool hasCandyZones;
+        private readonly Fx candyZoneReach;
 
         /// <param name="difficulty">0..1 level difficulty; scales the scroll pressure.</param>
         public Sim(SimConfig cfg, Platform[] platforms, Fx difficulty, bool endless)
@@ -250,6 +309,9 @@ namespace FluffyClimbers.Simulation
             NoPowerUps = spec.NoPowerUps;
             OneLife = spec.OneLife;
             KeepMoving = spec.KeepMoving;
+            BossRise = spec.BossRise;
+            SprintRest = spec.SprintRest;
+            LevelRows = level.Rows;
         }
 
         public Sim(SimConfig cfg, LevelData level, Fx difficulty, bool endless, bool campaignRamp)
@@ -265,6 +327,7 @@ namespace FluffyClimbers.Simulation
             Platforms = level.Platforms;
             Hazards = level.Hazards;
             Pickups = level.Pickups;
+            ringIdx = RingList(level.Pickups);   // Sky Hoops: indices of the ring pickups in Y order (null when the level has none)
             Endless = endless;
             CampaignRamp = campaignRamp;
             scrollPerTick = Fx.Lerp(cfg.ScrollSpeedEasy, cfg.ScrollSpeedHard, difficulty) * cfg.ScrollBasePercent / 100 / SimConfig.TicksPerSecond;
@@ -294,6 +357,9 @@ namespace FluffyClimbers.Simulation
                 PlatformKind bk = Platforms[i].Kind;
                 if (bk == PlatformKind.FizzVent) { zones = true; if (cfg.VentHeight > reach) reach = cfg.VentHeight; }
                 else if (bk == PlatformKind.PinwheelGust) { zones = true; if (cfg.PinwheelHeight > reach) reach = cfg.PinwheelHeight; }
+                else if (bk == PlatformKind.UndertowPad) { zones = true; if (cfg.UndertowHeight > reach) reach = cfg.UndertowHeight; }   // Final Change 6, region 3
+                else if (bk == PlatformKind.FogPuffDrift) { zones = true; if (cfg.FogHeight > reach) reach = cfg.FogHeight; }
+                else if (bk == PlatformKind.SporeFunnel) { zones = true; if (cfg.FunnelHeight > reach) reach = cfg.FunnelHeight; }
                 if (bk == PlatformKind.HiveLift && cfg.HiveBobAmplitude > bob) bob = cfg.HiveBobAmplitude;
                 else if (bk == PlatformKind.SproutLift && cfg.SproutRise > bob) bob = cfg.SproutRise;
                 else if (bk == PlatformKind.LanternLift && cfg.LanternRise > bob) bob = cfg.LanternRise;
@@ -302,9 +368,57 @@ namespace FluffyClimbers.Simulation
                 else if (bk == PlatformKind.SinkingRaft && cfg.RaftSinkDepth > bob) bob = cfg.RaftSinkDepth;
                 else if (bk == PlatformKind.SandcastleStep && Platforms[i].Amplitude > bob) bob = Platforms[i].Amplitude;
             }
+            bool webs = false, mirrors = false;
+            for (int i = 0; i < Platforms.Length; i++)
+            {
+                if (Platforms[i].Kind == PlatformKind.SilkSnareWeb) webs = true;
+                else if (Platforms[i].Kind == PlatformKind.DewdropMirrorLeaf) mirrors = true;
+            }
+            hasWebs = webs;
+            hasMirror = mirrors;
             bobMargin = bob;
             hasAirZones = zones;
             zoneReach = reach;
+            {
+                // Final Change 6, region 5: the Incense Mist Bank (drag column) and the Torii Lintel (ceiling) scan the platforms below the player, so the scan window covers their height
+                bool mistLevel = false, lintelLevel = false;
+                Fx reach5 = zoneReach;
+                for (int i = 0; i < Platforms.Length; i++)
+                {
+                    if (Platforms[i].Kind == PlatformKind.IncenseMistBank) { mistLevel = true; if (cfg.MistHeight > reach5) reach5 = cfg.MistHeight; }
+                    else if (Platforms[i].Kind == PlatformKind.ToriiLintel) { lintelLevel = true; if (cfg.LintelHeight + Fx.One > reach5) reach5 = cfg.LintelHeight + Fx.One; }
+                }
+                hasMist = mistLevel;
+                hasLintel = lintelLevel;
+                zoneReach = reach5;
+            }
+            {
+                // Final Change 6, region 4: the Caramel Magnet and the Sour Sprinkler Cannon have their own zone scan (ApplyCandyZones)
+                bool cz = false;
+                Fx creach = Fx.Zero;
+                for (int i = 0; i < Platforms.Length; i++)
+                {
+                    PlatformKind ck = Platforms[i].Kind;
+                    if (ck == PlatformKind.CaramelMagnet) { cz = true; if (cfg.MagnetHeight > creach) creach = cfg.MagnetHeight; }
+                    else if (ck == PlatformKind.SourSprinklerCannon) { cz = true; if (cfg.SprinklerHeight > creach) creach = cfg.SprinklerHeight; }
+                }
+                hasCandyZones = cz;
+                candyZoneReach = creach;
+            }
+            {
+                // Final Change 6, region 3: Moon Jelly Chain member index of every jelly pad = the run of jelly rows directly below it (0 to 2). Platforms are sorted by height, so the row below is found by scanning back.
+                int[] ji = null;
+                for (int i = 0; i < Platforms.Length; i++)
+                {
+                    if (Platforms[i].Kind != PlatformKind.MoonJellyChain) continue;
+                    if (ji == null) ji = new int[Platforms.Length];
+                    int idxBelow = 0;
+                    for (int j = i - 1; j >= 0 && Platforms[j].Row >= Platforms[i].Row - 1; j--)
+                        if (Platforms[j].Row == Platforms[i].Row - 1 && Platforms[j].Kind == PlatformKind.MoonJellyChain && ji[j] + 1 > idxBelow) idxBelow = ji[j] + 1;
+                    ji[i] = idxBelow > SimConfig.JellyChainLength - 1 ? SimConfig.JellyChainLength - 1 : idxBelow;
+                }
+                jellyIndex = ji;
+            }
 
             // Flight and Rocket stop PowerFlightRowsBelowTop rows under the top row of a campaign level (never in endless).
             Fx cap = Fx.FromInt(30000);
@@ -374,6 +488,7 @@ namespace FluffyClimbers.Simulation
             if (s.NetTicks > 0) { s.NetY0 = s.NetY0 - yShift; s.NetK0 = s.NetK0 - yShift; s.NetTarget -= dropPlatforms; }   // a running Safety Net jump follows the re-base
             s.GroundId -= dropPlatforms;
             s.BestGroundId -= dropPlatforms;
+            if (s.WebId > 0) { s.WebId -= dropPlatforms; if (s.WebId < 0) s.WebId = 0; }   // Silk Snare Web (Final Change 6): the id of the web the air phase already cut is a platform index too
             if (dropPlatforms > 0 && s.CrumbleTick != null)
             {
                 int keep = s.CrumbleTick.Length - dropPlatforms;
@@ -401,7 +516,10 @@ namespace FluffyClimbers.Simulation
                 rid--;
             s.BestGroundId = rid;
             PlatformKind rk = Platforms[rid].Kind;
-            if ((rk == PlatformKind.Crumble || rk == PlatformKind.SnapDaisy || rk == PlatformKind.SporePop || rk == PlatformKind.JellyWobble) && s.CrumbleTick != null) s.CrumbleTick[rid] = -1;
+            if ((rk == PlatformKind.Crumble || rk == PlatformKind.SnapDaisy || rk == PlatformKind.SporePop || rk == PlatformKind.JellyWobble || rk == PlatformKind.TaffyStretch || rk == PlatformKind.PrayerScrollRunner || rk == PlatformKind.WaterBambooTipper || rk == PlatformKind.MeltingScoop || rk == PlatformKind.SugarGlassLedge) && s.CrumbleTick != null) s.CrumbleTick[rid] = -1;
+            s.GlassDwell = 0;
+            if (rk == PlatformKind.DragonflyDart && s.CrumbleTick != null) s.CrumbleTick[rid] = -1;   // the dragonfly rests again
+            if (rk == PlatformKind.GlowwormRelay && s.CrumbleTick != null) RelayStart(ref s, rid, s.WorldTick - Platforms[rid].Phase * Cfg.RelayStepTicks);   // the revived pad is live (start of its window)
             Platform p = Platforms[s.BestGroundId];
             p.Y = PlatformY(s.BestGroundId, s.WorldTick, s.CrumbleTick);   // a Bee Hive Lift is somewhere on its bob, a Sprout Lift somewhere on its rise
             s.TiltDir = 0;
@@ -412,12 +530,16 @@ namespace FluffyClimbers.Simulation
             s.KoiStill = 0;
             s.KoiAir = 0;
             s.StandTicks = 0;   // Keep Moving: a revive restarts the timer (and the revive invulnerability pauses it)
+            s.BossRoar = 0;     // Boss Rise: a roar or lunge in progress is over with the revive (the lunge still counts for the speed)
+            s.BossLunge = 0;
+            if (s.BossLunged < s.BossPhase) s.BossLunged = s.BossPhase;
+            s.ShelterLeft = 0;  // Sprint and Rest: a revive on a shelter does not rest again (the shelter stays taken)
             s.Dead = false;
             s.GroundId = s.BestGroundId;
             s.X = PlatformX(s.BestGroundId, s.WorldTick);
             if (p.Kind == PlatformKind.FairyRing) s.X = p.X + p.Amplitude + Fx.One;   // never revive into the hole
             s.LandTick = s.WorldTick;
-            if (p.Kind == PlatformKind.SproutLift || p.Kind == PlatformKind.SinkingRaft || p.Kind == PlatformKind.LanternLift) OccupySprout(ref s, s.BestGroundId, s.WorldTick);
+            if (p.Kind == PlatformKind.SproutLift || p.Kind == PlatformKind.SinkingRaft || p.Kind == PlatformKind.LanternLift || p.Kind == PlatformKind.MeltingScoop) OccupySprout(ref s, s.BestGroundId, s.WorldTick);
             s.Y = p.Kind == PlatformKind.SandcastleStep ? SandSurfaceY(in p, s.X) : p.Y;
             s.Vx = Fx.Zero;
             s.Vy = Fx.Zero;
@@ -428,7 +550,7 @@ namespace FluffyClimbers.Simulation
             s.MaxY = p.Y;
             s.KillY = p.Y - Cfg.ReviveKillDistance;
             if (s.StartTick < 0) s.StartTick = s.Tick;
-            s.Invuln = Cfg.ReviveInvulnTicks;
+            s.Invuln = s.BumpGuard = Cfg.ReviveInvulnTicks;   // the revive grace also keeps mallet and log quiet (BumpGuard)
             s.WallHold = 0;
             s.Assisted = false;
             s.PowerAir = false;
@@ -492,6 +614,9 @@ namespace FluffyClimbers.Simulation
                 if (p.Period <= 0) return p.X;
                 return p.X + SpecialPlatforms.Sin((tick + p.Phase) % p.Period, p.Period) * p.Amplitude;
             }
+            else if (p.Kind == PlatformKind.PrayerScrollRunner) return p.X + (p.Width - ScrollLength(in p, id, tick, aux)) * (p.Dir == 0 ? 1 : p.Dir) / 2;   // Final Change 6: the scroll rolls up toward its roll end (side Dir)
+            else if (p.Kind == PlatformKind.DragonflyDart) return p.X + DartOffset(in p, id, tick, aux);
+            else if (p.Kind == PlatformKind.DewdropMirrorLeaf) return p.X + MirrorOffset(id, aux);
             else if (p.Kind != PlatformKind.Moving) return p.X;
             int half = p.Period / 2;
             int phase = (tick + p.Phase + shift) % p.Period;
@@ -529,25 +654,101 @@ namespace FluffyClimbers.Simulation
             if (landed < 0) return Fx.Zero;
             int e = tick - landed;
             if (e < 0 || e >= Cfg.JellyWobbleTicks) return Fx.Zero;
-            int wave = Cfg.JellyWaveTicks;
-            int q = wave / 4;                       // quarter wave: 0 to +1 in q ticks, back to 0 and on to -1, then to 0
-            int ph = e % wave;
-            Fx tri;
-            if (ph < q) tri = Fx.FromRatio(ph, q);
-            else if (ph < 3 * q) tri = Fx.FromRatio(2 * q - ph, q);
-            else tri = Fx.FromRatio(ph - wave, q);
-            return p.Amplitude * tri * (Cfg.JellyWobbleTicks - e) / Cfg.JellyWobbleTicks;
+            // smooth sine sway (integer table), eased in over JellyAttackTicks so the cube does not jerk, and a raised-cosine fade-out (flat start, zero slope at the end) so the decay is natural
+            Fx sway = SpecialPlatforms.Sin(e % Cfg.JellyWaveTicks, Cfg.JellyWaveTicks);
+            Fx env = (Fx.One + SpecialPlatforms.Cos(e, 2 * Cfg.JellyWobbleTicks)) / 2;
+            if (e < Cfg.JellyAttackTicks) env = env * Ease(e, Cfg.JellyAttackTicks);
+            return p.Amplitude * sway * env;
         }
 
-        /// <summary>Width of a platform at a tick: Platform.Width, except the Taffy Stretch, which breathes between Width and Width + 2 x Amplitude on a triangle wave of its period.</summary>
+        /// <summary>Width of a platform at a tick without the landing snap (the plain breathing): see <see cref="WidthAt(int,int,int[])"/>.</summary>
         public Fx WidthAt(int id, int tick)
         {
+            return WidthAt(id, tick, null);
+        }
+
+        /// <summary>Small integer hash of two ints, 0 to int.MaxValue (deterministic, no System.Random): the per-platform variation of the Taffy Stretch.</summary>
+        private static int Mix(int a, int b)
+        {
+            unchecked
+            {
+                uint h = (uint)a * 2654435761u ^ (uint)b * 40503u;
+                h ^= h >> 15;
+                h *= 2246822519u;
+                h ^= h >> 13;
+                h *= 3266489917u;
+                h ^= h >> 16;
+                return (int)(h & 0x7FFFFFFF);
+            }
+        }
+
+        /// <summary>Taffy Stretch: this platform's own breathing period in ticks (even, Platform.Period x TaffyPeriodMinPercent..MaxPercent), 0 when it has none.</summary>
+        public int TaffyPeriodOf(in Platform p)
+        {
+            if (p.Kind != PlatformKind.TaffyStretch || p.Period <= 0) return 0;
+            int span = Cfg.TaffyPeriodMaxPercent - Cfg.TaffyPeriodMinPercent + 1;
+            int pct = Cfg.TaffyPeriodMinPercent + Mix(p.Phase, p.Period) % span;
+            int t = (p.Period * pct / 100) & ~1;
+            return t < 8 ? 8 : t;
+        }
+
+        /// <summary>Taffy Stretch: how far this platform stretches, as percent of 2 x Platform.Amplitude (TaffyStretchMinPercent to 100).</summary>
+        public int TaffyStretchPercentOf(in Platform p)
+        {
+            int span = 100 - Cfg.TaffyStretchMinPercent + 1;
+            return Cfg.TaffyStretchMinPercent + Mix(p.Period, p.Phase + 17) % span;
+        }
+
+        /// <summary>Taffy Stretch: true when this platform is one of the snapping ones (TaffySnapPercent of them, by a hash of its phase).</summary>
+        public bool TaffySnaps(in Platform p)
+        {
+            return p.Kind == PlatformKind.TaffyStretch && p.Period > 0 && Mix(p.Phase + 101, p.Period + 7) % 100 < Cfg.TaffySnapPercent;
+        }
+
+        /// <summary>
+        /// Taffy Stretch: how closed the snap is at a tick, 0 (breathing normally) to 1 (snapped to the narrow width). <paramref name="aux"/> is SimState.CrumbleTick, whose entry holds the landing tick
+        /// that started the snap (-1 or null: none).
+        /// </summary>
+        public Fx TaffySnapAmount(in Platform p, int id, int tick, int[] aux)
+        {
+            if (aux == null || !TaffySnaps(in p)) return Fx.Zero;
+            int landed = aux[id];
+            if (landed < 0) return Fx.Zero;
+            int e = tick - landed - (Cfg.TaffySnapDelayMin + Mix(landed, p.Phase) % Cfg.TaffySnapDelaySpan);
+            if (e < 0) return Fx.Zero;
+            if (e < Cfg.TaffySnapInTicks) return Fx.FromRatio(e + 1, Cfg.TaffySnapInTicks);
+            e -= Cfg.TaffySnapInTicks;
+            if (e < Cfg.TaffySnapHoldTicks) return Fx.One;
+            e -= Cfg.TaffySnapHoldTicks;
+            if (e < Cfg.TaffySnapOutTicks) return Fx.One - Ease(e, Cfg.TaffySnapOutTicks);
+            return Fx.Zero;
+        }
+
+        /// <summary>
+        /// Width of a platform at a tick: Platform.Width, except the Taffy Stretch (owner 2026-11-25: surprising): it breathes between Width and Width + its own stretch of 2 x Amplitude on an
+        /// eased wave of its own period (<see cref="TaffyPeriodOf"/>), and a snapping taffy closes to Width a moment after a landing (<see cref="TaffySnapAmount"/>; <paramref name="aux"/> is
+        /// SimState.CrumbleTick, may be null for the plain breathing).
+        /// </summary>
+        public Fx WidthAt(int id, int tick, int[] aux)
+        {
             Platform p = Platforms[id];
+            if (p.Kind == PlatformKind.MeltingScoop)
+            {
+                // Final Change 6: melts inward from both edges while stood on (1 u of width per MeltTicksPerUnit ticks), down to the core; refreezes once empty
+                int melted = SproutLevel(id, tick, aux);
+                return melted <= 0 ? p.Width : Fx.Max(Cfg.MeltCoreWidth, p.Width - Fx.FromRatio(melted, Cfg.MeltTicksPerUnit));
+            }
+            if (p.Kind == PlatformKind.PrayerScrollRunner) return ScrollLength(in p, id, tick, aux);   // Final Change 6: the unrolled length of the scroll
             if (p.Kind != PlatformKind.TaffyStretch || p.Period <= 0) return p.Width;
-            int half = p.Period / 2;
-            int phase = (tick + p.Phase) % p.Period;
-            int tri = phase < half ? phase : p.Period - phase;
-            return p.Width + p.Amplitude * 2 * Fx.FromRatio(tri, half);
+            int period = TaffyPeriodOf(in p);
+            int half = period / 2;
+            int phase = (tick + p.Phase) % period;
+            int tri = phase < half ? phase : period - phase;
+            Fx stretch = p.Amplitude * 2 * TaffyStretchPercentOf(in p) / 100;
+            Fx w = p.Width + stretch * Ease(tri, half);
+            Fx snap = TaffySnapAmount(in p, id, tick, aux);
+            if (snap > Fx.Zero) w = w - (w - p.Width) * snap;
+            return w;
         }
 
         private static Fx Ease(int t, int total)
@@ -618,16 +819,86 @@ namespace FluffyClimbers.Simulation
             PlatformKind lk = Platforms[id].Kind;
             bool raft = lk == PlatformKind.SinkingRaft;   // the Sinking Raft uses the same clock: its "rise" is the sink, its release is the spring back
             bool lantern = lk == PlatformKind.LanternLift;   // the Lantern Lift (region 5) too: own rise ticks and a slower float down
-            int cap = raft ? Cfg.RaftSinkTicks : (lantern ? Cfg.LanternRiseTicks : Cfg.SproutRiseTicks);
+            bool melt = lk == PlatformKind.MeltingScoop;   // Melting Scoop (Final Change 6): same clock; its level is the ticks of melt (up to 5 s for a 6 u scoop), so the released level needs 10 bits instead of 7
+            int cap = raft ? Cfg.RaftSinkTicks : (lantern ? Cfg.LanternRiseTicks : (melt ? MeltCapTicks(Platforms[id].Width) : Cfg.SproutRiseTicks));
             if (v >= 0)
             {
                 int l = tick - v;
                 return l < 0 ? 0 : (l > cap ? cap : l);
             }
             int packed = -(v + 2);
-            int tl = packed >> 7, ll = packed & 127;
-            int level = ll - (tick - tl) * (raft ? Cfg.RaftSpringPercent : (lantern ? Cfg.LanternSinkPercent : Cfg.SproutSinkPercent)) / 100;
+            int tl = melt ? packed >> 10 : packed >> 7, ll = melt ? packed & 1023 : packed & 127;
+            int level = ll - (tick - tl) * (raft ? Cfg.RaftSpringPercent : (lantern ? Cfg.LanternSinkPercent : (melt ? Cfg.MeltRefreezePercent : Cfg.SproutSinkPercent))) / 100;
             return level < 0 ? 0 : level;
+        }
+
+        /// <summary>Melting Scoop: ticks of melt from the painted width down to the core (MeltCoreWidth), at 1 u of width per MeltTicksPerUnit ticks.</summary>
+        public int MeltCapTicks(Fx paintedWidth)
+        {
+            Fx span = paintedWidth - Cfg.MeltCoreWidth;
+            return span <= Fx.Zero ? 0 : (span * Cfg.MeltTicksPerUnit).FloorToInt();
+        }
+
+        /// <summary>
+        /// Sugar Glass Ledge: which end is cracked at a tick, -1 left, +1 right, 0 none (whole). <paramref name="aux"/> is SimState.CrumbleTick (crack tick x 2 + 1 for the right end, -1 = never cracked);
+        /// a crack lasts GlassReformTicks.
+        /// </summary>
+        public int GlassCrackedSide(int id, int tick, int[] aux)
+        {
+            if (aux == null || Platforms[id].Kind != PlatformKind.SugarGlassLedge) return 0;
+            int v = aux[id];
+            if (v < 0 || tick - (v >> 1) >= Cfg.GlassReformTicks) return 0;
+            return (v & 1) == 0 ? -1 : 1;
+        }
+
+        /// <summary>Sugar Glass Ledge: true when x is over a cracked end (the glass is gone there: no standing, no landing). The whole end counts, from W/2 - GlassEndWidth outward.</summary>
+        public bool GlassHole(in Platform p, int id, Fx x, int tick, int[] aux)
+        {
+            if (p.Kind != PlatformKind.SugarGlassLedge) return false;
+            int side = GlassCrackedSide(id, tick, aux);
+            return side != 0 && (x - p.X) * side > p.Width / 2 - Cfg.GlassEndWidth;
+        }
+
+        /// <summary>
+        /// Caramel Magnet and Sour Sprinkler Cannon (Final Change 6, region 4), applied after the air movement of a tick (<paramref name="d"/> = Glide divisor): an airborne player in the zone of a platform
+        /// below him is drawn toward the magnet's axis (sideways, MagnetPull, never past the axis) or pushed down while the jet fires (SprinklerPush). Both move the position only; his speed is untouched, so
+        /// steering always beats them and nothing sticks after the zone. No allocation.
+        /// </summary>
+        private void ApplyCandyZones(ref SimState s, int tick, int d)
+        {
+            for (int i = LowerBound(s.Y - candyZoneReach); i < Platforms.Length && Platforms[i].Y < s.Y; i++)
+            {
+                Platform p = Platforms[i];
+                if (p.Kind == PlatformKind.CaramelMagnet)
+                {
+                    Fx dx = p.X - s.X;
+                    Fx adx = Fx.Abs(dx);
+                    if (adx < Cfg.MagnetRadius && s.Y - p.Y < Cfg.MagnetHeight)
+                    {
+                        Fx pull = Fx.Min(Cfg.MagnetPull / d, adx);
+                        s.X = dx > Fx.Zero ? s.X + pull : s.X - pull;
+                    }
+                }
+                else if (p.Kind == PlatformKind.SourSprinklerCannon)
+                {
+                    if (SprinklerFiring(in p, tick) && Fx.Abs(s.X - p.X) < Cfg.SprinklerHalfWidth && s.Y - p.Y < Cfg.SprinklerHeight) s.Y = s.Y - Cfg.SprinklerPush / d;
+                }
+            }
+        }
+
+        /// <summary>Sour Sprinkler Cannon: true while the jet fires (the last SprinklerOnTicks of the global SprinklerCycleTicks cycle).</summary>
+        public bool SprinklerFiring(in Platform p, int tick)
+        {
+            return p.Kind == PlatformKind.SourSprinklerCannon && (tick + p.Phase) % Cfg.SprinklerCycleTicks >= Cfg.SprinklerCycleTicks - Cfg.SprinklerOnTicks;
+        }
+
+        /// <summary>Sour Sprinkler Cannon painted pose: 0 closed, 1 lid lifting (the SprinklerLidTicks before the jet), 2 firing.</summary>
+        public int SprinklerPose(in Platform p, int tick)
+        {
+            if (p.Kind != PlatformKind.SourSprinklerCannon) return 0;
+            int c = (tick + p.Phase) % Cfg.SprinklerCycleTicks;
+            if (c >= Cfg.SprinklerCycleTicks - Cfg.SprinklerOnTicks) return 2;
+            return c >= Cfg.SprinklerCycleTicks - Cfg.SprinklerOnTicks - Cfg.SprinklerLidTicks ? 1 : 0;
         }
 
         /// <summary>The player starts standing on a Sprout Lift: the rise continues from the level it has now.</summary>
@@ -643,7 +914,7 @@ namespace FluffyClimbers.Simulation
             int v = s.CrumbleTick[id];
             if (v < 0) return;
             int level = SproutLevel(id, tick, s.CrumbleTick);
-            s.CrumbleTick[id] = -(tick * 128 + level) - 2;
+            s.CrumbleTick[id] = -(tick * (Platforms[id].Kind == PlatformKind.MeltingScoop ? 1024 : 128) + level) - 2;
         }
 
         /// <summary>Sinking Raft: how far the raft has sunk at a tick (0 to RaftSinkDepth); the player on it and the raft are drawn this much lower.</summary>
@@ -704,12 +975,30 @@ namespace FluffyClimbers.Simulation
             return c >= Cfg.MalletSmashStart && c < Cfg.MalletDownEnd;
         }
 
-        /// <summary>Mallet Smash: true when x is inside the smash zone (MalletZoneHalf either side of a point MalletZoneHalf inside the end on side Platform.Dir).</summary>
+        /// <summary>
+        /// Mallet Smash: true while the mallet acts (owner 2026-11-25): from the smash until it lifts again (the same window as the painted down pose, <see cref="MalletDown"/>), so anyone
+        /// standing or landing in the zone while the mallet is visibly down is hopped, not only in the first 10 ticks.
+        /// </summary>
+        public bool MalletActive(int id, int tick)
+        {
+            return MalletDown(id, tick);
+        }
+
+        /// <summary>The side of the mallet end: Platform.Dir, or the nearest wall when it is 0 (a hand-built or unparameterised platform still has a working mallet).</summary>
+        public int MalletDirOf(in Platform p)
+        {
+            return p.Dir != 0 ? p.Dir : (p.X < Cfg.ScreenWidth / 2 ? -1 : 1);
+        }
+
+        /// <summary>
+        /// Mallet Smash: true when x is inside the smash zone: the 1.6 u (2 x MalletZoneHalf) at the end on side Dir AND everything beyond that end (the rim and the landing margin, which a player
+        /// can stand on, were outside the old zone, so the mallet silently missed him).
+        /// </summary>
         public bool InMalletZone(in Platform p, Fx x)
         {
-            if (p.Kind != PlatformKind.MalletSmash || p.Dir == 0) return false;
-            Fx zoneX = p.X + (p.Width / 2 - Cfg.MalletZoneHalf) * p.Dir;
-            return Fx.Abs(x - zoneX) < Cfg.MalletZoneHalf;
+            if (p.Kind != PlatformKind.MalletSmash) return false;
+            int dir = MalletDirOf(in p);
+            return (x - p.X) * dir > p.Width / 2 - Cfg.MalletZoneHalf * 2;
         }
 
         /// <summary>Rolling Log: centre x of the log at a tick (triangle wave over the platform: LogWidth in from each end, Platform.Period for there and back at a constant speed).</summary>
@@ -741,6 +1030,121 @@ namespace FluffyClimbers.Simulation
             if (e < 0) e = 0;
             if (e > Cfg.SquishTicks) e = Cfg.SquishTicks;
             return Fx.FromRatio(100 * Cfg.SquishTicks + Cfg.SquishJumpBonusPercent * e, 100 * Cfg.SquishTicks);
+        }
+
+        /// <summary>Teeter Cap: half width of the centre zone where a jump keeps its full power (0.3 u at width 1.5, 0.4 u at 2, 0.5 u from 3 up).</summary>
+        public Fx TeeterCentre(in Platform p)
+        {
+            if (p.Width <= Fx.FromRatio(15, 10)) return Cfg.TeeterCentreSmall;
+            if (p.Width <= Fx.FromInt(2)) return Cfg.TeeterCentreMid;
+            return Cfg.TeeterCentreWide;
+        }
+
+        /// <summary>
+        /// Teeter Cap: jump speed factor of a jump taken at x: 1.00 inside the centre zone, falling linearly to TeeterEdgePercent (0.78) at the edge (and a coyote jump just past it).
+        /// </summary>
+        public Fx TeeterJumpMultiplier(in Platform p, Fx x)
+        {
+            Fx centre = TeeterCentre(in p);
+            Fx half = p.Width / 2;
+            Fx off = Fx.Abs(x - p.X);
+            if (off <= centre) return Fx.One;
+            if (off >= half) return Fx.FromRatio(Cfg.TeeterEdgePercent, 100);
+            // 1 - (1 - edge) x (off - centre) / (half - centre), integer ratio of the raw values
+            long num = (long)(off - centre).Raw * (100 - Cfg.TeeterEdgePercent);
+            long den = (long)(half - centre).Raw * 100;
+            return Fx.FromRaw(Fx.OneRaw - (int)(Fx.OneRaw * num / den));
+        }
+
+        /// <summary>Teeter Cap: outward drift per tick of a player standing at x (0 for a platform that is not a Teeter Cap).</summary>
+        public Fx TeeterDrift(in Platform p, Fx x)
+        {
+            Fx off = x - p.X;
+            Fx mag = Fx.Abs(off);
+            int side = off.Sign();
+            if (side == 0) { side = p.Dir == 0 ? 1 : p.Dir; mag = Cfg.TeeterSeed; }
+            Fx d = Cfg.TeeterGrowth * mag;
+            if (d > Cfg.TeeterDriftMax) d = Cfg.TeeterDriftMax;
+            return d * side;
+        }
+
+        /// <summary>Fog Puff Drift: centre x of the cloud at a tick (triangle path of Platform.Amplitude either side of the platform centre, Platform.Period for there and back).</summary>
+        public Fx FogX(int id, int tick)
+        {
+            Platform p = Platforms[id];
+            if (p.Kind != PlatformKind.FogPuffDrift) return p.X;
+            Fx amp = FogAmplitude(in p);
+            int period = FogPeriod(in p);
+            int half = period / 2;
+            int phase = (tick + p.Phase) % period;
+            int tri = phase < half ? phase : period - phase;
+            return p.X - amp + amp * 2 * Fx.FromRatio(tri, half);
+        }
+
+        /// <summary>Fog Puff Drift: how far the cloud centre travels either side of the platform centre: (width + 1 - cloud width) / 2 (the lane is the platform plus 1 u), between FogMinAmplitude and FogMaxAmplitude.</summary>
+        public Fx FogAmplitude(in Platform p)
+        {
+            return Fx.Clamp((p.Width + Fx.One - Cfg.FogCloudWidth) / 2, Cfg.FogMinAmplitude, Cfg.FogMaxAmplitude);
+        }
+
+        /// <summary>Fog Puff Drift: ticks for there and back (4 x amplitude / FogSpeed, even, at least 2).</summary>
+        public int FogPeriod(in Platform p)
+        {
+            int ticks = (int)((long)FogAmplitude(in p).Raw * 4 / Cfg.FogSpeed.Raw);
+            ticks &= ~1;
+            return ticks < 2 ? 2 : ticks;
+        }
+
+        /// <summary>Spore Funnel: half width of the pull column (platform half width + FunnelHalfExtra, at least FunnelHalfMin).</summary>
+        public Fx FunnelHalfWidth(in Platform p)
+        {
+            return Fx.Max(Cfg.FunnelHalfMin, p.Width / 2 + Cfg.FunnelHalfExtra);
+        }
+
+        // ---- Final Change 6, region 3 (Moon Jelly Chain, Splitting Pier) ----
+
+        /// <summary>Moon Jelly Chain: member index (0 to 2) of a jelly pad = the run of jelly rows directly below it; 0 for every other platform.</summary>
+        public int JellyIndexOf(int id)
+        {
+            return jellyIndex == null ? 0 : jellyIndex[id];
+        }
+
+        /// <summary>Splitting Pier: the full gap width (u) of a pier of width <paramref name="w"/>: 1.2 at 4, 1.6 at 6, 2.0 at 8 (narrower or wider pieces use the nearest step).</summary>
+        public Fx PierGapOf(Fx w)
+        {
+            return w < Fx.FromInt(5) ? Cfg.PierGap4 : (w < Fx.FromInt(7) ? Cfg.PierGap6 : Cfg.PierGap8);
+        }
+
+        /// <summary>Splitting Pier: how open the pier is at a tick, 0 (closed) to 1 (widest). Cycle of PierCycleTicks: closed, smoothstep open, hold, smoothstep close. Platform.Phase offsets the cycle.</summary>
+        public Fx PierOpenness(in Platform p, int tick)
+        {
+            if (p.Kind != PlatformKind.SplittingPier) return Fx.Zero;
+            int cycle = Cfg.PierCycleTicks;
+            int c = (tick + p.Phase) % cycle;
+            int closed = Cfg.PierClosedTicks, open = Cfg.PierOpenTicks, hold = Cfg.PierHoldTicks;
+            int closing = cycle - closed - open - hold;
+            if (c < closed) return Fx.Zero;
+            c -= closed;
+            if (c < open) return Ease(c, open);
+            c -= open;
+            if (c < hold) return Fx.One;
+            c -= hold;
+            return Fx.One - Ease(c, closing);
+        }
+
+        /// <summary>Splitting Pier: half width of the gap in the middle at a tick (0 when closed). The painted halves slide apart by this much.</summary>
+        public Fx PierHalfGap(in Platform p, int tick)
+        {
+            if (p.Kind != PlatformKind.SplittingPier) return Fx.Zero;
+            return PierGapOf(p.Width) * PierOpenness(in p, tick) / 2;
+        }
+
+        /// <summary>Splitting Pier: true when x is over the gap at a tick (the player falls through there; never lethal, the row below catches him).</summary>
+        public bool OverPierGap(in Platform p, Fx x, int tick)
+        {
+            if (p.Kind != PlatformKind.SplittingPier) return false;
+            Fx h = PierHalfGap(in p, tick);
+            return h > Fx.Zero && Fx.Abs(x - p.X) < h;
         }
 
         /// <summary>Fairy Ring: true when x is over the hole (the player falls through there).</summary>
@@ -826,6 +1230,7 @@ namespace FluffyClimbers.Simulation
         {
             Platform p = Platforms[id];
             if (p.Kind == PlatformKind.SnapDaisy) return SnapPhase(id, tick, crumbleTick) != 2;
+            if (p.Kind == PlatformKind.GlowwormRelay) return RelaySolid(id, tick, crumbleTick);
             if (p.Kind == PlatformKind.Vanishing)
             {
                 return (tick + p.Phase) % (Cfg.VanishVisibleTicks + Cfg.VanishHiddenTicks) < Cfg.VanishVisibleTicks;
@@ -880,6 +1285,9 @@ namespace FluffyClimbers.Simulation
                 if (pct > Cfg.CampaignRampCapPercent) pct = Cfg.CampaignRampCapPercent;
                 scroll = scroll * (100 + pct) / 100;   // the row ramp is level design: multiplied on top of the setting steps
             }
+            // Boss Rise (+BossLungeSpeedPercent per lunge) and Sprint and Rest (+ShelterSpeedPercent per shelter taken): cumulative, multiplied on top of the setting steps, before the ceiling.
+            if (s.BossLunged > 0) scroll = scroll * (100 + s.BossLunged * Cfg.BossLungeSpeedPercent) / 100;
+            if (s.ShelterCount > 0) scroll = scroll * (100 + s.ShelterCount * Cfg.ShelterSpeedPercent) / 100;
             return scroll;
         }
 
@@ -982,6 +1390,97 @@ namespace FluffyClimbers.Simulation
             return left < 0 ? 0 : left;
         }
 
+        // ---- Boss Rise (owner Final Change 6, 2026-11-25; Planning/FINAL-CHANGE-6-LEVEL-TYPE-OPTIONS.md H3). Row based, no RNG, integers only. ----
+
+        /// <summary>
+        /// One tick of the boss, called after the normal scroll of the tick was decided (<paramref name="scroll"/>); returns the extra upward move of the danger line (0 outside a lunge).
+        /// A phase starts the first time the hero's highest row reaches n x BossPhaseRows (queued one after the other if several rows are skipped at once): the boss roars for BossRoarTicks,
+        /// then lunges: BossLungeDistance over BossLungeTicks, never closer than BossLungeMinGap under the hero's feet (a lunge squeezes the buffer but never kills by itself), and from the
+        /// lunge on the line is BossLungeSpeedPercent faster, cumulative (SimState.BossLunged). A hero who climbs during the roar is never reached.
+        /// </summary>
+        private Fx BossTick(ref SimState s, Fx scroll)
+        {
+            Fx add = Fx.Zero;
+            if (s.BossLunge > 0)
+            {
+                s.BossLunge--;
+                Fx step = Cfg.BossLungeDistance / Cfg.BossLungeTicks;
+                Fx room = (s.Y - Cfg.BossLungeMinGap) - (s.KillY + scroll);
+                add = room <= Fx.Zero ? Fx.Zero : (room < step ? room : step);
+            }
+            else if (s.BossRoar > 0)
+            {
+                if (--s.BossRoar == 0) { s.BossLunge = Cfg.BossLungeTicks; s.BossLunged++; }
+            }
+            else if (s.BossPhase < BossRiseRules.PhasesOf(Cfg, LevelRows) && s.Row >= BossRiseRules.PhaseRow(Cfg, s.BossPhase + 1))
+            {
+                s.BossPhase++;
+                s.BossRoar = Cfg.BossRoarTicks;
+            }
+            return add;
+        }
+
+        /// <summary>Boss Rise: ticks of the roar telegraph left (HUD cue and the boss roar pose); 0 when the boss is not roaring or the level is not a Boss Rise level.</summary>
+        public int BossRoarTicksLeft(in SimState s) { return BossRise ? s.BossRoar : 0; }
+
+        /// <summary>Boss Rise: true while the lunge runs (the boss reaches up).</summary>
+        public bool BossLunging(in SimState s) { return BossRise && s.BossLunge > 0; }
+
+        /// <summary>Boss Rise: phases started so far / phases of the level (HUD pips).</summary>
+        public int BossPhasesStarted(in SimState s) { return BossRise ? s.BossPhase : 0; }
+        public int BossPhasesTotal { get { return BossRise ? BossRiseRules.PhasesOf(Cfg, LevelRows) : 0; } }
+
+        /// <summary>Boss Rise: the boss speed-up shown to the player in percent (lunges so far x BossLungeSpeedPercent).</summary>
+        public int BossSpeedUpPercent(in SimState s) { return BossRise ? s.BossLunged * Cfg.BossLungeSpeedPercent : 0; }
+
+        /// <summary>Boss Rise: true while the hero stands in the boss arena (the top BossArenaRows rows).</summary>
+        public bool InBossArena(in SimState s) { return BossRise && BossRiseRules.IsArenaRow(Cfg, s.Row, LevelRows); }
+
+        // ---- Sprint and Rest (owner Final Change 6, 2026-11-25; H4) ----
+
+        /// <summary>True when platform <paramref name="id"/> is a shelter of this Sprint and Rest level.</summary>
+        public bool IsShelter(int id)
+        {
+            return SprintRest && id >= 0 && id < Platforms.Length && SprintRestRules.IsShelter(Cfg, in Platforms[id], LevelRows);
+        }
+
+        /// <summary>
+        /// One tick of the shelter rule, called while the line would scroll: true while the danger line is held. The first grounded tick on a new shelter takes it (SimState.ShelterMask,
+        /// ShelterCount: the line is ShelterSpeedPercent faster from now on, cumulative) and starts its rest of ShelterRestTicks (3 s). The rest runs only while the hero stands on that shelter;
+        /// leaving it (a jump or a fall) forfeits what is left, and a shelter gives its rest once. The setting's time steps keep running on the wall clock during a rest.
+        /// </summary>
+        private bool ShelterHolds(ref SimState s)
+        {
+            if (s.Grounded && s.NetTicks == 0 && IsShelter(s.GroundId))
+            {
+                int bit = 1 << (SprintRestRules.NumberOf(Cfg, Platforms[s.GroundId].Row) - 1);
+                if ((s.ShelterMask & bit) == 0)
+                {
+                    s.ShelterMask |= bit;
+                    s.ShelterCount++;
+                    s.ShelterLeft = Cfg.ShelterRestTicks;
+                }
+                if (s.ShelterLeft > 0) { s.ShelterLeft--; return true; }
+                return false;
+            }
+            s.ShelterLeft = 0;
+            return false;
+        }
+
+        /// <summary>Sprint and Rest: ticks of rest left on the shelter the hero stands on (HUD cue); 0 when not resting or not a Sprint and Rest level.</summary>
+        public int ShelterRestTicksLeft(in SimState s) { return SprintRest && s.Grounded ? s.ShelterLeft : 0; }
+
+        /// <summary>Sprint and Rest: the speed-up the shelters taken have added, in percent (shelters x ShelterSpeedPercent).</summary>
+        public int ShelterSpeedUpPercent(in SimState s) { return SprintRest ? s.ShelterCount * Cfg.ShelterSpeedPercent : 0; }
+
+        /// <summary>Sprint and Rest: the next shelter row above the hero's highest row (0 = none left), for the HUD pointer.</summary>
+        public int NextShelterRow(in SimState s)
+        {
+            if (!SprintRest) return 0;
+            int row = (s.Row / Cfg.ShelterRows + 1) * Cfg.ShelterRows;
+            return SprintRestRules.IsShelterRow(Cfg, row, LevelRows) ? row : 0;
+        }
+
         /// <summary>Keep Moving level: true while the countdown ring should show (the timer has started on this platform and SimConfig.KeepMovingWarnTicks or fewer are left).</summary>
         public bool KeepMovingWarning(in SimState s)
         {
@@ -1007,7 +1506,7 @@ namespace FluffyClimbers.Simulation
             int dir = ((input & SimInput.Right) != 0 ? 1 : 0) - ((input & SimInput.Left) != 0 ? 1 : 0);
             if (s.SteerLock > 0) dir = 0;   // Dizzy Spores: steering is ignored (never inverted); momentum and friction still work
             PlatformKind groundKind = Platforms[s.GroundId].Kind;
-            int sproutId = s.Grounded && (groundKind == PlatformKind.SproutLift || groundKind == PlatformKind.SinkingRaft || groundKind == PlatformKind.LanternLift) ? s.GroundId : -1;
+            int sproutId = s.Grounded && (groundKind == PlatformKind.SproutLift || groundKind == PlatformKind.SinkingRaft || groundKind == PlatformKind.LanternLift || groundKind == PlatformKind.MeltingScoop) ? s.GroundId : -1;
             Fx maxSpeed = CurrentMaxSpeed(s.Row);
 
             // --- power-ups: activation edges, then the effect flags of this tick ---
@@ -1034,6 +1533,7 @@ namespace FluffyClimbers.Simulation
             bool holding = s.WallHold > 0;
 
             // --- horizontal acceleration ---
+            bool inMist = hasMist && !s.Grounded && !flying && !holding && InMist(in s);   // Incense Mist Bank (Final Change 6): drag and half steering in the column
             PlatformKind surface = Platforms[s.GroundId].Kind;
             Fx accel = Cfg.Accel;
             Fx friction = Cfg.Accel * Cfg.BrakeFactor;
@@ -1043,11 +1543,22 @@ namespace FluffyClimbers.Simulation
                 if (slowClock) accel = accel / SimConfig.GlideSlowDivisor;      // Glide slow-mo: the steering of a slowed tick is half as strong too
                 if (s.GlideTicks > 0) accel = accel * Cfg.GlideAirMultiplier;   // Floss Glide: the air steering after a jump from it is doubled
                 else if (s.KoiAir > 0) accel = Cfg.Accel;                       // Koi Stone: a charged jump keeps the full ground steering in the air
+                if (inMist) accel = accel * Cfg.MistSteerPercent / 100;         // Incense Mist Bank: half the air steering (never inverted)
             }
             else if (surface == PlatformKind.Slippery)
             {
                 accel = accel * Cfg.SlipperyAccel;
                 friction = friction * Cfg.SlipperyFriction;
+            }
+            else if (surface == PlatformKind.SeaFoamPad)
+            {
+                // Sea Foam Pad: the footing fades from normal to the Slippery values over FoamFadeTicks after the landing (a fresh landing starts full again)
+                int fe = tick - s.LandTick;
+                if (fe < 0) fe = 0;
+                if (fe > Cfg.FoamFadeTicks) fe = Cfg.FoamFadeTicks;
+                Fx fade = Fx.FromRatio(fe, Cfg.FoamFadeTicks);
+                accel = accel * (Fx.One - (Fx.One - Cfg.SlipperyAccel) * fade);
+                friction = friction * (Fx.One - (Fx.One - Cfg.SlipperyFriction) * fade);
             }
             if (dir != 0)
             {
@@ -1062,6 +1573,7 @@ namespace FluffyClimbers.Simulation
                 else s.Vx = Fx.Zero;
             }
             s.Vx = Fx.Clamp(s.Vx, -maxSpeed, maxSpeed);
+            if (inMist) s.Vx = s.Vx * (100 - Cfg.MistDragPercent) / 100;   // Incense Mist Bank: the horizontal speed bleeds off while the player is in the column
             if (rocket || holding) s.Vx = Fx.Zero;
 
             // --- jump ---
@@ -1082,6 +1594,7 @@ namespace FluffyClimbers.Simulation
                 Fx v0 = Cfg.JumpSpeed(Fx.Abs(s.Vx));
                 if (surface == PlatformKind.Sticky) v0 = v0 * Cfg.StickyJumpMultiplier;
                 else if (surface == PlatformKind.SquishCap && s.Grounded) v0 = v0 * SquishJumpMultiplier(in s);   // a charged cap launches up to x1.45
+                else if (surface == PlatformKind.TeeterCap) v0 = v0 * TeeterJumpMultiplier(in Platforms[s.GroundId], s.X);   // the farther out, the weaker (x1.00 centre to x0.78 edge)
                 else if (surface == PlatformKind.PuffFloat) s.FloatTicks = Cfg.PuffFloatTicks;                      // the fall after this jump is slowed
                 else if (surface == PlatformKind.FlossGlide) s.GlideTicks = Cfg.GlideAirTicks;                      // the air steering after this jump is doubled
                 else if (surface == PlatformKind.KoiStone && s.Grounded && s.KoiStill >= Cfg.KoiStillTicks)
@@ -1126,7 +1639,14 @@ namespace FluffyClimbers.Simulation
             {
                 // Air zones (Fizz Vent: low gravity, Pinwheel Gust: sideways push): read once per tick from the platforms below the player
                 Fx gravity = Cfg.Gravity, zonePush = Fx.Zero;
-                if (hasAirZones && !flying && !holding) ReadAirZones(in s, out gravity, out zonePush);
+                Fx fogCap = Fx.Zero;
+                if (hasAirZones && !flying && !holding) ReadAirZones(in s, tick, out gravity, out zonePush, out fogCap);
+                if (fogCap > Fx.Zero)
+                {
+                    // Fog Puff Drift: inside the cloud the horizontal air speed is limited (vertical motion untouched)
+                    Fx cap = maxSpeed * Cfg.FogSpeedCapPercent / 100;
+                    s.Vx = Fx.Clamp(s.Vx, -cap, cap);
+                }
                 if (flying)
                 {
                     if (rocket)
@@ -1160,6 +1680,9 @@ namespace FluffyClimbers.Simulation
                 }
                 s.Y = s.Y + s.Vy / d;
                 s.X = s.X + (s.Vx + zonePush) / d;
+                if (hasCandyZones && !flying && !holding) ApplyCandyZones(ref s, tick, d);   // Caramel Magnet pull, Sour Sprinkler push (Final Change 6)
+                if (hasWebs && !flying && !holding) ApplyWebs(ref s, prevY);                  // Silk Snare Web: the first pass up through a web band cuts the climb (Final Change 6, region 1)
+                if (hasLintel && !flying && s.Vy > Fx.Zero) LintelBump(ref s, prevY);   // Torii Lintel (Final Change 6): the ceiling stops a rising head
                 if (flying && s.Y >= powerCapY)
                 {
                     // never skip the finish: stop under the top rows, then fall slowly
@@ -1204,7 +1727,7 @@ namespace FluffyClimbers.Simulation
                 {
                     KnockFromThorns(ref s, in g);   // stepping onto the thorny half hops the player away like a landing there
                 }
-                else if (!solid || Fx.Abs(s.X - PlatformX(s.GroundId, tick, s.CrumbleTick)) > WidthAt(s.GroundId, tick) / 2 + Cfg.LandingMargin + WideBonus(in s, WidthAt(s.GroundId, tick)) || InHole(in g, s.X))
+                else if (!solid || Fx.Abs(s.X - PlatformX(s.GroundId, tick, s.CrumbleTick)) > WidthAt(s.GroundId, tick, s.CrumbleTick) / 2 + Cfg.LandingMargin + WideBonus(in s, WidthAt(s.GroundId, tick, s.CrumbleTick)) || InHole(in g, s.X) || OverPierGap(in g, s.X, tick) || GlassHole(in g, s.GroundId, s.X, tick, s.CrumbleTick))
                 {
                     s.Grounded = false;
                     s.Vy = Fx.Zero;
@@ -1222,11 +1745,11 @@ namespace FluffyClimbers.Simulation
                 {
                     HopFromPuffer(ref s, in g);   // standing on a puffed pufferfish hops the player away
                 }
-                else if (g.Kind == PlatformKind.MalletSmash && s.Invuln == 0 && MalletSmashing(s.GroundId, tick) && InMalletZone(in g, s.X))
+                else if (g.Kind == PlatformKind.MalletSmash && s.BumpGuard == 0 && MalletActive(s.GroundId, tick) && InMalletZone(in g, s.X))
                 {
                     HopFromMallet(ref s, in g);   // standing in the smash zone at the smash: hopped inward
                 }
-                else if (g.Kind == PlatformKind.RollingLog && s.Invuln == 0 && Fx.Abs(s.X - LogX(s.GroundId, tick)) < Cfg.LogContactHalf)
+                else if (g.Kind == PlatformKind.RollingLog && s.BumpGuard == 0 && Fx.Abs(s.X - LogX(s.GroundId, tick)) < Cfg.LogContactHalf)
                 {
                     BumpFromLog(ref s, in g, tick);   // the rolling log runs into the player
                 }
@@ -1234,7 +1757,7 @@ namespace FluffyClimbers.Simulation
             else
             {
                 if (s.Coyote > 0) s.Coyote--;
-                if (s.Invuln == 0 && Platforms[s.GroundId].Kind == PlatformKind.RollingLog && s.Y >= Platforms[s.GroundId].Y && s.Y - Platforms[s.GroundId].Y < Cfg.LogLowAir
+                if (s.BumpGuard == 0 && Platforms[s.GroundId].Kind == PlatformKind.RollingLog && s.Y >= Platforms[s.GroundId].Y && s.Y - Platforms[s.GroundId].Y < Cfg.LogLowAir
                     && Fx.Abs(s.X - LogX(s.GroundId, tick)) < Cfg.LogContactHalf && Fx.Abs(s.X - Platforms[s.GroundId].X) < Platforms[s.GroundId].Width / 2 + Cfg.LandingMargin)
                 {
                     Platform lp = Platforms[s.GroundId];
@@ -1266,9 +1789,11 @@ namespace FluffyClimbers.Simulation
                         }
                         else if (p.Y < s.Y || p.Y > prevY) continue;   // outside the fall of this tick (only possible with the widened window)
                         if (!IsSolid(i, tick, s.CrumbleTick)) continue;
-                        Fx landW = p.Kind == PlatformKind.TaffyStretch ? WidthAt(i, tick) : p.Width;
+                        Fx landW = p.Kind == PlatformKind.TaffyStretch || p.Kind == PlatformKind.MeltingScoop || p.Kind == PlatformKind.PrayerScrollRunner ? WidthAt(i, tick, s.CrumbleTick) : p.Width;
                         if (Fx.Abs(s.X - PlatformX(i, tick, s.CrumbleTick)) > landW / 2 + Cfg.LandingMargin + WideBonus(in s, landW)) continue;
                         if (InHole(in p, s.X)) continue;   // Fairy Ring: the hole is no landing spot
+                        if (OverPierGap(in p, s.X, tick)) continue;   // Splitting Pier: the open gap is no landing spot
+                        if (GlassHole(in p, i, s.X, tick, s.CrumbleTick)) continue;   // Sugar Glass Ledge: a cracked end is no landing spot
                         if (best < 0 || surfaceY > bestY) { best = i; bestY = surfaceY; }
                     }
                     if (best >= 0)
@@ -1285,13 +1810,13 @@ namespace FluffyClimbers.Simulation
                             s.Y = tp.Y;
                             KnockFromThorns(ref s, in tp);   // a landing on the thorns does not count as a landing
                         }
-                        else if (Platforms[best].Kind == PlatformKind.MalletSmash && s.Invuln == 0 && MalletSmashing(best, tick) && InMalletZone(in Platforms[best], s.X))
+                        else if (Platforms[best].Kind == PlatformKind.MalletSmash && s.BumpGuard == 0 && MalletActive(best, tick) && InMalletZone(in Platforms[best], s.X))
                         {
                             Platform mp = Platforms[best];
                             s.Y = mp.Y;
                             HopFromMallet(ref s, in mp);   // a landing under the smashing mallet is no landing: it hops the player inward
                         }
-                        else if (Platforms[best].Kind == PlatformKind.RollingLog && s.Invuln == 0 && Fx.Abs(s.X - LogX(best, tick)) < Cfg.LogContactHalf)
+                        else if (Platforms[best].Kind == PlatformKind.RollingLog && s.BumpGuard == 0 && Fx.Abs(s.X - LogX(best, tick)) < Cfg.LogContactHalf)
                         {
                             Platform gp = Platforms[best];
                             s.Y = gp.Y;
@@ -1301,6 +1826,8 @@ namespace FluffyClimbers.Simulation
                     }
                 }
             }
+
+            if (hasMirror) UpdateMirrors(ref s, tick);   // Dewdrop Mirror Leaf: slides away from the airborne hero, frozen while he stands on it (Final Change 6, region 1)
 
             // --- pickups and hazards ---
             if (Pickups.Length > 0) CollectPickups(ref s, prevX, prevY + Cfg.PlayerCenterY, Fx.Zero);
@@ -1313,8 +1840,11 @@ namespace FluffyClimbers.Simulation
                 Fx scroll = ScrollPerTickAt(in s, rtick);   // one source of truth, also read by the HUD speed cue
                 if (s.SlowTicks > 0) scroll = scroll * (100 - Cfg.SlowTimePercent) / 100;
                 scroll = scroll / d;   // Glide slow-mo: the danger line crawls too while the player is in the air
+                if (SprintRest && ShelterHolds(ref s)) scroll = Fx.Zero;   // Sprint and Rest: the danger line waits while the hero rests on a shelter
+                if (BossRise) scroll = scroll + BossTick(ref s, scroll);   // Boss Rise: the lunge moves the line up on top of the normal scroll
                 s.KillY = s.KillY + scroll;
             }
+            if (ringIdx != null) ScanRings(ref s);
             Fx follow = s.MaxY - Cfg.KillDistance;
             if (follow > s.KillY) s.KillY = follow;
             // A One Life level has no rescue at all (owner 2026-11-22): even a net that is somehow armed in the state does nothing there, one fall ends the run.
@@ -1325,6 +1855,7 @@ namespace FluffyClimbers.Simulation
 
             if (s.JumpBuffer > 0) s.JumpBuffer--;
             if (s.Invuln > 0) s.Invuln--;
+            if (s.BumpGuard > 0) s.BumpGuard--;
             if (s.PwUsed > 0) TickPowerUps(ref s);
             if (s.SteerLock > 0) s.SteerLock--;
             if (s.JumpLock > 0) s.JumpLock--;
@@ -1334,6 +1865,7 @@ namespace FluffyClimbers.Simulation
             if (sproutId >= 0 && !(s.Grounded && s.GroundId == sproutId)) ReleaseSprout(ref s, sproutId, tick);   // the Sprout Lift starts to sink once it is empty
             s.Tick = rtick;
             s.WarpLost = lost;
+            if (Level.GhostRowAtTick != null && !s.RivalWon) RivalRace.Update(this, ref s);   // Rival Race: has the ghost reached the top before the player?
         }
 
         // ------------------------------------------------------------------------------------------
@@ -1441,7 +1973,7 @@ namespace FluffyClimbers.Simulation
                 s.Y = t.Y;
                 s.Vx = Fx.Zero;
                 s.Vy = Fx.Zero;
-                s.Invuln = Cfg.ReviveInvulnTicks;
+                s.Invuln = s.BumpGuard = Cfg.ReviveInvulnTicks;   // the revive grace also keeps mallet and log quiet (BumpGuard)
                 Land(ref s, s.NetTarget, tick, t.Y);   // an assisted landing: floors, +1 combo step, chain closed
                 if (s.Y > s.MaxY) s.MaxY = s.Y;
                 s.KillY = s.Y - Cfg.ReviveKillDistance;
@@ -1605,6 +2137,7 @@ namespace FluffyClimbers.Simulation
                 {
                     case PickupKind.Coin: s.Coins++; break;
                     case PickupKind.Star: s.StarMask |= 1 << Pickups[i].Tag; s.Stars++; break;
+                    case PickupKind.Ring: s.Rings++; break;
                     case PickupKind.Gem:
                         {
                             if (Pickups[i].Tag == SimConfig.DoubleGemTag) { s.Gems += Cfg.DoubleGemValue; break; }   // doc 25: a double gem is worth 2
@@ -1647,10 +2180,213 @@ namespace FluffyClimbers.Simulation
             }
         }
 
+        private static int[] RingList(Pickup[] pickups)
+        {
+            int n = 0;
+            for (int i = 0; i < pickups.Length; i++) if (pickups[i].Kind == PickupKind.Ring) n++;
+            if (n == 0) return null;
+            int[] list = new int[n];
+            n = 0;
+            for (int i = 0; i < pickups.Length; i++) if (pickups[i].Kind == PickupKind.Ring) list[n++] = i;
+            return list;
+        }
+
+        /// <summary>Sky Hoops: counts the rings the danger line has swallowed without the hero taking them (monotone scan, no allocation).</summary>
+        private void ScanRings(ref SimState s)
+        {
+            while (s.RingScan < ringIdx.Length && Pickups[ringIdx[s.RingScan]].Y < s.KillY)
+            {
+                if (!s.PickupTaken[ringIdx[s.RingScan]]) s.RingsGone++;
+                s.RingScan++;
+            }
+        }
+
+        /// <summary>Combo Gates: a landing on <paramref name="row"/> that gained <paramref name="gained"/> floors clears the gate the row belongs to when it gained GateFloors or more.</summary>
+        private void MarkGate(ref SimState s, int row, int gained)
+        {
+            if (gained < Level.GateFloors) return;
+            for (int k = 0; k < Level.GateStartRows.Length; k++)
+                if (row >= Level.GateStartRows[k] && row < Level.GateStartRows[k] + Level.GateLength) s.GateMask |= 1 << k;
+        }
+
+        // ------------------------------------------------------------------------------------------
+        // Final Change 6, region 1 (ids 43 to 46): Glowworm Relay, Dragonfly Dart, Dewdrop Mirror Leaf, Silk Snare Web.
+        // All fixed point; per-platform state lives in SimState.CrumbleTick; none of them can end the run by itself.
+        // ------------------------------------------------------------------------------------------
+
+        /// <summary>Glowworm Relay: true when the relay is idle: never started (<paramref name="start"/> -1) or RelayTotalTicks over. Only the head is solid then.</summary>
+        public bool RelayIdle(int start, int tick)
+        {
+            return start < 0 || tick - start >= Cfg.RelayTotalTicks;
+        }
+
+        /// <summary>Glowworm Relay: ticks since the relay started (0 to RelayTotalTicks - 1), or -1 when it is idle. <paramref name="aux"/> is SimState.CrumbleTick.</summary>
+        public int RelayElapsed(int id, int tick, int[] aux)
+        {
+            if (aux == null) return -1;
+            int start = aux[id];
+            return RelayIdle(start, tick) ? -1 : tick - start;
+        }
+
+        /// <summary>
+        /// Glowworm Relay: true while the pad holds. Pad k (Platform.Phase) is solid from RelayStepTicks x k to RelayStepTicks x k + RelayHoldTicks after the start; idle: only the head (k 0).
+        /// The glowworm glow of the painted pad shows exactly this state.
+        /// </summary>
+        public bool RelaySolid(int id, int tick, int[] aux)
+        {
+            int k = Platforms[id].Phase;
+            int e = RelayElapsed(id, tick, aux);
+            if (e < 0) return k == 0;
+            int open = k * Cfg.RelayStepTicks;
+            return e >= open && e < open + Cfg.RelayHoldTicks;
+        }
+
+        /// <summary>Glowworm Relay: starts the clock of all four pads of the relay that <paramref name="id"/> belongs to (the same start tick in each pad's CrumbleTick; the pads are the Glowworm platforms of the rows of the head).</summary>
+        private void RelayStart(ref SimState s, int id, int startTick)
+        {
+            int row0 = Platforms[id].Row - Platforms[id].Phase;
+            int lo = id;
+            while (lo > 0 && Platforms[lo - 1].Row >= row0) lo--;
+            for (int i = lo; i < Platforms.Length && Platforms[i].Row <= row0 + SimConfig.RelayLength - 1; i++)
+                if (Platforms[i].Kind == PlatformKind.GlowwormRelay && Platforms[i].Phase == Platforms[i].Row - row0) s.CrumbleTick[i] = startTick;
+        }
+
+        /// <summary>Dragonfly Dart: ticks of the dart (Amplitude at DartSpeed, rounded; at least 1).</summary>
+        public int DartOutTicks(in Platform p)
+        {
+            int sp = Cfg.DartSpeed.Raw > 0 ? Cfg.DartSpeed.Raw : 1;
+            int t = (p.Amplitude.Raw + sp / 2) / sp;
+            return t < 1 ? 1 : t;
+        }
+
+        /// <summary>Dragonfly Dart: ticks of the glide back (Amplitude at DartBackSpeed, rounded; at least 1).</summary>
+        public int DartBackTicks(in Platform p)
+        {
+            int sp = Cfg.DartBackSpeed.Raw > 0 ? Cfg.DartBackSpeed.Raw : 1;
+            int t = (p.Amplitude.Raw + sp / 2) / sp;
+            return t < 1 ? 1 : t;
+        }
+
+        /// <summary>Dragonfly Dart: length of a whole episode (wing buzz, dart, pause, glide back); after it the dragonfly rests and the next landing starts a new one.</summary>
+        public int DartTotalTicks(in Platform p)
+        {
+            return Cfg.DartDelayTicks + DartOutTicks(in p) + Cfg.DartPauseTicks + DartBackTicks(in p);
+        }
+
+        /// <summary>
+        /// Dragonfly Dart: sideways offset from the resting x at a tick, along Platform.Dir. <paramref name="aux"/> is SimState.CrumbleTick (the landing tick that started the episode; -1 or null = resting).
+        /// 0 for DartDelayTicks, then a straight dart to Platform.Amplitude at DartSpeed, a pause of DartPauseTicks, a glide back at DartBackSpeed.
+        /// </summary>
+        public Fx DartOffset(in Platform p, int id, int tick, int[] aux)
+        {
+            if (aux == null || p.Amplitude <= Fx.Zero) return Fx.Zero;
+            int landed = aux[id];
+            if (landed < 0) return Fx.Zero;
+            int e = tick - landed - Cfg.DartDelayTicks;
+            if (e < 0) return Fx.Zero;
+            int dir = p.Dir == 0 ? 1 : p.Dir;
+            int outT = DartOutTicks(in p);
+            if (e < outT) return p.Amplitude * (e + 1) / outT * dir;
+            e -= outT;
+            if (e < Cfg.DartPauseTicks) return p.Amplitude * dir;
+            e -= Cfg.DartPauseTicks;
+            int backT = DartBackTicks(in p);
+            if (e < backT) return p.Amplitude * (backT - e) / backT * dir;
+            return Fx.Zero;
+        }
+
+        /// <summary>Dragonfly Dart episode phase for the view: 0 resting, 1 wing buzz (the last DartDelayTicks before the dart), 2 darting, 3 pause at the far end, 4 gliding back.</summary>
+        public int DartPhase(int id, int tick, int[] aux)
+        {
+            Platform p = Platforms[id];
+            if (p.Kind != PlatformKind.DragonflyDart || aux == null || aux[id] < 0) return 0;
+            int e = tick - aux[id];
+            if (e < 0 || e >= DartTotalTicks(in p)) return 0;
+            if (e < Cfg.DartDelayTicks) return 1;
+            e -= Cfg.DartDelayTicks;
+            if (e < DartOutTicks(in p)) return 2;
+            e -= DartOutTicks(in p);
+            return e < Cfg.DartPauseTicks ? 3 : 4;
+        }
+
+        /// <summary>Dewdrop Mirror Leaf: sideways offset from its home x (Platform.X) right now. <paramref name="aux"/> is SimState.CrumbleTick: -1 (never moved) or (freeze deadline tick shifted left 12) | (offset in 1/1024 u + 2048).</summary>
+        public Fx MirrorOffset(int id, int[] aux)
+        {
+            if (aux == null) return Fx.Zero;
+            int v = aux[id];
+            if (v < 0) return Fx.Zero;
+            return Fx.FromRaw(((v & 4095) - 2048) << 6);
+        }
+
+        /// <summary>Dewdrop Mirror Leaf: true while the leaf is held still (the hero stands on it or left it less than MirrorFreezeTicks ago).</summary>
+        public bool MirrorFrozen(int id, int tick, int[] aux)
+        {
+            if (aux == null || aux[id] < 0) return false;
+            return tick < (aux[id] >> 12);
+        }
+
+        /// <summary>
+        /// Dewdrop Mirror Leaf: once per tick, after the landing test. A leaf the hero stands on holds still and keeps holding for MirrorFreezeTicks after he left it. While the hero is airborne within MirrorRange
+        /// (horizontally and vertically) and the leaf is free, it slides toward home + (home - hero x) x factor (limited to Platform.Amplitude), at most MirrorSpeed per tick. The hero's controls are never touched.
+        /// </summary>
+        private void UpdateMirrors(ref SimState s, int tick)
+        {
+            Fx range = Cfg.MirrorRange;
+            int step = Cfg.MirrorSpeed.Raw >> 6;
+            for (int i = LowerBound(s.Y - range); i < Platforms.Length && Platforms[i].Y <= s.Y + range; i++)
+            {
+                if (Platforms[i].Kind != PlatformKind.DewdropMirrorLeaf) continue;
+                Platform p = Platforms[i];
+                int v = s.CrumbleTick[i];
+                int off = v < 0 ? 0 : (v & 4095) - 2048;
+                int freeze = v < 0 ? 0 : v >> 12;
+                int nOff = off, nFreeze = freeze;
+                if (s.Grounded && s.GroundId == i) nFreeze = tick + Cfg.MirrorFreezeTicks;
+                else if (!s.Grounded && tick >= freeze && Fx.Abs(s.X - p.X) < range)
+                {
+                    int factor = p.Period > 0 ? p.Period : Cfg.MirrorFactorPercent;
+                    Fx target = Fx.Clamp((p.X - s.X) * factor / 100, -p.Amplitude, p.Amplitude);
+                    int dq = (target.Raw >> 6) - off;
+                    if (dq > step) dq = step; else if (dq < -step) dq = -step;
+                    nOff = off + dq;
+                }
+                if (nOff != off || nFreeze != freeze) s.CrumbleTick[i] = (nFreeze << 12) | (nOff + 2048);
+            }
+        }
+
+        /// <summary>Silk Snare Web: width of the web band (WebWidthSmall at platform widths up to 2, else the width plus WebWidthPad, at most WebWidthMax), centred on the platform.</summary>
+        public Fx WebWidthOf(in Platform p)
+        {
+            if (p.Width <= Fx.FromInt(2)) return Cfg.WebWidthSmall;
+            return Fx.Min(Cfg.WebWidthMax, p.Width + Cfg.WebWidthPad);
+        }
+
+        /// <summary>
+        /// Silk Snare Web: a rising player whose move of this tick (from <paramref name="prevY"/> to s.Y) touches a web band (WebHeight to WebHeight + WebThickness above its platform, inside WebWidthOf) loses WebCutPercent of
+        /// the vertical speed, once per air phase and web (SimState.WebId), but only when the climb started at or near the web platform's own level (the platform last stood on is at most WebLaunchMargin above it). Never damages.
+        /// </summary>
+        private void ApplyWebs(ref SimState s, Fx prevY)
+        {
+            if (s.Vy <= Fx.Zero) return;
+            Fx top = Cfg.WebHeight + Cfg.WebThickness;
+            for (int i = LowerBound(prevY - top); i < Platforms.Length && Platforms[i].Y + Cfg.WebHeight <= s.Y; i++)
+            {
+                Platform p = Platforms[i];
+                if (p.Kind != PlatformKind.SilkSnareWeb || s.WebId == i) continue;
+                if (Platforms[s.GroundId].Y > p.Y + Cfg.WebLaunchMargin) continue;   // the climb started above the web platform (the row above it): the band is behind him
+                if (Fx.Abs(s.X - p.X) >= WebWidthOf(in p) / 2) continue;
+                s.Vy = s.Vy * (100 - Cfg.WebCutPercent) / 100;
+                s.WebId = i;
+                s.WebCuts++;
+                return;
+            }
+        }
+
         private void Land(ref SimState s, int id, int tick, Fx surfaceY)
         {
             Platform p = Platforms[id];
             s.AirJumpUsed = false;   // Double Jump: every landing (also on a bounce platform) gives the next air phase its extra jump back
+            s.WebId = 0;             // Silk Snare Web: the next air phase can be cut again
             p.Y = p.Kind == PlatformKind.SandcastleStep ? surfaceY : PlatformY(id, tick, s.CrumbleTick);   // the surface of a Bee Hive Lift is somewhere on its bob, an Orbit Cap on its lap, a Sprout Lift on its rise, a raft on its sink, a Sandcastle Step at the player's x
             s.JumpLock = 0;
             s.GlideTicks = 0;   // Floss Glide ends with the next landing
@@ -1714,6 +2450,7 @@ namespace FluffyClimbers.Simulation
             if (newRow && Endless && continuesCombo) s.Coins += Cfg.ComboLandingCoins;
 
             s.LastJumpFloors = gained;
+            if (gained >= 1 && Level.GateStartRows != null) MarkGate(ref s, p.Row, gained);   // Combo Gates: a combo jump landed inside a gate clears it
             if (gained > s.BestJumpFloors) s.BestJumpFloors = gained;
             if (gained >= 1)
             {
@@ -1730,6 +2467,7 @@ namespace FluffyClimbers.Simulation
                 s.Coyote = 0;
                 s.JumpStartRow = p.Row;
             }
+            if (p.Kind != PlatformKind.MoonJellyChain) s.JellyArm = 0;   // a landing off the jelly chain ends it
             if (p.Kind >= PlatformKind.WindPetal) LandOnNewPlatform(ref s, in p, id, tick);
         }
 
@@ -1741,12 +2479,27 @@ namespace FluffyClimbers.Simulation
         {
             switch (p.Kind)
             {
+                case PlatformKind.PrayerScrollRunner:
+                    {
+                        // one retract cycle per landing episode: a landing inside the running cycle does not restart it
+                        int landed = s.CrumbleTick[id];
+                        if (landed < 0 || tick - landed >= ScrollCycleTicks(in p)) s.CrumbleTick[id] = tick;
+                        break;
+                    }
+                case PlatformKind.WaterBambooTipper:
+                    {
+                        // the fill restarts with every landing until the spout has tipped; a tip and its righting run to the end
+                        int landed = s.CrumbleTick[id];
+                        int e = tick - landed;
+                        if (landed < 0 || e < Cfg.TipperFillTicks || e >= Cfg.TipperFillTicks + Cfg.TipperCarryTicks + Cfg.TipperRightTicks) s.CrumbleTick[id] = tick;
+                        break;
+                    }
                 case PlatformKind.Seesaw:
                     {
                         // tilts toward the side landed on (a landing near the centre tilts the way the player was moving)
                         Fx dx = s.X - p.X;
                         if (Fx.Abs(dx) > Cfg.SeesawDeadZone) s.TiltDir = dx.Sign();
-                        else s.TiltDir = s.Vx.Sign() != 0 ? s.Vx.Sign() : 1;
+                        else s.TiltDir = s.Vx.Sign() != 0 ? s.Vx.Sign() : (p.Dir != 0 ? p.Dir : 1);   // dead centre and standing still: the leaf's seeded side (Platform.Dir)
                         break;
                     }
                 case PlatformKind.SnapDaisy:
@@ -1759,7 +2512,11 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.SproutLift:
                 case PlatformKind.SinkingRaft:
                 case PlatformKind.LanternLift:
+                case PlatformKind.MeltingScoop:   // Final Change 6: the melt clock is the sprout clock (the dwell time since the landing)
                     OccupySprout(ref s, id, tick);
+                    break;
+                case PlatformKind.SugarGlassLedge:
+                    s.GlassDwell = 0;   // the dwell on a glass end counts from the landing
                     break;
                 case PlatformKind.BambooFlick:
                     {
@@ -1774,6 +2531,22 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.KelpTangle:
                     s.JumpLock = Cfg.KelpLockTicks;
                     break;
+                case PlatformKind.MoonJellyChain:
+                    {
+                        // Moon Jelly Chain: pad 0 always launches (x1.15); pad k launches (x1.30, x1.45) only when it continues the chain (the takeoff from pad k - 1 was at most JellyChainWindowTicks ago); otherwise it is a plain landing
+                        int k = JellyIndexOf(id);
+                        if (k == 0 || (s.JellyArm == k && tick - s.JellyTick <= Cfg.JellyChainWindowTicks))
+                        {
+                            s.Vy = Cfg.JumpSpeed(Fx.Abs(s.Vx)) * Cfg.JellyLaunchOf(k);
+                            s.Grounded = false;
+                            s.Coyote = 0;
+                            s.JumpStartRow = p.Row;
+                            s.JellyArm = k + 1 < SimConfig.JellyChainLength ? k + 1 : 0;
+                            s.JellyTick = tick;
+                        }
+                        else s.JellyArm = 0;
+                        break;
+                    }
                 case PlatformKind.ClamShellPad:
                     if (ClamOpen(id, tick))
                     {
@@ -1794,11 +2567,32 @@ namespace FluffyClimbers.Simulation
                         if (landed < 0 || tick - landed >= Cfg.JellyWobbleTicks) s.CrumbleTick[id] = tick;
                         break;
                     }
+                case PlatformKind.TaffyStretch:
+                    {
+                        // a snapping taffy records the landing; the snap closes it a moment later (one sequence per landing episode)
+                        if (TaffySnaps(in p))
+                        {
+                            int landed = s.CrumbleTick[id];
+                            if (landed < 0 || tick - landed >= Cfg.TaffySnapTotalTicks) s.CrumbleTick[id] = tick;
+                        }
+                        break;
+                    }
                 case PlatformKind.SporePop:
                     {
                         // a new countdown starts unless the puffball is already swelling or flat
                         int landed = s.CrumbleTick[id];
                         if (landed < 0 || tick - landed >= Cfg.SporePopTicks + Cfg.SporePopFlatTicks) s.CrumbleTick[id] = tick;
+                        break;
+                    }
+                case PlatformKind.GlowwormRelay:
+                    // landing on the head of an idle relay starts the relay clock of all four pads (a landing on a running relay changes nothing)
+                    if (p.Phase == 0 && RelayIdle(s.CrumbleTick[id], tick)) RelayStart(ref s, id, tick);
+                    break;
+                case PlatformKind.DragonflyDart:
+                    {
+                        // a new episode starts unless the dragonfly is still darting, pausing or gliding back from the last landing
+                        int landed = s.CrumbleTick[id];
+                        if (landed < 0 || tick - landed >= DartTotalTicks(in p)) s.CrumbleTick[id] = tick;
                         break;
                     }
                 case PlatformKind.Dandelion:
@@ -1820,6 +2614,23 @@ namespace FluffyClimbers.Simulation
             int id = s.GroundId;
             switch (Platforms[id].Kind)
             {
+                case PlatformKind.WaterBambooTipper:
+                    {
+                        // the spout has tipped: carried along Dir (toward the middle of the screen) for TipperCarryTicks, never past the end of the slab
+                        int landed = s.CrumbleTick[id];
+                        int e = tick - landed;
+                        if (landed >= 0 && e >= Cfg.TipperFillTicks && e < Cfg.TipperFillTicks + Cfg.TipperCarryTicks)
+                        {
+                            Platform tp = Platforms[id];
+                            int cd = tp.Dir != 0 ? tp.Dir : (tp.X < Cfg.ScreenWidth / 2 ? 1 : -1);
+                            Fx nx = s.X + Cfg.TipperCarrySpeed * cd;
+                            Fx edge = tp.Width / 2;
+                            if (cd > 0) nx = Fx.Min(nx, Fx.Max(s.X, tp.X + edge));
+                            else nx = Fx.Max(nx, Fx.Min(s.X, tp.X - edge));
+                            s.X = nx;
+                        }
+                        break;
+                    }
                 case PlatformKind.Ladybug:
                     {
                         Fx before = PlatformX(id, s.WorldTick, s.CrumbleTick);
@@ -1837,6 +2648,9 @@ namespace FluffyClimbers.Simulation
                     break;
                 case PlatformKind.Seesaw:
                     s.X = s.X + Cfg.SeesawSlide * s.TiltDir;
+                    break;
+                case PlatformKind.TeeterCap:
+                    s.X = s.X + TeeterDrift(in Platforms[id], s.X);   // balanced on a thin stalk: the farther out, the faster it tips you out
                     break;
                 case PlatformKind.SquishCap:
                     s.Y = Platforms[id].Y - SquishSink(in s, id);   // the cap sinks under the player (the sink of the previous tick; the cap is drawn the same)
@@ -1881,6 +2695,10 @@ namespace FluffyClimbers.Simulation
                     // the wobbling cube carries the player most of the way (JellyCarryPercent), so the footing slides a little under an edge-standing player
                     s.X = s.X + (PlatformX(id, tick, s.CrumbleTick) - PlatformX(id, s.WorldTick, s.CrumbleTick)) * Cfg.JellyCarryPercent / 100;
                     break;
+                case PlatformKind.DragonflyDart:
+                    // the dragonfly carries the player along its dart and glide back (the whole move)
+                    s.X = s.X + PlatformX(id, tick, s.CrumbleTick) - PlatformX(id, s.WorldTick, s.CrumbleTick);
+                    break;
                 case PlatformKind.CandyBowl:
                     {
                         // outside the centre share of the dish a gentle pull moves the player back toward the middle
@@ -1892,6 +2710,23 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.LicoriceBelt:
                     s.X = s.X + Cfg.BeltSpeed * (Platforms[id].Dir == 0 ? 1 : Platforms[id].Dir);   // the conveyor carries along Dir (away from the next platform)
                     break;
+                case PlatformKind.SugarGlassLedge:
+                    {
+                        // standing on a glass end: GlassCrackTicks of dwell crack it (the end then drops away, GlassHole); the solid centre never cracks. One cracked end at a time (it re-forms first).
+                        Platform gp = Platforms[id];
+                        Fx goff = s.X - gp.X;
+                        if (Fx.Abs(goff) > gp.Width / 2 - Cfg.GlassEndWidth)
+                        {
+                            if (++s.GlassDwell >= Cfg.GlassCrackTicks)
+                            {
+                                int cv = s.CrumbleTick[id];
+                                if (cv < 0 || tick - (cv >> 1) >= Cfg.GlassReformTicks) s.CrumbleTick[id] = tick * 2 + (goff > Fx.Zero ? 1 : 0);
+                                s.GlassDwell = 0;
+                            }
+                        }
+                        else s.GlassDwell = 0;
+                        break;
+                    }
                 case PlatformKind.OrbitCap:
                     {
                         Fx before = PlatformX(id, s.WorldTick);
@@ -1922,10 +2757,11 @@ namespace FluffyClimbers.Simulation
         /// Air zones above the platforms below the player: a Fizz Vent column cuts gravity to VentGravityPercent, a Pinwheel Gust column pushes along its Dir.
         /// The zone starts at the surface (the player's feet must be above it) and is VentHeight / PinwheelHeight high.
         /// </summary>
-        private void ReadAirZones(in SimState s, out Fx gravity, out Fx push)
+        private void ReadAirZones(in SimState s, int tick, out Fx gravity, out Fx push, out Fx fogCap)
         {
             gravity = Cfg.Gravity;
             push = Fx.Zero;
+            fogCap = Fx.Zero;
             for (int i = LowerBound(s.Y - zoneReach); i < Platforms.Length && Platforms[i].Y < s.Y; i++)
             {
                 Platform p = Platforms[i];
@@ -1937,6 +2773,93 @@ namespace FluffyClimbers.Simulation
                 {
                     if (Fx.Abs(s.X - p.X) < Cfg.PinwheelHalfWidth && s.Y - p.Y < Cfg.PinwheelHeight) push = push + Cfg.PinwheelPush * (p.Dir == 0 ? 1 : p.Dir);
                 }
+                else if (p.Kind == PlatformKind.UndertowPad)
+                {
+                    // Undertow Pad: gravity is UndertowGravityPercent while the player moves UP inside the column (falling is normal)
+                    if (s.Vy > Fx.Zero && Fx.Abs(s.X - p.X) < Cfg.UndertowHalfWidth && s.Y - p.Y < Cfg.UndertowHeight) gravity = Cfg.Gravity * Cfg.UndertowGravityPercent / 100;
+                }
+                else if (p.Kind == PlatformKind.FogPuffDrift)
+                {
+                    // the cloud drifts over the lane; inside it the horizontal air speed is capped (flag only, the cap is applied by Step)
+                    if (s.Y - p.Y < Cfg.FogHeight && Fx.Abs(s.X - FogX(p.Id, tick)) < Cfg.FogCloudWidth / 2) fogCap = Fx.One;
+                }
+                else if (p.Kind == PlatformKind.SporeFunnel)
+                {
+                    // pulled toward the column axis, never past it: the pull is min(FunnelPull, distance)
+                    Fx off = p.X - s.X;
+                    if (Fx.Abs(off) < FunnelHalfWidth(in p) && s.Y - p.Y < Cfg.FunnelHeight) push = push + (Fx.Abs(off) < Cfg.FunnelPull ? off : Cfg.FunnelPull * off.Sign());
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------------------------------
+        // Final Change 6, region 5 (Bamboo Temple): Prayer Scroll Runner, Torii Lintel, Incense Mist Bank, Water Bamboo Tipper. Integer maths only; none of them can end a run by itself.
+        // ------------------------------------------------------------------------------------------
+
+        /// <summary>Prayer Scroll Runner: ticks the roll takes to retract from the full width to ScrollRollWidth.</summary>
+        public int ScrollRetractTicks(in Platform p)
+        {
+            Fx travel = p.Width - Cfg.ScrollRollWidth;
+            return travel <= Fx.Zero ? 0 : (travel.Raw + Cfg.ScrollRetractSpeed.Raw - 1) / Cfg.ScrollRetractSpeed.Raw;
+        }
+
+        /// <summary>Prayer Scroll Runner: ticks from a landing to the scroll being open again (open, retract, hold, unfurl). A new landing restarts the clock only after this.</summary>
+        public int ScrollCycleTicks(in Platform p)
+        {
+            Fx travel = p.Width - Cfg.ScrollRollWidth;
+            int unfurl = travel <= Fx.Zero ? 0 : (travel.Raw + Cfg.ScrollUnfurlSpeed.Raw - 1) / Cfg.ScrollUnfurlSpeed.Raw;
+            return Cfg.ScrollOpenTicks + ScrollRetractTicks(in p) + Cfg.ScrollHoldTicks + unfurl;
+        }
+
+        /// <summary>
+        /// Prayer Scroll Runner: walkable length of the scroll at a tick. <paramref name="aux"/> is SimState.CrumbleTick (the landing tick that started the cycle; -1 or null = open): open for ScrollOpenTicks,
+        /// then retracting at ScrollRetractSpeed to the roll (ScrollRollWidth), held ScrollHoldTicks, then unfurling at ScrollUnfurlSpeed. The roll sits at the end on side Platform.Dir and never moves.
+        /// </summary>
+        public Fx ScrollLength(in Platform p, int id, int tick, int[] aux)
+        {
+            if (aux == null) return p.Width;
+            int landed = aux[id];
+            if (landed < 0) return p.Width;
+            int e = tick - landed - Cfg.ScrollOpenTicks;
+            if (e < 0) return p.Width;
+            int r = ScrollRetractTicks(in p);
+            if (e < r) return Fx.Max(Cfg.ScrollRollWidth, p.Width - Cfg.ScrollRetractSpeed * e);
+            e -= r;
+            if (e < Cfg.ScrollHoldTicks) return Cfg.ScrollRollWidth;
+            e -= Cfg.ScrollHoldTicks;
+            Fx len = Cfg.ScrollRollWidth + Cfg.ScrollUnfurlSpeed * e;
+            return len > p.Width ? p.Width : len;
+        }
+
+        /// <summary>Water Bamboo Tipper: 0 filling (or untouched), 1 tipped (carrying the player), 2 righting itself. Pure presentation of CrumbleTick (the landing tick).</summary>
+        public int TipperPhase(int id, int tick, int[] aux)
+        {
+            if (Platforms[id].Kind != PlatformKind.WaterBambooTipper || aux == null || aux[id] < 0) return 0;
+            int e = tick - aux[id];
+            if (e < Cfg.TipperFillTicks) return 0;
+            if (e < Cfg.TipperFillTicks + Cfg.TipperCarryTicks) return 1;
+            return e < Cfg.TipperFillTicks + Cfg.TipperCarryTicks + Cfg.TipperRightTicks ? 2 : 0;
+        }
+
+        /// <summary>Incense Mist Bank: true when the airborne player is inside a mist column (MistHalfWidth either side of a burner, MistHeight above it).</summary>
+        private bool InMist(in SimState s)
+        {
+            for (int i = LowerBound(s.Y - zoneReach); i < Platforms.Length && Platforms[i].Y < s.Y; i++)
+            {
+                if (Platforms[i].Kind == PlatformKind.IncenseMistBank && Fx.Abs(s.X - Platforms[i].X) < Cfg.MistHalfWidth && s.Y - Platforms[i].Y < Cfg.MistHeight) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Torii Lintel: a rising head that reaches the underside of a lintel (LintelHeight above its slab, LintelHalf either side of the centre) stops there and falls; the player is never hurt.</summary>
+        private void LintelBump(ref SimState s, Fx prevY)
+        {
+            Fx head = Cfg.PlayerCenterY * 2;
+            for (int i = LowerBound(s.Y - zoneReach); i < Platforms.Length && Platforms[i].Y < s.Y; i++)
+            {
+                if (Platforms[i].Kind != PlatformKind.ToriiLintel || Fx.Abs(s.X - Platforms[i].X) >= Cfg.LintelHalf) continue;
+                Fx limit = Platforms[i].Y + Cfg.LintelHeight - head;
+                if (prevY < limit && s.Y >= limit) { s.Y = limit; s.Vy = Fx.Zero; return; }
             }
         }
 
@@ -1955,10 +2878,11 @@ namespace FluffyClimbers.Simulation
         private void HopFromMallet(ref SimState s, in Platform p)
         {
             s.Grounded = false;
-            s.Vx = Cfg.MalletKnockVx * -p.Dir;
+            s.Vx = Cfg.MalletKnockVx * -MalletDirOf(in p);
             s.Vy = Cfg.MalletKnockVy;
             s.Coyote = 0;
             s.JumpStartRow = p.Row;
+            s.BumpGuard = Cfg.MalletInvulnTicks;
             if (s.Invuln < Cfg.MalletInvulnTicks) s.Invuln = Cfg.MalletInvulnTicks;
             s.Bumps++;
         }
@@ -1972,6 +2896,7 @@ namespace FluffyClimbers.Simulation
             s.Vy = Cfg.LogBumpVy;
             s.Coyote = 0;
             s.JumpStartRow = p.Row;
+            s.BumpGuard = Cfg.LogInvulnTicks;
             if (s.Invuln < Cfg.LogInvulnTicks) s.Invuln = Cfg.LogInvulnTicks;
             s.Bumps++;
         }

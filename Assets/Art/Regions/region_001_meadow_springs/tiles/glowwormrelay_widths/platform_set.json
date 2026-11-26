@@ -1,0 +1,91 @@
+{
+  "asset": "glowwormrelay_widths",
+  "kind": "glowwormrelay",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 563,
+      "h": 166,
+      "bodyLeft": 30,
+      "bodyRight": 531,
+      "surfaceY": 50,
+      "bodyBottom": 134,
+      "width": 3.0,
+      "file": "reg001_glowwormrelay_live_w3.png",
+      "ppu": 167.0,
+      "kind": "glowwormrelay",
+      "dir": -1,
+      "pose": "live"
+    },
+    {
+      "w": 724,
+      "h": 160,
+      "bodyLeft": 28,
+      "bodyRight": 696,
+      "surfaceY": 49,
+      "bodyBottom": 133,
+      "width": 4.0,
+      "file": "reg001_glowwormrelay_live_w4.png",
+      "ppu": 167.0,
+      "kind": "glowwormrelay",
+      "dir": -1,
+      "pose": "live"
+    },
+    {
+      "w": 1058,
+      "h": 160,
+      "bodyLeft": 28,
+      "bodyRight": 1030,
+      "surfaceY": 49,
+      "bodyBottom": 133,
+      "width": 6.0,
+      "file": "reg001_glowwormrelay_live_w6.png",
+      "ppu": 167.0,
+      "kind": "glowwormrelay",
+      "dir": -1,
+      "pose": "live"
+    },
+    {
+      "w": 566,
+      "h": 165,
+      "bodyLeft": 32,
+      "bodyRight": 533,
+      "surfaceY": 52,
+      "bodyBottom": 135,
+      "width": 3.0,
+      "file": "reg001_glowwormrelay_ghost_w3.png",
+      "ppu": 167.0,
+      "kind": "glowwormrelay",
+      "dir": 1,
+      "pose": "ghost"
+    },
+    {
+      "w": 733,
+      "h": 165,
+      "bodyLeft": 32,
+      "bodyRight": 700,
+      "surfaceY": 52,
+      "bodyBottom": 135,
+      "width": 4.0,
+      "file": "reg001_glowwormrelay_ghost_w4.png",
+      "ppu": 167.0,
+      "kind": "glowwormrelay",
+      "dir": 1,
+      "pose": "ghost"
+    },
+    {
+      "w": 1067,
+      "h": 168,
+      "bodyLeft": 33,
+      "bodyRight": 1035,
+      "surfaceY": 51,
+      "bodyBottom": 134,
+      "width": 6.0,
+      "file": "reg001_glowwormrelay_ghost_w6.png",
+      "ppu": 167.0,
+      "kind": "glowwormrelay",
+      "dir": 1,
+      "pose": "ghost"
+    }
+  ]
+}

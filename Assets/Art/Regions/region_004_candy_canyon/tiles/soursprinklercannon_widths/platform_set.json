@@ -1,0 +1,91 @@
+{
+  "asset": "soursprinklercannon_widths",
+  "kind": "soursprinklercannon",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 375,
+      "h": 166,
+      "bodyLeft": 16,
+      "bodyRight": 358,
+      "surfaceY": 66,
+      "bodyBottom": 149,
+      "width": 2.0,
+      "file": "reg004_soursprinklercannon_closed_w2.png",
+      "ppu": 171.0,
+      "kind": "soursprinklercannon",
+      "dir": -1,
+      "pose": "closed"
+    },
+    {
+      "w": 534,
+      "h": 166,
+      "bodyLeft": 16,
+      "bodyRight": 517,
+      "surfaceY": 66,
+      "bodyBottom": 149,
+      "width": 3.0,
+      "file": "reg004_soursprinklercannon_closed_w3.png",
+      "ppu": 167.0,
+      "kind": "soursprinklercannon",
+      "dir": -1,
+      "pose": "closed"
+    },
+    {
+      "w": 397,
+      "h": 243,
+      "bodyLeft": 16,
+      "bodyRight": 380,
+      "surfaceY": 142,
+      "bodyBottom": 225,
+      "width": 2.0,
+      "file": "reg004_soursprinklercannon_lifting_w2.png",
+      "ppu": 182.0,
+      "kind": "soursprinklercannon",
+      "dir": 1,
+      "pose": "lifting"
+    },
+    {
+      "w": 534,
+      "h": 243,
+      "bodyLeft": 16,
+      "bodyRight": 517,
+      "surfaceY": 142,
+      "bodyBottom": 225,
+      "width": 3.0,
+      "file": "reg004_soursprinklercannon_lifting_w3.png",
+      "ppu": 167.0,
+      "kind": "soursprinklercannon",
+      "dir": 1,
+      "pose": "lifting"
+    },
+    {
+      "w": 393,
+      "h": 189,
+      "bodyLeft": 16,
+      "bodyRight": 376,
+      "surfaceY": 89,
+      "bodyBottom": 172,
+      "width": 2.0,
+      "file": "reg004_soursprinklercannon_firing_w2.png",
+      "ppu": 180.0,
+      "kind": "soursprinklercannon",
+      "dir": 2,
+      "pose": "firing"
+    },
+    {
+      "w": 534,
+      "h": 189,
+      "bodyLeft": 16,
+      "bodyRight": 517,
+      "surfaceY": 89,
+      "bodyBottom": 172,
+      "width": 3.0,
+      "file": "reg004_soursprinklercannon_firing_w3.png",
+      "ppu": 167.0,
+      "kind": "soursprinklercannon",
+      "dir": 2,
+      "pose": "firing"
+    }
+  ]
+}

@@ -142,34 +142,43 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual("This level fails on any wall touch.", s.FailReason);
         }
 
-        // ---- special level types (owner Final Change 1, 2026-11-22). Region 1: L6 No Wall Touch, L9 One Life, L14 No Power-ups, L16 Keep Moving, L21 Chase, L24 Combo Climb ----
+        // ---- special level types (owner Final Change 1, 2026-11-22; map of Final Change 6, 2026-11-25). Region 1: L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L17 Boss Rise, L21 Sprint and Rest, L24 Combo Gates, L25 Boss Rise ----
 
         [Test]
-        public void EveryRegionHasItsSixSpecialLevelsAndTheGemLevelsAreRegularRuns()
+        public void EveryRegionHasItsTenSpecialLevelsAndTheGemLevelsAreRegularRunsExceptLevel25()
         {
             for (int region = 1; region <= 5; region++)
             {
                 RegionDef r = repo.GetRegionByIndex(region);
                 var seen = new HashSet<SpecialLevelType>();
+                int bossLevels = 0;
                 foreach (LevelDef level in repo.LevelsOf(r.Id))
                 {
                     SpecialLevelType type = level.SpecialType;
                     Assert.AreEqual(type, SpecialLevels.TypeOf(LevelSpecFactory.Build(level, r)), level.Id + ": the content lookup and the spec lookup agree");
                     if (level.Index % 5 == 0)
                     {
-                        Assert.AreEqual(SpecialLevelType.None, type, level.Id + " is a gem level");
+                        // gem levels 5, 10, 15 and 20 are plain Regular Runs; level 25 is a gem level AND a Boss Rise level (Final Change 6)
+                        Assert.AreEqual(level.Index == 25 ? SpecialLevelType.BossRise : SpecialLevelType.None, type, level.Id + " is a gem level");
                         Assert.AreEqual("reachFloor", level.Goal.Type, level.Id);
                     }
-                    if (type != SpecialLevelType.None) Assert.IsTrue(seen.Add(type), level.Id + ": a second " + type + " level in the region");
+                    if (type != SpecialLevelType.None && type != SpecialLevelType.BossRise) Assert.IsTrue(seen.Add(type), level.Id + ": a second " + type + " level in the region");
+                    if (type == SpecialLevelType.BossRise) { seen.Add(type); bossLevels++; }
+                    Assert.IsTrue(type == SpecialLevelType.None || SpecialLevels.IsActive(type), level.Id + ": no level uses a retired type");
                 }
-                Assert.AreEqual(SpecialLevels.Count, seen.Count, "region " + region + " has one level of each special type");
+                Assert.AreEqual(SpecialLevels.Count, seen.Count, "region " + region + " has all nine special types");
+                Assert.AreEqual(2, bossLevels, "region " + region + " has two Boss Rise levels");
             }
             Assert.AreEqual(SpecialLevelType.NoWallTouch, repo.GetLevel("lvl_001_06").SpecialType);
             Assert.AreEqual(SpecialLevelType.OneLife, repo.GetLevel("lvl_001_09").SpecialType);
             Assert.AreEqual(SpecialLevelType.NoPowerUps, repo.GetLevel("lvl_001_14").SpecialType);
             Assert.AreEqual(SpecialLevelType.KeepMoving, repo.GetLevel("lvl_001_16").SpecialType);
-            Assert.AreEqual(SpecialLevelType.Chase, repo.GetLevel("lvl_001_21").SpecialType);
-            Assert.AreEqual(SpecialLevelType.ComboClimb, repo.GetLevel("lvl_001_24").SpecialType);
+            Assert.AreEqual(SpecialLevelType.SprintRest, repo.GetLevel("lvl_001_21").SpecialType);
+            Assert.AreEqual(SpecialLevelType.ComboGates, repo.GetLevel("lvl_001_24").SpecialType);
+            Assert.AreEqual(SpecialLevelType.SkyHoops, repo.GetLevel("lvl_001_08").SpecialType);
+            Assert.AreEqual(SpecialLevelType.RivalRace, repo.GetLevel("lvl_001_12").SpecialType);
+            Assert.AreEqual(SpecialLevelType.BossRise, repo.GetLevel("lvl_001_17").SpecialType);
+            Assert.AreEqual(SpecialLevelType.BossRise, repo.GetLevel("lvl_001_25").SpecialType);
         }
 
         [Test]
@@ -309,18 +318,19 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void ComboClimbAndChaseGoalTextsAndRules()
+        public void ComboGatesAndSkyHoopsGoalTextsAndRules()
         {
             LevelSpec combo = new RunSession(repo, new SimConfig(), "lvl_001_24").Spec;
-            Assert.AreEqual(GoalType.ComboChain, combo.Goal.Type);
+            Assert.AreEqual(GoalType.ComboGates, combo.Goal.Type);
             Assert.AreEqual(150, combo.TargetRow());
-            Assert.AreEqual("Floor 150 with 3 combo jumps", RunSession.DescribeGoal(combo));
-            Assert.AreEqual("A combo jump climbs 3 floors or more at once.", RunSession.GoalRule(combo));
-            Assert.AreEqual("Combo Climb", RunSession.SpecialName(combo));
-            LevelSpec chase = new RunSession(repo, new SimConfig(), "lvl_001_21").Spec;
-            Assert.IsTrue(chase.Ramp, "a Chase level has the row ramp");
-            Assert.AreEqual("Outclimb the chase: floor 150", RunSession.DescribeGoal(chase));
-            Assert.AreEqual(SpecialLevels.RuleText(SpecialLevelType.Chase), RunSession.GoalRule(chase));
+            Assert.AreEqual("Floor 150, combo in each gate", RunSession.DescribeGoal(combo));
+            Assert.AreEqual(SpecialLevels.RuleText(SpecialLevelType.ComboGates), RunSession.GoalRule(combo));
+            Assert.AreEqual("Combo Gates", RunSession.SpecialName(combo));
+            LevelSpec hoops = new RunSession(repo, new SimConfig(), "lvl_001_08").Spec;
+            Assert.AreEqual(GoalType.SkyHoops, hoops.Goal.Type);
+            Assert.AreEqual("Floor 90 with 8 of 10 rings", RunSession.DescribeGoal(hoops));
+            Assert.AreEqual(SpecialLevels.RuleText(SpecialLevelType.SkyHoops), RunSession.GoalRule(hoops));
+            Assert.AreEqual("Sky Hoops", RunSession.SpecialName(hoops));
             // levels 10, 15 and 20 lost their old goals: plain reach-floor gem levels with the same floor count
             Assert.AreEqual("Reach floor 90", RunSession.DescribeGoal(new RunSession(repo, new SimConfig(), "lvl_001_10").Spec));
             Assert.AreEqual("Reach floor 105", RunSession.DescribeGoal(new RunSession(repo, new SimConfig(), "lvl_001_15").Spec));

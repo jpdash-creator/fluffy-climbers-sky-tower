@@ -60,16 +60,20 @@ namespace FluffyClimbers.Simulation.Tests
                 // Owner Final Change 1 (2026-11-22): the gem levels 5/10/15/20/25 and every Regular Run reach the top; the special goals are No Wall Touch (noWallBounce),
                 // Combo Climb (comboChain 3 x 3 with its ladder) and Chase (bossChase with the row ramp), one level each per region (SpecialLevelTests pins the places).
                 SpecialLevelType type = SpecialLevels.TypeOf(ll.Spec);
+                // Final Change 6 (2026-11-25): Combo Gates (comboGates 3 x 3, explicit rows) and Sky Hoops (skyHoops 8 of 10, explicit rows) replace Combo Climb; Rival Race is a reach-the-top goal with a baked ghost;
+                // Boss Rise, Sprint and Rest are rules on reach-the-top levels.
                 if (type == SpecialLevelType.NoWallTouch) Assert.Equal(GoalType.NoWallBounce, g);
-                else if (type == SpecialLevelType.ComboClimb) Assert.Equal(GoalType.ComboChain, g);
-                else if (type == SpecialLevelType.Chase) Assert.Equal(GoalType.BossChase, g);
+                else if (type == SpecialLevelType.ComboGates) Assert.Equal(GoalType.ComboGates, g);
+                else if (type == SpecialLevelType.SkyHoops) Assert.Equal(GoalType.SkyHoops, g);
+                else if (type == SpecialLevelType.RivalRace) Assert.Equal(GoalType.RivalRace, g);
                 else Assert.Equal(GoalType.ReachFloor, g);
-                if (g != GoalType.ComboChain) Assert.Equal(ExpectedRows(idx), ll.Spec.Goal.Value);
+                bool explicitRows = g == GoalType.ComboGates || g == GoalType.SkyHoops;
+                if (!explicitRows) Assert.Equal(ExpectedRows(idx), ll.Spec.Goal.Value);
                 else Assert.Equal(ExpectedRows(idx), ll.Spec.Rows);
                 if (idx % 5 == 0) { Assert.Equal(GoalType.ReachFloor, g); Assert.Equal(0, ll.Spec.Goal.Count); Assert.Equal(0, ll.Spec.Goal.TimeSec); }
-                if (g != GoalType.ComboChain) Assert.Equal(-1, LevelBuilder.Build(cfg, ll.Spec).LadderStartRow);
+                Assert.Equal(-1, LevelBuilder.Build(cfg, ll.Spec).LadderStartRow);   // the old Combo Climb ladder is gone; Combo Gates uses GateStartRows
                 Assert.Empty(ll.Spec.FixedChunks);
-                Assert.Equal(type == SpecialLevelType.Chase, ll.Spec.Ramp);
+                Assert.False(ll.Spec.Ramp);
                 LevelData d = LevelBuilder.Build(cfg, ll.Spec);
                 Assert.Equal(ExpectedRows(idx), d.Rows);
             }
@@ -83,7 +87,7 @@ namespace FluffyClimbers.Simulation.Tests
             double sum = 0; int n = 0;
             foreach (LoadedLevel ll in All())
             {
-                if (ll.Spec.Goal.Type == GoalType.ComboChain) continue;   // the ladder rungs are one platform per row (or two columns), measured apart
+                if (ll.Spec.Goal.Type == GoalType.ComboChain || ll.Spec.Goal.Type == GoalType.ComboGates) continue;   // the ladder rungs are one platform per row (or two columns), measured apart
                 for (int i = 0; i < 6; i++)
                 {
                     LevelData d = LevelBuilder.Build(cfg, ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i)));
@@ -108,6 +112,7 @@ namespace FluffyClimbers.Simulation.Tests
             foreach (LoadedLevel ll in All())
             {
                 int idx = ll.Spec.LevelIndex;
+                if (ll.Spec.BossRiseRule) continue;   // Final Change 6: the top rows of a Boss Rise level are a plain boss arena by design, so its top third is not held to the ramp
                 for (int i = 0; i < 6; i++)
                 {
                     LevelData d = LevelBuilder.Build(cfg, ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i)));
@@ -119,6 +124,7 @@ namespace FluffyClimbers.Simulation.Tests
                     for (int r = 1; r <= rows; r++)
                     {
                         if (ladderLo > 0 && r >= ladderLo && r <= ladderHi) continue;
+                        if (d.GateStartRows != null && GateRules.GateOfRow(rows, d.GateStartRows.Length, d.GateLength, r) >= 0) continue;   // the gates are plain ladders too
                         bool sp = k[r] != PlatformKind.Normal;
                         all++; if (sp) allS++;
                         if (r <= third) { lowN++; if (sp) lowS++; }
@@ -128,11 +134,11 @@ namespace FluffyClimbers.Simulation.Tests
                     lowSum[idx] += lowPct; highSum[idx] += highPct; cnt[idx]++;
                     double mean = (cfg.RampLowPercent[idx] + cfg.RampHighPercent[idx]) / 2.0;
                     // ladder levels carry their plain ladder at the top, so only the mean of the free rows is held to the band there
-                    if (Math.Abs(allPct - mean) > 12 && ll.Spec.Goal.Type != GoalType.ComboChain) bad.Add(ll.Id + " seed " + i + ": overall " + allPct.ToString("F0") + "% vs " + mean + "%");
+                    if (Math.Abs(allPct - mean) > 12 && ll.Spec.Goal.Type != GoalType.ComboChain && ll.Spec.Goal.Type != GoalType.ComboGates) bad.Add(ll.Id + " seed " + i + ": overall " + allPct.ToString("F0") + "% vs " + mean + "%");
                 }
             }
             for (int idx = 1; idx <= 25; idx++)
-                if (idx != 5) Assert.True(highSum[idx] / cnt[idx] > lowSum[idx] / cnt[idx] + 6, "level " + idx + ": the top third must carry clearly more specials than the bottom third");
+                if (idx != 5 && cnt[idx] > 0) Assert.True(highSum[idx] / cnt[idx] > lowSum[idx] / cnt[idx] + 6, "level " + idx + ": the top third must carry clearly more specials than the bottom third");
             for (int idx = 1; idx <= 25; idx++)
                 output.WriteLine("level " + idx + ": ramp " + cfg.RampLowPercent[idx] + " to " + cfg.RampHighPercent[idx] + " percent; measured bottom third " + (lowSum[idx] / cnt[idx]).ToString("F1") + ", top third " + (highSum[idx] / cnt[idx]).ToString("F1"));
             foreach (string b in bad.Take(20)) output.WriteLine(b);

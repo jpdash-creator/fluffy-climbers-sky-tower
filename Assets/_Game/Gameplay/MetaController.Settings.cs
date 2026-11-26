@@ -140,10 +140,10 @@ namespace FluffyClimbers.Gameplay
             y += saveH + gap;
 
             // ---- two small rows of THREE equal buttons (owner 2026-11-25: the Help controls must not add a row, the popup stays under 1500) ----
-            // Row 1: Reset, Restore, Show help again. Row 2: Privacy, Terms, the Help switch. Word-only labels (no icons) so "Restore" fits a third of the width at 130 percent text.
+            // Row 1: Reset, Restore, Show help again. Row 2: Privacy, Terms, the Help switch. Painted icon (owner 2026-11-25, OpenArt batch 9) plus the short word on a third of the row: the label shrinks (never below 16 sp) so "Restore" fits at 130 percent text; no icon file = the word alone.
             float w3 = (contentW - 2f * gap) / 3f, xa = w3 + gap, xb = 2f * (w3 + gap);
-            SettingsWordButton(c, "Reset", "Reset", 3, "Reset progress", 0f, y, w3, rowH, ConfirmReset);
-            SettingsWordButton(c, "RestorePurchases", "Restore", 0, "Restore purchases", xa, y, w3, rowH, RestorePurchases);
+            SettingsIconWordButton(c, "Reset", "Reset", "icon_reset", 3, "Reset progress", 0f, y, w3, rowH, ConfirmReset);
+            SettingsIconWordButton(c, "RestorePurchases", "Restore", "icon_restore", 0, "Restore purchases", xa, y, w3, rowH, RestorePurchases);
             AddSettingsHelpAgain(c, xb, y, w3, rowH);
             y += rowH + gap;
 
@@ -291,6 +291,37 @@ namespace FluffyClimbers.Gameplay
             trt.anchorMax = Vector2.one;
             trt.offsetMin = new Vector2(20f + icon0 + 6f, 0f);
             trt.offsetMax = new Vector2(-12f, 0f);
+            return b;
+        }
+
+        /// <summary>
+        /// A kit button with a small painted icon at the left and one short word (Reset, Restore, Help again) for the three-per-row small rows (Final Change 6 batch 9). The icon is at most 60 percent of the
+        /// button height, the label takes the rest and shrinks (never below 16 sp) instead of clipping; a missing icon file leaves the word-only button (CUX-10). Same size and touch target as the word button.
+        /// </summary>
+        public static Button SettingsIconWordButton(RectTransform c, string name, string label, string icon, int role, string a11y, float x, float y, float w, float h, Action onClick)
+        {
+            Button b = SettingsWordButton(c, name, label, role, a11y, x, y, w, h, onClick);
+            Sprite sp = ToyKit.Get(icon);
+            if (sp == null) return b;
+            float side = Mathf.Min(h * 0.6f, 72f);
+            Image ic = UiKit.AddImage(b.transform, "Icon", sp, Color.white);
+            ic.preserveAspect = true;
+            ic.raycastTarget = false;
+            var irt = ic.rectTransform;
+            irt.anchorMin = irt.anchorMax = new Vector2(0f, 0.5f);
+            irt.pivot = new Vector2(0f, 0.5f);
+            irt.anchoredPosition = new Vector2(14f, 0f);
+            irt.sizeDelta = new Vector2(side, side);
+            Transform t = b.transform.Find("Label");
+            if (t != null)
+            {
+                var trt = (RectTransform)t;
+                trt.anchorMin = Vector2.zero;
+                trt.anchorMax = Vector2.one;
+                trt.offsetMin = new Vector2(14f + side + 4f, 0f);
+                trt.offsetMax = new Vector2(-8f, 0f);
+                FitLabel(t.GetComponent<Text>());
+            }
             return b;
         }
 

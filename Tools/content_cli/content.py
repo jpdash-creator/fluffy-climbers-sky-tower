@@ -101,23 +101,24 @@ TARGET_SCORE = [5, 20, 26.7, 33.3, 40, 44, 48, 52, 56, 60, 63, 66, 69, 72, 75, 7
 # Owner Final Change 1 (2026-11-22): the approved placement of the six special level types (one level each per region, never on a gem level). The table lives
 # next to the generator of the level files (migrate_levels_25.py) and is checked here against the shipped JSON.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from migrate_levels_25 import SPECIAL_PLACEMENT, SPECIAL_TYPES, GEM_LEVELS, COMBO_FLOORS, COMBO_JUMPS, rows as rows_25   # noqa: E402
+from migrate_levels_25 import SPECIAL_PLACEMENT, SPECIAL_TYPES, RULE_TYPES, GEM_LEVELS, COMBO_FLOORS, COMBO_GATES, RINGS_NEEDED, RINGS_TOTAL, rows as rows_25   # noqa: E402
 
 
 def special_type_of(lv):
     """The special level type of a level JSON object ("" = Regular Run): the rule field "special", or the type its goal stands for (Simulation SpecialLevels.TypeOf)."""
     if lv.get("special"):
         return lv["special"]
-    return {"noWallBounce": "noWallTouch", "comboChain": "comboClimb", "bossChase": "chase"}.get(lv["goal"]["type"], "")
+    return {"noWallBounce": "noWallTouch", "comboGates": "comboGates", "skyHoops": "skyHoops", "rivalRace": "rivalRace", "comboChain": "comboClimb", "bossChase": "chase"}.get(lv["goal"]["type"], "")
 
 
 def expected_level_25(n, i):
     """What migrate_levels_25.py writes for level i of region n: (goal, overrides or None, special or None)."""
-    t = next((k for k, idx in SPECIAL_PLACEMENT[n].items() if idx == i), "")
+    t = next((k for k, idxs in SPECIAL_PLACEMENT[n].items() if i in idxs), "")
     r = rows_25(i)
     if t == "noWallTouch": return {"type": "noWallBounce", "value": r}, None, None
-    if t == "chase": return {"type": "bossChase", "value": r}, {"ramp": True}, None
-    if t == "comboClimb": return {"type": "comboChain", "value": COMBO_FLOORS, "count": COMBO_JUMPS}, {"rows": r}, None
+    if t == "comboGates": return {"type": "comboGates", "value": COMBO_FLOORS, "count": COMBO_GATES}, {"rows": r}, None
+    if t == "skyHoops": return {"type": "skyHoops", "value": RINGS_NEEDED, "count": RINGS_TOTAL}, {"rows": r}, None
+    if t == "rivalRace": return {"type": "rivalRace", "value": r}, None, None
     if t: return {"type": "reachFloor", "value": r}, None, t
     return {"type": "reachFloor", "value": r}, None, None
 # Bug List 4 item 9 (2026-11-16): no level JSON pays a gem reward; gems are collectible pickups (Simulation GemLevels.GemsInLevel).
@@ -249,8 +250,8 @@ def validate():
                 errors.append("%s: overrides should be %s" % (lid, want_ov))
             if lv.get("special") != want_special:
                 errors.append("%s: special should be %s" % (lid, want_special))
-            if i in GEM_LEVELS and special_type_of(lv):
-                errors.append("%s: a gem level is never a special level" % lid)
+            if i in GEM_LEVELS and special_type_of(lv) and not (i == 25 and special_type_of(lv) == "bossRise"):
+                errors.append("%s: a gem level is a plain Regular Run (only level 25 may be a Boss Rise level)" % lid)
         else:
             if lv["class"] != CLASS_BY_LEVEL[i]:
                 errors.append("%s: class should be %s" % (lid, CLASS_BY_LEVEL[i]))
@@ -285,8 +286,8 @@ def validate():
             if int(lid.split("_")[1]) == n and special_type_of(lv):
                 found.setdefault(special_type_of(lv), []).append(lv["index"])
         for t in SPECIAL_TYPES:
-            if found.get(t) != [SPECIAL_PLACEMENT[n][t]]:
-                errors.append("region %d: special type %s should be on level %d only, found %s" % (n, t, SPECIAL_PLACEMENT[n][t], found.get(t)))
+            if sorted(found.get(t, [])) != sorted(SPECIAL_PLACEMENT[n][t]):
+                errors.append("region %d: special type %s should be on level(s) %s only, found %s" % (n, t, SPECIAL_PLACEMENT[n][t], found.get(t)))
         for t in found:
             if t not in SPECIAL_TYPES:
                 errors.append("region %d: unknown special type %s" % (n, t))

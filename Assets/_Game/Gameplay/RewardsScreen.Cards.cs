@@ -177,12 +177,23 @@ namespace FluffyClimbers.Gameplay
             return RewardStat.TrySplit(e.Stat, out stat, out minMode) && stat == RewardStat.GoldMedals;
         }
 
+        /// <summary>The special level type a task or goal counts (None for every other row): a "clear this special level" goal names it, a weekly / daily counter carries it in its stat.</summary>
+        static SpecialLevelType SpecialTypeOfEntry(RewardEntry e)
+        {
+            if (e == null) return SpecialLevelType.None;
+            RegionGoal goal = e as RegionGoal;
+            if (goal != null) return goal.Type == RegionGoalType.SpecialClear ? goal.Special : SpecialLevelType.None;
+            string stat; int minMode;
+            return RewardStat.TrySplit(e.Stat, out stat, out minMode) ? RewardStat.SpecialTypeOf(stat) : SpecialLevelType.None;
+        }
+
         static Sprite TaskIcon(RewardEntry e)
         {
             if (IsGoldMedalTask(e)) { Sprite gold = MedalIcons.For(MedalLevel.Gold, true); if (gold != null) return gold; }
             string slot, icon, kit;
             TaskSources(e, out slot, out icon, out kit);
-            Sprite s = RewardArt.Slot(slot) ?? RewardArt.Task(e != null ? e.Id : null) ?? RewardArt.Icon(icon) ?? ToyKit.Get(kit);
+            Sprite painted = SpecialIcons.For(SpecialTypeOfEntry(e));   // Final Change 6: the painted icon of Combo Gates / Sky Hoops / Boss Rise / Sprint and Rest / Rival Race beats the challenge skull (null = the skull)
+            Sprite s = painted ?? RewardArt.Slot(slot) ?? RewardArt.Task(e != null ? e.Id : null) ?? RewardArt.Icon(icon) ?? ToyKit.Get(kit);
             return s;
         }
 

@@ -61,6 +61,7 @@ namespace FluffyClimbers.Simulation.Tests
             // Spine gap = height difference between the first platform of consecutive rows.
             double prevY = 0, sum = 0, max = 0;
             int prevRow = 0, n = 0;
+            PlatformKind prevKind = PlatformKind.Normal;
             int lastSpineRow = 0;
             foreach (Platform p in d.Platforms)
             {
@@ -74,8 +75,8 @@ namespace FluffyClimbers.Simulation.Tests
                     double y = p.Y.Raw / 65536.0;
                     double g = y - prevY;
                     sum += g; n++;
-                    if (g > max) max = g;
-                    prevY = y; prevRow = p.Row;
+                    if (g > max && !(p.Kind == PlatformKind.MoonJellyChain && prevKind == PlatformKind.MoonJellyChain)) max = g;   // Final Change 6: the 4.6 and 5.8 u rows of a jelly chain are reached by its stepped launches
+                    prevY = y; prevRow = p.Row; prevKind = p.Kind;
                     m.Height = y;
                 }
             }
@@ -87,7 +88,7 @@ namespace FluffyClimbers.Simulation.Tests
         /// <summary>Sideways reach of a platform's own motion: Platform.Amplitude, except for kinds that use it for something else (Fairy Ring hole, Sandcastle Step riser).</summary>
         public static Fx Swing(Platform p)
         {
-            return p.Kind == PlatformKind.FairyRing || p.Kind == PlatformKind.SandcastleStep ? Fx.Zero : p.Amplitude;
+            return p.Kind == PlatformKind.FairyRing || p.Kind == PlatformKind.SandcastleStep || p.Kind == PlatformKind.DragonflyDart ? Fx.Zero : p.Amplitude;   // a Dragonfly Dart's Amplitude is a one-sided dart (Region1NewPlatformTests checks its far end against the wall)
         }
 
         /// <summary>Layout validity that does not need the bot: returns null when fine, else a description.</summary>

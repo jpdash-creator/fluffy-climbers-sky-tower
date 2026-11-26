@@ -8,13 +8,13 @@ using Xunit;
 namespace FluffyClimbers.LeaderboardService.Tests
 {
     /// <summary>
-    /// Owner Final Change 1 (2026-11-22): the six special level types against the REAL RunSession and the server replay. One Life offers and accepts no revive (client and server),
-    /// No Power-ups ignores every activation (also in a forged recording), Keep Moving ends the run after 3 s on one platform and still allows a revive, Combo Climb and Chase replay exactly.
-    /// Region 1 placement: L6 No Wall Touch, L9 One Life, L14 No Power-ups, L16 Keep Moving, L21 Chase, L24 Combo Climb.
+    /// Owner Final Change 1 (2026-11-22) and Final Change 6 (2026-11-25): the special level types against the REAL RunSession and the server replay. One Life offers and accepts no revive (client and server),
+    /// No Power-ups ignores every activation (also in a forged recording), Keep Moving ends the run after 3 s on one platform and still allows a revive, Combo Gates and Sky Hoops replay exactly.
+    /// Region 1 placement: L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L17 Boss Rise, L21 Sprint and Rest, L24 Combo Gates, L25 Boss Rise.
     /// </summary>
     public class SpecialLevelReplayTests
     {
-        const string NoWall = "lvl_001_06", OneLife = "lvl_001_09", NoPowers = "lvl_001_14", KeepMoving = "lvl_001_16", Chase = "lvl_001_21", Combo = "lvl_001_24";
+        const string NoWall = "lvl_001_06", OneLife = "lvl_001_09", NoPowers = "lvl_001_14", KeepMoving = "lvl_001_16", Hoops = "lvl_001_08", Combo = "lvl_001_24";
 
         static void AssertReplayEquals(RunSession s, RunSubmission sub, ReplayResult r)
         {
@@ -41,13 +41,18 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.Equal(SpecialLevelType.OneLife, Harness.NewLevelSession(OneLife, 2, 1).SpecialType);
             Assert.Equal(SpecialLevelType.NoPowerUps, Harness.NewLevelSession(NoPowers, 2, 1).SpecialType);
             Assert.Equal(SpecialLevelType.KeepMoving, Harness.NewLevelSession(KeepMoving, 2, 1).SpecialType);
-            Assert.Equal(SpecialLevelType.Chase, Harness.NewLevelSession(Chase, 2, 1).SpecialType);
-            Assert.Equal(SpecialLevelType.ComboClimb, Harness.NewLevelSession(Combo, 2, 1).SpecialType);
+            Assert.Equal(SpecialLevelType.SkyHoops, Harness.NewLevelSession(Hoops, 2, 1).SpecialType);
+            Assert.Equal(SpecialLevelType.ComboGates, Harness.NewLevelSession(Combo, 2, 1).SpecialType);
+            Assert.Equal(SpecialLevelType.BossRise, Harness.NewLevelSession("lvl_001_17", 2, 1).SpecialType);
+            Assert.Equal(SpecialLevelType.SprintRest, Harness.NewLevelSession("lvl_001_21", 2, 1).SpecialType);
+            Assert.Equal(SpecialLevelType.RivalRace, Harness.NewLevelSession("lvl_001_12", 2, 1).SpecialType);
+            Assert.Equal(SpecialLevelType.BossRise, Harness.NewLevelSession("lvl_001_25", 2, 1).SpecialType);   // the level-25 gem level is a Boss Rise level
             Assert.Equal(SpecialLevelType.None, Harness.NewLevelSession("lvl_001_10", 2, 1).SpecialType);   // a gem level is a Regular Run
             Assert.Equal(SpecialLevelType.None, Harness.NewEndlessSession("region_001_meadow_springs", 2, 1, false).SpecialType);
             // the content model gives the same answer without a session (level tiles, rewards)
             Assert.Equal(SpecialLevelType.OneLife, Harness.Repo.GetLevel(OneLife).SpecialType);
-            Assert.Equal(SpecialLevelType.ComboClimb, Harness.Repo.GetLevel(Combo).SpecialType);
+            Assert.Equal(SpecialLevelType.ComboGates, Harness.Repo.GetLevel(Combo).SpecialType);
+            Assert.Equal(SpecialLevelType.BossRise, Harness.Repo.GetLevel("lvl_001_25").SpecialType);
             Assert.Equal(SpecialLevelType.None, Harness.Repo.GetLevel("lvl_001_15").SpecialType);
             Assert.Equal(SpecialLevelType.NoWallTouch, Harness.Repo.GetLevel("lvl_006_07").SpecialType);   // the legacy 15-level regions keep their old goals: the lookup reads the goal, never an index
         }
@@ -219,19 +224,27 @@ namespace FluffyClimbers.LeaderboardService.Tests
         [Fact]
         public void KeepMovingEndsAnIdleRunAfterThreeSecondsAllowsAReviveAndReplaysExactly()
         {
-            RunSession s = Harness.NewLevelSession(KeepMoving, 2, 31);
-            Assert.True(s.Sim.KeepMoving);
-            var stock = new int[PowerUps.MaxType + 1];
-            stock[(int)PowerUp.SafetyNet] = 1;
-            s.ApplyStock(stock);
-            int[] first = Harness.BotTrace(s, s.State);
-            Harness.Play(s, first, 0, first.Length / 6);   // a sixth of the bot line: where the hero stands depends on Momo's physics (192 / 9 / 29 / 77 since Final Change 2); this spot ends on a still platform
-            s.Step(PowerUps.InputBit(PowerUp.SafetyNet));     // owner 2026-11-22: an armed net does not rescue the timeout (real falls only)
-            Assert.True(s.State.SafetyNetArmed);
-            while (!s.State.Grounded && !s.Over) s.Step(0);   // finish the jump in flight
-            Assert.False(s.Over);
-            int stood = s.State.StandTicks, ticks = 0;
-            while (!s.Over && ticks < 400) { s.Step(0); ticks++; }
+            // Where the hero stands after a share of the bot line depends on the layout and Momo's physics, so the spot is searched: the first share of the line that ends in the air or on
+            // a plain Normal platform that is still (the timer, not a moving or crumbling platform, must end the run); owner 2026-11-22: an armed net does not rescue the timeout (real falls only).
+            RunSession s = null;
+            int stood = 0, ticks = 0;
+            for (int div = 6; div <= 40; div++)
+            {
+                s = Harness.NewLevelSession(KeepMoving, 2, 31);
+                Assert.True(s.Sim.KeepMoving);
+                var stock = new int[PowerUps.MaxType + 1];
+                stock[(int)PowerUp.SafetyNet] = 1;
+                s.ApplyStock(stock);
+                int[] first = Harness.BotTrace(s, s.State);
+                Harness.Play(s, first, 0, first.Length / div);
+                s.Step(PowerUps.InputBit(PowerUp.SafetyNet));
+                if (!s.State.SafetyNetArmed) continue;
+                while (!s.State.Grounded && !s.Over) s.Step(0);   // finish the jump in flight
+                if (s.Over || s.Sim.Platforms[s.State.GroundId].Kind != PlatformKind.Normal) continue;
+                stood = s.State.StandTicks; ticks = 0;
+                while (!s.Over && ticks < 400) { s.Step(0); ticks++; }
+                if (s.KeepMovingTimedOut && ticks <= s.Cfg.KeepMovingLimitTicks + 1 - stood + 5) break;   // the timer ended it (a spot too near the danger line ends the run by the fall instead)
+            }
             Assert.True(s.State.Dead);
             Assert.True(ticks <= s.Cfg.KeepMovingLimitTicks + 1 - stood + 5, "the timer, not the danger line, ended the run after " + ticks + " ticks");
             Assert.True(s.KeepMovingTimedOut);
@@ -255,61 +268,77 @@ namespace FluffyClimbers.LeaderboardService.Tests
             AssertReplayEquals(s, sub, Harness.Replayer.Replay(sub, Harness.Lim));
         }
 
-        // ------------------------------------------------------------------ Combo Climb, Chase, No Wall Touch
+        // ------------------------------------------------------------------ Combo Gates, Sky Hoops, No Wall Touch
 
         [Theory]
         [InlineData(0)]
         [InlineData(4)]
-        public void ComboClimbIsClearedAtTheTopWithTheComboJumpsAndReplaysExactly(int mode)
+        public void ComboGatesIsClearedAtTheTopWithEveryGateAndReplaysExactly(int mode)
         {
             RunSession s = Harness.NewLevelSession(Combo, mode, 7001 + mode);
-            Assert.Equal(GoalType.ComboChain, s.Spec.Goal.Type);
+            Assert.Equal(GoalType.ComboGates, s.Spec.Goal.Type);
             Assert.Equal(150, s.Spec.TargetRow());
-            Assert.Equal("Floor 150 with 3 combo jumps", RunSession.DescribeGoal(s.Spec));
+            Assert.Equal("Floor 150, combo in each gate", RunSession.DescribeGoal(s.Spec));
             int[] trace = Harness.BotTrace(s, s.State);
-            bool jumpsBeforeTop = false;
+            int gatesBeforeTop = 0;
             for (int i = 0; i < trace.Length && !s.Over; i++)
             {
                 s.Step(trace[i]);
-                if (GoalEvaluator.ComboJumpsDone(s.Spec, s.State) && s.State.Row < 150) { jumpsBeforeTop = true; Assert.False(s.GoalReached, "the combo jumps alone do not end the level"); }
+                if (s.State.Row < 150) gatesBeforeTop = Math.Max(gatesBeforeTop, GoalEvaluator.GatesCleared(s.Spec, s.State));
+                Assert.False(s.GoalLost, "a gate was missed at row " + s.State.Row);
             }
-            Assert.True(jumpsBeforeTop);
+            Assert.Equal(3, gatesBeforeTop);
             Assert.True(s.GoalReached);
             Assert.Equal(150, s.RunFloors);
-            Assert.Equal(3, GoalEvaluator.ComboJumpsMade(s.Spec, s.State));
+            Assert.Equal(3, GoalEvaluator.GatesCleared(s.Spec, s.State));
             RunSubmission sub = Harness.Upload(s, Kinds.Level, 7001 + mode);
             AssertReplayEquals(s, sub, Harness.Replayer.Replay(sub, Harness.Lim));
         }
 
         [Fact]
-        public void ComboClimbIsLostAtTheTopWithoutTheComboJumps()
+        public void ComboGatesIsLostTheMomentAGateIsLeftBehindWithoutItsComboJump()
         {
             RunSession s = Harness.NewLevelSession(Combo, 1, 5);
-            // put the hero on the top row without a single combo jump: the goal is lost, there is no revive for a lost goal
-            s.State.Row = s.Spec.TargetRow() - 1;
-            s.State.JumpHist = 200UL;   // only one-floor jumps
+            int end0 = GateRules.EndRow(s.Spec.RowsFor(), 0, 3, GateRules.Length(3));
+            s.State.Row = end0;
             Assert.False(GoalEvaluator.IsFailed(s.Spec, s.State));
-            s.State.Row = s.Spec.TargetRow();
+            s.State.Row = end0 + 1;   // the first row above gate 0 without its bit: the run ends right there, not at the top
             s.Step(0);
             Assert.True(s.GoalLost);
             Assert.False(s.GoalReached);
             Assert.True(s.Failed);
-            Assert.True(s.ComboMissed);
+            Assert.True(s.GateMissed);
             Assert.False(s.CanRevive);
-            Assert.Equal("Combo missed!", s.FailTitle);
+            Assert.Equal("Gate missed!", s.FailTitle);
             Assert.NotNull(s.FailReason);
         }
 
+        [Fact]
+        public void SkyHoopsIsLostWhenTheTopComesWithoutEightRings()
+        {
+            RunSession s = Harness.NewLevelSession(Hoops, 1, 5);
+            Assert.Equal(GoalType.SkyHoops, s.Spec.Goal.Type);
+            Assert.Equal("Floor 90 with 8 of 10 rings", RunSession.DescribeGoal(s.Spec));
+            Assert.Equal(10, s.Data.Pickups.Count(p => p.Kind == PickupKind.Ring));
+            s.State.Row = s.Spec.TargetRow();
+            s.State.Rings = 7;
+            s.Step(0);
+            Assert.True(s.GoalLost);
+            Assert.True(s.RingsMissed);
+            Assert.False(s.CanRevive);
+            Assert.Equal("Rings missed!", s.FailTitle);
+        }
+
         [Theory]
-        [InlineData(Chase, 2)]
-        [InlineData(Chase, 4)]
+        [InlineData(Hoops, 2)]
+        [InlineData(Hoops, 4)]
         [InlineData(NoWall, 3)]
-        public void ChaseAndNoWallTouchReplayExactly(string levelId, int mode)
+        public void SkyHoopsAndNoWallTouchReplayExactly(string levelId, int mode)
         {
             RunSession s = Harness.NewLevelSession(levelId, mode, 1200 + mode);
-            if (levelId == Chase) { Assert.True(s.Spec.Ramp); Assert.True(s.Sim.CampaignRamp); Assert.Equal("Outclimb the chase: floor 150", RunSession.DescribeGoal(s.Spec)); }
             Harness.Play(s, Harness.BotTrace(s, s.State));
             Assert.True(s.GoalReached);
+            if (levelId == Hoops) Assert.True(s.State.Rings >= 8, s.State.Rings + " rings");
             RunSubmission sub = Harness.Upload(s, Kinds.Level, 1200 + mode);
             AssertReplayEquals(s, sub, Harness.Replayer.Replay(sub, Harness.Lim));
         }
@@ -317,7 +346,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
         [Fact]
         public void EverySpecialTypeHasAGoalRuleLineAndARegularRunHasNone()
         {
-            foreach (string id in new[] { NoWall, OneLife, NoPowers, KeepMoving, Chase, Combo })
+            foreach (string id in new[] { NoWall, OneLife, NoPowers, KeepMoving, Hoops, Combo })
             {
                 RunSession s = Harness.NewLevelSession(id, 2, 3);
                 string rule = RunSession.GoalRule(s.Spec);
@@ -325,13 +354,13 @@ namespace FluffyClimbers.LeaderboardService.Tests
                 Assert.EndsWith(".", rule);
                 Assert.True(rule.Length <= 50, rule);   // one short sentence: it fits the popup line
                 Assert.Equal(SpecialLevels.Name(s.SpecialType), RunSession.SpecialName(s.Spec));
-                if (s.SpecialType != SpecialLevelType.ComboClimb) Assert.Equal(SpecialLevels.RuleText(s.SpecialType), rule);
+                Assert.Equal(SpecialLevels.RuleText(s.SpecialType), rule);
             }
             RunSession plain = Harness.NewLevelSession("lvl_001_20", 2, 3);
             Assert.Null(RunSession.GoalRule(plain.Spec));
             Assert.Null(RunSession.SpecialName(plain.Spec));
             Assert.Equal("Reach floor 120", RunSession.DescribeGoal(plain.Spec));
-            Assert.Equal("A combo jump climbs 3 floors or more at once.", RunSession.GoalRule(Harness.NewLevelSession(Combo, 2, 3).Spec));
+            Assert.Equal("Land a 3-floor combo jump in every gate.", RunSession.GoalRule(Harness.NewLevelSession(Combo, 2, 3).Spec));
         }
     }
 }

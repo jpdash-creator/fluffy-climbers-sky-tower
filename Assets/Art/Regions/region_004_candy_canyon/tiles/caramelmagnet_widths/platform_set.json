@@ -1,0 +1,49 @@
+{
+  "asset": "caramelmagnet_widths",
+  "kind": "caramelmagnet",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 366,
+      "h": 133,
+      "bodyLeft": 15,
+      "bodyRight": 349,
+      "surfaceY": 33,
+      "bodyBottom": 116,
+      "width": 2.0,
+      "file": "reg004_caramelmagnet_slab_w2.png",
+      "ppu": 167.0,
+      "kind": "caramelmagnet",
+      "dir": 0,
+      "pose": "slab"
+    },
+    {
+      "w": 533,
+      "h": 133,
+      "bodyLeft": 15,
+      "bodyRight": 516,
+      "surfaceY": 33,
+      "bodyBottom": 116,
+      "width": 3.0,
+      "file": "reg004_caramelmagnet_slab_w3.png",
+      "ppu": 167.0,
+      "kind": "caramelmagnet",
+      "dir": 0,
+      "pose": "slab"
+    },
+    {
+      "w": 701,
+      "h": 127,
+      "bodyLeft": 16,
+      "bodyRight": 684,
+      "surfaceY": 25,
+      "bodyBottom": 109,
+      "width": 4.0,
+      "file": "reg004_caramelmagnet_slab_w4.png",
+      "ppu": 167.0,
+      "kind": "caramelmagnet",
+      "dir": 0,
+      "pose": "slab"
+    }
+  ]
+}

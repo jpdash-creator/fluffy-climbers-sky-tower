@@ -94,6 +94,8 @@ namespace FluffyClimbers.Content
         /// absent on every other level. The goal-based special types (noWallBounce, comboChain, bossChase) are told by the goal. Use <see cref="SpecialType"/>.
         /// </summary>
         [JsonProperty("special")] public string Special { get; set; }
+        /// <summary>Rival Race levels (goal rivalRace; Final Change 6): the baked ghost path, the ghost's row every 30 ticks from the first jump (Simulation.RivalRace). Written by Tools/content_cli/bake_rival.py; absent on every other level.</summary>
+        [JsonProperty("ghostRowAtTick")] public List<int> GhostRowAtTick { get; set; }
 
         /// <summary>The special level type of this level (None = Regular Run): the ONE lookup for UI, rewards and the server (SpecialLevels.Name / RuleText / Glyph take it).</summary>
         [JsonIgnore]

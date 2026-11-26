@@ -64,22 +64,32 @@ namespace FluffyClimbers.Tests
             Assert.IsFalse(l1.Ramp);
         }
 
-        /// <summary>Owner Final Change 1 (2026-11-22): the level JSON fields of the special level types reach the spec (goal, overrides.ramp, overrides.rows, special).</summary>
+        /// <summary>Owner Final Change 1 (2026-11-22): the level JSON fields of the special level types reach the spec (goal, overrides.rows, special).</summary>
         [Test]
         public void SpecialLevelFieldsAreMappedAndAnUnknownRuleIsAContentError()
         {
             var repo = ContentRepository.LoadFromResources();
-            LevelSpec chase = LevelSpecFactory.Build(repo, "lvl_001_21");
-            Assert.AreEqual(GoalType.BossChase, chase.Goal.Type);
-            Assert.IsTrue(chase.Ramp, "a Chase level carries the row ramp");
-            Assert.AreEqual(150, chase.TargetRow());
-            Assert.AreEqual(SpecialLevelType.Chase, SpecialLevels.TypeOf(chase));
+            LevelSpec sprint = LevelSpecFactory.Build(repo, "lvl_001_21");
+            Assert.AreEqual(GoalType.ReachFloor, sprint.Goal.Type);
+            Assert.AreEqual(SpecialLevelType.SprintRest, sprint.Special);
+            Assert.IsTrue(sprint.SprintRestRule && !sprint.BossRiseRule, "the rule flags follow the special type");
+            Assert.AreEqual(SpecialLevelType.SprintRest, SpecialLevels.TypeOf(sprint));
+            LevelSpec boss = LevelSpecFactory.Build(repo, "lvl_003_18");
+            Assert.AreEqual(SpecialLevelType.BossRise, boss.Special);
+            Assert.IsTrue(boss.BossRiseRule);
+            Assert.AreEqual(3, boss.BossRegion, "the region selects the boss");
+            LevelSpec hoops = LevelSpecFactory.Build(repo, "lvl_001_08");
+            Assert.AreEqual(GoalType.SkyHoops, hoops.Goal.Type);
+            Assert.AreEqual(8, hoops.Goal.Value);
+            Assert.AreEqual(10, hoops.Goal.Count);
+            Assert.AreEqual(90, hoops.Rows);
+            Assert.AreEqual(SpecialLevelType.SkyHoops, SpecialLevels.TypeOf(hoops));
 
             LevelSpec combo = LevelSpecFactory.Build(repo, "lvl_001_24");
-            Assert.AreEqual(GoalType.ComboChain, combo.Goal.Type);
+            Assert.AreEqual(GoalType.ComboGates, combo.Goal.Type);
             Assert.AreEqual(3, combo.Goal.Value);
             Assert.AreEqual(3, combo.Goal.Count);
-            Assert.AreEqual(150, combo.Rows, "the floor count of a Combo Climb level is written out (overrides.rows)");
+            Assert.AreEqual(150, combo.Rows, "the floor count of a Combo Gates level is written out (overrides.rows)");
             Assert.AreEqual(150, combo.RowsFor());
             Assert.AreEqual(150, combo.TargetRow());
 

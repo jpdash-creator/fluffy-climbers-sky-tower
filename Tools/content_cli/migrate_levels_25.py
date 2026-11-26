@@ -18,18 +18,24 @@ MIGRATED_REGIONS = 5          # TODO(regions 6-30 migration): raise to 30 when t
 LEVELS = 25
 # Gem levels (GemLevels in Simulation): plain Regular Run goals, never a special type.
 GEM_LEVELS = (5, 10, 15, 20, 25)
-# Owner Final Change 1 (2026-11-22): the six special level types, exactly ONE level each per region, never on a gem level, the same for all five Gameplay settings.
-# type -> level index, per region. Every other level is a Regular Run (reachFloor). Keep in step with Tools/content_cli/content.py (SPECIAL_PLACEMENT is imported there).
-SPECIAL_TYPES = ("noWallTouch", "oneLife", "noPowerUps", "keepMoving", "chase", "comboClimb")
+# Owner Final Change 6 (2026-11-25): ten special levels per region, nine types (Boss Rise has two levels: a mid-level one and level 25, which stays a gem level), the same for all five
+# Gameplay settings. Combo Climb and Chase were retired (their goals and enum values stay decodable; no level uses them). Gem levels 5, 10, 15, 20 are plain Regular Run
+# levels. type -> level indices, per region. Every other level is a Regular Run (reachFloor). Keep in step with Tools/content_cli/content.py (SPECIAL_PLACEMENT is imported there),
+# Simulation/SpecialLevels.cs and Tests/Simulation/SpecialLevelTests.cs (Placement).
+SPECIAL_TYPES = ("noWallTouch", "noPowerUps", "oneLife", "keepMoving", "comboGates", "skyHoops", "bossRise", "sprintRest", "rivalRace")
 SPECIAL_PLACEMENT = {
-    1: {"noWallTouch": 6, "oneLife": 9, "noPowerUps": 14, "keepMoving": 16, "chase": 21, "comboClimb": 24},
-    2: {"noWallTouch": 4, "oneLife": 7, "noPowerUps": 13, "comboClimb": 16, "keepMoving": 18, "chase": 23},
-    3: {"chase": 3, "oneLife": 6, "noPowerUps": 11, "comboClimb": 17, "noWallTouch": 21, "keepMoving": 23},
-    4: {"noPowerUps": 4, "keepMoving": 6, "comboClimb": 11, "chase": 14, "noWallTouch": 19, "oneLife": 24},
-    5: {"noWallTouch": 4, "chase": 6, "keepMoving": 9, "comboClimb": 14, "oneLife": 18, "noPowerUps": 24},
+    1: {"noWallTouch": [6], "skyHoops": [8], "oneLife": [9], "rivalRace": [12], "noPowerUps": [14], "keepMoving": [16], "bossRise": [17, 25], "sprintRest": [21], "comboGates": [24]},
+    2: {"noWallTouch": [4], "oneLife": [7], "skyHoops": [9], "rivalRace": [12], "noPowerUps": [13], "bossRise": [14, 25], "comboGates": [16], "keepMoving": [18], "sprintRest": [23]},
+    3: {"sprintRest": [4], "oneLife": [6], "skyHoops": [8], "noPowerUps": [11], "rivalRace": [13], "comboGates": [17], "bossRise": [18, 25], "noWallTouch": [21], "keepMoving": [23]},
+    4: {"noPowerUps": [4], "keepMoving": [6], "skyHoops": [7], "comboGates": [11], "rivalRace": [13], "bossRise": [16, 25], "noWallTouch": [19], "sprintRest": [22], "oneLife": [24]},
+    5: {"noWallTouch": [4], "sprintRest": [6], "keepMoving": [9], "skyHoops": [12], "comboGates": [14], "bossRise": [16, 25], "oneLife": [18], "rivalRace": [21], "noPowerUps": [24]},
 }
-# Combo Climb: 3 combo jumps of 3 floors or more (the chain the combo ladder was built for: one 6 u wide column, 1.2 u rungs), then the top row.
-COMBO_FLOORS, COMBO_JUMPS = 3, 3
+# The rule-only types (level JSON field "special" on a plain reachFloor level); the other types are goals.
+RULE_TYPES = ("noPowerUps", "oneLife", "keepMoving", "bossRise", "sprintRest")
+# Combo Gates: 3 gates, a combo jump of 3 floors or more in each (rungs 1.2 u apart, the ladder the old Combo Climb used, three times).
+COMBO_FLOORS, COMBO_GATES = 3, 3
+# Sky Hoops: 10 rings in the level, 8 needed.
+RINGS_NEEDED, RINGS_TOTAL = 8, 10
 # Target difficulty score per level (Bug List 6 item 4), see Tests/Simulation/DIFFICULTY_CURVE_REPORT.md
 TARGET = [5, 20, 26.7, 33.3, 40, 44, 48, 52, 56, 60, 63, 66, 69, 72, 75, 77.5, 80, 82.5, 85, 87.5, 90, 92.5, 95, 97.5, 100]
 # Owner Bug List 8 item 3: rows per level L1 60, L2-5 75, L6-10 90, L11-15 105, L16-20 120, L21-25 150 (speedrun time scaled 75 s per 90 rows -> 100 s per 120 rows)
@@ -47,8 +53,8 @@ def rows(i):
 
 def special_of(n, i):
     """The special type of level i in region n ("" for a Regular Run)."""
-    for t, idx in SPECIAL_PLACEMENT[n].items():
-        if idx == i: return t
+    for t, idxs in SPECIAL_PLACEMENT[n].items():
+        if i in idxs: return t
     return ""
 
 
@@ -56,17 +62,17 @@ def goal(n, i):
     """Goal of level i in region n. Levels 10, 15 and 20 lost noWallBounce, findHiddenGem and speedrun (Final Change 1): every gem level is a plain reachFloor with its old floor count."""
     t = special_of(n, i)
     if t == "noWallTouch": return {"type": "noWallBounce", "value": rows(i)}
-    if t == "chase": return {"type": "bossChase", "value": rows(i)}
-    if t == "comboClimb": return {"type": "comboChain", "value": COMBO_FLOORS, "count": COMBO_JUMPS}
+    if t == "comboGates": return {"type": "comboGates", "value": COMBO_FLOORS, "count": COMBO_GATES}
+    if t == "skyHoops": return {"type": "skyHoops", "value": RINGS_NEEDED, "count": RINGS_TOTAL}
+    if t == "rivalRace": return {"type": "rivalRace", "value": rows(i)}
     return {"type": "reachFloor", "value": rows(i)}
 
 
 def extras(n, i):
-    """Optional level fields of the special types: the rule id of the three rule-only types, the row ramp of a Chase level, the explicit height of a Combo Climb level."""
+    """Optional level fields of the special types: the rule id of the rule-only types, the explicit height of a Combo Gates or Sky Hoops level (their goal value is not the floor count)."""
     t = special_of(n, i)
-    if t in ("noPowerUps", "oneLife", "keepMoving"): return {"special": t}
-    if t == "chase": return {"overrides": {"ramp": True}}
-    if t == "comboClimb": return {"overrides": {"rows": rows(i)}}   # the goal value is the floors per combo jump, so the floor count is written out
+    if t in RULE_TYPES: return {"special": t}
+    if t in ("comboGates", "skyHoops"): return {"overrides": {"rows": rows(i)}}
     return {}
 
 
@@ -129,6 +135,8 @@ def main():
             if "overrides" in ex: lv["overrides"] = ex["overrides"]
             lv["rewards"] = {"gems": gem_rewards(i)}
             if "special" in ex: lv["special"] = ex["special"]
+            # Rival Race: the baked ghost path (Tools/content_cli/bake_rival.py) belongs to the level and survives a regeneration; any other level drops it.
+            if special_of(n, i) == "rivalRace" and prev and "ghostRowAtTick" in prev: lv["ghostRowAtTick"] = prev["ghostRowAtTick"]
             out.append(lv)
         region["levels"] = [lv["id"] for lv in out]
         if n >= 2:

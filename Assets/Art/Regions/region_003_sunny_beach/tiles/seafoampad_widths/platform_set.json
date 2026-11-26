@@ -1,0 +1,63 @@
+{
+  "asset": "seafoampad_widths",
+  "kind": "seafoampad",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 552,
+      "h": 150,
+      "bodyLeft": 25,
+      "bodyRight": 526,
+      "surfaceY": 35,
+      "bodyBottom": 119,
+      "width": 3.0,
+      "file": "reg003_seafoampad_foam_w3.png",
+      "ppu": 167.0,
+      "kind": "seafoampad",
+      "dir": 0,
+      "pose": "foam"
+    },
+    {
+      "w": 721,
+      "h": 149,
+      "bodyLeft": 26,
+      "bodyRight": 694,
+      "surfaceY": 37,
+      "bodyBottom": 120,
+      "width": 4.0,
+      "file": "reg003_seafoampad_foam_w4.png",
+      "ppu": 167.0,
+      "kind": "seafoampad",
+      "dir": 0,
+      "pose": "foam"
+    },
+    {
+      "w": 1055,
+      "h": 149,
+      "bodyLeft": 26,
+      "bodyRight": 1028,
+      "surfaceY": 37,
+      "bodyBottom": 120,
+      "width": 6.0,
+      "file": "reg003_seafoampad_foam_w6.png",
+      "ppu": 167.0,
+      "kind": "seafoampad",
+      "dir": 0,
+      "pose": "foam"
+    },
+    {
+      "w": 1389,
+      "h": 149,
+      "bodyLeft": 26,
+      "bodyRight": 1362,
+      "surfaceY": 37,
+      "bodyBottom": 120,
+      "width": 8.0,
+      "file": "reg003_seafoampad_foam_w8.png",
+      "ppu": 167.0,
+      "kind": "seafoampad",
+      "dir": 0,
+      "pose": "foam"
+    }
+  ]
+}

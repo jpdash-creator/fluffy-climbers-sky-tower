@@ -474,43 +474,45 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void SpecialGoalsReadTheRegionsOwnSixSpecialLevels()
+        public void SpecialGoalsReadTheRegionsOwnSpecialLevels()
         {
             ProgressService.TestUnlockAll = true;   // any level can be started directly
             ProgressService svc = NewService();
             LevelDef[] specials = svc.RegionSpecialLevels(1);
-            Assert.AreEqual(6, specials.Length);
-            // each "clear the X level" goal reads the region's level of that type (any setting)
-            foreach (SpecialLevelType type in SpecialLevels.All)
+            Assert.AreEqual(10, specials.Length);   // Final Change 6: ten special levels, nine types (Boss Rise twice)
+            // each "clear the X level" goal reads the region's level of that type (any setting); the six reward slots are SpecialLevels.RewardTypes
+            foreach (SpecialLevelType type in SpecialLevels.RewardTypes)
             {
                 string id = "g2_1_special_" + RewardTables.SpecialToken(type);
                 Assert.AreEqual(type, Goal(svc, id).Special);
                 Assert.AreEqual("Clear the " + SpecialLevels.Name(type) + " level", Goal(svc, id).Title);
                 Assert.AreEqual(0, Progress(svc, id));
             }
-            LevelDef chase1 = svc.RegionSpecialLevel(1, SpecialLevelType.Chase), chase2 = svc.RegionSpecialLevel(2, SpecialLevelType.Chase);
+            LevelDef chase1 = svc.RegionSpecialLevel(1, SpecialLevelType.BossRise), chase2 = svc.RegionSpecialLevel(2, SpecialLevelType.BossRise);   // (the old Chase slot is the Boss Rise slot now)
             svc.ApplyRun(chase2.Id, Won(7, Insane));
-            Assert.AreEqual(0, Progress(svc, "g2_1_special_chase"), "region 2's Chase level is not region 1's");
-            Assert.AreEqual(1, Progress(svc, "g2_2_special_chase"));
+            Assert.AreEqual(0, Progress(svc, "g2_1_special_bossrise"), "region 2's Boss Rise level is not region 1's");
+            Assert.AreEqual(1, Progress(svc, "g2_2_special_bossrise"));
             svc.ApplyRun(chase1.Id, Won(1, Relaxed));
-            Assert.IsTrue(Ready(svc, "g2_1_special_chase"));
+            Assert.IsTrue(Ready(svc, "g2_1_special_bossrise"));
             Assert.AreEqual(1, Progress(svc, "g2_1_special_all"));
             Assert.AreEqual(0, Progress(svc, "g2_1_normalup_special_all"), "a Relaxed clear is not on Normal or harder");
 
-            // all six on Relaxed with 3 stars on five of them
-            foreach (LevelDef l in specials) svc.ApplyRun(l.Id, Won(l.Id == chase1.Id ? 3 : 7, Relaxed));
+            // every special level on Relaxed with 3 stars on the types but the Boss Rise one (the six reward types count)
+            foreach (LevelDef l in specials) svc.ApplyRun(l.Id, Won(l.SpecialType == SpecialLevelType.BossRise ? 3 : 7, Relaxed));
             Assert.AreEqual(6, Progress(svc, "g2_1_special_all"));
             Assert.IsTrue(Ready(svc, "g2_1_special_all"));
-            Assert.AreEqual(5, Progress(svc, "g2_1_special_stars3"), "the Chase level has only 2 stars in its best setting");
+            Assert.AreEqual(5, Progress(svc, "g2_1_special_stars3"), "the Boss Rise levels have only 2 stars in their best setting");
             Assert.IsFalse(Ready(svc, "g2_1_special_stars3"));
             // each of the six in SOME setting of the range, not necessarily the same one: three on Normal, two on Hard, one on Insane
-            for (int i = 0; i < 6; i++) svc.ApplyRun(specials[i].Id, Won(1, i < 3 ? Normal : (i < 5 ? Hard : Insane)));
+            LevelDef[] rewardLevels = new LevelDef[6];
+            for (int i = 0; i < 6; i++) rewardLevels[i] = svc.RegionSpecialLevel(1, SpecialLevels.RewardTypes[i]);
+            for (int i = 0; i < 6; i++) svc.ApplyRun(rewardLevels[i].Id, Won(1, i < 3 ? Normal : (i < 5 ? Hard : Insane)));
             Assert.AreEqual(6, Progress(svc, "g2_1_normalup_special_all"));
             Assert.IsTrue(Ready(svc, "g2_1_normalup_special_all"));
             Assert.AreEqual(3, Progress(svc, "g2_1_hardup_special_all"));
             Assert.AreEqual(1, Progress(svc, "g2_1_insane_special_all"));
             Assert.IsFalse(Ready(svc, "g2_1_hardup_special_all"));
-            // 3 stars in at least one setting: the Chase level gets them on Easy
+            // 3 stars in at least one setting: the Boss Rise level gets them on Easy
             svc.ApplyRun(chase1.Id, Won(7, Easy));
             Assert.IsTrue(Ready(svc, "g2_1_special_stars3"));
             // a special level on all 5 settings: ONE level cleared in all five

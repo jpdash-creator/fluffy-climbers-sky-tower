@@ -138,6 +138,9 @@ namespace FluffyClimbers.Simulation
         private readonly PlatformKind[][] levelOptions = new PlatformKind[MaxLevel + 1][];
         private int lastHazardRow = -1000;
         private int prevDir;
+        /// <summary>Final Change 6, region 1: member index and swing / dart length of the previous platform, and the pads a started Glowworm Relay still has to place.</summary>
+        private int prevPhase, relayLeft, relayDebt, lastRelayRow = -1000;
+        private Fx prevAmp;
         // scratch buffers (no allocation per row)
         private readonly int[] pool = new int[32];
         private readonly Fx[] usedX = new Fx[4];
@@ -414,7 +417,7 @@ namespace FluffyClimbers.Simulation
             Fx gap = rng.Range(Fx.Lerp(gapEasyLo, gapHardLo, d), Fx.Lerp(gapEasyHi, gapHardHi, d));
             gap = Fx.Min(gap, cfg.NormalGapMax);
             if (prevKind == PlatformKind.Sticky) gap = Fx.Min(gap, cfg.StickyNextGapMax);
-            bool afterBounce = PlatformKinds.IsBouncePad(prevKind);
+            bool afterBounce = PlatformKinds.IsBouncePad(prevKind) || prevKind == PlatformKind.MoonJellyChain;   // Final Change 6: a lone jelly pad launches; the next row stays close
             if (afterBounce) gap = Fx.Min(gap, cfg.BounceNextGapMax);
 
             // Special platforms of the row: the region's level-N list at the level-N share (the first fixed rows stay plain).
@@ -429,6 +432,9 @@ namespace FluffyClimbers.Simulation
                 if (sigShare > cfg.SignatureMaxPercent) sigShare = cfg.SignatureMaxPercent;
                 if (sigShare > 0 && rng.Next(100) < sigShare) kind = sigKind;
             }
+            // Glowworm Relay (Final Change 6): a relay is RelayLength consecutive rows; once its head is drawn the next rows are its pads
+            if (relayLeft > 0) { kind = PlatformKind.GlowwormRelay; relayLeft--; }
+            else if (kind == PlatformKind.GlowwormRelay) { relayLeft = SimConfig.RelayLength - 1; relayDebt += SimConfig.RelayLength - 1; lastRelayRow = r; }   // the pads are extra special rows: the next draws that would give a special pay them back, so the share stays the level's
             if (afterBounce && PlatformKinds.IsBouncePad(kind)) kind = PlatformKind.Normal;
 
             Fx w = rng.Range(Fx.Lerp(widthEasyLo, widthHardLo, d), Fx.Lerp(widthEasyHi, widthHardHi, d));
@@ -445,10 +451,12 @@ namespace FluffyClimbers.Simulation
             Fx y = prevY + gap;
 
             Fx jm = prevKind == PlatformKind.Sticky ? cfg.StickyJumpMultiplier : Fx.One;
+            if (prevKind == PlatformKind.UndertowPad) jm = cfg.UndertowReachFactor;   // Final Change 6: the gravity column above an Undertow Pad cuts the reach
             Fx offFrac = rng.Range(Fx.Lerp(offEasyLo, offHardLo, d), Fx.Lerp(offEasyHi, offHardHi, d));
             Fx dx = offFrac * screen;
             Fx dxLimit = cfg.LayoutMaxReachDx(gap, jm) * 6 / 10 + (prevW + w) / 2 + half;
             if (afterBounce) dxLimit = Fx.Min(dxLimit, cfg.BounceNextDxMax + (prevW + w) / 2);
+            if (prevKind == PlatformKind.IncenseMistBank) dxLimit = Fx.Min(dxLimit, cfg.MistNextDxMax + (prevW + w) / 2);   // Final Change 6: a damped jump reaches less
             dx = Fx.Min(dx, dxLimit);
 
             int dir = rng.Next(2) == 0 ? -1 : 1;
@@ -459,6 +467,8 @@ namespace FluffyClimbers.Simulation
                 dx = Fx.Max(dx, screen / 3);
                 dx = Fx.Min(dx, dxLimit);
             }
+            if (kind == PlatformKind.GlowwormRelay && prevKind == PlatformKind.GlowwormRelay) dx = Fx.Min(dx, cfg.RelayDxMax);   // Final Change 6, region 1 (as in LevelBuilder)
+            if (prevKind == PlatformKind.DewdropMirrorLeaf) dx = Fx.Min(dx, Fx.Max(Fx.Zero, dxLimit - prevAmp));
             Fx x = prevX + dx * dir;
             if (x < lo || x > hi) x = prevX - dx * dir;
             x = Fx.Clamp(x, lo, hi);
@@ -466,12 +476,15 @@ namespace FluffyClimbers.Simulation
             if (prevKind == PlatformKind.LicoriceBelt && prevDir != 0) x = SpecialPlatforms.BeltNextX(prevX, prevDir, dx, w, screen);
             if (prevKind == PlatformKind.BambooFlick && prevDir != 0) x = SpecialPlatforms.FlickNextX(cfg, ref specRng, prevX, prevDir, w, screen);
             if (prevKind == PlatformKind.DizzySpores) x = SpecialPlatforms.DizzyNextX(cfg, prevX, prevW, w, x, screen);
+            if (prevKind == PlatformKind.DragonflyDart && prevDir != 0) x = SpecialPlatforms.DartNextX(prevX, prevDir, prevAmp, dx, dxLimit, w, screen);
 
             Fx amp = Fx.Zero;
             int period = 0, phase = 0, pdir = 0;
             if (PlatformKinds.IsRegionNew(kind))
             {
                 SpecialPlatforms.Params(cfg, ref specRng, kind, x, Fx.Min(x - lo, hi - x), screen, out amp, out period, out phase, out pdir);
+                SpecialPlatforms.FinishParams(cfg, kind, x, w, screen, prevKind, prevPhase, ref amp, ref period, ref phase, ref pdir);
+                x = SpecialPlatforms.FitSwing(kind, x, w, amp, screen, prevX, dxLimit);   // Ladybug / Turtle keep their whole path (never amplitude 0 at a wall)
                 if (PlatformKinds.IsHazardType(kind)) lastHazardRow = r;
             }
             else if (kind == PlatformKind.Moving)
@@ -480,7 +493,8 @@ namespace FluffyClimbers.Simulation
                 Fx want = signature == SignatureKind.DriftingPlatforms
                     ? rng.Range(cfg.DriftAmplitudeMin, cfg.DriftAmplitudeMax)
                     : rng.Range(Fx.Half, Fx.One);
-                amp = Fx.Min(want, room);
+                amp = want;   // the full drawn amplitude (owner 2026-11-25: a Moving platform at a wall got amplitude 0 and never moved); FitSwing moves it inward so the path fits
+                x = SpecialPlatforms.FitSwing(kind, x, w, amp, screen, prevX, dxLimit);
                 period = 2 * rng.Range(90, 150);
                 phase = rng.Next(period);
             }
@@ -518,7 +532,7 @@ namespace FluffyClimbers.Simulation
 
             if (signature == SignatureKind.SwingingGongs && level >= 3 && r > LevelGenerator.FixedRows + 1) AddGong(r, d, x, y, level);
 
-            prevX = x; prevW = w; prevY = y; prevKind = kind; prevDir = pdir;
+            prevX = x; prevW = w; prevY = y; prevKind = kind; prevDir = pdir; prevPhase = phase; prevAmp = amp;
             row = r;
             if (r % 1000 == 0) milestones.Add((long)fp);
         }
@@ -532,12 +546,14 @@ namespace FluffyClimbers.Simulation
         {
             int share = SpecialPlatforms.RowPercent(cfg, level, PositionInLevel(r), FloorsPerLevel, levels);
             if (specRng.Next(100) >= share) return PlatformKind.Normal;
+            if (relayDebt > 0) { relayDebt--; return PlatformKind.Normal; }   // pays back a Glowworm Relay's extra rows (Final Change 6)
             int spacing = SpecialPlatforms.HazardSpacing(cfg, level);
             PlatformKind[] opts = levelOptions[level];
             int n = 0;
             for (int i = 0; i < opts.Length; i++)
             {
                 if (!SpecialPlatforms.Allowed(opts[i], prevKind, r - lastHazardRow, spacing, false)) continue;
+                if (opts[i] == PlatformKind.GlowwormRelay && r - lastRelayRow < SimConfig.EndlessRelaySpacingRows) continue;   // about one relay per level, like the campaign (Final Change 6)
                 pool[n++] = i;
             }
             if (n == 0) return PlatformKind.Normal;

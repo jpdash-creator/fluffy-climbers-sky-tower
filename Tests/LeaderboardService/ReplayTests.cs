@@ -384,6 +384,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.Contains("Cfg.ScrollStepPercent = GameSettings.DifficultyStepPercent[d];", session);
             Assert.Contains("Cfg.GemSpotPermille = GameSettings.DifficultyGemPermille[d];", session);
             Assert.Contains("Cfg.ScrollStepCapPercent = SimConfig.TopSpeedUpPercent(d);", session);
+            Assert.Contains("Cfg.RivalPacePercent = RivalRace.PaceForMode(d);", session);
             Assert.Contains("DifficultyStepPercent = FluffyClimbers.Simulation.SimConfig.DifficultyStepPercent", settings);
             // owner Final Change 1 (2026-11-22): the step every 30 s, 8 steps, the tables 10/20/30/40/50 and 80/160/240/320/400; ApplyDifficulty sets nothing else
             // (the interval and the step count are the SimConfig defaults on both sides)
@@ -396,6 +397,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
                 Assert.Equal(b.ScrollStepPercent, a.ScrollStepPercent);
                 Assert.Equal(b.GemSpotPermille, a.GemSpotPermille);
                 Assert.Equal(b.ScrollStepCapPercent, a.ScrollStepCapPercent);
+                Assert.Equal(b.RivalPacePercent, a.RivalPacePercent);
                 Assert.Equal(b.ScrollStepSeconds, a.ScrollStepSeconds);
                 Assert.Equal(b.ScrollStepMaxSteps, a.ScrollStepMaxSteps);
                 Assert.Equal(steps[m], a.ScrollStepPercent);
@@ -411,12 +413,12 @@ namespace FluffyClimbers.LeaderboardService.Tests
             // owner Final Change 1 (2026-11-22): the speed steps and the crown bonus changed, so a client of the old rules must be told to update (HTTP 426)
             string client = System.IO.File.ReadAllText(System.IO.Path.Combine(Harness.Root, "Assets", "_Game", "Leaderboard", "LeaderboardConfig.cs"));
             Assert.Contains("public const int SimVersion = " + Harness.ClientSimVersion + ";", client);
-            Assert.Equal(3, Harness.ClientSimVersion);
+            Assert.Equal(4, Harness.ClientSimVersion);
             Assert.True(new Limits().SimVersionAllowed(Harness.ClientSimVersion));
             Assert.False(new Limits().SimVersionAllowed(1));
             Assert.False(new Limits().SimVersionAllowed(2), "Final Change 2 (hero bands, powers, region penalty) changed the replay: version 2 runs cannot be replayed");
             string cfg = System.IO.File.ReadAllText(System.IO.Path.Combine(Harness.Root, "Tools", "leaderboard_service", "config.default.json"));
-            Assert.Contains("\"simVersions\": [3]", cfg);
+            Assert.Contains("\"simVersions\": [4]", cfg);
 
             RunSession s = Harness.NewLevelSession("lvl_001_01", 2, 9);
             Harness.Play(s, Harness.BotTrace(s, s.State));

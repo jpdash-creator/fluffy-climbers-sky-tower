@@ -212,26 +212,51 @@ namespace FluffyClimbers.Simulation.Tests
 
         // ------------------------------------------------------------------ 4.5 Taffy Stretch
 
+        private static Sim TaffySim(int phase, int period = 270)
+        {
+            return World(Start(), P(1, 1, PlatformKind.TaffyStretch, 500, 300, 240, period: period, phase: phase, ampHundredths: 140));
+        }
+
+        private static int TaffyPhase(bool snaps)
+        {
+            for (int phase = 0; phase < 270; phase++)
+            {
+                Sim s = TaffySim(phase);
+                if (s.TaffySnaps(in s.Platforms[1]) == snaps) return phase;
+            }
+            return -1;
+        }
+
         [Fact]
-        public void TaffyStretch_BreathesBetween2Point4And5Point2UnitsOnA270TickPeriodWithEdgesAt0Point6UnitsPerSecond()
+        public void TaffyStretch_BreathesBetweenTheNarrowWidthAndItsOwnStretchOnAnEasedWaveWithItsOwnPeriodAndStretchPerPlatform()
         {
             SimConfig cfg = new SimConfig();
             Assert.Equal(270, cfg.TaffyPeriodTicks);
-            Sim sim = World(Start(), P(1, 1, PlatformKind.TaffyStretch, 500, 300, 240, period: 270, phase: 0, ampHundredths: 140));
-            Assert.Equal(F(240).Raw, sim.WidthAt(1, 0).Raw);
-            Assert.InRange(D(sim.WidthAt(1, 135)), 5.19, 5.21);
-            Assert.Equal(sim.WidthAt(1, 0).Raw, sim.WidthAt(1, 270).Raw);
-            Assert.Equal(sim.WidthAt(1, 77).Raw, sim.WidthAt(1, 77 + 270).Raw);
-            double minW = 99, maxW = 0, maxStep = 0;
-            for (int t = 0; t < 270; t++)
+            Assert.Equal(F(240).Raw, TaffySim(0).WidthAt(1, 0).Raw);   // phase 0 starts narrow
+            HashSet<int> periods = new HashSet<int>(), stretches = new HashSet<int>();
+            for (int phase = 0; phase < 270; phase += 7)
             {
-                double w = D(sim.WidthAt(1, t));
-                minW = Math.Min(minW, w); maxW = Math.Max(maxW, w);
-                maxStep = Math.Max(maxStep, Math.Abs(D(sim.WidthAt(1, t + 1)) - w));
+                Sim s = TaffySim(phase);
+                int period = s.TaffyPeriodOf(in s.Platforms[1]);
+                int pct = s.TaffyStretchPercentOf(in s.Platforms[1]);
+                periods.Add(period); stretches.Add(pct);
+                Assert.InRange(period, 270 * 70 / 100 - 2, 270 * 130 / 100 + 1);
+                Assert.Equal(0, period % 2);
+                Assert.InRange(pct, 70, 100);
+                double minW = 99, maxW = 0, maxStep = 0;
+                for (int t = 0; t < period; t++)
+                {
+                    double w = D(s.WidthAt(1, t));
+                    minW = Math.Min(minW, w); maxW = Math.Max(maxW, w);
+                    maxStep = Math.Max(maxStep, Math.Abs(D(s.WidthAt(1, t + 1)) - w));
+                    Assert.Equal(s.WidthAt(1, t).Raw, s.WidthAt(1, t + period).Raw);   // periodic
+                }
+                Assert.InRange(minW, 2.39, 2.41);
+                Assert.InRange(maxW, 2.4 + 2.8 * pct / 100.0 - 0.01, 2.4 + 2.8 * pct / 100.0 + 0.01);   // reaches its own stretch, never beyond 5.2
+                Assert.True(maxStep < 0.06, "eased: the width never jumps (" + maxStep + ")");
             }
-            Assert.InRange(minW, 2.39, 2.41);
-            Assert.InRange(maxW, 5.19, 5.21);
-            Assert.InRange(maxStep * 60 / 2, 0.55, 0.65);   // each edge moves about 0.6 u/s
+            Assert.True(periods.Count >= 8, "every taffy has its own rhythm: " + periods.Count + " distinct periods");
+            Assert.True(stretches.Count >= 8, "every taffy has its own stretch: " + stretches.Count);
             // other kinds are never touched by WidthAt
             Sim plain = World(Start(), P(1, 1, PlatformKind.Normal, 500, 300, 300));
             Assert.Equal(F(300).Raw, plain.WidthAt(1, 99).Raw);
@@ -240,18 +265,20 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void TaffyStretch_ALandingNearTheEdgeWorksWhenWideAndMissesWhenNarrowAndAShrinkingEdgeDropsAStandingPlayer()
         {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.TaffyStretch, 500, 300, 240, period: 270, phase: 0, ampHundredths: 140));
-            SimState wide = Drop(sim, 1, 700, 100, tick: 135);
+            Sim sim = TaffySim(0);
+            int period = sim.TaffyPeriodOf(in sim.Platforms[1]);
+            int wideTick = period / 2, narrowTick = 0;   // phase 0: narrowest at 0, widest at half a period
+            SimState wide = Drop(sim, 1, 700, 100, tick: wideTick);
             StepUntilGrounded(sim, ref wide, 1, 40);
             Assert.True(wide.Grounded && wide.GroundId == 1, "2.0 u from the centre is on the platform when it is wide");
-            SimState narrow = Drop(sim, 1, 700, 100, tick: 0);
+            SimState narrow = Drop(sim, 1, 700, 100, tick: narrowTick);
             StepUntilGrounded(sim, ref narrow, 1, 40);
             Assert.False(narrow.Grounded && narrow.GroundId == 1, "the same spot is off the platform when it is narrow");
             // a player standing 2.0 u from the centre when it is widest is dropped as the edge comes in; the coyote jump still works
             SimState stand = Stand(sim, 1, 700);
-            stand.Tick = 135;
+            stand.Tick = wideTick;
             bool fell = false;
-            for (int t = 0; t < 140 && !fell; t++) { sim.Step(ref stand, 0); fell = !stand.Grounded; }
+            for (int t = 0; t < period && !fell; t++) { sim.Step(ref stand, 0); fell = !stand.Grounded; }
             Assert.True(fell);
             Assert.True(stand.Coyote > 0, "coyote time after the edge slid away");
             // standing in the middle is always safe
@@ -260,48 +287,139 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.True(mid.Grounded && mid.GroundId == 1);
         }
 
+        [Fact]
+        public void TaffyStretch_SomeTaffiesSnapShutAMomentAfterALandingToTheNarrowWidthAndEaseBackOut()
+        {
+            SimConfig cfg = new SimConfig();
+            int snappers = 0;
+            for (int phase = 0; phase < 270; phase++)
+            {
+                Sim s = TaffySim(phase);
+                if (s.TaffySnaps(in s.Platforms[1])) snappers++;
+            }
+            Assert.InRange(snappers * 100 / 270, 30, 60);   // occasional, not every taffy
+            Sim sn = TaffySim(TaffyPhase(true));
+            Sim calm = TaffySim(TaffyPhase(false));
+            int[] aux = new int[sn.Platforms.Length];
+            for (int i = 0; i < aux.Length; i++) aux[i] = -1;
+            // nothing before a landing is recorded
+            Assert.Equal(sn.WidthAt(1, 77).Raw, sn.WidthAt(1, 77, aux).Raw);
+            int land = 100;
+            aux[1] = land;
+            for (int t = land; t < land + cfg.TaffySnapDelayMin; t++) Assert.Equal(0, sn.TaffySnapAmount(in sn.Platforms[1], 1, t, aux).Raw);   // never at once
+            int closed = -1;
+            for (int t = land; t < land + cfg.TaffySnapTotalTicks && closed < 0; t++) if (sn.TaffySnapAmount(in sn.Platforms[1], 1, t, aux) == Fx.One) closed = t;
+            Assert.InRange(closed, land + cfg.TaffySnapDelayMin + cfg.TaffySnapInTicks - 1, land + cfg.TaffySnapDelayMin + cfg.TaffySnapDelaySpan + cfg.TaffySnapInTicks);
+            for (int t = closed; t < closed + cfg.TaffySnapHoldTicks; t++) Assert.Equal(F(240).Raw, sn.WidthAt(1, t, aux).Raw);   // the narrow width the generator relies on
+            double maxStep = 0;
+            for (int t = land; t < land + cfg.TaffySnapTotalTicks + 10; t++) maxStep = Math.Max(maxStep, Math.Abs(D(sn.WidthAt(1, t + 1, aux)) - D(sn.WidthAt(1, t, aux))));
+            Assert.True(maxStep < 0.36, "the snap closes over " + cfg.TaffySnapInTicks + " ticks, never in one step (" + maxStep + ")");
+            int end = land + cfg.TaffySnapTotalTicks;
+            Assert.Equal(sn.WidthAt(1, end + 5).Raw, sn.WidthAt(1, end + 5, aux).Raw);   // back to the plain breathing
+            // a taffy that does not snap ignores the record
+            int[] aux2 = new int[calm.Platforms.Length];
+            for (int i = 0; i < aux2.Length; i++) aux2[i] = -1;
+            aux2[1] = land;
+            for (int t = 0; t < 400; t++) Assert.Equal(calm.WidthAt(1, t).Raw, calm.WidthAt(1, t, aux2).Raw);
+        }
+
+        [Fact]
+        public void TaffyStretch_ALandingOnASnappingTaffyRecordsItAndDropsAnEdgeStandingPlayerWhileACentredOneStaysAndACalmTaffyNeverSnaps()
+        {
+            foreach (bool snaps in new[] { true, false })
+            {
+                int phase = TaffyPhase(snaps);
+                Sim sim = TaffySim(phase);
+                int period = sim.TaffyPeriodOf(in sim.Platforms[1]);
+                int tw = (((period / 2 - 10 - phase) % period) + period) % period;   // a few ticks before the widest pose, so the landing is on a wide taffy
+                SimState edge = Drop(sim, 1, 500 + 155, 100, tick: tw);
+                StepUntilGrounded(sim, ref edge, 1, 60);
+                Assert.True(edge.Grounded && edge.GroundId == 1, "the wide taffy takes the landing 1.55 u from the centre");
+                int land = edge.LandTick;
+                Assert.Equal(snaps ? land : -1, edge.CrumbleTick[1]);
+                int fellAfter = -1;
+                for (int t = 1; t <= 70 && fellAfter < 0; t++) { sim.Step(ref edge, 0); if (!edge.Grounded) fellAfter = t; }
+                if (snaps) Assert.InRange(fellAfter, 20, 70);   // the snap closed the edge under him (1.45 u narrow limit)
+                else Assert.Equal(-1, fellAfter);               // a calm taffy narrows slowly: still wide enough
+                // standing in the middle survives every snap
+                SimState mid = Drop(sim, 1, 500, 100, tick: tw);
+                StepUntilGrounded(sim, ref mid, 1, 60);
+                Steps(sim, ref mid, 300);
+                Assert.True(mid.Grounded && mid.GroundId == 1 && !mid.Dead);
+            }
+        }
+
+        [Fact]
+        public void TaffyStretch_ManyRandomLandingsAndSnapsNeverEndTheRunOrCountAsDamage()
+        {
+            Rng rng = new Rng(55);
+            for (int i = 0; i < 300; i++)
+            {
+                Sim sim = TaffySim(rng.Next(270));
+                SimState s = Drop(sim, 1, 300 + rng.Next(400), 100 + rng.Next(200), tick: rng.Next(500));
+                for (int t = 0; t < 250; t++) sim.Step(ref s, (t % 41 == 0 ? SimInput.Jump : 0) | (rng.Next(4) == 0 ? SimInput.Left : 0) | (rng.Next(4) == 0 ? SimInput.Right : 0));
+                Assert.False(s.Dead);
+                Assert.Equal(0, s.Hits);
+            }
+        }
+
         // ------------------------------------------------------------------ 4.6 Jelly Wobble
 
         [Fact]
-        public void JellyWobble_WobblesUpToPoint6UnitsAt3HzFadingToZeroIn90TicksAndEveryLandingStartsFromTheLandingTick()
+        public void JellyWobble_SwaysUpToPoint9UnitsOnASmoothWaveEasedInAndFadingToZeroIn90TicksAndCarriesThePlayerAndEveryLandingStartsFromTheLandingTick()
         {
             SimConfig cfg = new SimConfig();
-            Sim sim = World(Start(), P(1, 1, PlatformKind.JellyWobble, 500, 300, 400, ampHundredths: 60));
+            Sim sim = World(Start(), P(1, 1, PlatformKind.JellyWobble, 500, 300, 400, ampHundredths: 90));
             Assert.True(PlatformKinds.IsHazardType(PlatformKind.JellyWobble));
             SimState s = Drop(sim, 1, 500, 100);
             StepUntilGrounded(sim, ref s, 1);
             int land = s.CrumbleTick[1];
             Assert.Equal(s.LandTick, land);
-            double max = 0, prev = 0;
+            double max = 0, prev = 0, maxLate = 0, vel = 0, lastOff = 0, maxVel = 0, maxAcc = 0;
             int crossings = 0;
+            double heroStart = D(s.X);
+            double maxSlide = 0;
             for (int e = 0; e <= 100; e++)
             {
                 double off = D(sim.PlatformX(1, land + e, s.CrumbleTick)) - 5.0;
                 max = Math.Max(max, Math.Abs(off));
+                if (e >= 45) maxLate = Math.Max(maxLate, Math.Abs(off));
                 if (e == 0 || e >= 90) Assert.Equal(0.0, off);
                 if (e > 0 && e < 90 && prev != 0 && off != 0 && Math.Sign(off) != Math.Sign(prev)) crossings++;
                 if (off != 0) prev = off;
+                double v = off - lastOff;
+                if (e >= 2) maxAcc = Math.Max(maxAcc, Math.Abs(v - vel));
+                if (e >= 1) maxVel = Math.Max(maxVel, Math.Abs(v));
+                vel = v; lastOff = off;
+                // the standing player rides the cube (92 percent carried, the rest is a slight slide under the feet)
+                if (e > 0 && e < 95)
+                {
+                    sim.Step(ref s, 0);
+                    Assert.True(s.Grounded && s.GroundId == 1, "carried, never shaken off at e=" + e);
+                    double relative = D(s.X) - heroStart - (D(sim.PlatformX(1, s.Tick, s.CrumbleTick)) - 5.0);
+                    maxSlide = Math.Max(maxSlide, Math.Abs(relative));
+                }
             }
-            Assert.InRange(max, 0.50, 0.601);
-            Assert.InRange(crossings, 8, 10);   // 3 Hz for 1.5 s: about 9 sign changes
+            Assert.InRange(max, 0.80, 0.901);          // larger than the old 0.6 u
+            Assert.True(maxVel < 0.17, "smooth: " + maxVel);
+            Assert.True(maxAcc < 0.06, "smooth: " + maxAcc);
+            Assert.InRange(crossings, 3, 5);            // 1.5 Hz for 1.5 s: about 4 sign changes
+            Assert.True(maxLate < max * 0.5, "it decays: " + maxLate + " vs " + max);
+            Assert.True(maxSlide < 0.12, "he is carried convincingly: " + maxSlide);
             // before any landing and for the plain query without the state array it is calm
             Assert.Equal(F(500).Raw, sim.PlatformX(1, 33).Raw);
-            // a player in the middle is carried along and stays on
-            Steps(sim, ref s, 100);
-            Assert.True(s.Grounded && s.GroundId == 1);
             Assert.Equal(F(500).Raw, sim.PlatformX(1, s.Tick, s.CrumbleTick).Raw);
+            Assert.True(cfg.JellyAmplitude > Fx.FromRatio(6, 10) && cfg.JellyCarryPercent >= 85);
         }
 
         [Fact]
-        public void JellyWobble_ShakesAnEdgeStandingPlayerOffButNotOneInTheMiddle()
+        public void JellyWobble_CarriesAnEdgeStandingPlayerAlongSoHeStaysOnAndTheMiddleToo()
         {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.JellyWobble, 500, 300, 400, ampHundredths: 60));
-            SimState edge = Drop(sim, 1, 500 + 215, 100);   // inside the landing margin of the 4 u wide cube
+            Sim sim = World(Start(), P(1, 1, PlatformKind.JellyWobble, 500, 300, 400, ampHundredths: 90));
+            SimState edge = Drop(sim, 1, 500 + 210, 100);   // inside the landing margin of the 4 u wide cube
             StepUntilGrounded(sim, ref edge, 1);
             Assert.True(edge.Grounded && edge.GroundId == 1);
-            bool fell = false;
-            for (int t = 0; t < 100 && !fell; t++) { sim.Step(ref edge, 0); fell = !edge.Grounded; }
-            Assert.True(fell, "the wobble shook the edge-standing player off");
+            for (int t = 0; t < 200; t++) { sim.Step(ref edge, 0); Assert.True(edge.Grounded, "carried with the cube at tick " + t); }
             SimState mid = Drop(sim, 1, 500 + 100, 100);
             StepUntilGrounded(sim, ref mid, 1);
             for (int t = 0; t < 200; t++) { sim.Step(ref mid, 0); Assert.True(mid.Grounded); }
@@ -315,7 +433,7 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void JellyWobble_ManyRandomLandingsNeverEndTheRunOrCountAsDamage()
         {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.JellyWobble, 500, 300, 400, ampHundredths: 60));
+            Sim sim = World(Start(), P(1, 1, PlatformKind.JellyWobble, 500, 300, 400, ampHundredths: 90));
             Rng rng = new Rng(91);
             for (int i = 0; i < 500; i++)
             {
@@ -477,13 +595,13 @@ namespace FluffyClimbers.Simulation.Tests
         public void Region4UsesItsSevenKindsWithTheStickySignatureAndTwoGenericsAndEnumValuesAreStable()
         {
             PlatformKind[] set = RegionPlatformSets.For(SignatureKind.StickyGum);
-            Assert.Equal(7, set.Length);
+            Assert.Equal(11, set.Length);   // the seven of doc 30 + the four of Final Change 6 (Region4NewPlatformTests)
             Assert.All(set, k => Assert.True(PlatformKinds.IsRegion4New(k) && PlatformKinds.IsRegionNew(k)));
             Assert.Equal(new[] { PlatformKind.Crumble, PlatformKind.Slippery }, RegionPlatformSets.GenericsFor(SignatureKind.StickyGum));
-            Assert.Equal(7, RegionPlatformSets.For(SignatureKind.SwingingGongs).Length);   // region 5 got its seven kinds (Region5PlatformTests)
+            Assert.Equal(11, RegionPlatformSets.For(SignatureKind.SwingingGongs).Length);   // region 5: its seven kinds (Region5PlatformTests) + the four of Final Change 6
             LevelSpec spec = Region4().First(l => l.Spec.LevelIndex == 5).Spec;
             PlatformKind[] options = SpecialPlatforms.Options(spec, PlatformKind.Sticky);
-            Assert.Equal(10, options.Length);   // 7 new + Sticky + Crumble + Slippery
+            Assert.Equal(14, options.Length);   // 11 new + Sticky + Crumble + Slippery
             Assert.Equal(1, options.Count(k => k == PlatformKind.Sticky));
             Assert.Equal(1, options.Count(k => k == PlatformKind.Crumble));
             Assert.Equal(1, options.Count(k => k == PlatformKind.Slippery));
@@ -799,7 +917,7 @@ namespace FluffyClimbers.Simulation.Tests
             output.WriteLine("endless special share: floors 5-40 " + ep.ToString("F1") + " percent, floors 200-320 " + lp.ToString("F1") + " percent");
             Assert.InRange(ep, 8, 16);   // endless cycle: floors 5-40 are the start of level 1 (10 to 30 percent ramp over its 100 floors)
             Assert.InRange(lp, 18, 30);   // floors 200-320 are levels 2 to 4 (Bug List 6 curve: 10 to 35 percent ramps)
-            Assert.Equal(10, seen.Count);   // seven new platforms, the sticky signature and the two generics appear
+            Assert.Equal(14, seen.Count);   // eleven new platforms (seven + the four of Final Change 6), the sticky signature and the two generics appear
         }
 
         [Fact]

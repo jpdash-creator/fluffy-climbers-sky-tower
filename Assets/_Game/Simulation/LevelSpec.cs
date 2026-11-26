@@ -11,7 +11,13 @@ namespace FluffyClimbers.Simulation
         FindHiddenGem = 4,
         Speedrun = 5,
         SurviveWave = 6,
-        BossChase = 7
+        BossChase = 7,
+        /// <summary>Rival Race (Final Change 6): reach the top row before the baked ghost rival does (LevelSpec.GhostRowAtTick). A plain reach-the-top level otherwise.</summary>
+        RivalRace = 8,
+        /// <summary>Combo Gates (Final Change 6): Value = floors of a combo jump, Count = number of gates; the level height is the explicit Rows (overrides.rows). Cleared at the top with every gate done.</summary>
+        ComboGates = 9,
+        /// <summary>Sky Hoops (Final Change 6): Value = rings needed, Count = rings in the level; the level height is the explicit Rows (overrides.rows). Cleared at the top with enough rings.</summary>
+        SkyHoops = 10
     }
 
     public enum SignatureKind
@@ -74,7 +80,9 @@ namespace FluffyClimbers.Simulation
         private static readonly PlatformKind[] Region1Set =
         {
             PlatformKind.WindPetal, PlatformKind.HiveLift, PlatformKind.SnapDaisy, PlatformKind.Dandelion,
-            PlatformKind.ThornBush, PlatformKind.Ladybug, PlatformKind.Seesaw
+            PlatformKind.ThornBush, PlatformKind.Ladybug, PlatformKind.Seesaw,
+            // Final Change 6 (owner-approved 2026-11-25): four new region 1 kinds
+            PlatformKind.GlowwormRelay, PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf, PlatformKind.SilkSnareWeb
         };
 
         /// <summary>
@@ -87,8 +95,11 @@ namespace FluffyClimbers.Simulation
 
         private static readonly PlatformKind[] Region2Set =
         {
-            PlatformKind.SquishCap, PlatformKind.SproutLift, PlatformKind.PuffFloat, PlatformKind.FairyRing,
-            PlatformKind.OrbitCap, PlatformKind.DizzySpores, PlatformKind.SporePop
+            // Fairy Ring (PlatformKind 18) was removed from the plans 2026-11-25 (owner: useless); the enum value and its rules stay so old data and replays still load.
+            PlatformKind.SquishCap, PlatformKind.SproutLift, PlatformKind.PuffFloat,
+            PlatformKind.OrbitCap, PlatformKind.DizzySpores, PlatformKind.SporePop,
+            // Final Change 6 (owner-approved 2026-11-25, ids 47 to 49): Teeter Cap (demanding), Fog Puff Drift and Spore Funnel (air-field hazards)
+            PlatformKind.TeeterCap, PlatformKind.FogPuffDrift, PlatformKind.SporeFunnel
         };
         /// <summary>Generic kinds a region keeps next to its new set (doc 30 section 7; region 2: rotting log Crumble and dew moss Slippery).</summary>
         private static readonly PlatformKind[] Region2Generics = { PlatformKind.Crumble, PlatformKind.Slippery };
@@ -96,7 +107,8 @@ namespace FluffyClimbers.Simulation
         private static readonly PlatformKind[] Region3Set =
         {
             PlatformKind.SurfBoostWave, PlatformKind.SandcastleStep, PlatformKind.ClamShellPad, PlatformKind.SinkingRaft,
-            PlatformKind.TurtleShuttle, PlatformKind.KelpTangle, PlatformKind.PufferfishPad
+            PlatformKind.TurtleShuttle, PlatformKind.KelpTangle, PlatformKind.PufferfishPad,
+            PlatformKind.MoonJellyChain, PlatformKind.SplittingPier, PlatformKind.UndertowPad, PlatformKind.SeaFoamPad   // Final Change 6 (owner-approved 2026-11-25)
         };
         /// <summary>Region 3 keeps the sand slab Crumble and the sea foam Vanishing, each once; the drifting platform (signature) is listed twice so it stays the most common kind.</summary>
         private static readonly PlatformKind[] Region3Generics = { PlatformKind.Crumble, PlatformKind.Vanishing };
@@ -104,7 +116,9 @@ namespace FluffyClimbers.Simulation
         private static readonly PlatformKind[] Region4Set =
         {
             PlatformKind.CandyBowl, PlatformKind.FlossGlide, PlatformKind.FizzVent, PlatformKind.LicoriceBelt,
-            PlatformKind.TaffyStretch, PlatformKind.JellyWobble, PlatformKind.PinwheelGust
+            PlatformKind.TaffyStretch, PlatformKind.JellyWobble, PlatformKind.PinwheelGust,
+            // Final Change 6 (owner 2026-11-25): four new kinds (ids 54 to 57)
+            PlatformKind.MeltingScoop, PlatformKind.CaramelMagnet, PlatformKind.SourSprinklerCannon, PlatformKind.SugarGlassLedge
         };
         /// <summary>Region 4 keeps the sugar crumble Crumble and the icing Slippery next to the sticky gum signature (doc 30 section 11 question 8).</summary>
         private static readonly PlatformKind[] Region4Generics = { PlatformKind.Crumble, PlatformKind.Slippery };
@@ -112,7 +126,8 @@ namespace FluffyClimbers.Simulation
         private static readonly PlatformKind[] Region5Set =
         {
             PlatformKind.BambooFlick, PlatformKind.LanternLift, PlatformKind.KoiStone, PlatformKind.SwingPlank,
-            PlatformKind.PagodaRidge, PlatformKind.MalletSmash, PlatformKind.RollingLog
+            PlatformKind.PagodaRidge, PlatformKind.MalletSmash, PlatformKind.RollingLog,
+            PlatformKind.PrayerScrollRunner, PlatformKind.ToriiLintel, PlatformKind.IncenseMistBank, PlatformKind.WaterBambooTipper   // Final Change 6
         };
         /// <summary>Region 5 keeps the paper-screen Vanishing and the rope-bridge Moving (doc 30 section 11 question 8); the swinging gongs are hazard OBJECTS, not a platform kind (the signature adds no platform option).</summary>
         private static readonly PlatformKind[] Region5Generics = { PlatformKind.Moving, PlatformKind.Vanishing };
@@ -159,6 +174,9 @@ namespace FluffyClimbers.Simulation
                 case "speedrun": return GoalType.Speedrun;
                 case "survivewave": return GoalType.SurviveWave;
                 case "bosschase": return GoalType.BossChase;
+                case "combogates": return GoalType.ComboGates;
+                case "skyhoops": return GoalType.SkyHoops;
+                case "rivalrace": return GoalType.RivalRace;
                 default: return GoalType.ReachFloor;
             }
         }
@@ -167,7 +185,7 @@ namespace FluffyClimbers.Simulation
     public sealed class GoalSpec
     {
         public GoalType Type;
-        /// <summary>Target floor for ReachFloor, NoWallBounce, Speedrun, BossChase; floors per jump for ComboChain.</summary>
+        /// <summary>Target floor for ReachFloor, NoWallBounce, Speedrun, BossChase, RivalRace; floors per jump for ComboChain.</summary>
         public int Value;
         /// <summary>CollectCoins: coins to collect. ComboChain: how many such jumps.</summary>
         public int Count;
@@ -294,7 +312,7 @@ namespace FluffyClimbers.Simulation
         public bool Ramp;
         /// <summary>
         /// Rule of a special level that is not a goal (owner Final Change 1, 2026-11-22; level JSON field "special"): NoPowerUps, OneLife or KeepMoving, None otherwise.
-        /// The goal-based special types (No Wall Touch, Combo Climb, Chase) are NOT stored here; ask <see cref="SpecialLevels.TypeOf(LevelSpec)"/> for the type of a level.
+        /// The goal-based special types (No Wall Touch, Combo Gates, Sky Hoops, and the retired Combo Climb and Chase) are NOT stored here; ask <see cref="SpecialLevels.TypeOf(LevelSpec)"/> for the type of a level.
         /// The rule never changes the layout (the builder does not read it); the simulation enforces it (Sim.NoPowerUps / OneLife / KeepMoving).
         /// </summary>
         public SpecialLevelType Special;
@@ -304,6 +322,22 @@ namespace FluffyClimbers.Simulation
         public bool OneLife { get { return !Endless && Special == SpecialLevelType.OneLife; } }
         /// <summary>Keep Moving level: more than SimConfig.KeepMovingLimitTicks on one platform ends the run.</summary>
         public bool KeepMoving { get { return !Endless && Special == SpecialLevelType.KeepMoving; } }
+        /// <summary>
+        /// Rival Race (Final Change 6): the baked ghost path, the ghost's row every <see cref="RivalRace.SampleTicks"/> (30) ticks from the player's first jump at the Normal ghost pace (RivalRace.BakedPacePercent),
+        /// first value 0, last value = the target row. Level JSON field ghostRowAtTick, written by Tools/content_cli/bake_rival.py (from a LevelBot run, see RivalRace). Null on every other level;
+        /// LevelBuilder copies it into LevelData (part of the level hash) and the Sim runs the race only when it is set.
+        /// </summary>
+        public int[] GhostRowAtTick;
+        /// <summary>
+        /// Boss Rise / Sprint and Rest rules (owner Final Change 6, 2026-11-25), carried by the level JSON field "special" (<see cref="Special"/> = BossRise / SprintRest, set by the content
+        /// factory). <see cref="BossRiseRule"/> and <see cref="SprintRestRule"/> are plain override flags for tests and tools that build a spec by hand. Neither changes a level that does not carry
+        /// the rule (golden hashes). BossRise: a region boss rises under the danger line, a lunge every 25 floors, the top 10 rows are an arena (builder + Sim). SprintRest: an 8 u shelter every
+        /// 25 floors holds the danger line up to 3 s once, then it is 15 percent faster (builder + Sim). <see cref="BossRegion"/>: region 1..5 whose boss shows (0 = from the signature, <see cref="BossRoster.RegionOf"/>).
+        /// </summary>
+        public bool BossRiseRule, SprintRestRule;
+        public int BossRegion;
+        public bool BossRise { get { return !Endless && (BossRiseRule || Special == SpecialLevelType.BossRise); } }
+        public bool SprintRest { get { return !Endless && (SprintRestRule || Special == SpecialLevelType.SprintRest); } }
         /// <summary>Authored chunk ids (chunk_complex_a ...) spliced into the level, empty for none.</summary>
         public string[] FixedChunks = new string[0];
         /// <summary>Explicit platform rows above the start; 0 = derive with RowsFor().</summary>
@@ -333,6 +367,7 @@ namespace FluffyClimbers.Simulation
                     case GoalType.ReachFloor:
                     case GoalType.Speedrun:
                     case GoalType.BossChase:
+                    case GoalType.RivalRace:
                     case GoalType.NoWallBounce:
                     case GoalType.FindHiddenGem:   // Bug List 6 item 4: a hidden gem level has Goal.Value rows (the gem sits half way, the level ends on its row)
                         rows = Goal.Value > 0 ? Goal.Value : DefaultRows;
@@ -357,6 +392,7 @@ namespace FluffyClimbers.Simulation
                 case GoalType.ReachFloor:
                 case GoalType.Speedrun:
                 case GoalType.BossChase:
+                case GoalType.RivalRace:
                 case GoalType.NoWallBounce:
                     return Goal.Value > 0 ? Goal.Value : RowsFor();
                 default:

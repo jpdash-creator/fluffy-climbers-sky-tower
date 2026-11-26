@@ -1,0 +1,85 @@
+{
+  "asset": "fogpuffdrift_widths",
+  "kind": "fogpuffdrift",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 281,
+      "h": 114,
+      "bodyLeft": 17,
+      "bodyRight": 267,
+      "surfaceY": 23,
+      "bodyBottom": 107,
+      "width": 1.5,
+      "file": "reg002_fogpuffdrift_w1_5.png",
+      "ppu": 166.667,
+      "kind": "fogpuffdrift",
+      "dir": 0
+    },
+    {
+      "w": 365,
+      "h": 114,
+      "bodyLeft": 17,
+      "bodyRight": 351,
+      "surfaceY": 23,
+      "bodyBottom": 107,
+      "width": 2.0,
+      "file": "reg002_fogpuffdrift_w2.png",
+      "ppu": 167.0,
+      "kind": "fogpuffdrift",
+      "dir": 0
+    },
+    {
+      "w": 547,
+      "h": 113,
+      "bodyLeft": 18,
+      "bodyRight": 519,
+      "surfaceY": 23,
+      "bodyBottom": 106,
+      "width": 3.0,
+      "file": "reg002_fogpuffdrift_w3.png",
+      "ppu": 167.0,
+      "kind": "fogpuffdrift",
+      "dir": 0
+    },
+    {
+      "w": 714,
+      "h": 113,
+      "bodyLeft": 18,
+      "bodyRight": 686,
+      "surfaceY": 23,
+      "bodyBottom": 106,
+      "width": 4.0,
+      "file": "reg002_fogpuffdrift_w4.png",
+      "ppu": 167.0,
+      "kind": "fogpuffdrift",
+      "dir": 0
+    },
+    {
+      "w": 1048,
+      "h": 113,
+      "bodyLeft": 18,
+      "bodyRight": 1020,
+      "surfaceY": 23,
+      "bodyBottom": 106,
+      "width": 6.0,
+      "file": "reg002_fogpuffdrift_w6.png",
+      "ppu": 167.0,
+      "kind": "fogpuffdrift",
+      "dir": 0
+    },
+    {
+      "w": 1382,
+      "h": 113,
+      "bodyLeft": 18,
+      "bodyRight": 1354,
+      "surfaceY": 23,
+      "bodyBottom": 106,
+      "width": 8.0,
+      "file": "reg002_fogpuffdrift_w8.png",
+      "ppu": 167.0,
+      "kind": "fogpuffdrift",
+      "dir": 0
+    }
+  ]
+}

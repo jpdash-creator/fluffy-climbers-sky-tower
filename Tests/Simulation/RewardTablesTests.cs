@@ -161,8 +161,8 @@ namespace FluffyClimbers.Simulation.Tests
             new Row(EndlessTa, "Finish 5 Time Attack runs", 300),
             new Row(Special, "Clear the No Wall Touch level", 400),
             new Row(Special, "Clear the No Power-ups level", 400),
-            new Row(Special, "Clear the Combo Climb level", 400),
-            new Row(Special, "Clear the Chase level", 400),
+            new Row(Special, "Clear the Combo Gates level", 400),
+            new Row(Special, "Clear the Boss Rise level", 400),
             new Row(Special, "Clear the One Life level", 400),
             new Row(Special, "Clear the Keep Moving level", 400),
             new Row(Special, "Clear all 6 special level types", 600, 5),
@@ -224,7 +224,7 @@ namespace FluffyClimbers.Simulation.Tests
             }
             // the six "clear the X level" tasks name the six types once each, in the lookup's order
             List<RewardEntry> typeTasks = RewardTables.WeeklyTasks().FindAll(e => RewardStat.SpecialTypeOf(e.Stat) != SpecialLevelType.None);
-            Assert.Equal(SpecialLevels.All, typeTasks.Select(e => RewardStat.SpecialTypeOf(e.Stat)).ToArray());
+            Assert.Equal(SpecialLevels.RewardTypes, typeTasks.Select(e => RewardStat.SpecialTypeOf(e.Stat)).ToArray());
             foreach (RewardEntry e in typeTasks) Assert.Equal("Clear the " + SpecialLevels.Name(RewardStat.SpecialTypeOf(e.Stat)) + " level", e.Title);
         }
 
@@ -253,9 +253,13 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Same(RewardStat.PerMode(RewardStat.Levels, 4), RewardStat.PerMode(RewardStat.Levels, 4));   // cached: no string is built per run
             Assert.Equal("levels.0", RewardStat.PerMode(RewardStat.Levels, -3));
             Assert.Equal("levels.4", RewardStat.PerMode(RewardStat.Levels, 77));
-            Assert.Equal(SpecialLevelType.Chase, RewardStat.SpecialTypeOf(RewardStat.SpecialTypeStat(SpecialLevelType.Chase)));
+            Assert.Equal(SpecialLevelType.Chase, RewardStat.SpecialTypeOf(RewardStat.SpecialTypeStat(SpecialLevelType.Chase)));   // the retired types still decode
+            foreach (SpecialLevelType t in new[] { SpecialLevelType.ComboGates, SpecialLevelType.SkyHoops, SpecialLevelType.BossRise, SpecialLevelType.SprintRest, SpecialLevelType.RivalRace })
+                Assert.Equal(t, RewardStat.SpecialTypeOf(RewardStat.SpecialTypeStat(t)));   // two-digit values (10, 11) decode too
             Assert.Equal(SpecialLevelType.None, RewardStat.SpecialTypeOf("specialType.0"));
-            Assert.Equal(SpecialLevelType.None, RewardStat.SpecialTypeOf("specialType.7"));
+            Assert.Equal(SpecialLevelType.None, RewardStat.SpecialTypeOf("specialType.12"));
+            Assert.Equal(SpecialLevelType.None, RewardStat.SpecialTypeOf("specialType.7x"));
+            Assert.Equal(SpecialLevelType.None, RewardStat.SpecialTypeOf("specialType.111"));
             Assert.Equal(SpecialLevelType.None, RewardStat.SpecialTypeOf(RewardStat.SpecialTypes));
             Assert.Equal(SpecialLevelType.None, RewardStat.SpecialTypeOf(null));
         }
@@ -299,7 +303,7 @@ namespace FluffyClimbers.Simulation.Tests
             rows.Add(new Row(TimeAttack, "Time Attack: 100 floors on Normal or harder", 250));
             rows.Add(new Row(TimeAttack, "Time Attack: 100 floors on Hard or Insane", 350));
             // Special levels
-            foreach (string name in new[] { "No Wall Touch", "No Power-ups", "Combo Climb", "Chase", "One Life", "Keep Moving" }) rows.Add(new Row(Special, "Clear the " + name + " level", 100));
+            foreach (string name in new[] { "No Wall Touch", "No Power-ups", "Combo Gates", "Boss Rise", "One Life", "Keep Moving" }) rows.Add(new Row(Special, "Clear the " + name + " level", 100));
             rows.Add(new Row(Special, "Clear all 6 special levels", 200));
             rows.Add(new Row(Special, "Clear a special level on all 5 settings", 250));
             rows.Add(new Row(Special, "Get 3 stars on all 6 special levels", 300, 2));
@@ -399,7 +403,7 @@ namespace FluffyClimbers.Simulation.Tests
                     Assert.Equal(RegionGoalTable.Token(x.Type), x.Stat);
                     Assert.Equal(r, x.Region);
                 }
-                Assert.Equal(SpecialLevels.All, g.FindAll(x => x.Type == RegionGoalType.SpecialClear).ConvertAll(x => x.Special).ToArray());
+                Assert.Equal(SpecialLevels.RewardTypes, g.FindAll(x => x.Type == RegionGoalType.SpecialClear).ConvertAll(x => x.Special).ToArray());
                 // caps: nothing asks for more than a region holds
                 Assert.All(g.FindAll(x => x.Type == RegionGoalType.Stars), x => Assert.True(x.Target <= RegionGoalTable.StarsPerRegion));
                 Assert.All(g.FindAll(x => x.Type == RegionGoalType.SettingStars), x => Assert.True(x.Target <= RegionGoalTable.StarsPerSetting));
@@ -464,7 +468,7 @@ namespace FluffyClimbers.Simulation.Tests
             {
                 "g2_1_clear_5", "g2_1_clear_25", "g2_1_stars_375", "g2_2_stars3_15", "g2_3_gold_25", "g2_1_relaxed_clear_10", "g2_1_insane_clear_25", "g2_4_hard_stars_75",
                 "g2_5_easy_medals_10", "g2_1_endless_100", "g2_1_endless_5000", "g2_2_normal_endless_200", "g2_1_ta_50", "g2_1_ta_200", "g2_1_taruns_20", "g2_1_normalup_ta_100",
-                "g2_1_hardup_ta_100", "g2_1_special_nowall", "g2_1_special_nopowerups", "g2_1_special_combo", "g2_1_special_chase", "g2_1_special_onelife", "g2_1_special_keepmoving",
+                "g2_1_hardup_ta_100", "g2_1_special_nowall", "g2_1_special_nopowerups", "g2_1_special_combogates", "g2_1_special_bossrise", "g2_1_special_onelife", "g2_1_special_keepmoving",
                 "g2_1_special_all", "g2_1_special_allsettings", "g2_1_special_stars3", "g2_1_normalup_special_all", "g2_1_hardup_special_all", "g2_5_insane_special_all"
             }) Assert.Contains(id, seen);
         }

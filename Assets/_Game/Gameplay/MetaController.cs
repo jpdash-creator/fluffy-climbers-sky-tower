@@ -1972,6 +1972,10 @@ namespace FluffyClimbers.Gameplay
             int stars = unlocked ? progress.StarsOf(level.Id, mode) : 0;
             bool boss = level.LevelClass == LevelDef.ClassHighlyComplex;
             bool complex = level.LevelClass == LevelDef.ClassComplex;
+            // Final Change 6 (owner 2026-11-25): a Boss Rise level (the mid boss and level 25) shows its region's painted boss badge INSTEAD of the number (Sprite null = the number stays).
+            SpecialLevelType special = level.SpecialType;   // owner Final Change 1: one of the special types, or None (Regular Run)
+            Sprite bossBadge = special == SpecialLevelType.BossRise && unlocked ? SpecialIcons.BossBadge(level.Region) : null;
+            if (bossBadge != null) boss = false;   // the crown bubble has its crown in the middle of the badge's area: the plain / cleared bubble carries the badge
             int sprite = !unlocked ? 3 : (boss ? 2 : (cleared ? 5 : 0));
             Color tint = Color.white;
             if (unlocked && !boss && cleared) tint = new Color(1f, 0.93f, 0.55f, 1f);   // completed: warm gold bubble
@@ -1981,10 +1985,10 @@ namespace FluffyClimbers.Gameplay
             RectTransform rt = (RectTransform)b.transform;
             b.GetComponent<Image>().preserveAspect = true;
             string setting = GameSettings.DifficultyNames[Mathf.Clamp(mode, 0, GameSettings.DifficultyNames.Length - 1)];
-            SpecialLevelType special = level.SpecialType;   // owner Final Change 1: one of the six special types, or None (Regular Run)
             b.GetComponent<A11yLabel>().Text = "Level " + level.Index + (special != SpecialLevelType.None ? ", " + SpecialLevels.Name(special) : "")
                 + (unlocked ? ", " + stars + " of 3 stars on " + setting + (isCurrent ? ", current level" : "") : ", locked on " + setting);
-            if (unlocked && !boss)
+            if (bossBadge != null) AddBossBadge(rt, bossBadge);
+            else if (unlocked && !boss)
             {
                 Text num = UiKit.AddText(rt, "Num", level.Index.ToString(), 72, UiKit.ButtonInk);
                 DropOutline(num);
@@ -2060,6 +2064,23 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Size of the special badge (reference px). It is a corner pip like the gem badge (<see cref="CornerPipPosition"/>): x 130..186 of the 150 px tile, y 0..56.</summary>
         public const float SpecialBadgeSize = 56f;
 
+        /// <summary>Name of the painted boss badge that replaces the number on a Boss Rise level tile.</summary>
+        public const string BossBadgeName = "BossBadge";
+        /// <summary>Side of the boss badge (reference px): it fills the column of the number on the 150 px tile (x 23..127 of 20..130, the box of a two-digit number at 130 percent text), so it is clear of both corner pips (gem or special badge from x 130, medal up to x 20), CUX-3.</summary>
+        public const float BossBadgeSize = 104f;
+
+        /// <summary>The region's boss badge in the middle of a level tile, in place of the number (Final Change 6). Not a button of its own: the tile carries the accessibility label (level number and "Boss Rise").</summary>
+        void AddBossBadge(RectTransform node, Sprite sprite)
+        {
+            Image img = UiKit.AddImage(node, BossBadgeName, sprite, Color.white);
+            img.preserveAspect = true;
+            img.raycastTarget = false;
+            img.rectTransform.anchorMin = img.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+            img.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            img.rectTransform.anchoredPosition = Vector2.zero;
+            img.rectTransform.sizeDelta = new Vector2(BossBadgeSize, BossBadgeSize);
+        }
+
         /// <summary>
         /// The special level badge on the top right of a level tile (owner Final Change 1, 2026-11-22): a dark disc with the type's own glyph (SpecialLevels.Glyph: a different
         /// character per type, so the six types never differ by colour alone) and an accessibility label with the type name and its rule. A special level is never a gem level,
@@ -2076,11 +2097,23 @@ namespace FluffyClimbers.Gameplay
             disc.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             disc.rectTransform.anchoredPosition = CornerPipPosition(SpecialBadgeSize);   // the pip starts right of a two-digit level number at 130 percent text, so the widest glyph (W, M) never meets it
             disc.rectTransform.sizeDelta = new Vector2(SpecialBadgeSize, SpecialBadgeSize);
-            Text glyph = UiKit.AddText(disc.transform, "Glyph", SpecialLevels.Glyph(type), 42, Color.white, TextAnchor.MiddleCenter, true);
-            glyph.fontSize = Mathf.RoundToInt(UiKit.MinBodyTextPx);   // a badge glyph, not body text: it keeps its size at 130 percent text so it stays inside the disc and clear of the level number
-            DropOutline(glyph);
-            glyph.horizontalOverflow = HorizontalWrapMode.Overflow;
-            UiKit.Stretch((RectTransform)glyph.transform);
+            Sprite painted = SpecialIcons.For(type);   // Final Change 6: the five new types have a painted round icon (letter glyph stays when the file is missing)
+            if (painted != null)
+            {
+                disc.color = Color.clear;
+                Image pic = UiKit.AddImage(disc.transform, "Icon", painted, Color.white);
+                pic.preserveAspect = true;
+                pic.raycastTarget = false;
+                UiKit.Stretch(pic.rectTransform);
+            }
+            else
+            {
+                Text glyph = UiKit.AddText(disc.transform, "Glyph", SpecialLevels.Glyph(type), 42, Color.white, TextAnchor.MiddleCenter, true);
+                glyph.fontSize = Mathf.RoundToInt(UiKit.MinBodyTextPx);   // a badge glyph, not body text: it keeps its size at 130 percent text so it stays inside the disc and clear of the level number
+                DropOutline(glyph);
+                glyph.horizontalOverflow = HorizontalWrapMode.Overflow;
+                UiKit.Stretch((RectTransform)glyph.transform);
+            }
             disc.gameObject.AddComponent<A11yLabel>().Text = "Special level: " + SpecialLevels.Name(type) + ". " + SpecialLevels.RuleText(type);
         }
 

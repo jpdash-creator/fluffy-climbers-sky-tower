@@ -53,3 +53,6 @@ Applies on top of the Final Change 1 steps above (do them once, from the release
 1. **Redeploy** the Cloud Run service from the release commit: the hero tables (`HeroTable.cs`, `HeroVariants.cs`, `HeroRolls.cs`), per-copy powers and the region penalty are compiled into it, and a replay needs the SAME tables the phone used (a variant index means another stat set after the hero rebuild).
 2. **Firestore `config/leaderboard`:** set `simVersions` to `[3]` (code default, `config.default.json` and `LeaderboardConfig.SimVersion` already say 3). Version 2 apps get HTTP 426 and their queued runs are dropped by the phone (final answer).
 3. Read `Planning/LEADERBOARD-REVIEW-2026-11-23.md` (findings and the entry-limit recommendation) before `leaderboard.enabled` is switched on.
+
+## Rules version 4 (Final Changes 5 and 6, 2026-11-25), NOT deployed
+`LeaderboardConfig.SimVersion`, `Limits.SimVersions` and `config.default.json` say 4 (19 new platforms, nine special level types, Moving platform fix, new level layouts and Rival Race ghost paths). Owner steps: redeploy `fluffy-leaderboard` from the release commit, set `simVersions` to `[4]` in Firestore `config/leaderboard`, re-measure the prize entry limits. Version 3 apps then get HTTP 426.

@@ -317,7 +317,7 @@ namespace FluffyClimbers.Gameplay
             if (sims >= MaxSims) return 0;
             int nodeStart = sims;
             Platform here = sim.Platforms[from.GroundId];
-            int[] waits = here.Kind == PlatformKind.Crumble ? CrumbleWaits : (here.Kind == PlatformKind.SnapDaisy || here.Kind == PlatformKind.SporePop || here.Kind == PlatformKind.LicoriceBelt || here.Kind == PlatformKind.TaffyStretch ? SnapWaits : (here.Kind == PlatformKind.DizzySpores ? DizzyWaits : (here.Kind == PlatformKind.KelpTangle ? KelpWaits : (here.Kind == PlatformKind.SinkingRaft ? RaftWaits : (here.Kind == PlatformKind.LanternLift ? LanternWaits : (here.Kind == PlatformKind.KoiStone ? KoiWaits : Waits))))));
+            int[] waits = here.Kind == PlatformKind.Crumble ? CrumbleWaits : (here.Kind == PlatformKind.SnapDaisy || here.Kind == PlatformKind.SporePop || here.Kind == PlatformKind.LicoriceBelt || here.Kind == PlatformKind.TaffyStretch || here.Kind == PlatformKind.MeltingScoop || here.Kind == PlatformKind.SugarGlassLedge ? SnapWaits : (here.Kind == PlatformKind.DizzySpores ? DizzyWaits : (here.Kind == PlatformKind.KelpTangle ? KelpWaits : (here.Kind == PlatformKind.SinkingRaft ? RaftWaits : (here.Kind == PlatformKind.LanternLift ? LanternWaits : (here.Kind == PlatformKind.KoiStone ? KoiWaits : Waits))))));
             int[] targets = targetBufs[depth];
             int tc = Targets(from, tier, targets);
             for (int ti = 0; ti < tc; ti++)
@@ -439,6 +439,8 @@ namespace FluffyClimbers.Gameplay
             int s = sim.Platforms[st.GroundId].Row * 1000;
             s += (st.Coins + st.Gems * 10) * coinWeight + st.Stars * 40 + st.HiddenGems * 3000 - st.Hits * 60 - st.Tick / 16;
             if (spec != null && spec.Goal.Type == GoalType.ComboChain) s += GoalEvaluator.JumpsWithFloors(st, spec.Goal.Value) * 1200;
+            if (spec != null && spec.Goal.Type == GoalType.ComboGates) s += GoalEvaluator.GatesCleared(spec, st) * 1200;   // Final Change 6: the gates and the rings pull the autopilot like the old combo jumps did
+            if (spec != null && spec.Goal.Type == GoalType.SkyHoops) s += st.Rings * 300;
             if (goalDone) s += DoneBonus;
             return s;
         }
@@ -453,6 +455,10 @@ namespace FluffyClimbers.Gameplay
                     return c.Tick > spec.Goal.TimeSec * SimConfig.TicksPerSecond;
                 case GoalType.FindHiddenGem:
                     return data != null && data.HiddenGemRow >= 0 && c.HiddenGems == 0 && c.Row > data.HiddenGemRow + 1;
+                case GoalType.ComboGates:
+                    return GateRules.MissedGate(spec, c.Row, c.GateMask) >= 0;   // a gate left behind without its combo jump ends the run
+                case GoalType.SkyHoops:
+                    return GoalEvaluator.RingsStillPossible(spec, c) < RingRules.Needed(spec);
                 default:
                     return false;
             }
@@ -462,7 +468,8 @@ namespace FluffyClimbers.Gameplay
         {
             long vb = (c.Vx.Raw * 20L / Fx.OneRaw) + 16;
             long xb = c.X.Raw * 4L / Fx.OneRaw;
-            return c.GroundId + (vb << 20) + (xb << 36);
+            long extra = spec != null ? (spec.Goal.Type == GoalType.ComboGates ? c.GateMask : (spec.Goal.Type == GoalType.SkyHoops ? c.Rings : 0)) : 0;
+            return c.GroundId + (vb << 20) + (xb << 36) + (extra << 44);
         }
 
         /// <summary>Candidate landing platforms: tier 0 = the next three rows plus the other platforms of this row; tier 1 also the three rows below.</summary>

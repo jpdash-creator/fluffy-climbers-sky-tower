@@ -647,12 +647,13 @@ namespace FluffyClimbers.Simulation.Tests
         public void Region2UsesItsSevenKindsWithTheSignatureCapAndTwoGenericsAndTheOtherRegionsAreUntouched()
         {
             PlatformKind[] set = RegionPlatformSets.For(SignatureKind.BounceCaps);
-            Assert.Equal(7, set.Length);
+            Assert.Equal(9, set.Length);   // Fairy Ring (18) was removed from the plans 2026-11-25 (enum value and rules stay for old data); Final Change 6 added Teeter Cap, Fog Puff Drift, Spore Funnel (47 to 49)
+            Assert.DoesNotContain(PlatformKind.FairyRing, set);
             Assert.All(set, k => Assert.True(PlatformKinds.IsRegion2New(k)));
             Assert.Equal(new[] { PlatformKind.Crumble, PlatformKind.Slippery }, RegionPlatformSets.GenericsFor(SignatureKind.BounceCaps));
             Assert.Equal(new[] { PlatformKind.Crumble, PlatformKind.Moving }, RegionPlatformSets.GenericsFor(SignatureKind.BounceFlowers));   // region 1 got two gentle generics (owner 2026-11-10)
-            Assert.Equal(7, RegionPlatformSets.For(SignatureKind.StickyGum).Length);   // region 4 has its own set since D5
-            Assert.Equal(7, RegionPlatformSets.For(SignatureKind.SwingingGongs).Length);   // region 5 got its seven kinds (Region5PlatformTests)
+            Assert.Equal(11, RegionPlatformSets.For(SignatureKind.StickyGum).Length);   // region 4 has its own set since D5 (+ the four of Final Change 6)
+            Assert.Equal(11, RegionPlatformSets.For(SignatureKind.SwingingGongs).Length);   // region 5: seven kinds (Region5PlatformTests) + the four of Final Change 6
             Assert.True(PlatformKinds.IsHazardType(PlatformKind.DizzySpores) && PlatformKinds.IsHazardType(PlatformKind.SporePop));
             Assert.True(PlatformKinds.IsDemanding(PlatformKind.FairyRing) && PlatformKinds.IsDemanding(PlatformKind.OrbitCap));
             // the enum values of regions 1 and 2 are stable
@@ -792,6 +793,7 @@ namespace FluffyClimbers.Simulation.Tests
             foreach (KeyValuePair<PlatformKind, int> kv in seen.OrderBy(k => (int)k.Key)) output.WriteLine(kv.Key + ": " + kv.Value);
             Assert.True(bad.Count == 0, bad.Count + " rule violations, first: " + (bad.Count > 0 ? bad[0] : ""));
             foreach (PlatformKind k in RegionPlatformSets.For(SignatureKind.BounceCaps)) Assert.True(seen.ContainsKey(k), k + " never placed");
+            Assert.False(seen.ContainsKey(PlatformKind.FairyRing), "Fairy Ring is removed from region 2 (owner 2026-11-25)");
             Assert.True(seen.ContainsKey(PlatformKind.BounceCap), "the cap is one of the options");
             Assert.True(seen.ContainsKey(PlatformKind.Crumble) && seen.ContainsKey(PlatformKind.Slippery), "the two generics are options");
         }
@@ -818,7 +820,7 @@ namespace FluffyClimbers.Simulation.Tests
                     }
                 }
                 output.WriteLine(ll.Id + ": " + (special / (double)Seeds).ToString("F1") + " special rows per layout, " + (hazard / (double)Seeds).ToString("F1") + " hazard-type, " + (launch / (double)Seeds).ToString("F1") + " launchers, " + (demanding / (double)Seeds).ToString("F1") + " demanding");
-                Assert.True(hazard <= special * 0.25 + 1, ll.Id + ": hazards " + hazard + " of " + special);
+                Assert.True(hazard <= special * 0.30 + 1, ll.Id + ": hazards " + hazard + " of " + special);   // 0.30 since Final Change 6: region 2 has four hazard kinds (Dizzy Spores, Spore Pop, Fog Puff Drift, Spore Funnel), the shared cap is 30 percent
                 Assert.True(launch <= special * 0.15 + 1, ll.Id + ": launchers " + launch + " of " + special);
                 Assert.True(demanding <= special * 0.30 + 1, ll.Id + ": demanding " + demanding + " of " + special);
             }
@@ -908,7 +910,7 @@ namespace FluffyClimbers.Simulation.Tests
             output.WriteLine("endless special share: floors 5-40 " + ep.ToString("F1") + " percent, floors 200-320 " + lp.ToString("F1") + " percent");
             Assert.InRange(ep, 8, 16);   // endless cycle: floors 5-40 are the start of level 1 (10 to 30 percent ramp over its 100 floors)
             Assert.InRange(lp, 18, 30);   // floors 200-320 are levels 2 to 4 (Bug List 6 curve: 10 to 35 percent ramps)
-            Assert.Equal(10, seen.Count);   // seven new platforms, the cap and the two generics appear
+            Assert.Equal(12, seen.Count);   // nine new platforms (six + Teeter Cap, Fog Puff Drift, Spore Funnel of Final Change 6) (Fairy Ring removed 2026-11-25), the cap and the two generics appear
         }
 
         [Fact]

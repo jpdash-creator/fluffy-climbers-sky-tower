@@ -52,6 +52,22 @@ namespace FluffyClimbers.Simulation
             if (demanding && (PlatformKinds.IsDemanding(prev) || PlatformKinds.IsHazardType(prev) || PlatformKinds.IsLaunch(prev))) return false;
             // doc 30 section 5 (risk R4): the Taffy Stretch and the region's sticky gum both reduce control, so they never sit in adjacent rows
             if ((k == PlatformKind.TaffyStretch && prev == PlatformKind.Sticky) || (k == PlatformKind.Sticky && prev == PlatformKind.TaffyStretch)) return false;
+            // Final Change 6, region 4: the two kinds that bend the flight (Caramel Magnet, Sour Sprinkler Cannon) never touch another reach-changing kind (sticky gum, taffy, fizz vent), and the
+            // Melting Scoop (a dwell test) never sits next to the sticky gum (a weak, slow jump out of the gum plus a melting footing)
+            if (BendsFlight(k) && (prev == PlatformKind.Sticky || prev == PlatformKind.TaffyStretch || prev == PlatformKind.FizzVent)) return false;
+            if (BendsFlight(prev) && (k == PlatformKind.Sticky || k == PlatformKind.TaffyStretch || k == PlatformKind.FizzVent)) return false;
+            if ((k == PlatformKind.MeltingScoop && prev == PlatformKind.Sticky) || (k == PlatformKind.Sticky && prev == PlatformKind.MeltingScoop)) return false;
+            // Final Change 6, region 3: the Moon Jelly Chain is a launcher for the placement rules (its group is placed whole by Plan, never drawn row by row): never after a launcher or another jelly pad,
+            // and nothing hazardous, demanding or launching follows its last pad (the flight after pad 2 is not chosen by the player)
+            if (k == PlatformKind.MoonJellyChain && (restricted || PlatformKinds.IsLaunch(prev) || prev == PlatformKind.MoonJellyChain)) return false;
+            if (prev == PlatformKind.MoonJellyChain && (hazard || demanding || launch)) return false;
+            // integration 2026-11-25: two clock platforms never touch: a Splitting Pier (240-tick cycle) and a Vanishing platform (lvl_003_22 had no solution at Normal speed)
+            if ((k == PlatformKind.SplittingPier && prev == PlatformKind.Vanishing) || (k == PlatformKind.Vanishing && prev == PlatformKind.SplittingPier)) return false;
+            // integration 2026-11-26: a Vanishing platform never follows a Kelp Tangle (the 0.6 s jump lock plus the blink window left no landing in one Keep Moving layout, lvl_003_23)
+            if (k == PlatformKind.Vanishing && prev == PlatformKind.KelpTangle) return false;
+            // integration 2026-11-25: a jelly chain never starts right after an Undertow Pad (its gravity column cuts the reach, the chain's first pad is a launcher: random layouts had no solution)
+            // (widened after the 60-seed sweeps: also never right after any hazard, demanding, moving, slippery, sticky or vanishing platform - the entry jump to pad 0 must be a plain one)
+            if (k == PlatformKind.MoonJellyChain && (prev == PlatformKind.UndertowPad || PlatformKinds.IsHazardType(prev) || PlatformKinds.IsDemanding(prev) || prev == PlatformKind.Moving || prev == PlatformKind.Slippery || prev == PlatformKind.Sticky || prev == PlatformKind.Vanishing)) return false;
             return true;
         }
 
@@ -67,6 +83,12 @@ namespace FluffyClimbers.Simulation
             if (Fx.Abs(d) <= maxDx) return x;
             Fx nx = d.Raw < 0 ? prevX - maxDx : prevX + maxDx;
             return Fx.Clamp(nx, w / 2, screen - w / 2);
+        }
+
+        /// <summary>Final Change 6: kinds whose air zone bends the flight path above them (Caramel Magnet: sideways pull, Sour Sprinkler Cannon: downward jet).</summary>
+        public static bool BendsFlight(PlatformKind k)
+        {
+            return k == PlatformKind.CaramelMagnet || k == PlatformKind.SourSprinklerCannon;
         }
 
         private static bool Contains(PlatformKind[] set, PlatformKind k)
@@ -107,10 +129,12 @@ namespace FluffyClimbers.Simulation
                 if (sigKind != PlatformKind.Normal) { list.Add(sigKind); list.Add(sigKind); }
                 for (int i = 0; i < GenericSet.Length; i++) if (GenericSet[i] != sigKind) list.Add(GenericSet[i]);
             }
-            if (spec.LevelIndex <= 1) list.RemoveAll(k => PlatformKinds.IsHazardType(k));
+            if (spec.LevelIndex <= 1) list.RemoveAll(k => PlatformKinds.NoTutorial(k));
             // doc 30 section 4: the Surf Boost Wave can carry a landing player into a wall, so a no-wall-bounce level never has one
             // doc 30 section 8 item 8: the same for the Pinwheel Gust, which pushes airborne players sideways
-            if (spec.Goal != null && spec.Goal.Type == GoalType.NoWallBounce) list.RemoveAll(k => k == PlatformKind.SurfBoostWave || k == PlatformKind.PinwheelGust);
+            if (spec.Goal != null && spec.Goal.Type == GoalType.NoWallBounce) list.RemoveAll(k => k == PlatformKind.SurfBoostWave || k == PlatformKind.PinwheelGust || k == PlatformKind.SporeFunnel || k == PlatformKind.CaramelMagnet || k == PlatformKind.WaterBambooTipper);   // Spore Funnel (Final Change 6): the pull toward its axis can carry the player into a wall
+            // Final Change 6, region 1: the dragonfly carries the hero sideways, so a no-wall-bounce level never has one (the four new kinds are hazard types, so level 1 has none of them)
+            if (spec.Goal != null && spec.Goal.Type == GoalType.NoWallBounce) list.RemoveAll(k => k == PlatformKind.DragonflyDart);
             return list.ToArray();
         }
 
@@ -168,8 +192,21 @@ namespace FluffyClimbers.Simulation
             int hazardKinds = 0, launchKinds = 0;
             for (int o = 0; o < options.Length; o++) { if (PlatformKinds.IsHazardType(options[o])) hazardKinds++; if (PlatformKinds.IsLaunch(options[o])) launchKinds++; }
             int hazardBudget = (chosen.Count * hazardKinds + options.Length / 2) / options.Length;
+            if (hazardBudget > chosen.Count * 30 / 100) hazardBudget = chosen.Count * 30 / 100;   // Final Change 6: a region with many hazard kinds (region 4 has five) still keeps them at most 30 percent of its special rows
             int launchBudget = (chosen.Count * launchKinds + options.Length / 2) / options.Length;
             int hazardsPlaced = 0, launchesPlaced = 0;
+            // Moon Jelly Chain (Final Change 6): a group of three consecutive rows; it gets its share of the special rows (three rows per group, rounded up, so a level with any special row can hold one)
+            int jellyOptions = 0;
+            for (int o = 0; o < options.Length; o++) if (options[o] == PlatformKind.MoonJellyChain) jellyOptions++;
+            int jellyBudget = jellyOptions == 0 ? 0 : (chosen.Count * jellyOptions + 3 * options.Length - 1) / (3 * options.Length);
+            int jellyGroups = 0;
+            int lastJellyEnd = -1000;   // integration 2026-11-26: two chains never within JellySpacingRows rows (a chain right after another one had no solution: lvl_003_23, 17, 25 layouts)
+            // Glowworm Relay (Final Change 6): a group of RelayLength consecutive rows; at most one per about four times the share of the options, never within RelaySpacingRows of the previous one
+            int relayOptions = 0;
+            for (int o = 0; o < options.Length; o++) if (options[o] == PlatformKind.GlowwormRelay) relayOptions++;
+            int relayBudget = relayOptions == 0 ? 0 : (chosen.Count * relayOptions + 4 * options.Length - 1) / (4 * options.Length);
+            int relayGroups = 0;
+            int lastRelayEnd = -1000;
             int lastHazardRow = -1000;
             PlatformKind prevKind = PlatformKind.Normal;
             int prevRow = -10;
@@ -177,6 +214,7 @@ namespace FluffyClimbers.Simulation
             for (int ci = 0; ci < chosen.Count; ci++)
             {
                 int r = chosen[ci];
+                if (plan[r] != PlatformKind.Normal) continue;   // taken by a Moon Jelly Chain group placed earlier
                 PlatformKind lower = prevRow == r - 1 ? prevKind : PlatformKind.Normal;
                 bool restricted = Restricted(r, rows, gemRow);
                 bool beside = locked[r - 1] || locked[r + 1];   // next to a ladder or chunk: only kinds without gap or position rules
@@ -186,10 +224,15 @@ namespace FluffyClimbers.Simulation
                     PlatformKind k = options[o];
                     if (beside && (k == PlatformKind.HiveLift || k == PlatformKind.Sticky || k == PlatformKind.SproutLift || k == PlatformKind.OrbitCap || k == PlatformKind.SinkingRaft || k == PlatformKind.SandcastleStep
                         || k == PlatformKind.FizzVent || k == PlatformKind.PinwheelGust || k == PlatformKind.LicoriceBelt || k == PlatformKind.TaffyStretch
-                        || k == PlatformKind.LanternLift || k == PlatformKind.SwingPlank || k == PlatformKind.PagodaRidge || PlatformKinds.IsLaunch(k))) continue;
+                        || k == PlatformKind.LanternLift || k == PlatformKind.SwingPlank || k == PlatformKind.PagodaRidge || k == PlatformKind.TeeterCap || k == PlatformKind.SporeFunnel || k == PlatformKind.DizzySpores   // Dizzy Spores: its next platform must overlap it, a ladder start cannot be moved (found by DizzySpores_TheNextRowsSpine... after the Final Change 6 re-roll)
+                        || k == PlatformKind.MoonJellyChain || k == PlatformKind.UndertowPad   // Final Change 6, region 3: their gap rules do not fit beside a ladder or chunk
+                        || k == PlatformKind.ToriiLintel || k == PlatformKind.IncenseMistBank || k == PlatformKind.PrayerScrollRunner || k == PlatformKind.MeltingScoop || k == PlatformKind.CaramelMagnet || k == PlatformKind.SourSprinklerCannon || k == PlatformKind.SugarGlassLedge || PlatformKinds.IsLaunch(k))) continue;
                     if (restricted && k == PlatformKind.Vanishing) continue;   // the finish never blinks
+                    if (beside && (k == PlatformKind.GlowwormRelay || k == PlatformKind.DragonflyDart || k == PlatformKind.DewdropMirrorLeaf || k == PlatformKind.SilkSnareWeb)) continue;   // Final Change 6, region 1: gap and position rules do not fit beside a ladder or chunk
+                    if (k == PlatformKind.GlowwormRelay && (relayGroups >= relayBudget || r - lastRelayEnd < SimConfig.RelaySpacingRows || chosen.Count - ci - 1 < SimConfig.RelayLength - 1 || !RelayGroupFits(r, rows, locked, gemRow))) continue;
                     if (PlatformKinds.IsHazardType(k) && hazardsPlaced >= hazardBudget) continue;
                     if (PlatformKinds.IsLaunch(k) && launchesPlaced >= launchBudget) continue;
+                    if (k == PlatformKind.MoonJellyChain && (jellyGroups >= jellyBudget || r - lastJellyEnd < SimConfig.JellySpacingRows || !JellyGroupFits(r, rows, locked, gemRow) || !GroupRowsRemovable(chosen, ci, r, SimConfig.JellyChainLength))) continue;
                     if (!Allowed(k, lower, r - lastHazardRow, spacing, restricted)) continue;
                     pool.Add(o);
                 }
@@ -200,7 +243,7 @@ namespace FluffyClimbers.Simulation
                     {
                         PlatformKind k = options[o];
                         if (PlatformKinds.IsHazardType(k) || PlatformKinds.IsLaunch(k) || PlatformKinds.IsDemanding(k) || k == PlatformKind.HiveLift || k == PlatformKind.Sticky || k == PlatformKind.Vanishing
-                            || k == PlatformKind.SproutLift || k == PlatformKind.SinkingRaft || k == PlatformKind.SandcastleStep || k == PlatformKind.SurfBoostWave || k == PlatformKind.LanternLift) continue;
+                            || k == PlatformKind.SproutLift || k == PlatformKind.SinkingRaft || k == PlatformKind.SandcastleStep || k == PlatformKind.SurfBoostWave || k == PlatformKind.LanternLift || k == PlatformKind.MoonJellyChain) continue;
                         pool.Add(o);
                         break;
                     }
@@ -216,10 +259,80 @@ namespace FluffyClimbers.Simulation
                 plan[r] = options[o2];
                 prevKind = options[o2];
                 prevRow = r;
+                if (options[o2] == PlatformKind.MoonJellyChain)
+                {
+                    // the whole chain: three consecutive rows; the rows it takes from the draw come off the later special rows, so the level keeps its exact count
+                    jellyGroups++;
+                    int need = SimConfig.JellyChainLength - 1;
+                    for (int g = 1; g < SimConfig.JellyChainLength; g++)
+                    {
+                        plan[r + g] = PlatformKind.MoonJellyChain;
+                        int at = chosen.IndexOf(r + g);
+                        if (at > ci) { chosen.RemoveAt(at); need--; }
+                    }
+                    for (int rm = chosen.Count - 1; need > 0 && rm > ci; rm--)
+                    {
+                        if (chosen[rm] <= r + SimConfig.JellyChainLength - 1) break;
+                        chosen.RemoveAt(rm);
+                        need--;
+                    }
+                    prevRow = r + SimConfig.JellyChainLength - 1;
+                    lastJellyEnd = prevRow;
+                }
+                if (options[o2] == PlatformKind.GlowwormRelay)
+                {
+                    // the whole relay: RelayLength consecutive rows; the rows it takes from the draw come off the later special rows, so the level keeps its exact count
+                    relayGroups++;
+                    int need = SimConfig.RelayLength - 1;
+                    for (int g = 1; g < SimConfig.RelayLength; g++)
+                    {
+                        plan[r + g] = PlatformKind.GlowwormRelay;
+                        int at = chosen.IndexOf(r + g);
+                        if (at > ci) { chosen.RemoveAt(at); need--; }
+                    }
+                    // the rest comes off the specials right after the group (not the last ones of the level), so the share keeps its ramp inside the level
+                    while (need > 0 && ci + 1 < chosen.Count) { chosen.RemoveAt(ci + 1); need--; }
+                    prevRow = r + SimConfig.RelayLength - 1;
+                    lastRelayEnd = prevRow;
+                }
                 if (PlatformKinds.IsHazardType(options[o2])) { lastHazardRow = r; hazardsPlaced++; }
                 if (PlatformKinds.IsLaunch(options[o2])) launchesPlaced++;
             }
             return plan;
+        }
+
+        /// <summary>
+        /// True when a group of <paramref name="len"/> rows starting at <paramref name="r"/> can take its len - 1 extra rows out of the later drawn rows (the rows of the group that were drawn, then the last drawn rows beyond it),
+        /// so the level keeps its exact special row count (Final Change 6 integration: a seed that could not pay for a group made the count differ between seeds).</summary>
+        public static bool GroupRowsRemovable(List<int> chosen, int ci, int r, int len)
+        {
+            int free = 0;
+            for (int i = ci + 1; i < chosen.Count; i++) if (chosen[i] > r) free++;
+            return free >= len - 1;
+        }
+
+        /// <summary>
+        /// Moon Jelly Chain: true when a chain of SimConfig.JellyChainLength pads fits on the rows <paramref name="r"/> to r + 2: none of them and the row after them is owned by a ladder or chunk or is the hidden gem row,
+        /// and none lies in the restricted zone (a launcher never sits in the last three rows or around the gem).
+        /// </summary>
+        public static bool JellyGroupFits(int r, int rows, bool[] locked, int gemRow)
+        {
+            int last = r + SimConfig.JellyChainLength - 1;
+            for (int i = r - 1; i <= last + 1 && i < locked.Length; i++) if (i >= 0 && (locked[i] || i == gemRow)) return false;
+            for (int i = r; i <= last; i++) if (Restricted(i, rows, gemRow)) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// Glowworm Relay: true when a relay of SimConfig.RelayLength pads fits on the rows <paramref name="r"/> to r + 3: none of them and the rows just below and above are owned by a ladder (combo ladder rows are excluded) or chunk
+        /// or are the hidden gem row, and none lies in the restricted zone (never the last three rows or around the gem).
+        /// </summary>
+        public static bool RelayGroupFits(int r, int rows, bool[] locked, int gemRow)
+        {
+            int last = r + SimConfig.RelayLength - 1;
+            for (int i = r - 1; i <= last + 1 && i < locked.Length; i++) if (i >= 0 && (locked[i] || i == gemRow)) return false;
+            for (int i = r; i <= last; i++) if (Restricted(i, rows, gemRow)) return false;
+            return true;
         }
 
         /// <summary>The last three rows before the goal and the two rows either side of the hidden gem avoid launchers and hazards.</summary>
@@ -245,6 +358,7 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.HiveLift: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));
                 case PlatformKind.SnapDaisy: return Fx.Max(w, Fx.FromInt(2));
                 case PlatformKind.SproutLift: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));
+                case PlatformKind.GlowwormRelay: return Fx.Clamp(w, Fx.FromInt(3), Fx.FromInt(6));              // Final Change 6: painted 3, 4 and 6 u (1.5, 2 and 8 are excluded)
                 case PlatformKind.FairyRing: return cfg.FairyRingWidth;   // two halves of at least 1.4 u around the hole
                 case PlatformKind.OrbitCap: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));
                 case PlatformKind.DizzySpores: return Fx.Max(w, Fx.FromInt(2));
@@ -256,6 +370,10 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.TurtleShuttle: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));
                 case PlatformKind.KelpTangle: return Fx.Max(w, Fx.FromInt(2));
                 case PlatformKind.PufferfishPad: return Fx.Clamp(w, cfg.PufferMinWidth, Fx.FromInt(6));         // room to stay clear of the centre while puffed
+                // Final Change 6, region 3: Moon Jelly Chain painted 2, 3, 4 u; Splitting Pier 4, 6, 8 u (each half stays at least 1.4 u wide); Sea Foam Pad 3 to 8 u; Undertow Pad keeps every width
+                case PlatformKind.MoonJellyChain: return Fx.Clamp(w, Fx.FromInt(3), Fx.FromInt(4));   // integration 2026-11-25: 2 u pads made random chains unsolvable (the 2 u art stays painted but unused)
+                case PlatformKind.SplittingPier: return Fx.Clamp(w, cfg.PierMinWidth, Fx.FromInt(8));
+                case PlatformKind.SeaFoamPad: return Fx.Max(w, cfg.FoamMinWidth);
                 case PlatformKind.CandyBowl: return Fx.Clamp(w, cfg.BowlMinWidth, cfg.BowlMaxWidth);            // painted dish: 4, 6 or 8 u
                 case PlatformKind.FlossGlide: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(6));
                 case PlatformKind.FizzVent: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));                   // the bubble column is 1.8 u wide
@@ -263,6 +381,11 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.TaffyStretch: return cfg.TaffyMinWidth;                                       // the narrow width; the breathing is Platform.Amplitude per edge
                 case PlatformKind.JellyWobble: return Fx.Clamp(w, cfg.JellyMinWidth, Fx.FromInt(6));            // stand in the middle: at least 3.5 u (painted 4 or 6)
                 case PlatformKind.PinwheelGust: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));
+                // Final Change 6, region 4 (painted widths: Scoop 3, 4, 6; Magnet 2, 3, 4; Sprinkler 2, 3; Glass Ledge 4, 6, 8; LevelBuilder.Region4NewWidthsTenths snaps to them)
+                case PlatformKind.MeltingScoop: return Fx.Clamp(w, Fx.FromInt(3), Fx.FromInt(6));
+                case PlatformKind.CaramelMagnet: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));
+                case PlatformKind.SourSprinklerCannon: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(3));
+                case PlatformKind.SugarGlassLedge: return Fx.Max(w, cfg.GlassMinWidth);   // a solid centre of at least 2.4 u
                 case PlatformKind.BambooFlick: return cfg.FlickWidth;                                           // one painted piece (3 u)
                 case PlatformKind.LanternLift: return Fx.Clamp(w, Fx.FromInt(3), Fx.FromInt(5));               // painted 3 or 5 u
                 case PlatformKind.KoiStone: return Fx.Clamp(w, cfg.KoiMinWidth, cfg.KoiMaxWidth);               // wide and restful: 5 or 7 u
@@ -270,6 +393,10 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.PagodaRidge: return Fx.Clamp(w, cfg.RidgeMinWidth, cfg.RidgeMaxWidth);       // painted 2.5, 3.5 or 4.5 u
                 case PlatformKind.MalletSmash: return Fx.Clamp(w, cfg.MalletMinWidth, cfg.MalletMaxWidth);     // 2.9 u safe + the 1.6 u zone: painted 4.5 or 6 u
                 case PlatformKind.RollingLog: return cfg.LogPlatformWidth;                                      // one painted track (5 u)
+                case PlatformKind.PrayerScrollRunner: return Fx.Clamp(w, cfg.ScrollMinWidth, cfg.ScrollMaxWidth);   // Final Change 6: painted open 3, 4.5 or 6 u
+                case PlatformKind.ToriiLintel: return Fx.Clamp(w, cfg.LintelMinWidth, cfg.LintelMaxWidth);          // the arch needs a base: 4.5 or 6 u (1.25 u of open slab each side of the 2 u lintel at 4.5)
+                case PlatformKind.IncenseMistBank: return Fx.Clamp(w, cfg.MistMinWidth, cfg.MistMaxWidth);          // painted 3 or 4.5 u
+                case PlatformKind.WaterBambooTipper: return Fx.Clamp(w, cfg.TipperMinWidth, cfg.TipperMaxWidth);    // painted 3 or 4.5 u
                 default: return w;
             }
         }
@@ -293,9 +420,47 @@ namespace FluffyClimbers.Simulation
             if (kind == PlatformKind.LanternLift || prevKind == PlatformKind.LanternLift) gap = Fx.Clamp(gap, cfg.LanternGapMin, cfg.NormalGapMax);
             // Swing Plank: it rises PlankRise at the ends of its swing, so both neighbours keep PlankGapMin and every height stays within a jump.
             if (kind == PlatformKind.SwingPlank || prevKind == PlatformKind.SwingPlank) gap = Fx.Clamp(gap, cfg.PlankGapMin, cfg.NormalGapMax - cfg.PlankRise);
+            // Teeter Cap (Final Change 6): a jump from it can be as weak as x0.94 within the fair centre band, so the row above is at most TeeterGapMax (3.4 u) higher.
+            if (prevKind == PlatformKind.TeeterCap) gap = Fx.Min(gap, cfg.TeeterGapMax);
+            // Undertow Pad (Final Change 6): the gravity column above it cuts the reach, so the row above is at most UndertowGapMax (3.0 u) higher.
+            if (prevKind == PlatformKind.UndertowPad) gap = Fx.Min(gap, cfg.UndertowGapMax);
+            // Glowworm Relay (Final Change 6): the pads of one relay are RelayGapMin to RelayGapMax apart, so a flight of 36 to 54 ticks lands inside the window of the next pad.
+            if (kind == PlatformKind.GlowwormRelay && prevKind == PlatformKind.GlowwormRelay) gap = Fx.Clamp(gap, cfg.RelayGapMin, cfg.RelayGapMax);
+            // Silk Snare Web (Final Change 6): the web cuts the climb to about 3.46 u, so the row above is at most WebGapMax (2.9 u) higher.
+            if (prevKind == PlatformKind.SilkSnareWeb) gap = Fx.Min(gap, cfg.WebGapMax);
             // Bamboo Flick: the flick peaks 2.76 u, so the next row is FlickGapMin to FlickGapMax higher (the flight lands on the way down).
             if (prevKind == PlatformKind.BambooFlick) gap = Fx.Clamp(gap, cfg.FlickGapMin, cfg.FlickGapMax);
+            if (prevKind == PlatformKind.KelpTangle) gap = Fx.Min(gap, cfg.KelpNextGapMax);   // integration 2026-11-25: the jump lock leaves less time, so the next row is closer
+            // Torii Lintel (Final Change 6): the lintel stands LintelHeight above its slab, so the row above is at least LintelGapMin higher (the lintel never sits in the next platform).
+            if (prevKind == PlatformKind.ToriiLintel) gap = Fx.Clamp(gap, cfg.LintelGapMin, cfg.NormalGapMax);
             return gap;
+        }
+
+        /// <summary>
+        /// Ladybug Rider, Turtle Shuttle and the generic Moving platform always travel their whole path: the centre is moved inward so width / 2 + amplitude fits between the
+        /// walls (their amplitude is never cut down to the room, which used to leave a platform at a wall with amplitude 0). Other kinds: x unchanged.
+        /// </summary>
+        public static Fx FitSwing(PlatformKind kind, Fx x, Fx w, Fx amp, Fx screen)
+        {
+            if (kind != PlatformKind.Ladybug && kind != PlatformKind.TurtleShuttle && kind != PlatformKind.Moving) return x;
+            Fx edge = w / 2 + amp;
+            return Fx.Clamp(x, edge, screen - edge);
+        }
+
+        /// <summary>
+        /// <see cref="FitSwing(PlatformKind, Fx, Fx, Fx, Fx)"/> that also keeps the climb from the previous platform fair: when moving inward would push the
+        /// platform farther from <paramref name="prevX"/> than the layout reach <paramref name="dxLimit"/> (and farther than it already was), the mirror
+        /// position across the screen centre is tried first, then the position is pulled back toward prevX as far as the swing still fits.
+        /// </summary>
+        public static Fx FitSwing(PlatformKind kind, Fx x, Fx w, Fx amp, Fx screen, Fx prevX, Fx dxLimit)
+        {
+            Fx fit = FitSwing(kind, x, w, amp, screen);
+            if (fit == x) return fit;
+            Fx limit = Fx.Max(dxLimit, Fx.Abs(x - prevX));
+            if (Fx.Abs(fit - prevX) <= limit) return fit;
+            Fx mirror = FitSwing(kind, screen - x, w, amp, screen);
+            if (Fx.Abs(mirror - prevX) <= limit) return mirror;
+            return fit;
         }
 
         /// <summary>The x of the platform after a dandelion: in the direction of its arrow, DandelionNextDxMin to Max away, kept inside the walls.</summary>
@@ -312,6 +477,9 @@ namespace FluffyClimbers.Simulation
             Fx dx = rng.Range(cfg.FlickNextDxMin, cfg.FlickNextDxMax);
             return Fx.Clamp(prevX + dx * prevDir, w / 2, screen - w / 2);
         }
+
+        /// <summary>Fog Puff Drift: the start offset of the cloud is drawn from 0 to this many ticks (taken modulo the cloud period).</summary>
+        public const int FogPhaseRange = 600;
 
         /// <summary>
         /// Draws the per-platform parameters of a region 1 special platform. <paramref name="room"/> is the free space either side of x inside
@@ -331,10 +499,14 @@ namespace FluffyClimbers.Simulation
                     phase = rng.Next(period);
                     break;
                 case PlatformKind.Ladybug:
-                    amp = Fx.Min(rng.Range(cfg.LadybugAmplitudeMin, cfg.LadybugAmplitudeMax), room);
-                    if (amp < Fx.Zero) amp = Fx.Zero;
+                    // The full drawn amplitude, NOT clamped to the room: a Ladybug near a wall used to get amplitude 0 and never move (owner 2026-11-25).
+                    // The builder moves the platform inward instead (FitSwing), so the path always fits between the walls.
+                    amp = rng.Range(cfg.LadybugAmplitudeMin, cfg.LadybugAmplitudeMax);
                     period = 2 * rng.Range(100, 150);
                     phase = rng.Next(period);
+                    break;
+                case PlatformKind.Seesaw:
+                    dir = rng.Next(2) == 0 ? -1 : 1;   // the side a dead-centre landing tilts to when the player stands still
                     break;
                 case PlatformKind.ThornBush:
                     dir = rng.Next(2) == 0 ? -1 : 1;
@@ -368,13 +540,16 @@ namespace FluffyClimbers.Simulation
                     phase = rng.Next(cfg.ClamCycleTicks);
                     break;
                 case PlatformKind.TurtleShuttle:
-                    amp = Fx.Min(cfg.TurtleAmplitude, room);
-                    if (amp < Fx.Zero) amp = Fx.Zero;
+                    amp = cfg.TurtleAmplitude;   // never clamped to the room (it would be 0 at a wall and the turtle would never move); FitSwing moves the platform inward
                     period = cfg.TurtlePeriodTicks;
                     phase = rng.Next(period);
                     break;
                 case PlatformKind.PufferfishPad:
                     phase = rng.Next(cfg.PufferCycleTicks);
+                    break;
+                case PlatformKind.SplittingPier:
+                    // the cycle offset (a multiple of 20 ticks, so the painted halves of neighbouring piers are not in step); the gap is centred, never clamped to a wall
+                    phase = rng.Next(cfg.PierCycleTicks / 20) * 20;
                     break;
                 case PlatformKind.LicoriceBelt:
                     dir = x < screen / 2 ? -1 : 1;   // carries toward the nearest wall; the next platform sits toward the middle (BeltNextX), so the belt runs AWAY from it
@@ -391,6 +566,9 @@ namespace FluffyClimbers.Simulation
                     break;
                 case PlatformKind.PinwheelGust:
                     dir = x < screen / 2 ? 1 : -1;   // the gust pushes toward the middle of the screen, never into a wall
+                    break;
+                case PlatformKind.SourSprinklerCannon:
+                    phase = rng.Next(cfg.SprinklerCycleTicks);   // where in the global jet cycle this cannon sits
                     break;
                 case PlatformKind.BambooFlick:
                     dir = x < screen / 2 ? 1 : -1;   // the flick carries toward the middle of the screen, never into a wall
@@ -411,11 +589,67 @@ namespace FluffyClimbers.Simulation
                     dir = x < screen / 2 ? -1 : 1;   // the mallet stands at the end toward the nearest wall: the hop goes inward, never into a wall
                     phase = rng.Next(cfg.MalletCycleTicks);
                     break;
+                case PlatformKind.DragonflyDart:
+                    dir = x < screen / 2 ? 1 : -1;   // Final Change 6: darts toward the middle and the farther wall (the room is checked in FinishParams); the next platform sits on the other side (DartNextX)
+                    break;
                 case PlatformKind.RollingLog:
                     period = cfg.LogPeriodTicks;
                     phase = rng.Next(period);
                     break;
+                case PlatformKind.PrayerScrollRunner:
+                case PlatformKind.WaterBambooTipper:
+                    dir = x < screen / 2 ? 1 : -1;   // Final Change 6: the scroll's roll end and the tipper's carry both point toward the middle of the screen (never into a wall)
+                    break;
+                case PlatformKind.TeeterCap:
+                    dir = rng.Next(2) == 0 ? -1 : 1;   // the side a dead-centre player is nudged to (never stable)
+                    break;
+                case PlatformKind.FogPuffDrift:
+                    phase = rng.Next(FogPhaseRange);   // the cloud path (amplitude and period) follows the final painted width inside Sim.FogX; only the start offset is drawn
+                    break;
+                // Spore Funnel: no per-platform parameter (the column is a function of the width)
             }
+        }
+
+        /// <summary>
+        /// Final Change 6, region 1: the parameters that need the final width and the previous row. Call it right after <see cref="Params"/> (builder and endless tower).
+        /// Glowworm Relay: Phase = member index (0 head to 3), counted up from the previous row when that is a relay pad too. Dragonfly Dart: Amplitude = the dart length, 2.4 u (1.6 u at widths 1.5 and 2) but never more than
+        /// the free room to the wall on the dart side. Dewdrop Mirror Leaf: Amplitude = the slide limit (1.2 u at widths 1.5 and 2, 1.8 u at 3 and 4, 1.0 u at 6 and 8, never more than the room to the nearer wall),
+        /// Period = the mirror factor in percent (35 at widths 1.5 and 2, else 50).
+        /// </summary>
+        public static void FinishParams(SimConfig cfg, PlatformKind kind, Fx x, Fx w, Fx screen, PlatformKind prevKind, int prevPhase, ref Fx amp, ref int period, ref int phase, ref int dir)
+        {
+            switch (kind)
+            {
+                case PlatformKind.GlowwormRelay:
+                    phase = prevKind == PlatformKind.GlowwormRelay ? prevPhase + 1 : 0;
+                    break;
+                case PlatformKind.DragonflyDart:
+                    {
+                        Fx len = w <= Fx.FromInt(2) ? cfg.DartLengthSmall : cfg.DartLength;
+                        Fx room = dir > 0 ? screen - x - w / 2 : x - w / 2;
+                        amp = Fx.Max(Fx.Zero, Fx.Min(len, room));
+                        break;
+                    }
+                case PlatformKind.DewdropMirrorLeaf:
+                    {
+                        bool small = w <= Fx.FromInt(2);
+                        Fx lim = small ? cfg.MirrorLimitSmall : (w >= Fx.FromInt(6) ? cfg.MirrorLimitWide : cfg.MirrorLimitMid);
+                        Fx room = Fx.Min(x - w / 2, screen - x - w / 2);
+                        amp = Fx.Max(Fx.Zero, Fx.Min(lim, room));
+                        period = small ? cfg.MirrorFactorSmallPercent : cfg.MirrorFactorPercent;
+                        break;
+                    }
+            }
+        }
+
+        /// <summary>
+        /// The x of the platform after a Dragonfly Dart: on the other side of the dart (opposite to the dart's Dir), at most the layout reach <paramref name="dxLimit"/> away from the darted position too
+        /// (the distance from the resting position is <paramref name="dx"/> shortened by the dart length <paramref name="prevAmp"/>), so the row above is reachable with the dragonfly at rest and at the far end of its dart.
+        /// </summary>
+        public static Fx DartNextX(Fx prevX, int prevDir, Fx prevAmp, Fx dx, Fx dxLimit, Fx w, Fx screen)
+        {
+            Fx dd = Fx.Min(dx, Fx.Max(Fx.Zero, dxLimit - prevAmp));
+            return Fx.Clamp(prevX - dd * prevDir, w / 2, screen - w / 2);
         }
 
         /// <summary>The x of the platform after a Licorice Belt: toward the middle, opposite to the belt's Dir (it carries away from the next platform), dx away, kept inside the walls.</summary>

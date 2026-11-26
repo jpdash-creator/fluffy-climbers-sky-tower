@@ -1,0 +1,85 @@
+{
+  "asset": "undertowpad_widths",
+  "kind": "undertowpad",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 275,
+      "h": 115,
+      "bodyLeft": 12,
+      "bodyRight": 262,
+      "surfaceY": 16,
+      "bodyBottom": 99,
+      "width": 1.5,
+      "file": "reg003_undertowpad_w1_5.png",
+      "ppu": 166.667,
+      "kind": "undertowpad",
+      "dir": 0
+    },
+    {
+      "w": 359,
+      "h": 115,
+      "bodyLeft": 12,
+      "bodyRight": 346,
+      "surfaceY": 16,
+      "bodyBottom": 99,
+      "width": 2.0,
+      "file": "reg003_undertowpad_w2.png",
+      "ppu": 167.0,
+      "kind": "undertowpad",
+      "dir": 0
+    },
+    {
+      "w": 526,
+      "h": 115,
+      "bodyLeft": 12,
+      "bodyRight": 513,
+      "surfaceY": 16,
+      "bodyBottom": 99,
+      "width": 3.0,
+      "file": "reg003_undertowpad_w3.png",
+      "ppu": 167.0,
+      "kind": "undertowpad",
+      "dir": 0
+    },
+    {
+      "w": 693,
+      "h": 115,
+      "bodyLeft": 12,
+      "bodyRight": 680,
+      "surfaceY": 17,
+      "bodyBottom": 100,
+      "width": 4.0,
+      "file": "reg003_undertowpad_w4.png",
+      "ppu": 167.0,
+      "kind": "undertowpad",
+      "dir": 0
+    },
+    {
+      "w": 1027,
+      "h": 115,
+      "bodyLeft": 12,
+      "bodyRight": 1014,
+      "surfaceY": 17,
+      "bodyBottom": 100,
+      "width": 6.0,
+      "file": "reg003_undertowpad_w6.png",
+      "ppu": 167.0,
+      "kind": "undertowpad",
+      "dir": 0
+    },
+    {
+      "w": 1361,
+      "h": 115,
+      "bodyLeft": 12,
+      "bodyRight": 1348,
+      "surfaceY": 17,
+      "bodyBottom": 100,
+      "width": 8.0,
+      "file": "reg003_undertowpad_w8.png",
+      "ppu": 167.0,
+      "kind": "undertowpad",
+      "dir": 0
+    }
+  ]
+}

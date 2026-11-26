@@ -69,6 +69,11 @@ namespace FluffyClimbers.Simulation
         /// <summary>Ticks to run away from the target first (builds speed on a narrow platform).</summary>
         private static readonly int[] HomeBacks = { 0, 6, 14 };
         private static readonly int[] HomeBacksFast = { 0, 8 };
+        private static readonly int[] HomeRunsRich = { 0, 3, 6, 10, 14, 20, 28, 40 };
+        private static readonly int[] HomeBacksRich = { 0, 3, 6, 10, 14, 22 };
+        private static readonly int[] RichWaits = { 0, 10, 20, 30, 45, 60, 80 };
+        /// <summary>Last resort pass of the depth-first search (set by Solve after the normal passes found nothing): finer run-ups, back-offs and waits. Same real inputs, only more of them.</summary>
+        private bool Rich;
         /// <summary>Consecutive sideways hops on the same row the depth-first search may chain (bounds recursion depth).</summary>
         private const int MaxSameRowHops = 6;
         /// <summary>
@@ -84,7 +89,11 @@ namespace FluffyClimbers.Simulation
         private readonly LevelData data;
         private readonly int targetRow;
         private readonly int maxNodes;
+        /// <summary>Node cap of the running pass (the first passes of a campaign search get a quarter of the budget, the last one all of it).</summary>
+        private int nodeCap;
         private readonly HashSet<long> visited = new HashSet<long>();
+        /// <summary>Best buffer (hero feet minus danger line, raw) a key was reached with; a later arrival with at least <see cref="RevisitGap"/> more buffer is searched again (the buffer is not part of the key).</summary>
+        private readonly Dictionary<long, int> bufferGap = new Dictionary<long, int>();
         private int nodes;
         private int bestRow;
         private SimState best;
@@ -106,6 +115,22 @@ namespace FluffyClimbers.Simulation
         /// </summary>
         public int PowerBudget;
         public PowerUp[] PowerSet;
+
+        /// <summary>
+        /// Sprint and Rest levels (owner Final Change 6, 2026-11-25): the bot may stand on a shelter for the whole rest (ShelterRestTicks) before it jumps on. Off (default): the normal waits apply, so the
+        /// bot rests only as long as its ordinary 0 to 80 tick waits (it may also skip a shelter by jumping past it). On: the only wait on a shelter is the full rest, which proves the level is also
+        /// solvable by a hero who always uses the shelters (the line is held, but every shelter makes it 15 percent faster afterwards).
+        /// </summary>
+        public bool RestOnShelters;
+
+        /// <summary>
+        /// Boss Rise levels (owner Final Change 6, 2026-11-25): landings with the danger line closer than this under the hero's feet are cut from the search. The lunges and the faster line
+        /// leave little slack, and a depth-first search that does not look at the gap walks into a dead end around row 100 and then backtracks for ever; keeping a gap steers it onto the
+        /// fast lines a good player takes. Search heuristic only (a line that keeps the gap is a real line); 0 turns it off.
+        /// </summary>
+        public Fx BossGuardGap = Fx.FromInt(2);
+        /// <summary>Waits on a shelter when <see cref="RestOnShelters"/> is on: the full rest, then a short extra wait to start the run-up from a steady stand.</summary>
+        private int[] shelterWaits;
         private int pendingPower;
         private static readonly int[] PowerWaits = { 0, 20 };
         private static readonly int[] PowerRuns = { 0, 14 };
@@ -116,6 +141,7 @@ namespace FluffyClimbers.Simulation
             this.sim = sim;
             this.targetRow = targetRow;
             this.maxNodes = maxNodes;
+            this.nodeCap = maxNodes;
         }
 
         /// <summary>Campaign mode: solve the 1-star goal of <paramref name="spec"/> on a level built from it.</summary>
@@ -126,6 +152,7 @@ namespace FluffyClimbers.Simulation
             this.data = data;
             this.targetRow = spec.RowsFor();
             this.maxNodes = maxNodes;
+            this.nodeCap = maxNodes;
             noWall = spec.Goal.Type == GoalType.NoWallBounce;
             comboValue = spec.Goal.Value;
         }
@@ -167,6 +194,8 @@ namespace FluffyClimbers.Simulation
         private bool Prune(SimState c)
         {
             if (c.Hits > MaxHits) return true;
+            if (BossGuardGap > Fx.Zero && sim.BossRise && c.Grounded && c.Y - c.KillY < BossGuardGap) return true;   // Boss Rise: a landing with the line this close under the feet is a trap, cut it early (see BossGuardGap)
+            if (c.RivalWon) return true;   // Rival Race: the ghost got to the top first, this line has lost
             if (spec == null) return false;
             switch (spec.Goal.Type)
             {
@@ -179,6 +208,12 @@ namespace FluffyClimbers.Simulation
                 case GoalType.ComboChain:
                     // above the combo ladder without the combo jumps: the top row no longer clears the level (GoalEvaluator.IsFailed)
                     return data != null && data.LadderEndRow >= 0 && c.Row > data.LadderEndRow + 1 && !GoalEvaluator.ComboJumpsDone(spec, c);
+                case GoalType.ComboGates:
+                    // a gate was left behind without its combo jump: the run would end there (GoalEvaluator.IsFailed)
+                    return GateRules.MissedGate(spec, c.Row, c.GateMask) >= 0;
+                case GoalType.SkyHoops:
+                    // too many rings are gone: the 8 of 10 can no longer be reached
+                    return GoalEvaluator.RingsStillPossible(spec, c) < RingRules.Needed(spec);
                 default:
                     return false;
             }
@@ -200,7 +235,7 @@ namespace FluffyClimbers.Simulation
         /// </summary>
         public BotResult SolveFrom(SimState start)
         {
-            if (spec != null && spec.Goal.Type == GoalType.Speedrun) return SolveFast();
+            if (spec != null && (spec.Goal.Type == GoalType.Speedrun || spec.Goal.Type == GoalType.RivalRace)) return SolveFast();   // Rival Race: the fastest line the bot finds (the ghost is baked from it and the proof races it)
             BotResult result = default(BotResult);
             System.Exception error = null;
             System.Threading.Thread worker = new System.Threading.Thread(() =>
@@ -210,7 +245,36 @@ namespace FluffyClimbers.Simulation
                     best = start;
                     pathRev.Clear();
                     InputTrace = null;
-                    bool solved = Search(start, 0);
+                    bool solved = false;
+                    bool multi = UseHoming;
+                    int quarter = System.Math.Max(1, maxNodes / 4);
+                    // Pass 1: the plain search. On a Boss Rise level it runs WITHOUT the buffer guard (the guard is a search heuristic that cut the only line of several layouts: a long
+                    // Moon Jelly flight lands with the line close under the feet). Passes 2 and 3 only run when the earlier ones found nothing, each from scratch: 2 = the guarded Boss Rise search
+                    // (a different order of tries), 3 = finer run-ups, back-offs and waits ("Rich"); a line any pass finds is a real line.
+                    Fx guard = BossGuardGap;
+                    bool boss = sim.BossRise && guard > Fx.Zero;
+                    if (boss) BossGuardGap = Fx.Zero;
+                    nodeCap = multi ? quarter : maxNodes;
+                    solved = Search(start, 0);
+                    if (!solved && multi)
+                    {
+                        if (boss)
+                        {
+                            BossGuardGap = guard;
+                            visited.Clear(); bufferGap.Clear(); nodes = 0; best = start; pathRev.Clear();
+                            solved = Search(start, 0);
+                            BossGuardGap = Fx.Zero;
+                        }
+                        if (!solved)
+                        {
+                            Rich = true;
+                            nodeCap = maxNodes;
+                            visited.Clear(); bufferGap.Clear(); nodes = 0; best = start; pathRev.Clear();
+                            solved = Search(start, 0);
+                            Rich = false;
+                        }
+                    }
+                    BossGuardGap = guard;
                     result = Result(solved);
                     if (RecordInputs && solved) BuildTrace();
                 }
@@ -254,28 +318,74 @@ namespace FluffyClimbers.Simulation
             if (c.Row < s.Row) return 0;
             if (c.Row == s.Row && sameRow >= MaxSameRowHops) return 0;
             if (Prune(c)) return 0;
-            if (!visited.Add(Key(c))) return 0;
+            if (!FirstVisit(c)) return 0;
             if (Search(c, c.Row == s.Row ? sameRow + 1 : 0)) { if (seg != null) pathRev.Add(seg); return 1; }
-            return nodes > maxNodes ? -1 : 0;
+            return nodes > nodeCap ? -1 : 0;
         }
+
+        /// <summary>
+        /// Visited test of the depth-first search. The key (platform, speed, x, clocks) has no buffer, and the first arrival at a key can be the one with the least buffer (a slow line that
+        /// squeezes against the danger line): cutting every later arrival called solvable layouts unsolvable (lvl_003_25, 24, 23, 22, 21 attempt layouts at the Normal setting, 2026-11-26).
+        /// A key is therefore searched again when it is reached with at least RevisitGap more buffer than before (a real line, only searched more completely).
+        /// </summary>
+        private bool FirstVisit(SimState c)
+        {
+            long key = Key(c);
+            int gap = (c.Y - c.KillY).Raw;
+            int old;
+            if (!bufferGap.TryGetValue(key, out old)) { bufferGap[key] = gap; return true; }
+            if (gap < old + RevisitGap.Raw) return false;
+            bufferGap[key] = gap;
+            return true;
+        }
+
+        /// <summary>Extra buffer (u) that makes a second visit of the same key worth searching.</summary>
+        public Fx RevisitGap = Fx.One;
 
         /// <summary>Launch platforms (flower, cap, dandelion): the flight after them is steered toward the next target.</summary>
         private bool IsBounce(int id)
         {
-            return PlatformKinds.IsLaunch(sim.Platforms[id].Kind);
+            return PlatformKinds.IsLaunch(sim.Platforms[id].Kind) || sim.Platforms[id].Kind == PlatformKind.MoonJellyChain;   // Final Change 6: a jelly pad launches too
+        }
+
+        /// <summary>
+        /// Moon Jelly Chain: the platform to steer toward after a launch from jelly pad <paramref name="id"/>: the next pad of the chain on the row above (nearest x), else the nearest
+        /// platform of the row above; -1 when there is none.
+        /// </summary>
+        private int JellyHome(int id, Fx x)
+        {
+            int row = sim.Platforms[id].Row;
+            int bestJelly = -1, bestAny = -1;
+            Fx dj = Fx.Zero, da = Fx.Zero;
+            for (int i = id + 1; i < sim.Platforms.Length && sim.Platforms[i].Row <= row + 1; i++)
+            {
+                if (sim.Platforms[i].Row != row + 1) continue;
+                Fx d = Fx.Abs(sim.Platforms[i].X - x);
+                if (bestAny < 0 || d < da) { bestAny = i; da = d; }
+                if (sim.Platforms[i].Kind == PlatformKind.MoonJellyChain && (bestJelly < 0 || d < dj)) { bestJelly = i; dj = d; }
+            }
+            return bestJelly >= 0 ? bestJelly : bestAny;
         }
 
         /// <summary>Waits before a jump: a crumbling platform and a snap daisy (closes 90 ticks after the landing) allow only short ones.</summary>
         private static int[] WaitsFor(PlatformKind here, int[] normal)
         {
             if (here == PlatformKind.Crumble) return CrumbleWaits;
-            if (here == PlatformKind.SnapDaisy || here == PlatformKind.SporePop) return SnapWaits;   // a spore pop flings the player 72 ticks after the landing
+            if (here == PlatformKind.SnapDaisy || here == PlatformKind.SporePop || here == PlatformKind.MeltingScoop || here == PlatformKind.SugarGlassLedge) return SnapWaits;   // Final Change 6: the scoop melts and the glass end cracks (20 ticks) while he waits   // a spore pop flings the player 72 ticks after the landing
             if (here == PlatformKind.DizzySpores) return DizzyWaits;                                  // steering is locked for the first 60 ticks
             if (here == PlatformKind.KelpTangle) return KelpWaits;                                    // no jump for the first 36 ticks
             if (here == PlatformKind.SinkingRaft) return RaftWaits;                                   // the raft sinks 1 u in 90 ticks: leave within about 1.3 s
             if (here == PlatformKind.LanternLift) return LanternWaits;                                // rises 2 u in 90 ticks: waiting for the full rise is the point
             if (here == PlatformKind.KoiStone) return KoiWaits;                                       // 60 still ticks (plus the braking after the landing) charge the next jump
             return normal;
+        }
+
+        /// <summary>The waits of a landing on <paramref name="groundId"/>: on a shelter with <see cref="RestOnShelters"/> only the full rest; everywhere else the given ones.</summary>
+        private int[] RestWaits(int groundId, int[] normal)
+        {
+            if (!RestOnShelters || !sim.IsShelter(groundId)) return normal;
+            if (shelterWaits == null) shelterWaits = new int[] { sim.Cfg.ShelterRestTicks };
+            return shelterWaits;
         }
 
         private static readonly int[] SnapWaits = { 0, 12, 30 };
@@ -303,12 +413,13 @@ namespace FluffyClimbers.Simulation
         {
             if (s.Row > bestRow) { bestRow = s.Row; if (!Done(best)) best = s; }
             if (Done(s)) { best = s; return true; }
-            if (++nodes > maxNodes) return false;
+            if (++nodes > nodeCap) return false;
 
             Platform here = sim.Platforms[s.GroundId];
             int preferred = PreferredDirection(s);
             int[] dirs = { preferred, 0, -preferred };
-            int[] waits = WaitsFor(here.Kind, Full.Waits);
+            int[] hb = Rich ? HomeBacksRich : HomeBacks, hr = Rich ? HomeRunsRich : HomeRuns;
+            int[] waits = RestWaits(s.GroundId, WaitsFor(here.Kind, Rich ? RichWaits : Full.Waits));
 
             int[] targets = new int[24];
             int tc = UseHoming ? Targets(s, targets) : 0;
@@ -317,12 +428,12 @@ namespace FluffyClimbers.Simulation
                 Fx tx = sim.PlatformX(targets[ti], s.Tick + 20);
                 int tdir = tx >= s.X ? 1 : -1;
                 for (int wi = 0; wi < waits.Length; wi++)
-                    for (int bi = 0; bi < HomeBacks.Length; bi++)
-                        for (int ri = 0; ri < HomeRuns.Length; ri++)
+                    for (int bi = 0; bi < hb.Length; bi++)
+                        for (int ri = 0; ri < hr.Length; ri++)
                         {
-                            if (HomeBacks[bi] > 0 && ri == 0) continue;
+                            if (hb[bi] > 0 && ri == 0) continue;
                             SimState c;
-                            if (!TryJump(s, waits[wi], HomeBacks[bi], tdir, HomeRuns[ri], 0, 0, targets[ti], -1, 0, out c)) continue;
+                            if (!TryJump(s, waits[wi], hb[bi], tdir, hr[ri], 0, 0, targets[ti], -1, 0, out c)) continue;
                             int v = Visit(s, c, sameRow);
                             if (v != 0) return v > 0;
                         }
@@ -340,19 +451,19 @@ namespace FluffyClimbers.Simulation
                 for (int ni = 0; ni < nc; ni++)
                     for (int bias = 0; bias <= 1; bias++)
                         for (int wi = 0; wi < waits.Length; wi++)
-                            for (int bi = 0; bi < HomeBacks.Length; bi++)
-                                for (int ri = 0; ri < HomeRuns.Length; ri++)
+                            for (int bi = 0; bi < hb.Length; bi++)
+                                for (int ri = 0; ri < hr.Length; ri++)
                                 {
-                                    if (HomeBacks[bi] > 0 && ri == 0) continue;
+                                    if (hb[bi] > 0 && ri == 0) continue;
                                     SimState c;
-                                    if (!TryJump(s, waits[wi], HomeBacks[bi], tdir, HomeRuns[ri], 0, 0, tgt, nexts[ni], bias, out c)) continue;
+                                    if (!TryJump(s, waits[wi], hb[bi], tdir, hr[ri], 0, 0, tgt, nexts[ni], bias, out c)) continue;
                                     int v = Visit(s, c, sameRow);
                                     if (v != 0) return v > 0;
                                 }
             }
 
             ActionSet scripted = UseHoming ? Mid : Full;
-            int[] swaits = WaitsFor(here.Kind, scripted.Waits);
+            int[] swaits = RestWaits(s.GroundId, WaitsFor(here.Kind, scripted.Waits));
             for (int wi = 0; wi < swaits.Length; wi++)
             {
                 for (int di = 0; di < dirs.Length; di++)
@@ -435,14 +546,18 @@ namespace FluffyClimbers.Simulation
             long tb = 0;
             if (PlatformKinds.IsTimeDependent(p.Kind)) tb = TimeBucket(p, c.Tick);
             if (sim.Hazards.Length > 0) tb = (c.Tick / 24) % 32;
+            if (p.Kind == PlatformKind.GlowwormRelay || p.Kind == PlatformKind.DragonflyDart) tb = EpisodeBucket(c, p);   // Final Change 6, region 1: keyed by the time since the landing that started the relay / dart (12-tick buckets)
             long xb = c.X.Raw * 4L / Fx.OneRaw;
             long extra = 0;
             if (spec != null)
             {
                 if (spec.Goal.Type == GoalType.ComboChain) extra = GoalEvaluator.JumpsWithFloors(c, comboValue);
+                else if (spec.Goal.Type == GoalType.ComboGates) extra = c.GateMask;
+                else if (spec.Goal.Type == GoalType.SkyHoops) extra = c.Rings;
                 else if (spec.Goal.Type == GoalType.FindHiddenGem) extra = c.HiddenGems;
                 else if (spec.Goal.Type == GoalType.Speedrun) extra = c.Tick / 90;
             }
+            if (sim.SprintRest) extra = c.ShelterMask;   // a state reached with a shelter taken (faster line) is not the same as one reached without
             long pw = PowerBudget > 0 ? (c.PwUsed > 3 ? 3 : c.PwUsed) : 0;   // a state reached with units left is not the same as one reached without
             return c.GroundId + (vb << 20) + (tb << 28) + (xb << 36) + (extra << 44) + (pw << 54);
         }
@@ -457,14 +572,29 @@ namespace FluffyClimbers.Simulation
             {
                 case PlatformKind.ClamShellPad: return ((tick + p.Phase) % sim.Cfg.ClamCycleTicks) / 12;
                 case PlatformKind.PufferfishPad: return ((tick + p.Phase) % sim.Cfg.PufferCycleTicks) / 12;
+                case PlatformKind.SplittingPier: return ((tick + p.Phase) % sim.Cfg.PierCycleTicks) / 12;   // Final Change 6: 240-tick cycle, 20 buckets
                 case PlatformKind.TurtleShuttle: return ((tick + p.Phase) % sim.Cfg.TurtlePeriodTicks) / 12;
-                case PlatformKind.TaffyStretch: return ((tick + p.Phase) % sim.Cfg.TaffyPeriodTicks) / 12;
+                case PlatformKind.TaffyStretch: { int tp = sim.TaffyPeriodOf(in p); return tp > 0 ? ((tick + p.Phase) % tp) / 12 : 0; }
                 case PlatformKind.LanternLift: return ((tick + p.Phase) % sim.Cfg.LanternSwayTicks) / 12;
                 case PlatformKind.SwingPlank: return ((tick + p.Phase) % sim.Cfg.PlankPeriodTicks) / 12;
                 case PlatformKind.MalletSmash: return ((tick + p.Phase) % sim.Cfg.MalletCycleTicks) / 12;
                 case PlatformKind.RollingLog: return ((tick + p.Phase) % sim.Cfg.LogPeriodTicks) / 12;
+                case PlatformKind.SourSprinklerCannon: return ((tick + p.Phase) % sim.Cfg.SprinklerCycleTicks) / 12;   // Final Change 6: the jet clock
                 default: return (tick / 20) % 24;
             }
+        }
+
+        /// <summary>
+        /// Final Change 6, region 1: bucket (12 ticks) of the time since the relay clock / dart episode of the platform stood on started; 30 when it is idle. The windows of a relay and the position of a dragonfly depend on it,
+        /// not on the global tick, so two landings at different global ticks but the same relay time are the same state.
+        /// </summary>
+        private long EpisodeBucket(SimState c, Platform p)
+        {
+            int start = c.CrumbleTick[p.Id];
+            if (start < 0) return 30;
+            int e = c.Tick - start;
+            int total = p.Kind == PlatformKind.GlowwormRelay ? sim.Cfg.RelayTotalTicks : sim.DartTotalTicks(in p);
+            return e >= total ? 30 : e / 12;
         }
 
         // Scratch state reused by every TryJump so that failed attempts do not allocate; only a landing is cloned.
@@ -559,6 +689,11 @@ namespace FluffyClimbers.Simulation
                     // landed on a bounce platform: the flight continues toward the next platform
                     lastGround = scratch.GroundId;
                     if (curHome == lastGround && home2 >= 0) curHome = home2;
+                    if (!scratch.Grounded && sim.Platforms[lastGround].Kind == PlatformKind.MoonJellyChain)
+                    {
+                        int jh = JellyHome(lastGround, scratch.X);   // launched from a jelly pad: on to the next pad of the chain (or the row above the last one)
+                        if (jh >= 0) curHome = jh;
+                    }
                 }
                 if (noWall && scratch.WallBounces > 0) return false;
                 if (stopWhenDone ? Done(scratch) : scratch.Row >= topRow) { result = scratch.Clone(); return true; }
@@ -600,12 +735,21 @@ namespace FluffyClimbers.Simulation
 
         // ------------------------------------------------------------------ non-lazy expansion (best-first, beam)
 
+        /// <summary>SolveFast with input recording: the inputs of the jump that led to each state Expand added (parallel to the output list), so the solving line can be replayed.</summary>
+        private List<int[]> outSegs;
+
+        private void Emit(List<SimState> output, SimState c)
+        {
+            output.Add(c);
+            if (outSegs != null) { int[] seg = new int[recN]; System.Array.Copy(rec, seg, recN); outSegs.Add(seg); }   // TryJump just ran for c: rec holds exactly its inputs
+        }
+
         private void Expand(SimState s, ActionSet set, bool scripted, List<SimState> output)
         {
             Platform here = sim.Platforms[s.GroundId];
             int preferred = PreferredDirection(s);
             int[] dirs = { preferred, 0, -preferred };
-            int[] waits = WaitsFor(here.Kind, set.Waits);
+            int[] waits = RestWaits(s.GroundId, WaitsFor(here.Kind, set.Waits));
             int[] targets = new int[24];
             int tc = Targets(s, targets);
             for (int ti = 0; ti < tc; ti++)
@@ -624,7 +768,7 @@ namespace FluffyClimbers.Simulation
                         if (c.Row <= s.Row && c.GroundId == s.GroundId) continue;
                         if (c.Row < s.Row) continue;
                         if (Prune(c)) continue;
-                        output.Add(c);
+                        Emit(output, c);
                     }
             }
             int[] nexts = new int[6];
@@ -645,7 +789,7 @@ namespace FluffyClimbers.Simulation
                                 if (c.Row <= s.Row && c.GroundId == s.GroundId) continue;
                                 if (c.Row < s.Row) continue;
                                 if (Prune(c)) continue;
-                                output.Add(c);
+                                Emit(output, c);
                             }
             }
             if (!scripted) return;
@@ -663,7 +807,7 @@ namespace FluffyClimbers.Simulation
                                 if (c.Row <= s.Row && c.GroundId == s.GroundId) continue;
                                 if (c.Row < s.Row) continue;
                                 if (Prune(c)) continue;
-                                output.Add(c);
+                                Emit(output, c);
                             }
                     }
         }
@@ -674,6 +818,8 @@ namespace FluffyClimbers.Simulation
         {
             public SimState S;
             public int F;
+            public HeapNode Parent;
+            public int[] Seg;   // the inputs of the jump from Parent to S (only with RecordInputs)
         }
 
         private static void HeapPush(List<HeapNode> heap, HeapNode n)
@@ -709,8 +855,43 @@ namespace FluffyClimbers.Simulation
             return top;
         }
 
+        /// <summary>
+        /// After a successful Speedrun / Rival Race solve: the landings of the solving line as (ticks since the first jump, row), first (0, 0), last = the state that met the goal. The input of
+        /// RivalRace.BuildGhost (the baked ghost path). Null before a solve and after a failed one.
+        /// </summary>
+        public int[] PathTicks, PathRows;
+
+        private void RecordPath(HeapNode end)
+        {
+            int count = 0;
+            for (HeapNode h = end; h != null; h = h.Parent) count++;
+            int start = end.S.StartTick < 0 ? 0 : end.S.StartTick;
+            int[] ticks = new int[count], rows = new int[count];
+            int i = count - 1;
+            for (HeapNode h = end; h != null; h = h.Parent, i--)
+            {
+                ticks[i] = h.S.Tick > start ? h.S.Tick - start : 0;
+                rows[i] = h.S.Row;
+            }
+            PathTicks = ticks;
+            PathRows = rows;
+            if (RecordInputs)
+            {
+                int total = 0;
+                for (HeapNode h = end; h != null; h = h.Parent) if (h.Seg != null) total += h.Seg.Length;
+                int[] trace = new int[total];
+                int at = total;
+                for (HeapNode h = end; h != null; h = h.Parent)
+                    if (h.Seg != null) { at -= h.Seg.Length; System.Array.Copy(h.Seg, 0, trace, at, h.Seg.Length); }
+                InputTrace = trace;
+            }
+        }
+
         private BotResult SolveFast()
         {
+            PathTicks = PathRows = null;
+            InputTrace = null;
+            outSegs = RecordInputs ? new List<int[]>() : null;
             List<HeapNode> heap = new List<HeapNode>();
             SimState start = sim.NewState();
             best = start;
@@ -723,9 +904,10 @@ namespace FluffyClimbers.Simulation
                 HeapNode n = HeapPop(heap);
                 SimState s = n.S;
                 if (s.Row > bestRow) { bestRow = s.Row; best = s; }
-                if (Done(s)) { best = s; return Result(true); }
+                if (Done(s)) { best = s; RecordPath(n); return Result(true); }
                 nodes++;
                 kids.Clear();
+                if (outSegs != null) outSegs.Clear();
                 Expand(s, Fast, true, kids);
                 for (int i = 0; i < kids.Count; i++)
                 {
@@ -733,6 +915,8 @@ namespace FluffyClimbers.Simulation
                     if (!visited.Add(Key(c))) continue;
                     HeapNode h = new HeapNode();
                     h.S = c;
+                    h.Parent = n;
+                    if (outSegs != null) h.Seg = outSegs[i];
                     h.F = c.Tick + TicksPerRowGuess * (targetRow - c.Row);
                     HeapPush(heap, h);
                 }

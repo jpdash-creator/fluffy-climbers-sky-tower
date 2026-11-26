@@ -327,9 +327,12 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.False(sim.MalletSmashing(1, 70));
             Assert.True(sim.MalletSmashing(1, 150 + 65));      // global cycle
             Assert.True(sim.MalletDown(1, 100) && !sim.MalletDown(1, 20) && !sim.MalletDown(1, 120));
+            // the mallet acts for the whole time it is painted down (owner 2026-11-25), not only the first 10 ticks
+            Assert.True(!sim.MalletActive(1, 59) && sim.MalletActive(1, 60) && sim.MalletActive(1, 109) && !sim.MalletActive(1, 110));
             Assert.True(sim.InMalletZone(sim.Platforms[1], F(640)));
             Assert.False(sim.InMalletZone(sim.Platforms[1], F(560)));
             Assert.False(sim.InMalletZone(sim.Platforms[1], F(500)));
+            Assert.True(sim.InMalletZone(sim.Platforms[1], F(740)), "the zone reaches past the end: the rim is part of it");
             // standing in the zone at the smash: hopped inward 3 u and 0.7 u up, invulnerable, never a landing
             SimState s = Stand(sim, 1, 640, tick: 59);
             sim.Step(ref s, 0);
@@ -352,9 +355,9 @@ namespace FluffyClimbers.Simulation.Tests
             SimState early = Stand(sim, 1, 640, tick: 20);
             Steps(sim, ref early, 38);
             Assert.True(early.Grounded && early.Bumps == 0, "the mallet is still rising: it is not a hit");
-            SimState late = Stand(sim, 1, 640, tick: 70);
-            Steps(sim, ref late, 60);
-            Assert.True(late.Grounded && late.Bumps == 0);
+            SimState late = Stand(sim, 1, 640, tick: 110);
+            Steps(sim, ref late, 38);
+            Assert.True(late.Grounded && late.Bumps == 0, "the mallet has lifted again");
             // a landing in the zone at the smash is no landing; a landing outside it is
             SimState drop = Drop(sim, 1, 640, 40, tick: 58);
             drop.Vy = -F(5, 100);
@@ -383,10 +386,10 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.InRange(D(sim.LogX(1, 190)), 3.09, 3.11);
             Assert.InRange(D(sim.LogX(1, 10)) - D(sim.LogX(1, 9)), 0.039, 0.041);   // 0.04 u per tick = 2.4 u/s
             // the log runs into a standing player: up 1.0 u, 2 u toward the middle of the platform, invulnerable
-            SimState s = Stand(sim, 1, 400, tick: 0);   // the log (3.1 + 0.04 t) reaches x = 4.0 - 0.7 at t = 7.5
+            SimState s = Stand(sim, 1, 480, tick: 0);   // the log (3.1 + 0.04 t) reaches x = 4.8 - 1.0 at t = 17.5
             int hit = -1;
             for (int t = 0; t < 40 && hit < 0; t++) { sim.Step(ref s, 0); if (s.Bumps > 0) hit = t; }
-            Assert.InRange(hit, 3, 14);
+            Assert.InRange(hit, 12, 24);
             Assert.Equal(1, s.Bumps);
             Assert.Equal(cfg.LogBumpVx.Raw, s.Vx.Raw);   // the player is left of the middle: pushed right (toward it)
             double peak = D(s.Y), x0 = D(s.X);
@@ -395,8 +398,8 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.InRange(D(s.X) - x0, 1.8, 2.2);
             Assert.False(s.Dead);
             // jumping over it is safe: jump while the log is still 1.2 u away
-            SimState j = Stand(sim, 1, 400, tick: 0);
-            sim.Step(ref j, SimInput.Jump);   // log at 3.14 + 0.04, 0.8 u from the player's x... still outside 0.7
+            SimState j = Stand(sim, 1, 480, tick: 0);
+            sim.Step(ref j, SimInput.Jump);   // log at 3.14, 1.66 u from the player's x: still outside the 1.0 u contact
             Steps(sim, ref j, 40);
             Assert.Equal(0, j.Bumps);
             // landing on top of the log bumps as well
@@ -406,6 +409,152 @@ namespace FluffyClimbers.Simulation.Tests
             // a revive (invulnerable 2 s) never starts with a bump, and the log never ends the run
             Assert.True(PlatformKinds.IsHazardType(PlatformKind.RollingLog) && PlatformKinds.IsTimeDependent(PlatformKind.RollingLog));
             Assert.Equal(cfg.LogPlatformWidth.Raw, SpecialPlatforms.ConstrainWidth(cfg, PlatformKind.RollingLog, Fx.FromInt(2)).Raw);
+        }
+
+        [Fact]
+        public void MalletSmash_ActsForTheWholePaintedDownPoseNotJustTheFirst10Ticks()
+        {
+            Sim sim = World(Start(), P(1, 1, PlatformKind.MalletSmash, 500, 300, 450, dir: 1, phase: 0));
+            // standing in the zone while the mallet lies on the slab (ticks 60 to 109 of the cycle): hopped
+            foreach (int tick in new[] { 59, 74, 99, 108 })
+            {
+                SimState s = Stand(sim, 1, 640, tick: tick);
+                Steps(sim, ref s, 2);
+                Assert.Equal(1, s.Bumps);
+            }
+            // landing on it while it lies there is no landing either
+            SimState drop = Drop(sim, 1, 640, 40, tick: 85);
+            drop.Vy = -F(5, 100);
+            for (int t = 0; t < 30 && drop.Bumps == 0 && !drop.Grounded; t++) sim.Step(ref drop, 0);
+            Assert.Equal(1, drop.Bumps);
+            Assert.Equal(0, drop.Row);
+        }
+
+        [Fact]
+        public void MalletSmash_TheRimBeyondTheEndIsPartOfTheZone()
+        {
+            Sim sim = World(Start(), P(1, 1, PlatformKind.MalletSmash, 500, 300, 450, dir: 1, phase: 0));
+            // the end is at x = 7.25; the player can stand up to 0.25 u past it (landing margin): he used to be outside the 1.6 u zone and never hit
+            foreach (int x in new[] { 725, 735, 748 })
+            {
+                SimState s = Stand(sim, 1, x, tick: 59);
+                sim.Step(ref s, 0);
+                Assert.Equal(1, s.Bumps);
+                Assert.False(s.Grounded);
+            }
+            Sim mirror = World(Start(), P(1, 1, PlatformKind.MalletSmash, 500, 300, 450, dir: -1, phase: 0));
+            SimState m = Stand(mirror, 1, 262, tick: 59);
+            mirror.Step(ref m, 0);
+            Assert.Equal(1, m.Bumps);
+        }
+
+        [Fact]
+        public void MalletSmash_IsNotSilencedByAGongGraceButByItsOwnAntiChainGuardAndTheReviveGrace()
+        {
+            Sim sim = World(Start(), P(1, 1, PlatformKind.MalletSmash, 500, 300, 450, dir: 1, phase: 0));
+            SimState gong = Stand(sim, 1, 640, tick: 59);
+            gong.Invuln = 80;   // e.g. a gong hit
+            sim.Step(ref gong, 0);
+            Assert.Equal(1, gong.Bumps);
+            SimState chained = Stand(sim, 1, 640, tick: 59);
+            chained.BumpGuard = 30;   // a bump just happened: no chain
+            sim.Step(ref chained, 0);
+            Assert.Equal(0, chained.Bumps);
+            SimState revived = Stand(sim, 1, 640, tick: 59);
+            revived.BumpGuard = 100;   // revive grace
+            Steps(sim, ref revived, 10);
+            Assert.Equal(0, revived.Bumps);
+        }
+
+        [Fact]
+        public void MalletSmash_AnUnparameterisedMalletStillHasItsZoneAtTheNearestWall()
+        {
+            SimConfig cfg = new SimConfig();
+            Sim sim = World(Start(), P(1, 1, PlatformKind.MalletSmash, 300, 300, 450, dir: 0, phase: 0));   // Dir 0, left half of the screen
+            Assert.Equal(-1, sim.MalletDirOf(in sim.Platforms[1]));
+            SimState s = Stand(sim, 1, 90, tick: 59);
+            sim.Step(ref s, 0);
+            Assert.Equal(1, s.Bumps);
+            Assert.Equal(cfg.MalletKnockVx.Raw, s.Vx.Raw);   // hopped toward the middle
+        }
+
+        [Fact]
+        public void MalletSmash_EveryGeneratedMalletPointsToTheWallItIsNearest()
+        {
+            SimConfig cfg = new SimConfig();
+            List<string> bad = new List<string>();
+            int seen = 0;
+            foreach (LoadedLevel ll in Region5())
+                for (int a = 1; a <= 4; a++)
+                {
+                    LevelSpec spec = ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(a));
+                    LevelData data = LevelBuilder.Build(cfg, spec);
+                    foreach (Platform p in data.Platforms)
+                    {
+                        if (p.Kind != PlatformKind.MalletSmash) continue;
+                        seen++;
+                        int near = p.X < cfg.ScreenWidth / 2 ? -1 : 1;
+                        if (p.Dir != near) bad.Add(ll.Spec.LevelIndex + "/" + a + " row " + p.Row + ": Dir " + p.Dir + " at x " + D(p.X));
+                    }
+                }
+            output.WriteLine("mallets checked: " + seen);
+            Assert.True(seen > 0);
+            Assert.True(bad.Count == 0, string.Join("; ", bad));
+        }
+
+        [Fact]
+        public void RollingLog_ContactIsWhenTheBodiesTouchAndGongGraceDoesNotSilenceIt()
+        {
+            SimConfig cfg = new SimConfig();
+            // the log is 1.2 u wide, the hero 1.0 u: they overlap from 1.1 u apart; the contact must not wait until the log is deep inside the hero
+            Assert.True((cfg.LogContactHalf.Raw * 10) >= (cfg.LogWidth / 2 + cfg.PlayerHalfWidth).Raw * 9, "contact radius " + D(cfg.LogContactHalf));
+            Sim sim = World(Start(), P(1, 1, PlatformKind.RollingLog, 500, 300, 500, phase: 0, period: 190));
+            SimState close = Stand(sim, 1, 405, tick: 0);   // log at 3.14 after one tick: 0.91 u away
+            sim.Step(ref close, 0);
+            Assert.Equal(1, close.Bumps);
+            SimState apart = Stand(sim, 1, 425, tick: 0);   // 1.11 u away
+            sim.Step(ref apart, 0);
+            Assert.Equal(0, apart.Bumps);
+            SimState gong = Stand(sim, 1, 405, tick: 0);
+            gong.Invuln = 80;   // a gong grace used to make the log do nothing
+            sim.Step(ref gong, 0);
+            Assert.Equal(1, gong.Bumps);
+            SimState chained = Stand(sim, 1, 405, tick: 0);
+            chained.BumpGuard = 30;
+            sim.Step(ref chained, 0);
+            Assert.Equal(0, chained.Bumps);
+        }
+
+        [Fact]
+        public void RollingLog_NeverMissesAPlayerWhoStandsStillAnywhereOnTheTrack()
+        {
+            foreach (int phase in new[] { 0, 31, 95, 140, 189 })
+            {
+                Sim sim = World(Start(), P(1, 1, PlatformKind.RollingLog, 500, 300, 500, phase: phase, period: 190));
+                for (int x = 252; x <= 748; x += 12)
+                {
+                    SimState s = Stand(sim, 1, x, tick: 0);
+                    int hit = -1;
+                    for (int t = 0; t < 200 && hit < 0; t++) { sim.Step(ref s, 0); if (s.Bumps > 0) hit = t; }
+                    Assert.True(hit >= 0, "phase " + phase + " x " + x + ": the log rolled through him without a bump");
+                }
+            }
+        }
+
+        [Fact]
+        public void RollingLog_LandingWhileTheLogIsNearBumps()
+        {
+            Sim sim = World(Start(), P(1, 1, PlatformKind.RollingLog, 500, 300, 500, phase: 0, period: 190));
+            for (int t0 = 0; t0 < 190; t0 += 19)
+            {
+                int lx = (int)Math.Round(D(sim.LogX(1, t0 + 12)) * 100);
+                foreach (int dx in new[] { -40, 0, 40 })
+                {
+                    SimState d = Drop(sim, 1, lx + dx, 100, tick: t0);
+                    for (int t = 0; t < 40 && d.Bumps == 0 && !d.Grounded; t++) sim.Step(ref d, 0);
+                    Assert.True(d.Bumps == 1, "tick " + t0 + " dx " + dx + ": landing within 0.5 u of the log must bump (grounded " + d.Grounded + ")");
+                }
+            }
         }
 
         [Fact]
@@ -530,17 +679,17 @@ namespace FluffyClimbers.Simulation.Tests
         public void Region5UsesItsSevenKindsWithTheMovingAndVanishingGenericsAndEnumValuesAreStable()
         {
             PlatformKind[] set = RegionPlatformSets.For(SignatureKind.SwingingGongs);
-            Assert.Equal(7, set.Length);
+            Assert.Equal(11, set.Length);   // 7 of doc 30 + the four Final Change 6 kinds (Region5NewPlatformTests)
             Assert.All(set, k => Assert.True(PlatformKinds.IsRegion5New(k) && PlatformKinds.IsRegionNew(k)));
             Assert.Equal(new[] { PlatformKind.Moving, PlatformKind.Vanishing }, RegionPlatformSets.GenericsFor(SignatureKind.SwingingGongs));
             LevelSpec spec = Region5().First(l => l.Spec.LevelIndex == 5).Spec;
             PlatformKind[] options = SpecialPlatforms.Options(spec, SignatureKinds.PlatformFor(SignatureKind.SwingingGongs));
-            Assert.Equal(9, options.Length);   // 7 new + Moving + Vanishing (the gongs are objects, the signature adds no platform option)
+            Assert.Equal(13, options.Length);   // 11 new + Moving + Vanishing (the gongs are objects, the signature adds no platform option)
             Assert.Equal(1, options.Count(k => k == PlatformKind.Moving));
             Assert.Equal(1, options.Count(k => k == PlatformKind.Vanishing));
-            Assert.Equal(2, options.Count(PlatformKinds.IsHazardType));
+            Assert.Equal(5, options.Count(PlatformKinds.IsHazardType));   // Mallet, Log + Torii Lintel, Incense Mist Bank, Water Bamboo Tipper
             Assert.Equal(1, options.Count(PlatformKinds.IsLaunch));
-            Assert.Equal(2, options.Count(PlatformKinds.IsDemanding));
+            Assert.Equal(3, options.Count(PlatformKinds.IsDemanding));   // Swing Plank, Pagoda Ridge + Prayer Scroll Runner
             Assert.True(PlatformKinds.IsHazardType(PlatformKind.MalletSmash) && PlatformKinds.IsHazardType(PlatformKind.RollingLog));
             Assert.True(PlatformKinds.IsDemanding(PlatformKind.SwingPlank) && PlatformKinds.IsDemanding(PlatformKind.PagodaRidge));
             Assert.True(PlatformKinds.IsLaunch(PlatformKind.BambooFlick));
@@ -829,7 +978,7 @@ namespace FluffyClimbers.Simulation.Tests
             output.WriteLine("endless special share: floors 5-40 " + ep.ToString("F1") + " percent, floors 200-320 " + lp.ToString("F1") + " percent");
             Assert.InRange(ep, 8, 16);   // endless cycle: floors 5-40 are the start of level 1 (10 to 30 percent ramp over its 100 floors)
             Assert.InRange(lp, 18, 30);   // floors 200-320 are levels 2 to 4 (Bug List 6 curve: 10 to 35 percent ramps)
-            Assert.Equal(9, seen.Count);   // seven new platforms and the two generics appear
+            Assert.Equal(13, seen.Count);   // eleven new platforms (seven of doc 30 + four Final Change 6) and the two generics appear
         }
 
         [Fact]

@@ -25,6 +25,9 @@ namespace FluffyClimbers.Simulation
         public static bool IsFailed(LevelSpec spec, SimState s)
         {
             if (spec.Goal.Type == GoalType.ComboChain) return s.Row >= spec.TargetRow() && !ComboJumpsDone(spec, s);
+            if (spec.Goal.Type == GoalType.ComboGates) return GateRules.MissedGate(spec, s.Row, s.GateMask) >= 0;   // Combo Gates: a gate was left behind without its combo jump ("Gate missed")
+            if (spec.Goal.Type == GoalType.SkyHoops) return RingsStillPossible(spec, s) < RingRules.Needed(spec);   // Sky Hoops: too many rings are gone or the top came without enough
+            if (spec.Goal.Type == GoalType.RivalRace) return s.RivalWon && s.Row < spec.TargetRow();   // Rival Race: the ghost reached the top first (the run ends with "Rival won")
             return spec.Goal.Type == GoalType.NoWallBounce && s.WallBounces > 0 && !IsComplete(spec, s);
         }
 
@@ -47,6 +50,30 @@ namespace FluffyClimbers.Simulation
             return JumpsWithFloors(s, spec.Goal.Value) >= ComboJumpsNeeded(spec);
         }
 
+        /// <summary>Combo Gates: gates cleared so far (HUD "n / 3"), no allocation.</summary>
+        public static int GatesCleared(LevelSpec spec, SimState s)
+        {
+            return GateRules.Cleared(s.GateMask & ((1 << GateRules.Count(spec)) - 1));
+        }
+
+        /// <summary>Combo Gates: true when every gate has its combo jump.</summary>
+        public static bool GatesDone(LevelSpec spec, SimState s)
+        {
+            int n = GateRules.Count(spec);
+            return n > 0 && GateRules.Cleared(s.GateMask & ((1 << n) - 1)) >= n;
+        }
+
+        /// <summary>
+        /// Sky Hoops: the most rings the run can still end with = rings taken + rings not yet gone. At the top the level is over, so only the taken ones count there.
+        /// Below the needed number the goal is lost (IsFailed), at the top or when the danger line swallowed too many.
+        /// </summary>
+        public static int RingsStillPossible(LevelSpec spec, SimState s)
+        {
+            if (s.Row >= spec.TargetRow()) return s.Rings;
+            int open = RingRules.Total(spec) - s.RingsGone - s.Rings;
+            return s.Rings + (open < 0 ? 0 : open);
+        }
+
         public static bool IsComplete(LevelSpec spec, SimState s)
         {
             GoalSpec g = spec.Goal;
@@ -55,12 +82,19 @@ namespace FluffyClimbers.Simulation
                 case GoalType.ReachFloor:
                 case GoalType.BossChase:
                     return s.Row >= spec.TargetRow();
+                case GoalType.RivalRace:
+                    // Rival Race: the top row, but only while the ghost has not got there first (RivalRace.Update sets RivalWon the step the ghost arrives; a tie goes to the player)
+                    return s.Row >= spec.TargetRow() && !s.RivalWon;
                 case GoalType.CollectCoins:
                     return s.Coins >= g.Count;
                 case GoalType.ComboChain:
                     // Combo Climb (owner Final Change 1, 2026-11-22): the combo jumps AND the top row. The jumps count anywhere in the level (a launcher jump of enough
                     // floors too); the combo ladder under the top makes them possible on every layout. Before this the goal ended the run on the last combo jump.
                     return ComboJumpsDone(spec, s) && s.Row >= spec.TargetRow();
+                case GoalType.ComboGates:
+                    return s.Row >= spec.TargetRow() && GatesDone(spec, s);
+                case GoalType.SkyHoops:
+                    return s.Row >= spec.TargetRow() && s.Rings >= RingRules.Needed(spec);
                 case GoalType.NoWallBounce:
                     return s.Row >= spec.TargetRow() && s.WallBounces == 0;
                 case GoalType.FindHiddenGem:

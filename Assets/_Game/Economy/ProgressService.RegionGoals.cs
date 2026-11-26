@@ -61,12 +61,12 @@ namespace FluffyClimbers.Economy
             return n;
         }
 
-        // ---- the six special levels of a region (one per type, never a gem level): the ONE lookup is LevelDef.SpecialType ----
+        // ---- the ten special levels of a region (Final Change 6: nine types, Boss Rise twice; level 25 is a gem level AND a Boss Rise level): the ONE lookup is LevelDef.SpecialType ----
 
         Dictionary<int, LevelDef[]> regionSpecials;
         static readonly LevelDef[] noSpecials = new LevelDef[0];
 
-        /// <summary>The special levels of a region in level order (six in regions 1 to 5; empty for an unknown region). Do not modify the array.</summary>
+        /// <summary>The special levels of a region in level order (ten in regions 1 to 5; empty for an unknown region). Do not modify the array.</summary>
         public LevelDef[] RegionSpecialLevels(int region)
         {
             if (regionSpecials == null) regionSpecials = new Dictionary<int, LevelDef[]>();
@@ -74,14 +74,14 @@ namespace FluffyClimbers.Economy
             if (regionSpecials.TryGetValue(region, out arr)) return arr;
             RegionDef def = repo.TryGetRegionByIndex(region);
             if (def == null) return noSpecials;
-            var list = new List<LevelDef>(SpecialLevels.Count);
+            var list = new List<LevelDef>(SpecialLevels.Count + 1);
             foreach (LevelDef l in repo.LevelsOf(def.Id)) if (l.SpecialType != SpecialLevelType.None) list.Add(l);
             arr = list.ToArray();
             regionSpecials[region] = arr;
             return arr;
         }
 
-        /// <summary>The region's level of one special type, or null when the region has none.</summary>
+        /// <summary>The region's (first) level of one special type, or null when the region has none. Boss Rise has two levels; use <see cref="RegionSpecialTypeCleared"/> to ask whether the type was cleared.</summary>
         public LevelDef RegionSpecialLevel(int region, SpecialLevelType type)
         {
             foreach (LevelDef l in RegionSpecialLevels(region)) if (l.SpecialType == type) return l;
@@ -97,11 +97,21 @@ namespace FluffyClimbers.Economy
             return false;
         }
 
-        /// <summary>How many of the region's special levels are cleared in a setting from <paramref name="minMode"/> up (each one in some setting of that range, not necessarily the same).</summary>
+        /// <summary>True when at least one level of the special type is cleared in a setting from <paramref name="minMode"/> up.</summary>
+        public bool RegionSpecialTypeCleared(int region, SpecialLevelType type, int minMode = 0)
+        {
+            foreach (LevelDef l in RegionSpecialLevels(region)) if (l.SpecialType == type && ClearedFrom(l.Id, minMode)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// How many of the six reward types (SpecialLevels.RewardTypes, Final Change 6) the region has cleared in a setting from <paramref name="minMode"/> up (a type counts once, a level of it in some
+        /// setting of that range; Boss Rise has two levels and counts once).
+        /// </summary>
         public int RegionSpecialsCleared(int region, int minMode = 0)
         {
             int n = 0;
-            foreach (LevelDef l in RegionSpecialLevels(region)) if (ClearedFrom(l.Id, minMode)) n++;
+            foreach (SpecialLevelType type in SpecialLevels.RewardTypes) if (RegionSpecialTypeCleared(region, type, minMode)) n++;
             return n;
         }
 
@@ -120,14 +130,18 @@ namespace FluffyClimbers.Economy
             return best;
         }
 
-        /// <summary>How many of the region's special levels have 3 stars in at least one Gameplay setting.</summary>
+        /// <summary>How many of the six reward types (SpecialLevels.RewardTypes) have a level with 3 stars in at least one Gameplay setting.</summary>
         public int RegionSpecialsThreeStar(int region)
         {
             int n = 0;
-            foreach (LevelDef l in RegionSpecialLevels(region))
+            foreach (SpecialLevelType type in SpecialLevels.RewardTypes)
             {
-                LevelProgress p = GetProgress(l.Id);
-                if (p != null && p.BestStars() >= 3) n++;
+                foreach (LevelDef l in RegionSpecialLevels(region))
+                {
+                    if (l.SpecialType != type) continue;
+                    LevelProgress p = GetProgress(l.Id);
+                    if (p != null && p.BestStars() >= 3) { n++; break; }
+                }
             }
             return n;
         }
@@ -169,8 +183,8 @@ namespace FluffyClimbers.Economy
                 case RegionGoalType.TimeAttackRuns: return RegionTimeAttackRuns(g.Region);
                 case RegionGoalType.SpecialClear:
                 {
-                    LevelDef l = RegionSpecialLevel(g.Region, g.Special);
-                    return l != null && IsLevelCleared(l.Id) ? 1 : 0;
+                    foreach (LevelDef l in RegionSpecialLevels(g.Region)) if (l.SpecialType == g.Special && IsLevelCleared(l.Id)) return 1;   // any level of the type (Boss Rise has two)
+                    return 0;
                 }
                 case RegionGoalType.SpecialAll: return RegionSpecialsCleared(g.Region, g.MinMode);
                 case RegionGoalType.SpecialAllSettings: return RegionSpecialBestSettings(g.Region);

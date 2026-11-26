@@ -58,6 +58,7 @@ namespace FluffyClimbers.Gameplay
             int d = GameSettings.Difficulty;
             Cfg.ScrollStepPercent = GameSettings.DifficultyStepPercent[d];
             Cfg.GemSpotPermille = GameSettings.DifficultyGemPermille[d];
+            Cfg.RivalPacePercent = RivalRace.PaceForMode(d);   // Rival Race levels: the ghost's pace of the setting (65/75/85/90/95)
             Cfg.ScrollStepCapPercent = SimConfig.TopSpeedUpPercent(d);   // the top speed-up of a setting is step x 8 (80/160/240/320/400 percent), no global percent cap
         }
 

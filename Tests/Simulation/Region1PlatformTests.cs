@@ -333,10 +333,67 @@ namespace FluffyClimbers.Simulation.Tests
                 Assert.Equal(side, s.TiltDir);
                 Assert.Equal(side, sim.SeesawTilt(s, 1));
                 double x0 = D(s.X);
-                Steps(sim, ref s, 60);
-                Assert.InRange((D(s.X) - x0) * side, 1.7, 1.9);   // 1.8 u/s
+                Steps(sim, ref s, 20);   // a third of a second: the leaf is 6 u wide, a full second would slide off its edge
+                Assert.InRange((D(s.X) - x0) * side, 0.95, 1.05);   // 3.0 u/s (owner 2026-11-25, was 1.8)
             }
             Assert.Equal(0, sim.SeesawTilt(Stand(sim, 0), 1));   // nobody on it: level
+        }
+
+        [Fact]
+        public void Seesaw_DeadCentreLandingTiltsTowardTheSeededSideAndStillSlides()
+        {
+            foreach (int dir in new[] { 1, -1 })
+            {
+                Sim sim = World(Start(), P(1, 1, PlatformKind.Seesaw, 500, 200, 600, dir: dir));
+                SimState s = Drop(sim, 1, 500, 100);   // exactly the middle, no sideways speed
+                for (int i = 0; i < 100 && !(s.Grounded && s.GroundId == 1); i++) sim.Step(ref s, 0);
+                Assert.True(s.Grounded && s.GroundId == 1);
+                Assert.Equal(dir, s.TiltDir);
+                double x0 = D(s.X);
+                Steps(sim, ref s, 30);
+                Assert.True((D(s.X) - x0) * dir > 1.0);   // moved toward its side
+            }
+        }
+
+        [Fact]
+        public void Ladybug_AndTurtleAlwaysKeepTheirWholePathEvenNextToAWall()
+        {
+            SimConfig cfg = new SimConfig();
+            Fx screen = cfg.ScreenWidth;
+            foreach (PlatformKind kind in new[] { PlatformKind.Ladybug, PlatformKind.TurtleShuttle })
+                foreach (int xh in new[] { 100, 200, 500, 800, 900 })
+                {
+                    Rng rng = new Rng(7);
+                    Fx w = Fx.FromInt(2), x = F(xh);
+                    Fx room = Fx.Min(x - w / 2, screen - w / 2 - x);
+                    if (room < Fx.Zero) room = Fx.Zero;
+                    SpecialPlatforms.Params(cfg, ref rng, kind, x, room, screen, out Fx amp, out int period, out int phase, out int pdir);
+                    x = SpecialPlatforms.FitSwing(kind, x, w, amp, screen);
+                    Assert.True(amp >= F(70), kind + " at " + xh + " amplitude " + D(amp));
+                    Assert.True(x - w / 2 - amp >= Fx.Zero && x + w / 2 + amp <= screen);
+                }
+        }
+
+        [Fact]
+        public void GeneratedLadybugsAndTurtlesAllMove()
+        {
+            int seen = 0;
+            string root = ContentLoader.FindRoot();
+            if (root == null) return;
+            SimConfig cfg = new SimConfig();
+            foreach (LoadedLevel ll in ContentLoader.LoadRegions(root, 1, 5))
+                for (int i = 0; i < 3; i++)
+                {
+                    LevelData d = LevelBuilder.Build(cfg, ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i)));
+                    foreach (Platform p in d.Platforms)
+                        if (p.Kind == PlatformKind.Ladybug || p.Kind == PlatformKind.TurtleShuttle)
+                        {
+                            seen++;
+                            Assert.True(p.Amplitude >= Fx.FromRatio(7, 10) && p.Period > 0, p.Kind + " row " + p.Row + " is (nearly) static");
+                        }
+                }
+            output.WriteLine("ladybugs and turtles checked: " + seen);
+            Assert.True(seen > 0);
         }
 
         // ------------------------------------------------------------------ determinism and the whole kit on a generated level
@@ -672,7 +729,7 @@ namespace FluffyClimbers.Simulation.Tests
             output.WriteLine("endless special share: floors 5-40 " + ep.ToString("F1") + " percent, floors 200-320 " + lp.ToString("F1") + " percent");
             Assert.InRange(ep, 8, 16);   // endless cycle: floors 5-40 are the start of level 1 (10 to 30 percent ramp over its 100 floors)
             Assert.InRange(lp, 18, 30);   // floors 200-320 are levels 2 to 4 (Bug List 6 curve: 10 to 35 percent ramps)
-            Assert.Equal(10, seen.Count);   // all seven new platforms, the flower and the two generics (Crumble, Moving) appear
+            Assert.Equal(14, seen.Count);   // all seven new platforms + the four Final Change 6 kinds (Region1NewPlatformTests), the flower and the two generics (Crumble, Moving) appear
         }
 
         [Fact]

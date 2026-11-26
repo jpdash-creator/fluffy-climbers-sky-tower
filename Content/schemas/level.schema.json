@@ -16,7 +16,7 @@
       "required": ["type"],
       "additionalProperties": false,
       "properties": {
-        "type": {"type": "string", "enum": ["reachFloor", "collectCoins", "comboChain", "noWallBounce", "findHiddenGem", "speedrun", "surviveWave", "bossChase"]},
+        "type": {"type": "string", "enum": ["reachFloor", "collectCoins", "comboChain", "noWallBounce", "findHiddenGem", "speedrun", "surviveWave", "bossChase", "rivalRace", "comboGates", "skyHoops"]},
         "value": {"type": "integer", "minimum": 1},
         "count": {"type": "integer", "minimum": 1},
         "timeSec": {"type": "integer", "minimum": 1}
@@ -31,7 +31,8 @@
         "rows": {"type": "integer", "minimum": 30}
       }
     },
-    "special": {"type": "string", "enum": ["noPowerUps", "oneLife", "keepMoving"]},
+    "special": {"type": "string", "enum": ["noPowerUps", "oneLife", "keepMoving", "bossRise", "sprintRest"]},
+    "ghostRowAtTick": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 2},
     "rewards": {
       "type": "object",
       "required": ["gems"],

@@ -264,6 +264,30 @@ namespace FluffyClimbers.Gameplay
             trt0.offsetMin = new Vector2(leftSpan, ty);
             trt0.offsetMax = new Vector2(-rightSpan, ty + 56f);
             timeText.horizontalOverflow = HorizontalWrapMode.Overflow;
+            if (session.Spec.Goal.Type == GoalType.RivalRace)
+            {
+                // "Rival: 123 rows ahead" is longer than the other chips: shrink to fit between the pads instead of running into them (CUX-3, CUX-5)
+                timeText.horizontalOverflow = HorizontalWrapMode.Wrap;
+                timeText.resizeTextForBestFit = true;
+                timeText.resizeTextMinSize = 24;
+                timeText.resizeTextMaxSize = 40;
+                rivalIconAhead = ToyKit.Get("icon_rival_ahead");
+                rivalIconBehind = ToyKit.Get("icon_rival_behind");
+                rivalIconEven = ToyKit.Get("icon_rival_marker");
+                if (rivalIconAhead != null && rivalIconBehind != null)
+                {
+                    // The badge sits at the pad side of the chip row, the text takes the rest and stays centred (the text always says it too: CUX-6). Left-handed: leftSpan is already mirrored.
+                    rivalChipIcon = UiKit.AddImage(root, RivalChipIconName, rivalIconEven != null ? rivalIconEven : rivalIconAhead, Color.white);
+                    rivalChipIcon.preserveAspect = true;
+                    rivalChipIcon.raycastTarget = false;
+                    RectTransform irt = rivalChipIcon.rectTransform;
+                    irt.anchorMin = irt.anchorMax = Vector2.zero;
+                    irt.pivot = Vector2.zero;
+                    irt.anchoredPosition = new Vector2(leftSpan + 4f, ty + 2f);
+                    irt.sizeDelta = new Vector2(RivalChipIconSize, RivalChipIconSize);
+                    trt0.offsetMin = new Vector2(leftSpan + RivalChipIconSize + 12f, ty);
+                }
+            }
 
             BuildTiming(root, session, row2Y);   // doc 46: timer, best pace and live delta in the third strip row, plus the optional Pace Ghost
             BuildIntro(root, session);
@@ -299,6 +323,117 @@ namespace FluffyClimbers.Gameplay
         int lastKeepSecs = -1, lastComboJumps = -1;
         string[] comboProgressTexts;
 
+        // ---- Rival Race (Final Change 6): the rival marker. A square marker rides the tower gauge in the top strip at the ghost's row (the shape differs from the round hero marker), and the chip between the pads
+        // says it in words: "Rival: 12 rows ahead" / "You lead by 3 rows" / "Neck and neck" (CUX-6: never colour or position alone). All texts are cached; Refresh only swaps them.
+        /// <summary>Name of the rival marker on the gauge (tests).</summary>
+        public const string RivalMarkerName = "RivalMarker";
+        /// <summary>Painted rival marker on the gauge: 60 reference px (the gauge row is RunLayout.Row2H 76 high, the hero marker 40), inside the reserved top strip. Not a button.</summary>
+        public const float RivalMarkerSize = 60f;
+        /// <summary>Name and size of the small badge left of the "Rival: N rows ahead" chip (up arrow = the ghost leads, down arrow = you lead, pin = neck and neck).</summary>
+        public const string RivalChipIconName = "RivalChipIcon";
+        public const float RivalChipIconSize = 52f;
+        Image rivalChipIcon;
+        Sprite rivalIconAhead, rivalIconBehind, rivalIconEven;
+        RectTransform rivalMarker;
+        string[] rivalTexts;
+        int rivalOffset, lastRivalAhead = int.MinValue, lastRivalRow = -1;
+
+        // ---- Boss Rise and Sprint and Rest cues (owner Final Change 6, 2026-11-25). Same banner slot as the Keep Moving cue (a level never has both); the chip text takes the slot of the Combo/Gates/Rings counter. All texts are cached once. ----
+        /// <summary>Boss Rise banner texts: index 0 = the lunge, 1 and 2 = the whole seconds of the roar telegraph left (1.5 s: "ROAR! 2" then "ROAR! 1"). Text AND the boss pose AND a sound, so the warning is never one channel only (CUX-6).</summary>
+        public static readonly string[] BossCueTexts = { "LUNGE!", "ROAR! 1", "ROAR! 2" };
+        /// <summary>Sprint and Rest banner texts by whole seconds of rest left (index 0 = the last ticks, 3 = a full rest).</summary>
+        public static readonly string[] RestCueTexts = { "REST", "REST 1", "REST 2", "REST 3" };
+        /// <summary>Names of the boss / shelter cue banner (tests).</summary>
+        public const string BossBannerName = "BossBanner", RestBannerName = "RestBanner";
+        RectTransform phaseRoot;
+        Text phaseCueText;
+        string[] levelChipTexts;
+        int lastPhaseCue = -2, lastLevelChip = -1;
+        bool bossLevelHud, restLevelHud;
+
+        void BuildPhaseBanner(RectTransform root, string name, string firstText, string label)
+        {
+            Image pill = Theme.GlassPanel(root, name, 24f);
+            phaseRoot = pill.rectTransform;
+            phaseRoot.anchorMin = phaseRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            phaseRoot.pivot = new Vector2(0.5f, 0.5f);
+            phaseRoot.anchoredPosition = new Vector2(0f, BannerKeepMovingY);
+            phaseRoot.sizeDelta = new Vector2(BannerW, BannerH);
+            phaseCueText = UiKit.AddText(pill.transform, "Value", firstText, 64, new Color(1f, 0.8f, 0.55f), TextAnchor.MiddleCenter, true);
+            phaseCueText.horizontalOverflow = HorizontalWrapMode.Overflow;
+            phaseCueText.resizeTextForBestFit = true;   // stays inside the pill at 130 percent text
+            phaseCueText.resizeTextMinSize = 40;
+            phaseCueText.resizeTextMaxSize = 64;
+            RectTransform prt = (RectTransform)phaseCueText.transform;
+            prt.anchorMin = Vector2.zero;
+            prt.anchorMax = Vector2.one;
+            prt.offsetMin = new Vector2(24f, 0f);
+            prt.offsetMax = new Vector2(-24f, 0f);
+            pill.gameObject.AddComponent<A11yLabel>().Text = label;
+            phaseRoot.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// Boss Rise: the banner (roar and lunge) plus the phase chip "Boss n / N +P%" in the counter slot; Sprint and Rest: the "REST n" banner plus the chip "Shelter at floor F, line +P%".
+        /// Cached strings only (CUX-1); the chip has an own text for every state the level can reach.
+        /// </summary>
+        void BuildLevelRuleCues(RectTransform root, RunSession session)
+        {
+            SimConfig cfg = session.Cfg;
+            if (session.Sim.BossRise)
+            {
+                bossLevelHud = true;
+                BuildPhaseBanner(root, BossBannerName, BossCueTexts[2], "Boss roars: climb away, it lunges");
+                int total = session.Sim.BossPhasesTotal;
+                levelChipTexts = new string[total + 1];
+                for (int n = 0; n <= total; n++) levelChipTexts[n] = "Boss " + n + " / " + total + "  +" + (n * cfg.BossLungeSpeedPercent) + "%";
+            }
+            else if (session.Sim.SprintRest)
+            {
+                restLevelHud = true;
+                BuildPhaseBanner(root, RestBannerName, RestCueTexts[3], "Resting on a shelter: the danger line waits");
+                int shelters = 0;
+                while (SprintRestRules.IsShelterRow(cfg, (shelters + 1) * cfg.ShelterRows, session.Sim.LevelRows)) shelters++;
+                levelChipTexts = new string[shelters + 1];
+                for (int n = 0; n <= shelters; n++)
+                {
+                    string line = "Line +" + (n * cfg.ShelterSpeedPercent) + "%";
+                    levelChipTexts[n] = n < shelters ? "Shelter at floor " + ((n + 1) * cfg.ShelterRows) + "  " + line : "No more shelters  " + line;
+                }
+            }
+        }
+
+        /// <summary>Per frame: the boss / shelter banner and chip. Swaps cached strings only when the value changed; no allocation.</summary>
+        void RefreshLevelRuleCues(RunSession s, in SimState st)
+        {
+            if (phaseRoot == null) return;
+            int cue;   // -1 none, otherwise the index into the banner texts
+            if (bossLevelHud)
+            {
+                int roar = s.Sim.BossRoarTicksLeft(in st);
+                cue = s.Sim.BossLunging(in st) ? 0 : (roar > 0 ? Mathf.Clamp((roar + SimConfig.TicksPerSecond - 1) / SimConfig.TicksPerSecond, 1, 2) : -1);
+            }
+            else
+            {
+                int rest = s.Sim.ShelterRestTicksLeft(in st);
+                cue = rest > 0 ? Mathf.Clamp((rest + SimConfig.TicksPerSecond - 1) / SimConfig.TicksPerSecond, 0, 3) : -1;
+            }
+            if (cue != lastPhaseCue)
+            {
+                bool starts = lastPhaseCue < 0 && cue >= 0;
+                lastPhaseCue = cue;
+                phaseRoot.gameObject.SetActive(cue >= 0);
+                if (cue >= 0) UiKit.SetText(phaseCueText, bossLevelHud ? BossCueTexts[cue] : RestCueTexts[cue]);
+                if (starts && bossLevelHud) AudioManager.Play(Sfx.SpeedUp);   // the roar is audible too (CUX-6)
+            }
+            int chip = bossLevelHud ? s.Sim.BossPhasesStarted(in st) : st.ShelterCount;
+            if (levelChipTexts != null && chip != lastLevelChip)
+            {
+                lastLevelChip = chip;
+                UiKit.SetText(timeText, levelChipTexts[Mathf.Clamp(chip, 0, levelChipTexts.Length - 1)]);
+            }
+        }
+
         /// <summary>
         /// Builds what a special level adds to the HUD: the "MOVE!" cue of a Keep Moving level (hidden until the last 2 seconds on a platform) and the "Combo jumps n / N" line of a
         /// Combo Climb level (in the slot of the old speedrun clock between the pads). All texts are built here once: Refresh only swaps cached strings (CUX-1).
@@ -306,6 +441,29 @@ namespace FluffyClimbers.Gameplay
         void BuildSpecialCues(RectTransform root, RunSession session)
         {
             if (session.IsEndless) return;
+            if (session.Spec.Goal.Type == GoalType.RivalRace && session.Sim.Level.GhostRowAtTick != null)
+            {
+                int target = Mathf.Max(1, session.Spec.TargetRow());
+                rivalOffset = target;
+                rivalTexts = new string[2 * target + 1];
+                for (int i = 0; i < rivalTexts.Length; i++) rivalTexts[i] = RivalRace.MarkerText(i - target);
+                if (gaugeTrack != null)
+                {
+                    // Painted round badge (owner Final Change 6, batch 7: icon_rival_marker, an orange pin with a face: another shape and colour than the gold hero dot); the square placeholder stays when the art is missing.
+                    Sprite markerArt = ToyKit.Get("icon_rival_marker");
+                    Image g = UiKit.AddImage(gaugeTrack, RivalMarkerName, markerArt != null ? markerArt : Theme.RoundSprite, markerArt != null ? Color.white : new Color(0.62f, 0.82f, 1f, 0.95f));
+                    if (markerArt != null) g.preserveAspect = true;
+                    else { g.type = Image.Type.Sliced; g.pixelsPerUnitMultiplier = 12f; }   // nearly square corners: a square next to the round hero marker
+                    g.raycastTarget = false;
+                    g.rectTransform.anchorMin = g.rectTransform.anchorMax = new Vector2(0f, 0.5f);
+                    g.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                    g.rectTransform.sizeDelta = markerArt != null ? new Vector2(RivalMarkerSize, RivalMarkerSize) : new Vector2(34f, 34f);
+                    g.rectTransform.anchoredPosition = new Vector2(mirror ? 370f : 30f, 0f);
+                    g.gameObject.AddComponent<A11yLabel>().Text = "Rival: the ghost hero on the tower gauge";
+                    rivalMarker = g.rectTransform;
+                }
+            }
+            BuildLevelRuleCues(root, session);
             if (session.Sim.KeepMoving)
             {
                 Image pill = Theme.GlassPanel(root, KeepMovingBannerName, 24f);
@@ -333,11 +491,45 @@ namespace FluffyClimbers.Gameplay
                 comboProgressTexts = new string[need + 1];
                 for (int i = 0; i <= need; i++) comboProgressTexts[i] = "Combo jumps " + i + " / " + need;
             }
+            else if (session.Spec.Goal.Type == GoalType.ComboGates)
+            {
+                int need = GateRules.Count(session.Spec);   // Final Change 6: the gate counter takes the same chip ("Gates 1 / 3")
+                comboProgressTexts = new string[need + 1];
+                for (int i = 0; i <= need; i++) comboProgressTexts[i] = "Gates " + i + " / " + need;
+            }
+            else if (session.Spec.Goal.Type == GoalType.SkyHoops)
+            {
+                int need = RingRules.Needed(session.Spec);   // "Rings 3 / 8" (the chip counts up to the 8 needed, the level holds 10)
+                comboProgressTexts = new string[need + 1];
+                for (int i = 0; i <= need; i++) comboProgressTexts[i] = "Rings " + i + " / " + need;
+            }
         }
 
         /// <summary>Per frame: swaps the cached cue texts when their value changed. No allocation.</summary>
         void RefreshSpecialCues(RunSession s, in SimState st)
         {
+            if (rivalTexts != null)
+            {
+                int ahead = s.RivalRowsAhead;
+                if (ahead != lastRivalAhead)
+                {
+                    lastRivalAhead = ahead;
+                    UiKit.SetText(timeText, rivalTexts[Mathf.Clamp(ahead + rivalOffset, 0, rivalTexts.Length - 1)]);
+                    if (rivalChipIcon != null) rivalChipIcon.sprite = ahead > 0 ? rivalIconAhead : (ahead < 0 ? rivalIconBehind : (rivalIconEven != null ? rivalIconEven : rivalIconAhead));
+                }
+                if (rivalMarker != null)
+                {
+                    int gr = RivalRace.GhostRow(s.Sim, in st);
+                    if (gr != lastRivalRow)
+                    {
+                        lastRivalRow = gr;
+                        float f = Mathf.Clamp01(gr / (float)Mathf.Max(1, s.Spec.TargetRow()));
+                        if (gaugeTrack != null && gaugeTrack.rect.width > 60f) gaugeW = gaugeTrack.rect.width;
+                        rivalMarker.anchoredPosition = new Vector2(30f + (mirror ? 1f - f : f) * (gaugeW - 60f), 0f);
+                    }
+                }
+            }
+            RefreshLevelRuleCues(s, in st);
             if (keepRoot != null)
             {
                 bool warn = s.Sim.KeepMovingWarning(in st);
@@ -353,7 +545,8 @@ namespace FluffyClimbers.Gameplay
             }
             if (comboProgressTexts != null)
             {
-                int made = GoalEvaluator.ComboJumpsMade(s.Spec, st);
+                GoalType gt = s.Spec.Goal.Type;
+                int made = gt == GoalType.ComboGates ? GoalEvaluator.GatesCleared(s.Spec, st) : (gt == GoalType.SkyHoops ? RingRules.Made(s.Spec, st.Rings) : GoalEvaluator.ComboJumpsMade(s.Spec, st));
                 if (made != lastComboJumps)
                 {
                     lastComboJumps = made;
@@ -417,6 +610,21 @@ namespace FluffyClimbers.Gameplay
         }
 
         /// <summary>The level intro: region and level, the goal as flag + target, and the three controls as icons (no sentences).</summary>
+        public const string RivalStartIconName = "RivalStartIcon", RivalResultIconName = "RivalResultIcon";
+        const float RivalResultIconSize = 110f, RivalResultIconRoom = 125f;
+
+        /// <summary>Round rival badge (won / lost) centred under the popup content, y from the top of the panel; missing art draws nothing (the title and the reason carry the meaning).</summary>
+        static void AddRivalResultIcon(Transform panel, string spriteName, float y)
+        {
+            Sprite badge = ToyKit.Get(spriteName);
+            if (badge == null) return;
+            Image img = UiKit.AddImage(panel, RivalResultIconName, badge, Color.white);
+            img.preserveAspect = true;
+            img.raycastTarget = false;
+            UiKit.Place(img.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -y), new Vector2(RivalResultIconSize, RivalResultIconSize));
+            img.rectTransform.pivot = new Vector2(0.5f, 1f);
+        }
+
         void BuildIntro(RectTransform root, RunSession session)
         {
             Image back = Theme.GlassPanel(root, "Intro", 40f);
@@ -452,6 +660,22 @@ namespace FluffyClimbers.Gameplay
                 UiKit.Place((RectTransform)ruleText.transform, new Vector2(0.5f, 1f), new Vector2(0f, -360f - nameH - 6f), new Vector2(720f, ruleH));
                 ruleText.rectTransform.pivot = new Vector2(0.5f, 1f);
                 back.rectTransform.sizeDelta = new Vector2(780f, 360f + nameH + 6f + ruleH + 28f);   // room for the name and the rule under the goal
+            }
+            if (!endless && session.Spec.Goal.Type == GoalType.RivalRace)
+            {
+                // Race start (owner Final Change 6, batch 7): the crossed race flags in the top right corner of the intro panel; the rule text under the goal says it in words.
+                Sprite startArt = ToyKit.Get("icon_rival_start");
+                if (startArt != null)
+                {
+                    Image start = UiKit.AddImage(introRoot, RivalStartIconName, startArt, Color.white);
+                    start.preserveAspect = true;
+                    start.raycastTarget = false;
+                    RectTransform srt = start.rectTransform;
+                    srt.anchorMin = srt.anchorMax = new Vector2(1f, 1f);
+                    srt.pivot = new Vector2(1f, 1f);
+                    srt.anchoredPosition = new Vector2(-18f, -18f);
+                    srt.sizeDelta = new Vector2(96f, 96f);
+                }
             }
             // The small control-hint chips (left, right, jump) were removed on purpose (owner 2026-11-02): the intro shows the level number, the target and the rule only.
             AddPenaltyCue(back.rectTransform, session);
@@ -805,6 +1029,9 @@ namespace FluffyClimbers.Gameplay
             // The height follows the real content: the action row grows with big touch targets / 130 percent text, the revive line with the touch size.
             string reason = s.FailReason;   // a special rule ended the run or forbids the revive: one line under the progress bar
             float contentBottom = reason != null ? 505f : 395f;   // from the top of the panel: end of the progress bar (or of the reason line)
+            bool rivalLostIcon = s.RivalWon && ToyKit.Get("icon_rival_lost") != null;   // "Rival won!": the grey flag badge under the reason (owner Final Change 6, batch 7)
+            float iconY = contentBottom + 10f;
+            if (rivalLostIcon) contentBottom += RivalResultIconRoom;
             float reviveH = ReviveButtonH;
             float actionTop = ButtonY + ButtonSizeFor(150f);   // from the bottom of the panel: top of the action buttons
             float reviveY = actionTop + 24f;
@@ -825,6 +1052,7 @@ namespace FluffyClimbers.Gameplay
                 why.fontStyle = FontStyle.Italic;
                 UiKit.Place((RectTransform)why.transform, new Vector2(0.5f, 1f), new Vector2(0f, -415f), new Vector2(780f, 90f));
             }
+            if (rivalLostIcon) AddRivalResultIcon(panel, "icon_rival_lost", iconY);
             if (offerGems)
             {
                 // ONE line, two equal buttons side by side (ad left, gems right; a lone gem button is centred and wider). Schedule: RevivePolicy.
@@ -990,6 +1218,18 @@ namespace FluffyClimbers.Gameplay
                 Image star = UiKit.AddImage(panel, "Star" + i, art != null ? (got ? art.StarFilled : art.StarEmpty) : null, got ? Color.white : new Color(1f, 1f, 1f, 0.6f));
                 UiKit.Place(star.rectTransform, new Vector2(0.5f, 1f), new Vector2((i - 1) * 130f, -starY), new Vector2(StarSize, StarSize));
                 star.rectTransform.pivot = new Vector2(0.5f, 1f);
+            }
+            if (s.Spec.Goal.Type == GoalType.RivalRace && ToyKit.Get("icon_rival_won") != null)
+            {
+                // Rival Race cleared (owner Final Change 6, batch 7): the trophy badge in the top left corner, level with the title ("Level clear!" says it in words; the close X is top right).
+                Image won = UiKit.AddImage(panel, RivalResultIconName, ToyKit.Get("icon_rival_won"), Color.white);
+                won.preserveAspect = true;
+                won.raycastTarget = false;
+                RectTransform wrt = won.rectTransform;
+                wrt.anchorMin = wrt.anchorMax = new Vector2(0f, 1f);
+                wrt.pivot = new Vector2(0f, 1f);
+                wrt.anchoredPosition = new Vector2(28f, -TitleTop);
+                wrt.sizeDelta = new Vector2(StarSize, StarSize);
             }
             // What you earned, as icon pills (no sentences): coins and gems, then the best combo.
             if (medals)
