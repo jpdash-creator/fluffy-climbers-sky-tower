@@ -71,6 +71,15 @@ namespace FluffyClimbers.Simulation
                     }
                 }
             }
+            // final pass (only when still short, for example attempt seeds with many special rows): every row from the bottom, every jump length up to four rows, rings 1.5 u apart (they never overlap)
+            for (int r = lo; r <= hi && rings.Count < total; r++)
+            {
+                for (int k = 1; k <= 4 && rings.Count < total; k++)
+                {
+                    Pickup ring;
+                    if (r + k <= rows && TryArc(cfg, sim, platforms, rowFirst, r, k, list, rings, out ring, true) && FarFromRings(rings, ring, Fx.FromRatio(15, 10), true)) rings.Add(ring);
+                }
+            }
             for (int i = 0; i < rings.Count; i++) { Pickup p = rings[i]; p.Tag = i; rings[i] = p; list.Add(p); }
             list.Sort(ComparePickup);
             Pickup[] arr = list.ToArray();
@@ -88,11 +97,11 @@ namespace FluffyClimbers.Simulation
 
         private static bool Static(in Platform p)
         {
-            return (p.Kind == PlatformKind.Normal || p.Kind == PlatformKind.PollenPuff) && p.Amplitude == Fx.Zero && p.Width >= Fx.FromInt(2);   // a Pollen Puff slab lands exactly like a Normal one (its cloud only adds a 10 percent lift once)
+            return (p.Kind == PlatformKind.Normal || p.Kind == PlatformKind.CloverSwap) && p.Amplitude == Fx.Zero && p.Width >= Fx.FromInt(2);   // a lone Clover slab (Amplitude 0, no partner) never moves and lands like a Normal slab
         }
 
         /// <summary>Plays the jump from the spine platform of row <paramref name="row"/> to the one <paramref name="skip"/> rows higher; true with the ring on the highest clear point of the arc.</summary>
-        private static bool TryArc(SimConfig cfg, Sim sim, Platform[] platforms, int[] rowFirst, int row, int skip, List<Pickup> others, List<Pickup> rings, out Pickup ring)
+        private static bool TryArc(SimConfig cfg, Sim sim, Platform[] platforms, int[] rowFirst, int row, int skip, List<Pickup> others, List<Pickup> rings, out Pickup ring, bool anyHigherLanding = false)
         {
             ring = default(Pickup);
             int ia = rowFirst[row], ib = row + skip < rowFirst.Length ? rowFirst[row + skip] : -1;
@@ -121,7 +130,8 @@ namespace FluffyClimbers.Simulation
                 sim.Step(ref s, input);
                 if (s.Grounded) break;
             }
-            if (s.Dead || !s.Grounded || s.GroundId != ib || !have) return false;
+            if (s.Dead || !s.Grounded || !have) return false;
+            if (anyHigherLanding ? s.Row <= a.Row : s.GroundId != ib) return false;   // the last fill-up pass accepts a jump that lands anywhere higher: the ring still lies on a real jump from a still platform
             ring = new Pickup { Kind = PickupKind.Ring, X = bestX, Y = bestY, Radius = Radius };
             return true;
         }

@@ -31,7 +31,7 @@
         "rows": {"type": "integer", "minimum": 30}
       }
     },
-    "special": {"type": "string", "enum": ["noPowerUps", "oneLife", "keepMoving", "bossRise", "sprintRest"]},
+    "special": {"type": "string", "enum": ["noPowerUps", "oneLife", "keepMoving", "sprintRest"]},
     "ghostRowAtTick": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 2},
     "rewards": {
       "type": "object",

@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 namespace FluffyClimbers.Simulation.Tests
 {
     /// <summary>
-    /// Final Change 6 (owner-approved 2026-11-25): the three new Region 2 (Mushroom Grove) platform kinds Teeter Cap (47), Fog Puff Drift (48) and Spore Funnel (49).
+    /// Final Change 6 (owner-approved 2026-11-25): the two new Region 2 (Mushroom Grove) platform kinds Teeter Cap (47) and Fog Puff Drift (48) (Spore Funnel (49) was removed 2026-11-26, owner Final Bugs 1).
     /// Behaviour tests use small hand-built worlds; generator and bot tests use the shipped region 2 levels with random attempt seeds.
     /// </summary>
     [Trait("Category", "Region2NewPlatforms")]
@@ -71,9 +71,8 @@ namespace FluffyClimbers.Simulation.Tests
         {
             Assert.Equal(47, (int)PlatformKind.TeeterCap);
             Assert.Equal(48, (int)PlatformKind.FogPuffDrift);
-            Assert.Equal(49, (int)PlatformKind.SporeFunnel);
             Assert.Equal(21, (int)PlatformKind.SporePop);   // the old region 2 values are untouched
-            foreach (PlatformKind k in new[] { PlatformKind.TeeterCap, PlatformKind.FogPuffDrift, PlatformKind.SporeFunnel })
+            foreach (PlatformKind k in new[] { PlatformKind.TeeterCap, PlatformKind.FogPuffDrift })
             {
                 Assert.True(PlatformKinds.IsRegion2New(k) && PlatformKinds.IsRegionNew(k), k + " is a region 2 special");
                 Assert.Contains(k, RegionPlatformSets.For(SignatureKind.BounceCaps));
@@ -83,7 +82,7 @@ namespace FluffyClimbers.Simulation.Tests
                 Assert.DoesNotContain(k, RegionPlatformSets.For(SignatureKind.SwingingGongs));
             }
             Assert.True(PlatformKinds.IsDemanding(PlatformKind.TeeterCap) && !PlatformKinds.IsHazardType(PlatformKind.TeeterCap));
-            Assert.True(PlatformKinds.IsHazardType(PlatformKind.FogPuffDrift) && PlatformKinds.IsHazardType(PlatformKind.SporeFunnel));
+            Assert.True(PlatformKinds.IsHazardType(PlatformKind.FogPuffDrift));
             Assert.True(PlatformKinds.IsTimeDependent(PlatformKind.FogPuffDrift));
         }
 
@@ -243,70 +242,6 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.True(Math.Abs(D(s.X) - 5.0) < 0.01, "no sideways push, x " + D(s.X));
         }
 
-        // ------------------------------------------------------------------ Spore Funnel
-
-        [Fact]
-        public void SporeFunnel_TheColumnIsThePlatformHalfWidthPlus0Point6AndAtLeast1Point35()
-        {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.SporeFunnel, 500, 300, 150), P(2, 2, PlatformKind.SporeFunnel, 500, 650, 600));
-            Assert.InRange(D(sim.FunnelHalfWidth(sim.Platforms[1])), 1.349, 1.351);   // 0.75 + 0.6 = 1.35
-            Assert.InRange(D(sim.FunnelHalfWidth(sim.Platforms[2])), 3.599, 3.601);   // 3 + 0.6
-            Assert.InRange(D(sim.FunnelHalfWidth(P(3, 3, PlatformKind.SporeFunnel, 500, 900, 100))), 1.349, 1.351);
-        }
-
-        [Fact]
-        public void SporeFunnel_PullsAnAirbornePlayerTowardTheAxisOnlyInsideTheColumnAndNeverPastIt()
-        {
-            SimConfig cfg = new SimConfig();
-            Sim sim = World(Start(), P(1, 1, PlatformKind.SporeFunnel, 500, 300, 400));
-            // inside the column (half width 2.6) 1.5 u above the platform, 1.5 u right of the axis: pulled left by 2.5 u/s
-            SimState s = Air(sim, 1, 650, 150, 0);
-            Fx x0 = s.X;
-            sim.Step(ref s, 0);
-            Assert.InRange((D(x0) - D(s.X)) * 60, 2.45, 2.55);
-            // outside the column (3 u right of the axis): no pull
-            SimState o = Air(sim, 1, 800, 150, 0);
-            Fx ox = o.X;
-            sim.Step(ref o, 0);
-            Assert.Equal(ox, o.X);
-            // above the column height: no pull
-            SimState h = Air(sim, 1, 650, 400, 0);
-            Fx hx = h.X;
-            sim.Step(ref h, 0);
-            Assert.Equal(hx, h.X);
-            // never past the axis: a player 0.01 u right of the axis ends within 0.01 u of it, never beyond
-            SimState c = Air(sim, 1, 501, 150, 0);
-            sim.Step(ref c, 0);
-            Assert.True(c.X <= F(501) && c.X >= F(500), "not pulled past the axis, x " + D(c.X));
-            // the pull is the same on the other side
-            SimState l = Air(sim, 1, 350, 150, 0);
-            Fx lx = l.X;
-            sim.Step(ref l, 0);
-            Assert.InRange((D(l.X) - D(lx)) * 60, 2.45, 2.55);
-            Assert.InRange(D(cfg.FunnelPull) * 60, 2.49, 2.51);
-        }
-
-        [Fact]
-        public void SporeFunnel_SteeringBeatsThePull()
-        {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.SporeFunnel, 500, 300, 400));
-            SimState s = Air(sim, 1, 600, 100, 30);
-            double start = D(s.X);
-            for (int i = 0; i < 30; i++) sim.Step(ref s, SimInput.Right);   // steer away from the axis for half a second inside the column
-            Assert.True(D(s.X) > start, "the player moved away from the axis against the pull, x " + D(s.X));
-        }
-
-        [Fact]
-        public void SporeFunnel_NeverEndsARunOnItsOwn()
-        {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.SporeFunnel, 500, 300, 400), P(2, 2, PlatformKind.Normal, 300, 650, 400));
-            SimState s = Stand(sim, 1, 500);
-            sim.Step(ref s, SimInput.Jump);
-            int ticks = 0;
-            while (!s.Grounded && !s.Dead && ticks < 300) { sim.Step(ref s, 0); ticks++; }
-            Assert.False(s.Dead);
-        }
-
         // ------------------------------------------------------------------ generator
 
         private static List<LoadedLevel> Region2()
@@ -316,7 +251,7 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void TheGeneratorPlacesAllThreeKindsWithPaintedWidthsAndTheRulesHold()
+        public void TheGeneratorPlacesBothKindsWithPaintedWidthsAndTheRulesHold()
         {
             SimConfig cfg = new SimConfig();
             Dictionary<PlatformKind, int> seen = new Dictionary<PlatformKind, int>();
@@ -331,7 +266,7 @@ namespace FluffyClimbers.Simulation.Tests
                     for (int n = 0; n < d.Platforms.Length; n++)
                     {
                         Platform p = d.Platforms[n];
-                        if (p.Kind != PlatformKind.TeeterCap && p.Kind != PlatformKind.FogPuffDrift && p.Kind != PlatformKind.SporeFunnel) continue;
+                        if (p.Kind != PlatformKind.TeeterCap && p.Kind != PlatformKind.FogPuffDrift) continue;
                         if (p.Row < 1 || p.Row > d.Rows) continue;
                         seen[p.Kind] = (seen.ContainsKey(p.Kind) ? seen[p.Kind] : 0) + 1;
                         if (!widths.ContainsKey(p.Kind)) widths[p.Kind] = new HashSet<int>();
@@ -340,7 +275,6 @@ namespace FluffyClimbers.Simulation.Tests
                         string tag = ll.Id + " seed " + i + " row " + p.Row + " " + p.Kind;
                         if (Array.IndexOf(PaintedWidthsTenths, wt) < 0) bad.Add(tag + ": unpainted width " + D(p.Width));
                         if (ll.Spec.LevelIndex <= 1 && p.Kind != PlatformKind.TeeterCap) bad.Add(tag + ": hazard in level 1");
-                        if (ll.Spec.Goal.Type == GoalType.NoWallBounce && p.Kind == PlatformKind.SporeFunnel) bad.Add(tag + ": funnel on a No Wall Touch level");
                         if (p.Row > d.Rows - 3) bad.Add(tag + ": in the last three rows");
                         if (p.Kind == PlatformKind.TeeterCap && n + 1 < d.Platforms.Length)
                         {
@@ -355,24 +289,8 @@ namespace FluffyClimbers.Simulation.Tests
             foreach (string s in bad.Take(30)) output.WriteLine(s);
             foreach (KeyValuePair<PlatformKind, int> kv in seen) output.WriteLine(kv.Key + ": " + kv.Value + " placed, widths " + string.Join(",", widths[kv.Key].OrderBy(x => x)));
             Assert.True(bad.Count == 0, bad.Count + " rule violations, first: " + (bad.Count > 0 ? bad[0] : ""));
-            Assert.True(seen.ContainsKey(PlatformKind.TeeterCap) && seen.ContainsKey(PlatformKind.FogPuffDrift) && seen.ContainsKey(PlatformKind.SporeFunnel), "all three kinds are placed");
+            Assert.True(seen.ContainsKey(PlatformKind.TeeterCap) && seen.ContainsKey(PlatformKind.FogPuffDrift), "both kinds are placed");
             Assert.True(widths[PlatformKind.TeeterCap].Count >= 4, "the Teeter Cap uses several painted widths");
-        }
-
-        [Fact]
-        public void NoWallTouchLevelsOfRegion2NeverHaveAFunnel()
-        {
-            SimConfig cfg = new SimConfig();
-            int checkedLevels = 0;
-            foreach (LoadedLevel ll in Region2().Where(l => l.Spec.Goal.Type == GoalType.NoWallBounce))
-            {
-                checkedLevels++;
-                PlatformKind[] opts = SpecialPlatforms.Options(ll.Spec, PlatformKind.BounceCap);
-                Assert.DoesNotContain(PlatformKind.SporeFunnel, opts);
-                Assert.Contains(PlatformKind.TeeterCap, opts);
-                Assert.Contains(PlatformKind.FogPuffDrift, opts);
-            }
-            Assert.True(checkedLevels >= 1, "region 2 has a No Wall Touch level");
         }
 
         [Fact]
@@ -384,42 +302,12 @@ namespace FluffyClimbers.Simulation.Tests
                 if (ll.Spec.LevelIndex <= 1)
                 {
                     Assert.DoesNotContain(PlatformKind.FogPuffDrift, opts);
-                    Assert.DoesNotContain(PlatformKind.SporeFunnel, opts);
                 }
                 else
                 {
                     Assert.Contains(PlatformKind.FogPuffDrift, opts);
-                    Assert.Contains(PlatformKind.SporeFunnel, opts);
                 }
             }
-        }
-
-        [Fact]
-        public void AfterAFunnelTheNextRowIsWithinCounterSteerReach()
-        {
-            SimConfig cfg = new SimConfig();
-            int checkedRows = 0;
-            List<string> bad = new List<string>();
-            foreach (LoadedLevel ll in Region2())
-                for (int i = 0; i < 12; i++)
-                {
-                    LevelData d = LevelBuilder.Build(cfg, ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i)));
-                    foreach (Platform p in d.Platforms)
-                    {
-                        if (p.Kind != PlatformKind.SporeFunnel || p.Row < 1 || p.Row > d.Rows) continue;
-                        foreach (Platform q in d.Platforms)
-                        {
-                            if (q.Row != p.Row + 1) continue;
-                            checkedRows++;
-                            Fx edgeGap = Fx.Abs(q.X - p.X) - (p.Width + q.Width) / 2;
-                            if (edgeGap > cfg.FunnelNextDxMax + F(5)) bad.Add(ll.Id + " seed " + i + " row " + p.Row + ": next platform " + D(edgeGap) + " u from the funnel platform edge");
-                            break;
-                        }
-                    }
-                }
-            output.WriteLine("funnel rows checked: " + checkedRows);
-            Assert.True(bad.Count == 0, bad.Count + " violations, first: " + (bad.Count > 0 ? bad[0] : ""));
-            Assert.True(checkedRows > 0);
         }
 
         [Fact]
@@ -472,7 +360,7 @@ namespace FluffyClimbers.Simulation.Tests
                 {
                     LevelSpec s = ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i + 40));
                     LevelData d = LevelBuilder.Build(cfg, s);
-                    if (d.Platforms.Any(p => p.Kind == PlatformKind.TeeterCap || p.Kind == PlatformKind.FogPuffDrift || p.Kind == PlatformKind.SporeFunnel)) withNew[li]++;
+                    if (d.Platforms.Any(p => p.Kind == PlatformKind.TeeterCap || p.Kind == PlatformKind.FogPuffDrift)) withNew[li]++;
                     BotResult r = new LevelBot(new Sim(cfg, d, s), s, d, SolvabilityT4Tests.NodeBudget * Math.Max(1, s.RowsFor() / 60)).Solve();
                     if (!r.Solved) f.Add(ll.Id + " attempt seed " + RandomLayoutTests.AttemptSeed(i + 40) + ": best row " + r.BestRow + "/" + d.Rows + " nodes " + r.Nodes);
                 }
@@ -503,7 +391,6 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.True(failures.All(f => f == null), string.Join("; ", failures.Where(f => f != null)));
             Assert.Contains(PlatformKind.TeeterCap, seen);
             Assert.Contains(PlatformKind.FogPuffDrift, seen);
-            Assert.Contains(PlatformKind.SporeFunnel, seen);
         }
     }
 }

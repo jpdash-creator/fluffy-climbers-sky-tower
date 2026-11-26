@@ -61,12 +61,12 @@ namespace FluffyClimbers.Economy
             return n;
         }
 
-        // ---- the ten special levels of a region (Final Change 6: nine types, Boss Rise twice; level 25 is a gem level AND a Boss Rise level): the ONE lookup is LevelDef.SpecialType ----
+        // ---- the eight special levels of a region (Final Change 6, Boss Rise removed 2026-11-26: seven types, Sky Hoops more than once): the ONE lookup is LevelDef.SpecialType ----
 
         Dictionary<int, LevelDef[]> regionSpecials;
         static readonly LevelDef[] noSpecials = new LevelDef[0];
 
-        /// <summary>The special levels of a region in level order (ten in regions 1 to 5; empty for an unknown region). Do not modify the array.</summary>
+        /// <summary>The special levels of a region in level order (eight in regions 1 to 5; empty for an unknown region). Do not modify the array.</summary>
         public LevelDef[] RegionSpecialLevels(int region)
         {
             if (regionSpecials == null) regionSpecials = new Dictionary<int, LevelDef[]>();
@@ -81,7 +81,7 @@ namespace FluffyClimbers.Economy
             return arr;
         }
 
-        /// <summary>The region's (first) level of one special type, or null when the region has none. Boss Rise has two levels; use <see cref="RegionSpecialTypeCleared"/> to ask whether the type was cleared.</summary>
+        /// <summary>The region's (first) level of one special type, or null when the region has none. A type can have several levels (Sky Hoops); use <see cref="RegionSpecialTypeCleared"/> to ask whether the type was cleared.</summary>
         public LevelDef RegionSpecialLevel(int region, SpecialLevelType type)
         {
             foreach (LevelDef l in RegionSpecialLevels(region)) if (l.SpecialType == type) return l;
@@ -106,7 +106,7 @@ namespace FluffyClimbers.Economy
 
         /// <summary>
         /// How many of the six reward types (SpecialLevels.RewardTypes, Final Change 6) the region has cleared in a setting from <paramref name="minMode"/> up (a type counts once, a level of it in some
-        /// setting of that range; Boss Rise has two levels and counts once).
+        /// setting of that range; a type with several levels counts once).
         /// </summary>
         public int RegionSpecialsCleared(int region, int minMode = 0)
         {
@@ -183,7 +183,7 @@ namespace FluffyClimbers.Economy
                 case RegionGoalType.TimeAttackRuns: return RegionTimeAttackRuns(g.Region);
                 case RegionGoalType.SpecialClear:
                 {
-                    foreach (LevelDef l in RegionSpecialLevels(g.Region)) if (l.SpecialType == g.Special && IsLevelCleared(l.Id)) return 1;   // any level of the type (Boss Rise has two)
+                    foreach (LevelDef l in RegionSpecialLevels(g.Region)) if (l.SpecialType == g.Special && IsLevelCleared(l.Id)) return 1;   // any level of the type (Sky Hoops has several)
                     return 0;
                 }
                 case RegionGoalType.SpecialAll: return RegionSpecialsCleared(g.Region, g.MinMode);

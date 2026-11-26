@@ -65,7 +65,7 @@ namespace FluffyClimbers.Economy
     /// groups (Levels 15, Gameplay setting 25, Endless 15, Time Attack 8, Special levels 12). Region 1 pays 19,200 coins, 50 gems and 5 power-ups; the coins of the other
     /// regions use the region coin factor (<see cref="CoinPayoutRules.RegionFactorPercentOf"/>) rounded to the nearest 10; targets, gems and power-ups never scale. NO goal gives a hero.
     /// Retune here only. Regions 1..<see cref="PlayableRegions"/> have goals, the others are Coming Soon and have none.
-    /// Ids: second generation, "g2_&lt;region&gt;_&lt;token&gt;" (for example g2_1_clear_25, g2_3_hard_stars_75, g2_5_special_bossrise). The ids of the old table ("g_...") are never
+    /// Ids: second generation, "g2_&lt;region&gt;_&lt;token&gt;" (for example g2_1_clear_25, g2_3_hard_stars_75, g2_5_special_sprintrest). The ids of the old table ("g_...") are never
     /// reused: an old claimed id left in a save matches nothing and is ignored.
     /// </summary>
     public static class RegionGoalTable

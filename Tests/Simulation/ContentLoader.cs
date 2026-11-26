@@ -132,9 +132,7 @@ namespace FluffyClimbers.Simulation.Tests
                         {
                             spec.Special = SpecialLevels.RuleFromId(special.GetString());
                             if (spec.Special == SpecialLevelType.None) throw new InvalidOperationException(ll.Id + ": unknown special level rule " + special.GetString());
-                            spec.BossRiseRule = spec.Special == SpecialLevelType.BossRise;   // Final Change 6: the rule flags and the boss region, like LevelSpecFactory
                             spec.SprintRestRule = spec.Special == SpecialLevelType.SprintRest;
-                            if (spec.BossRiseRule) spec.BossRegion = ll.Region;
                         }
                         JsonElement ghost;
                         if (lv.TryGetProperty("ghostRowAtTick", out ghost))

@@ -1,6 +1,7 @@
 using System.IO;
 using FluffyClimbers.Content;
 using FluffyClimbers.Economy;
+using FluffyClimbers.Leaderboard;
 using FluffyClimbers.Simulation;
 using UnityEngine;
 
@@ -111,17 +112,34 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Starts a 3:00 Time Attack run next time the Run scene loads (same tower rules as endless, a countdown instead of a free clock).</summary>
         public static void SelectTimeAttack(string regionId)
         {
-            SelectEndless(regionId);
+            SelectEndless(regionId, false);
             TimeAttackMode = true;
+            WarmTicket("timeattack", regionId);
+        }
+
+        /// <summary>Asks for the server seed ticket of the run the player just chose, so it is cached when the Run scene starts (no-op when not signed in; a ticket already cached is kept).</summary>
+        static void WarmTicket(string kind, string target)
+        {
+            if (TicketWaitPolicy.ShouldPrefetch(LeaderboardHub.CanUpload, LeaderboardHub.HasTicket(kind, target, GameSettings.Difficulty))) LeaderboardHub.Prefetch(kind, target, GameSettings.Difficulty);
+        }
+
+        /// <summary>The ticket of the run the player most likely starts next (used after a reset and after a profile sync): the selected Endless or Time Attack region, else the selected level.</summary>
+        public static void WarmNextTicket()
+        {
+            if (EndlessMode && !string.IsNullOrEmpty(EndlessRegionId)) WarmTicket(TimeAttackMode ? "timeattack" : "endless", EndlessRegionId);
+            else if (!string.IsNullOrEmpty(CurrentLevelId)) WarmTicket("level", CurrentLevelId);
         }
 
         /// <summary>Starts an endless run next time the Run scene loads. A new random seed is drawn for every run.</summary>
-        public static void SelectEndless(string regionId)
+        public static void SelectEndless(string regionId) { SelectEndless(regionId, true); }
+
+        static void SelectEndless(string regionId, bool warm)
         {
             EndlessMode = true;
             TimeAttackMode = false;
             EndlessRegionId = regionId;
             EndlessSeed = 0;
+            if (warm) WarmTicket("endless", regionId);
         }
 
         /// <summary>A fresh endless seed: UTC ticks and the region mixed, never 0.</summary>

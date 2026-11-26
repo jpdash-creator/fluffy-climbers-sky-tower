@@ -3,8 +3,8 @@
     set PYTHONPATH=E:/pylibs
     python Tools/art_pipeline/bake_fc9_icons.py
 
-Special-type icons (Art/_candidates/fc6_type_icons/{A,B}.png, cells row by row): icon_special_combogates = B1, icon_special_skyhoops = A2, icon_special_bossrise = B3,
-icon_special_sprintrest = A4, icon_special_rivalrace = A5.  Boss badges (fc6_boss_badges/A.png, reading order = regions 1-5): boss_badge_r1..r5.
+Special-type icons (Art/_candidates/fc6_type_icons/{A,B}.png, cells row by row): icon_special_combogates = B1, icon_special_skyhoops = A2, (icon_special_bossrise = B3 was removed 2026-11-26),
+icon_special_sprintrest = A4, icon_special_rivalrace = A5.  The boss badges were removed with Boss Rise (2026-11-26).
 Settings icons (fc9/icons_B.png cells 1-4): icon_reset, icon_restore, icon_help_again, icon_help.
 """
 import os
@@ -73,12 +73,8 @@ def main():
     out = []
     sheets = {s: boxes(os.path.join(CAND, "fc6_type_icons", s + ".png")) for s in "AB"}
     print("type icon cells", {k: len(v) for k, v in sheets.items()})
-    for name, (s, i) in {"combogates": ("B", 0), "skyhoops": ("A", 1), "bossrise": ("B", 2), "sprintrest": ("A", 3), "rivalrace": ("A", 4)}.items():
+    for name, (s, i) in {"combogates": ("B", 0), "skyhoops": ("A", 1), "sprintrest": ("A", 3), "rivalrace": ("A", 4)}.items():
         out.append(save_icon(sheets[s][i], "icon_special_" + name))
-    boss = boxes(os.path.join(CAND, "fc6_boss_badges", "A.png"), merge=6)
-    print("boss badges", len(boss))
-    for r in range(5):
-        out.append(save_icon(boss[r], "boss_badge_r%d" % (r + 1)))
     st = boxes(os.path.join(CAND, "fc9", "icons_B.png"), 420, 700)
     print("settings icons", len(st))
     for name, i in {"icon_reset": 0, "icon_restore": 1, "icon_help_again": 2, "icon_help": 3}.items():

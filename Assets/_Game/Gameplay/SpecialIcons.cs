@@ -4,7 +4,7 @@ using UnityEngine;
 namespace FluffyClimbers.Gameplay
 {
     /// <summary>
-    /// Painted icons of the five Final Change 6 special level types and the five region boss badges (owner picks 2026-11-25, OpenArt batch 8; Resources/Art/Ui, 256 px round badges).
+    /// Painted icons of the Final Change 6 special level types (owner picks 2026-11-25, OpenArt batch 8; the region boss badges were removed 2026-11-26; Resources/Art/Ui, 256 px round badges).
     /// Every lookup returns null when the file is missing, so the caller keeps its letter glyph or number (CUX-10). Since 2026-11-26 No Wall Touch, No Power-ups, One Life and Keep Moving have painted badges too (owner picks, icons2 sheet); the retired Combo Climb and Chase keep the letter.
     /// </summary>
     public static class SpecialIcons
@@ -20,7 +20,6 @@ namespace FluffyClimbers.Gameplay
                 case SpecialLevelType.KeepMoving: return "icon_special_keepmoving";
                 case SpecialLevelType.ComboGates: return "icon_special_combogates";
                 case SpecialLevelType.SkyHoops: return "icon_special_skyhoops";
-                case SpecialLevelType.BossRise: return "icon_special_bossrise";
                 case SpecialLevelType.SprintRest: return "icon_special_sprintrest";
                 case SpecialLevelType.RivalRace: return "icon_special_rivalrace";
                 default: return null;
@@ -41,13 +40,6 @@ namespace FluffyClimbers.Gameplay
             string[] parts = regionId.Split('_');
             int n;
             return parts.Length >= 2 && int.TryParse(parts[1], out n) ? n : 0;
-        }
-
-        /// <summary>The boss badge of a region (boss_badge_r1 .. r5), or null when the region has none or the file is missing.</summary>
-        public static Sprite BossBadge(string regionId)
-        {
-            int n = RegionNumber(regionId);
-            return n >= 1 && n <= 5 ? ToyKit.Get("boss_badge_r" + n) : null;
         }
     }
 }

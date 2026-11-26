@@ -104,6 +104,33 @@ namespace FluffyClimbers.LeaderboardService
                 return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await api.SyncBreakdownAsync(uid, req));
             });
 
+            // ---- full save backup copy (Final Bugs 1 item 12): Tools/leaderboard_service/SaveBackup/SaveBackupApi.cs ----
+            var saveApi = new SaveBackupApi(memory ? (ISaveBackupStore)new InMemorySaveBackupStore() : new FirestoreSaveBackupStore(project), () => DateTime.UtcNow);
+            app.Use(async (c, next) =>
+            {
+                if (c.Request.Path.StartsWithSegments("/v1/save"))
+                {
+                    var f = c.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+                    if (f != null && !f.IsReadOnly) f.MaxRequestBodySize = SaveBackupApi.MaxRequestBytes;   // the other routes keep the 512 KB limit
+                }
+                await next();
+            });
+            app.MapPut("/v1/save", async (HttpContext c, SaveBackupApi.PutRequest req) =>
+            {
+                string uid = await Uid(c);
+                return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await saveApi.PutAsync(uid, req));
+            });
+            app.MapGet("/v1/save", async (HttpContext c) =>
+            {
+                string uid = await Uid(c);
+                return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await saveApi.GetAsync(uid));
+            });
+            app.MapDelete("/v1/save", async (HttpContext c) =>
+            {
+                string uid = await Uid(c);
+                return uid == null ? Results.Json(new { error = "unauthorized" }, statusCode: 401) : Out(await saveApi.DeleteAsync(uid));
+            });
+
             app.MapPost("/admin/tick", async (HttpContext c) =>
             {
                 string given = c.Request.Headers["X-Admin-Key"];

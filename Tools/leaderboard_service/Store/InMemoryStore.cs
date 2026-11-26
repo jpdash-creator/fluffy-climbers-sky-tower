@@ -22,6 +22,9 @@ namespace FluffyClimbers.LeaderboardService
 
         public Task<Limits> GetLimitsAsync() { return Task.FromResult(LimitsValue); }
 
+        /// <summary>Tests: removes the player document (a deleted profile).</summary>
+        public void RemovePlayer(string uid) { lock (gate) players.Remove(uid); }
+
         public void SetProfile(string uid, string name, string avatar)
         {
             lock (gate)

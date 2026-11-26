@@ -139,11 +139,9 @@ namespace FluffyClimbers.Simulation
             LevelData data = new LevelData();
             data.Rows = rows;
 
-            // Boss Rise (owner Final Change 6, 2026-11-25): the top BossArenaRows rows are the boss arena (wide painted platforms, no special platforms, no hazards, no row mates).
             // Sprint and Rest: every ShelterRows floors the spine platform is an 8 u shelter (a Normal platform of the shelter width; no special kind, no row mate).
-            // Both only on a level that carries the rule, so every other level keeps its layout and its golden hash bit for bit.
-            bool bossLevel = spec.BossRise, sprintLevel = spec.SprintRest;
-            if (bossLevel) for (int r = rows - cfg.BossArenaRows + 1; r <= rows; r++) if (r > 0) locked[r] = true;
+            // Only on a level that carries the rule, so every other level keeps its layout and its golden hash bit for bit.
+            bool sprintLevel = spec.SprintRest;
             if (sprintLevel) for (int r = 1; r <= rows; r++) if (SprintRestRules.IsShelterRow(cfg, r, rows)) locked[r] = true;
 
             int[] chunkAt = new int[rows + 3];
@@ -352,9 +350,8 @@ namespace FluffyClimbers.Simulation
                 // Bounce platforms are never chained: the landing speed on a bounce pad is set by the previous flight,
                 // so two pads in a row would make the second one pure luck.
                 if (afterBounce && PlatformKinds.IsBouncePad(kind)) kind = PlatformKind.Normal;
-                bool arenaRow = bossLevel && BossRiseRules.IsArenaRow(cfg, row, rows);
                 bool shelterRow = sprintLevel && SprintRestRules.IsShelterRow(cfg, row, rows);
-                if (arenaRow || shelterRow) kind = PlatformKind.Normal;
+                if (shelterRow) kind = PlatformKind.Normal;
 
                 Fx w = rng.Range(Fx.Lerp(widthEasyLo, widthHardLo, d), Fx.Lerp(widthEasyHi, widthHardHi, d));
                 w = w * rng.Range(jitterLo, jitterHi);
@@ -365,8 +362,7 @@ namespace FluffyClimbers.Simulation
                 if (PlatformKinds.IsRegionNew(kind)) w = SpecialPlatforms.ConstrainWidth(cfg, kind, w);
                 if (row == gemRow && w > Fx.FromRatio(35, 10)) w = Fx.FromRatio(35, 10);
                 if (extraRow[row] && w > Fx.FromInt(4) && kind != PlatformKind.FairyRing) w = Fx.FromInt(4);   // a row with a mate keeps room for it (a Fairy Ring keeps its two usable halves; a mate that finds no spot moves on)
-                if (arenaRow) w = Fx.FromInt(6 + 2 * rng.Next(2));            // boss arena: a wide painted platform, 6 or 8 u
-                else if (shelterRow) w = cfg.ShelterWidth;                    // Sprint and Rest shelter: 8 u
+                if (shelterRow) w = cfg.ShelterWidth;                    // Sprint and Rest shelter: 8 u
                 if (prevKind == PlatformKind.MoonJellyChain && kind != PlatformKind.MoonJellyChain && w < cfg.JellyExitMinWidth) w = cfg.JellyExitMinWidth;   // integration 2026-11-26: the landing after a chain's big flight is at least 3 u wide (a 2 u platform at a wall after the chain had no way on at the Insane setting)
                 w = SnapWidth(w, kind);                                       // painted widths only; the final snap pass finds nothing left to change
                 // Narrow platforms get smaller gaps so one jump always works (owner, 2026-10-20).
@@ -389,7 +385,6 @@ namespace FluffyClimbers.Simulation
                 if (prevKind == PlatformKind.MoonJellyChain) dxLimit = Fx.Min(dxLimit, cfg.JellyExitDxMax + (prevW + w) / 2);   // integration 2026-11-26: the flight after the last pad lands at most JellyExitDxMax beyond its edges (3.0 u layouts had no solution at the Insane setting)
                 if (prevKind == PlatformKind.KelpTangle) dxLimit = Fx.Min(dxLimit, cfg.KelpNextDxMax + (prevW + w) / 2);   // integration 2026-11-25
                 if (prevKind == PlatformKind.IncenseMistBank) dxLimit = Fx.Min(dxLimit, cfg.MistNextDxMax + (prevW + w) / 2);   // Final Change 6: a damped jump reaches less
-                if (prevKind == PlatformKind.SporeFunnel) dxLimit = Fx.Min(dxLimit, cfg.FunnelNextDxMax + (prevW + w) / 2);   // Final Change 6: a counter-steer against the funnel pull always reaches the next row
                 dx = Fx.Min(dx, dxLimit);
                 if (jellyRun == 0) dx = Fx.Min(dx, cfg.JellyEntryDxMax);
                 if (jellyRun >= 1) dx = Fx.Min(dx, cfg.JellyNextDxMax);   // chained pads sit close together: the stepped flight must land inside the chain window
@@ -422,14 +417,14 @@ namespace FluffyClimbers.Simulation
                 if (prevKind == PlatformKind.DragonflyDart && prevDir != 0) x = SpecialPlatforms.DartNextX(prevX, prevDir, prevAmp, dx, dxLimit, w, screen);
 
                 // Clover Swap (2026-11-26): a PAIR of slabs on this row (homes x -/+ h), both inside the walls and within reach of the row below; the stack rule leaves room for the pair (at most one other platform in the window).
-                // No pair fits = the row stays Normal.
+                // No pair fits = one lone clover slab (Amplitude 0).
                 bool clover = false;
                 Fx cloverH = Fx.Zero;
                 if (kind == PlatformKind.CloverSwap)
                 {
                     Fx cc = x, cw = w;
                     if (CountInWindow(ctx.Plats, y) <= MaxPerWindow - 3 && SpecialPlatforms.CloverPair(cfg, prevX, dxLimit - w / 2, screen, ref cc, ref cw, out cloverH)) { clover = true; x = cc; w = cw; }
-                    else kind = PlatformKind.PollenPuff;   // no pair fits here: the row keeps a special kind (the level's special row count never depends on the seed): a helpful Pollen Puff slab
+                    // no pair fits here: the row keeps the kind (the special row count never depends on the seed) as ONE lone clover slab: Amplitude 0, so it never moves and lands like a Normal slab (the view shows it calm)
                 }
 
                 Fx amp = Fx.Zero;
@@ -538,7 +533,6 @@ namespace FluffyClimbers.Simulation
 
             // ---- hazards ----
             data.Hazards = BuildHazards(cfg, spec, ctx, data.Platforms, data.Pickups, rows, d, wave, waveStart, waveEnd);
-            if (bossLevel && data.Hazards.Length > 0) data.Hazards = WithoutArenaHazards(cfg, data.Hazards, data.Platforms, rows);
             if (spec.Goal.Type == GoalType.RivalRace && spec.GhostRowAtTick != null && spec.GhostRowAtTick.Length > 1) data.GhostRowAtTick = spec.GhostRowAtTick;   // Rival Race: the baked ghost path rides with the level data (and its hash)
             return data;
         }
@@ -1152,24 +1146,6 @@ namespace FluffyClimbers.Simulation
             }
             list.Sort(CompareHazard);
             Hazard[] arr = list.ToArray();
-            for (int i = 0; i < arr.Length; i++) arr[i].Id = i;
-            return arr;
-        }
-
-        /// <summary>
-        /// Boss Rise: drops every hazard whose anchor lies at or above the platform of the row just under the arena (the arena and its entry corridor have no hazards). A filter after the
-        /// normal placement, so the random draws of the rows below the arena are exactly those of a level without the rule.
-        /// </summary>
-        private static Hazard[] WithoutArenaHazards(SimConfig cfg, Hazard[] hazards, Platform[] platforms, int rows)
-        {
-            int firstArena = rows - cfg.BossArenaRows + 1;
-            Fx arenaFloorY = Fx.Zero;
-            for (int i = 0; i < platforms.Length; i++)
-                if (platforms[i].Row == firstArena - 1) { arenaFloorY = platforms[i].Y; break; }
-            List<Hazard> keep = new List<Hazard>(hazards.Length);
-            for (int i = 0; i < hazards.Length; i++)
-                if (hazards[i].Y < arenaFloorY) keep.Add(hazards[i]);
-            Hazard[] arr = keep.ToArray();
             for (int i = 0; i < arr.Length; i++) arr[i].Id = i;
             return arr;
         }

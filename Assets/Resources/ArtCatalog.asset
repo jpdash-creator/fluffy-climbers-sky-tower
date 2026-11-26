@@ -1120,7 +1120,6 @@ MonoBehaviour:
     - {fileID: 0}
     - {fileID: 21300000, guid: 17a7268ef2717aa4b952fbd1dda35736, type: 3}
     - {fileID: 21300000, guid: 773a6dda4345c9b4daef3f7ad0c2691c, type: 3}
-    - {fileID: 21300000, guid: 27abf560d89102348985f0c611f50da9, type: 3}
     KindPieces:
     - Kind: 20
       Dir: 0
@@ -1386,72 +1385,6 @@ MonoBehaviour:
         BodyRight: 1349
         SurfaceY: 51
         BodyBottom: 136
-    - Kind: 49
-      Dir: 0
-      WidthUnits: 1.5
-      Sprite: {fileID: 21300000, guid: cfee6d02cdea26b44b53e583289434cb, type: 3}
-      Metric:
-        W: 269
-        H: 108
-        BodyLeft: 6
-        BodyRight: 256
-        SurfaceY: 17
-        BodyBottom: 101
-    - Kind: 49
-      Dir: 0
-      WidthUnits: 2
-      Sprite: {fileID: 21300000, guid: d29e588b63c282043aa45c60423e3b3d, type: 3}
-      Metric:
-        W: 353
-        H: 108
-        BodyLeft: 6
-        BodyRight: 340
-        SurfaceY: 17
-        BodyBottom: 101
-    - Kind: 49
-      Dir: 0
-      WidthUnits: 3
-      Sprite: {fileID: 21300000, guid: 27abf560d89102348985f0c611f50da9, type: 3}
-      Metric:
-        W: 520
-        H: 108
-        BodyLeft: 6
-        BodyRight: 507
-        SurfaceY: 17
-        BodyBottom: 101
-    - Kind: 49
-      Dir: 0
-      WidthUnits: 4
-      Sprite: {fileID: 21300000, guid: c04af22b3567d9145b9e8204acd5b46f, type: 3}
-      Metric:
-        W: 687
-        H: 108
-        BodyLeft: 6
-        BodyRight: 674
-        SurfaceY: 17
-        BodyBottom: 101
-    - Kind: 49
-      Dir: 0
-      WidthUnits: 6
-      Sprite: {fileID: 21300000, guid: d465fb3fbe0b5f344af0d7c069c7a479, type: 3}
-      Metric:
-        W: 1030
-        H: 107
-        BodyLeft: 15
-        BodyRight: 1017
-        SurfaceY: 17
-        BodyBottom: 100
-    - Kind: 49
-      Dir: 0
-      WidthUnits: 8
-      Sprite: {fileID: 21300000, guid: 062872a8c5acb194caf39532deb54474, type: 3}
-      Metric:
-        W: 1364
-        H: 107
-        BodyLeft: 15
-        BodyRight: 1351
-        SurfaceY: 17
-        BodyBottom: 100
     - Kind: 21
       Dir: -1
       WidthUnits: 2

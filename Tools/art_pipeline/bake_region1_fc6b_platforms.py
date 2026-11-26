@@ -2,7 +2,7 @@
 Assets/Art/Regions/region_001_meadow_springs/tiles/cloverswap_widths (poses calm = dir -1, swap = dir 1; widths 2, 3, 4 u, one uniform scale per row, plain middle cut/repeated).
 Owner note: the swap pose must not read as a pale/white platform, so the three mint rows are recoloured to a saturated bright yellow-green (hue shifted toward lime,
 outline, white sparkles and alpha kept) BEFORE baking.      set PYTHONPATH=E:/pylibs ; python Tools/art_pipeline/bake_region1_fc6b_platforms.py
-Also cuts the Pollen Puff parts: see bake_region1_fc6b_pollen.py."""
+The Pollen Puff parts were removed 2026-11-26 (owner Final Bugs 1)."""
 import colorsys
 import os
 import sys

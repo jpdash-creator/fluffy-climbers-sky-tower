@@ -12,6 +12,8 @@ namespace FluffyClimbers.LeaderboardService
         public ReplayResult Replay;
         public DateTime Now;
         public Limits Limits;
+        /// <summary>The submission's optional display name / picture (already the raw request values; cleaned in <see cref="SlotMath.Apply"/>).</summary>
+        public string DisplayName, AvatarUrl;
     }
 
     public sealed class ApplyOutcome
@@ -20,6 +22,8 @@ namespace FluffyClimbers.LeaderboardService
         /// <summary>rate_limited, implausible, ok.</summary>
         public string Error;
         public bool Improved;
+        /// <summary>The player document had no profile name (deleted or never written) and this call created one: the store must write displayName / avatarUrl too.</summary>
+        public bool ProfileCreated;
         /// <summary>What the slot counted before and after this run: the best crown of a level slot, the SUM of the three best runs of an Endless / Time Attack slot.</summary>
         public long PreviousCrown, SlotCrown;
         /// <summary>Runs the slot holds after this call (1 for a level slot, 1 to 3 for Endless / Time Attack, 0 when nothing is stored).</summary>
@@ -93,6 +97,15 @@ namespace FluffyClimbers.LeaderboardService
             newPlayer = player ?? new PlayerDoc { CreatedAt = inp.Now };
             if (string.IsNullOrEmpty(newPlayer.Pid)) newPlayer.Pid = inp.Pid;
             if (newPlayer.HeroVariants == null) newPlayer.HeroVariants = new Dictionary<string, int>();
+            // a deleted or never written profile comes back with the first accepted run (name from the submission, else "Player" + pid tail); an existing name is never changed here
+            bool profileCreated = false;
+            if (string.IsNullOrWhiteSpace(newPlayer.DisplayName))
+            {
+                newPlayer.DisplayName = ProfileText.Name(inp.DisplayName) ?? ProfileText.Fallback(newPlayer.Pid);
+                if (string.IsNullOrEmpty(newPlayer.AvatarUrl)) newPlayer.AvatarUrl = ProfileText.Avatar(inp.AvatarUrl) ?? "";
+                newPlayer.UpdatedAt = inp.Now;
+                profileCreated = true;
+            }
 
             // ---- durable rate limits (the cheap in-memory bucket in front of the replay is in LeaderboardApi) ----
             if (newPlayer.LastSubmitAt > Epoch.Utc && (inp.Now - newPlayer.LastSubmitAt).TotalMilliseconds < lim.MinSubmitIntervalMs)
@@ -112,6 +125,7 @@ namespace FluffyClimbers.LeaderboardService
             newPlayer.LastSubmitAt = inp.Now;
             newPlayer.TicksToday += rr.TicksStepped;
             outcome.Accepted = true;
+            outcome.ProfileCreated = profileCreated;
             outcome.PreviousCrown = slot == null ? 0 : slot.Crown;   // what the totals already count for this slot
             outcome.SlotCrown = outcome.PreviousCrown;
             outcome.Totals = totals;

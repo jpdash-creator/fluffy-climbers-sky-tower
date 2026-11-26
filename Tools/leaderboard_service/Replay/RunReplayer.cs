@@ -31,6 +31,40 @@ namespace FluffyClimbers.LeaderboardService
         /// <summary>Ticket from POST /start-run: carries the server-chosen seed, bound to uid, level or region and setting, single use, short expiry.</summary>
         public string Ticket { get; set; }
         public ClaimedResult Claimed { get; set; }
+        /// <summary>Optional (Final Bugs 1 item 11): the name and picture the player shows. Used ONLY to create a missing or nameless profile (players/{uid}) on the first accepted run, never to change an existing one; sanitised by <see cref="ProfileText"/>.</summary>
+        public string DisplayName { get; set; }
+        public string AvatarUrl { get; set; }
+    }
+
+    /// <summary>Server-side cleaning of the profile text a submission may carry (the uid always comes from the token, so a name can only ever be created for the caller's own profile).</summary>
+    public static class ProfileText
+    {
+        public const int MaxName = 32;
+
+        /// <summary>Trimmed, control characters removed, cut to 32 without splitting a surrogate pair; null when nothing usable is left.</summary>
+        public static string Name(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            var sb = new System.Text.StringBuilder(raw.Length);
+            foreach (char c in raw) if (!char.IsControl(c)) sb.Append(c);
+            string n = sb.ToString().Trim();
+            if (n.Length > MaxName) { int cut = MaxName; if (char.IsHighSurrogate(n[cut - 1])) cut--; n = n.Substring(0, cut).TrimEnd(); }
+            return n.Length == 0 ? null : n;
+        }
+
+        /// <summary>An https picture URL of at most 512 characters on a Google picture host, else null.</summary>
+        public static string Avatar(string raw)
+        {
+            string u = (raw ?? "").Trim();
+            if (u.Length == 0 || u.Length > 512) return null;
+            Uri uri;
+            if (!Uri.TryCreate(u, UriKind.Absolute, out uri) || uri.Scheme != Uri.UriSchemeHttps) return null;
+            string h = uri.Host.ToLowerInvariant();
+            return h.EndsWith(".googleusercontent.com", StringComparison.Ordinal) || h.EndsWith(".ggpht.com", StringComparison.Ordinal) ? u : null;
+        }
+
+        /// <summary>The name of a player who sent none: "Player" and the last 4 characters of the public id.</summary>
+        public static string Fallback(string pid) { return "Player" + (string.IsNullOrEmpty(pid) ? "" : pid.Substring(Math.Max(0, pid.Length - 4))); }
     }
 
     public sealed class ClaimedResult

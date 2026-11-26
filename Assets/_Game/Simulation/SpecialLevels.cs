@@ -2,8 +2,8 @@ namespace FluffyClimbers.Simulation
 {
     /// <summary>
     /// The special level types. Final Change 1 (2026-11-22) introduced six, Final Change 6 (2026-11-25) retired Combo Climb and Chase and added five
-    /// (Combo Gates, Sky Hoops, Boss Rise, Sprint and Rest, Rival Race); the owner then retired Combo Gates too (2026-11-26) and gave its levels to Sky Hoops: ten special levels per
-    /// region, eight distinct types (Boss Rise has two levels per region, the second is the level-25 gem level; Sky Hoops has two or three). The values are stable (saves, analytics,
+    /// (Combo Gates, Sky Hoops, Boss Rise, Sprint and Rest, Rival Race; Boss Rise is gone again); the owner then retired Combo Gates too (2026-11-26) and gave its levels to Sky Hoops: eight special levels per
+    /// region (after Boss Rise's removal), seven distinct types. Boss Rise was removed completely on 2026-11-26 (its ten levels became plain Regular Runs; value 9 stays unused). The values are stable (saves, analytics,
     /// replays and the server may store them), so the retired types keep their numbers and stay decodable; no shipped level uses them.
     /// </summary>
     public enum SpecialLevelType
@@ -26,8 +26,7 @@ namespace FluffyClimbers.Simulation
         ComboGates = 7,
         /// <summary>Goal skyHoops: 10 rings hang in mid-air along the natural arcs of 2+ floor jumps; the level is cleared at the top with at least 8 of the 10. Several levels per region.</summary>
         SkyHoops = 8,
-        /// <summary>Rule field "special": a boss rises behind the hero (a different boss per region, built by the Boss Rise worker). Two levels per region (the second is the level-25 gem level).</summary>
-        BossRise = 9,
+        // 9 was Boss Rise (REMOVED 2026-11-26, never shipped): the value stays unused, the others keep their numbers.
         /// <summary>Rule field "special": sprint under a faster danger line between shelters, rest on a shelter (Sprint and Rest worker).</summary>
         SprintRest = 10,
         /// <summary>Goal rivalRace: race a baked rival ghost to the top (Rival Race worker; level JSON field ghostRowAtTick).</summary>
@@ -36,40 +35,41 @@ namespace FluffyClimbers.Simulation
 
     /// <summary>
     /// The ONE lookup for the special level types: UI (level popup, tile badge, HUD), rewards and the server all ask here instead of testing a level index.
-    /// Four active types are goals of the level JSON (noWallBounce, skyHoops, rivalRace; the retired comboGates, comboChain and bossChase still decode); five are rules carried by the optional level JSON field
-    /// "special" (noPowerUps, oneLife, keepMoving, bossRise, sprintRest) on a plain reachFloor level. Pure functions, no state.
+    /// Three active types are goals of the level JSON (noWallBounce, skyHoops, rivalRace; the retired comboGates, comboChain and bossChase still decode); four are rules carried by the optional level JSON field
+    /// "special" (noPowerUps, oneLife, keepMoving, sprintRest) on a plain reachFloor level. Pure functions, no state.
     /// </summary>
     public static class SpecialLevels
     {
-        /// <summary>Number of ACTIVE special types (the eight of <see cref="All"/>). A region has ten special levels: Boss Rise and Sky Hoops each hold two or more.</summary>
-        public const int Count = 8;
+        /// <summary>Number of ACTIVE special types (the seven of <see cref="All"/>). A region has eight special levels (owner 2026-11-26, Boss Rise removed): Sky Hoops holds two or more.</summary>
+        public const int Count = 7;
 
         /// <summary>
         /// Number of types the reward tables ask about (Main goals "Clear the X level", weekly tasks, "Clear all 6 special levels"): the economy of Final Change 1 is pinned to six,
-        /// so the tables keep six slots (<see cref="RewardTypes"/>) and the two newest types (Sprint and Rest, Rival Race) have no goal of their own yet.
+        /// so the tables keep six slots (<see cref="RewardTypes"/>) and Rival Race has no goal of its own yet (Sprint and Rest uses the old Boss Rise slot).
         /// </summary>
         public const int RewardCount = 6;
 
         /// <summary>Level JSON ids of the "special" field (the rule types).</summary>
-        public const string NoPowerUpsId = "noPowerUps", OneLifeId = "oneLife", KeepMovingId = "keepMoving", BossRiseId = "bossRise", SprintRestId = "sprintRest";
+        public const string NoPowerUpsId = "noPowerUps", OneLifeId = "oneLife", KeepMovingId = "keepMoving", SprintRestId = "sprintRest";
 
-        /// <summary>All eight active types in the fixed display order (retired Combo Climb, Chase and Combo Gates are not listed).</summary>
+        /// <summary>All seven active types in the fixed display order (retired Combo Climb, Chase and Combo Gates are not listed).</summary>
         public static readonly SpecialLevelType[] All =
         {
             SpecialLevelType.NoWallTouch, SpecialLevelType.NoPowerUps, SpecialLevelType.OneLife, SpecialLevelType.KeepMoving,
-            SpecialLevelType.SkyHoops, SpecialLevelType.BossRise, SpecialLevelType.SprintRest, SpecialLevelType.RivalRace
+            SpecialLevelType.SkyHoops, SpecialLevelType.SprintRest, SpecialLevelType.RivalRace
         };
 
-        /// <summary>The six types the reward tables use, in table order (Sky Hoops takes the Combo Gates slot, which took the old Combo Climb slot; Boss Rise the old Chase slot).</summary>
+        /// <summary>The six types the reward tables use, in table order (Sky Hoops takes the Combo Gates slot, which took the old Combo Climb slot; since 2026-11-26 Sprint and Rest takes the Boss Rise slot, which took the old Chase slot).</summary>
         public static readonly SpecialLevelType[] RewardTypes =
         {
-            SpecialLevelType.NoWallTouch, SpecialLevelType.NoPowerUps, SpecialLevelType.SkyHoops, SpecialLevelType.BossRise, SpecialLevelType.OneLife, SpecialLevelType.KeepMoving
+            SpecialLevelType.NoWallTouch, SpecialLevelType.NoPowerUps, SpecialLevelType.SkyHoops, SpecialLevelType.SprintRest, SpecialLevelType.OneLife, SpecialLevelType.KeepMoving
         };
 
-        /// <summary>True for the eight types a level can have today; false for None and the three retired types.</summary>
+        /// <summary>True for the seven types a level can have today; false for None, the three retired types and the removed value 9.</summary>
         public static bool IsActive(SpecialLevelType type)
         {
-            return type != SpecialLevelType.None && type != SpecialLevelType.ComboClimb && type != SpecialLevelType.Chase && type != SpecialLevelType.ComboGates && (int)type >= 1 && (int)type <= (int)SpecialLevelType.RivalRace;
+            for (int i = 0; i < All.Length; i++) if (All[i] == type) return true;
+            return false;   // None, the retired Combo Climb, Chase and Combo Gates and the removed value 9 (Boss Rise)
         }
 
         /// <summary>Maps the level JSON field "special" to its rule type; null, empty or unknown gives None.</summary>
@@ -80,7 +80,6 @@ namespace FluffyClimbers.Simulation
                 case NoPowerUpsId: return SpecialLevelType.NoPowerUps;
                 case OneLifeId: return SpecialLevelType.OneLife;
                 case KeepMovingId: return SpecialLevelType.KeepMoving;
-                case BossRiseId: return SpecialLevelType.BossRise;
                 case SprintRestId: return SpecialLevelType.SprintRest;
                 default: return SpecialLevelType.None;
             }
@@ -94,7 +93,6 @@ namespace FluffyClimbers.Simulation
                 case SpecialLevelType.NoPowerUps: return NoPowerUpsId;
                 case SpecialLevelType.OneLife: return OneLifeId;
                 case SpecialLevelType.KeepMoving: return KeepMovingId;
-                case SpecialLevelType.BossRise: return BossRiseId;
                 case SpecialLevelType.SprintRest: return SprintRestId;
                 default: return "";
             }
@@ -119,7 +117,7 @@ namespace FluffyClimbers.Simulation
         public static bool IsRule(SpecialLevelType type)
         {
             return type == SpecialLevelType.NoPowerUps || type == SpecialLevelType.OneLife || type == SpecialLevelType.KeepMoving
-                || type == SpecialLevelType.BossRise || type == SpecialLevelType.SprintRest;
+                || type == SpecialLevelType.SprintRest;
         }
 
         /// <summary>The special type of a level spec: its rule (LevelSpec.Special) or, without one, the type of its goal. Endless specs are never special.</summary>
@@ -149,7 +147,6 @@ namespace FluffyClimbers.Simulation
                 case SpecialLevelType.KeepMoving: return "Keep Moving";
                 case SpecialLevelType.ComboGates: return "Combo Gates";
                 case SpecialLevelType.SkyHoops: return "Sky Hoops";
-                case SpecialLevelType.BossRise: return "Boss Rise";
                 case SpecialLevelType.SprintRest: return "Sprint and Rest";
                 case SpecialLevelType.RivalRace: return "Rival Race";
                 default: return "Regular Run";
@@ -169,7 +166,6 @@ namespace FluffyClimbers.Simulation
                 case SpecialLevelType.KeepMoving: return "Over 3 seconds on one platform ends the run.";
                 case SpecialLevelType.ComboGates: return "";   // removed type: no rule text
                 case SpecialLevelType.SkyHoops: return "Fly through 8 of the 10 rings, then reach the top.";
-                case SpecialLevelType.BossRise: return "A boss rises behind you. Outclimb it.";
                 case SpecialLevelType.SprintRest: return "Sprint between shelters and rest on them.";
                 case SpecialLevelType.RivalRace: return "Reach the top before your rival does.";
                 default: return "";
@@ -192,7 +188,6 @@ namespace FluffyClimbers.Simulation
                 case SpecialLevelType.KeepMoving: return "M";
                 case SpecialLevelType.ComboGates: return "G";
                 case SpecialLevelType.SkyHoops: return "O";
-                case SpecialLevelType.BossRise: return "B";
                 case SpecialLevelType.SprintRest: return "S";
                 case SpecialLevelType.RivalRace: return "R";
                 default: return "";

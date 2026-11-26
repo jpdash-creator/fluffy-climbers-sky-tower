@@ -38,47 +38,71 @@ namespace FluffyClimbers.Tests
         // ---- interstitial rule ----
 
         [Test]
-        public void InterstitialIsOfferedOnEveryThirdRestartOnly()
+        public void FailedTypeExitsShowOnEverySecondEventOnly()
         {
             var p = new InterstitialPolicy();
-            Assert.IsFalse(p.OnRestart(0f, true, true), "1st restart");
-            Assert.IsFalse(p.OnRestart(1f, true, true), "2nd restart");
-            Assert.IsTrue(p.OnRestart(2f, true, true), "3rd restart");
-            p.MarkShown(2f);
-            Assert.IsFalse(p.OnRestart(3f, true, true));
-            Assert.IsFalse(p.OnRestart(4f, true, true));
-            Assert.IsFalse(p.OnRestart(5f, true, true), "6th restart, but only 3 s after the last ad");
-            Assert.IsFalse(p.OnRestart(6f, true, true));
-            Assert.IsFalse(p.OnRestart(7f, true, true));
-            Assert.IsTrue(p.OnRestart(2f + InterstitialPolicy.MinSecondsBetween, true, true), "9th restart, 4 minutes after the close");
+            Assert.AreEqual(2, InterstitialPolicy.EveryNthExit);
+            Assert.IsFalse(p.OnExit(0f, true, true), "1st exit event");
+            Assert.IsTrue(p.OnExit(1f, true, true), "2nd exit event");
+            p.MarkShown(1f);
+            Assert.IsFalse(p.OnExit(2f, true, true), "3rd");
+            Assert.IsFalse(p.OnExit(3f, true, true), "4th, but 2 s after the last ad");
+            Assert.IsFalse(p.OnExit(4f, true, true), "5th");
+            Assert.IsTrue(p.OnExit(1f + InterstitialPolicy.MinSecondsBetween, true, true), "6th, 120 s after the close");
         }
 
         [Test]
-        public void InterstitialNeedsConsentAndALoadedAdAndNeverBlocksTheRestart()
+        public void InterstitialNeedsConsentAndALoadedAdAndNeverBlocksTheExit()
         {
             var p = new InterstitialPolicy();
-            p.OnRestart(0f, true, true); p.OnRestart(0f, true, true);
-            Assert.IsFalse(p.OnRestart(0f, false, true), "no consent: no ad");
-            p.OnRestart(0f, true, false); p.OnRestart(0f, true, false);
-            Assert.IsFalse(p.OnRestart(0f, true, false), "no ad loaded: skipped at once");
+            p.OnExit(0f, true, true);
+            Assert.IsFalse(p.OnExit(0f, false, true), "no consent: no ad");
+            p.OnExit(0f, true, false);
+            Assert.IsFalse(p.OnExit(0f, true, false), "no ad loaded: skipped at once");
             Assert.AreEqual(0, p.Restarts, "a skipped candidate starts the count over");
-            p.OnRestart(0f, true, true); p.OnRestart(0f, true, true);
-            Assert.IsTrue(p.OnRestart(0f, true, true), "the next 3rd restart is a candidate again");
+            p.OnExit(0f, true, true);
+            Assert.IsTrue(p.OnExit(0f, true, true), "the next 2nd exit is a candidate again");
+            Assert.IsFalse(p.OnPausedExit(0f, false, true), "paused exit: no consent, no ad");
+            Assert.IsFalse(p.OnPausedExit(0f, true, false), "paused exit: no ad loaded, no ad");
+            Assert.IsTrue(p.OnPausedExit(0f, true, true));
         }
 
         [Test]
-        public void HomeAndShopExitsShareTheRestartCounter()
+        public void PausedExitsAttemptAnAdEveryTimeWithoutCounting()
         {
             var p = new InterstitialPolicy();
-            Assert.IsFalse(p.OnRestart(0f, true, true), "1st event: a restart");
-            Assert.IsFalse(p.OnExit(1f, true, true), "2nd event: an exit through Home or Shop");
-            Assert.IsTrue(p.OnExit(2f, true, true), "3rd event, an exit: shared counter, the ad is due");
-            p.MarkShown(2f);
-            Assert.IsFalse(p.OnExit(3f, true, true));
-            Assert.IsFalse(p.OnRestart(4f, true, true));
-            Assert.IsFalse(p.OnExit(5f, true, true), "6th event, but 3 s after the last ad");
-            Assert.IsFalse(p.OnExit(6f, false, true), "no consent: never an ad on exit");
-            Assert.AreEqual(1, p.Restarts, "the 6th event reset the counter, the 7th started the next round");
+            Assert.IsTrue(p.OnPausedExit(0f, true, true), "1st paused exit: ad");
+            p.MarkShown(0f);
+            Assert.IsFalse(p.OnPausedExit(60f, true, true), "60 s after the close: too soon");
+            Assert.IsFalse(p.OnPausedExit(119.9f, true, true));
+            Assert.IsTrue(p.OnPausedExit(120f, true, true), "120 s after the close: ad again, no counting");
+            p.MarkShown(120f);
+            Assert.IsTrue(p.OnPausedExit(240f, true, true));
+        }
+
+        [Test]
+        public void PausedAndFailedExitsHaveSeparateCountersButShareTheGap()
+        {
+            var p = new InterstitialPolicy();
+            Assert.IsFalse(p.OnExit(0f, true, true), "failed exit 1 of 2");
+            Assert.AreEqual(1, p.Restarts);
+            Assert.IsTrue(p.OnPausedExit(1f, true, true), "a paused exit does not touch the failed counter");
+            Assert.AreEqual(1, p.Restarts, "paused exits are not counted");
+            p.MarkShown(1f);
+            Assert.IsFalse(p.OnExit(2f, true, true), "failed exit 2 is due, but 1 s after a paused-exit ad: the shared gap blocks it");
+            Assert.AreEqual(0, p.Restarts, "the blocked candidate is not made up later");
+            Assert.IsFalse(p.OnExit(3f, true, true), "failed exit 1 of the next round");
+            Assert.IsTrue(p.OnExit(1f + InterstitialPolicy.MinSecondsBetween, true, true), "failed exit 2: 120 s after the last close");
+            p.MarkShown(121f);
+            Assert.IsFalse(p.OnPausedExit(122f, true, true), "and a paused exit right after a failed-exit ad is blocked too");
+        }
+
+        [Test]
+        public void RestartAliasCountsAsAFailedTypeExit()
+        {
+            var p = new InterstitialPolicy();
+            Assert.IsFalse(p.OnRestart(0f, true, true));
+            Assert.IsTrue(p.OnExit(1f, true, true), "Retry then Home: the 2nd failed-type exit event");
         }
 
         [Test]
@@ -97,12 +121,12 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void IntervalIsFourMinutesAfterTheLastClose()
+        public void IntervalIsTwoMinutesAfterTheLastClose()
         {
             Assert.IsTrue(InterstitialPolicy.IntervalPassed(false, 0f, 0f), "nothing shown yet");
-            Assert.IsFalse(InterstitialPolicy.IntervalPassed(true, 100f, 339f));
-            Assert.IsTrue(InterstitialPolicy.IntervalPassed(true, 100f, 340f));
-            Assert.AreEqual(240f, InterstitialPolicy.MinSecondsBetween);
+            Assert.IsFalse(InterstitialPolicy.IntervalPassed(true, 100f, 219f));
+            Assert.IsTrue(InterstitialPolicy.IntervalPassed(true, 100f, 220f));
+            Assert.AreEqual(120f, InterstitialPolicy.MinSecondsBetween);
         }
 
         [Test]

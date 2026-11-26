@@ -151,7 +151,7 @@ namespace FluffyClimbers.Simulation.Tests
                 // kind list: the shipped level's options (SpecialPlatforms.Options, minus the wall-bounce exclusions of a no-wall-bounce goal) equal the endless list of level n
                 HashSet<PlatformKind> expected = new HashSet<PlatformKind>(SpecialPlatforms.Options(ll.Spec, SignatureKinds.PlatformFor(ll.Spec.Signature)));
                 HashSet<PlatformKind> got = new HashSet<PlatformKind>(EndlessTower.OptionsForLevel(probe, n));
-                if (ll.Spec.Goal.Type == GoalType.NoWallBounce) { got.Remove(PlatformKind.SurfBoostWave); got.Remove(PlatformKind.PinwheelGust); got.Remove(PlatformKind.DragonflyDart); got.Remove(PlatformKind.SporeFunnel); got.Remove(PlatformKind.CaramelMagnet); got.Remove(PlatformKind.WaterBambooTipper); }   // the same exclusions as SpecialPlatforms.Options (Final Change 6 air and carry kinds)
+                if (ll.Spec.Goal.Type == GoalType.NoWallBounce) { got.Remove(PlatformKind.SurfBoostWave); got.Remove(PlatformKind.PinwheelGust); got.Remove(PlatformKind.DragonflyDart); got.Remove(PlatformKind.CaramelMagnet); got.Remove(PlatformKind.WaterBambooTipper); }   // the same exclusions as SpecialPlatforms.Options (Final Change 6 air and carry kinds)
                 Assert.True(expected.SetEquals(got), "region " + region + " level " + n + ": shipped {" + string.Join(",", expected) + "} endless {" + string.Join(",", got) + "}");
                 Assert.True(ll.Spec.Signature == Signatures[r0]);
             }

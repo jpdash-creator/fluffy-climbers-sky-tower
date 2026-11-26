@@ -46,8 +46,8 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.InRange(s.HalfSpeedJump, 5.4, 5.46);
             Assert.InRange(s.FullSpeedJump, 6.4, 6.47);
             Assert.InRange(s.StickyJump, 2.2, 2.23);
-            Assert.InRange(s.BounceLaunch, 26.5, 26.7);
-            Assert.InRange(s.BounceHeight, 8.8, 8.9);
+            Assert.InRange(s.BounceLaunch, 34.1, 34.3);   // 19 x 1.8: every spring launches like Region 2's Bounce Cap since 2026-11-26 (owner Final Bugs 1)
+            Assert.InRange(s.BounceHeight, 14.5, 14.8);
         }
 
         [Fact]

@@ -128,7 +128,7 @@ namespace FluffyClimbers.Tests
                     if (img.sprite == null || img.color.a < 0.3f || !img.gameObject.activeInHierarchy || Theme.IsSurfaceSprite(img.sprite)) continue;
                     if (img.GetComponent<Button>() != null) continue;          // buttons are audited as buttons
                     string n = img.name;
-                    if (n == "Bg" || n == "Fill" || n == "Panel" || n == "Ribbon" || n == "WalletPanel" || n == "StarPill" || n == "RowsBacking" || n == "TopBacking" || n == "SeamSky" || n == "NameBacking" || n == "Ground" || n == "GroundEdge" || n == "DirtOval" || n == "Backdrop") continue;   // GearPic: number badges sit on their own backing over its corner by design; the others are scenery
+                    if (n == MetaController.LockedShadeName || n == "Bg" || n == "Fill" || n == "Panel" || n == "Ribbon" || n == "WalletPanel" || n == "StarPill" || n == "RowsBacking" || n == "TopBacking" || n == "SeamSky" || n == "NameBacking" || n == "Ground" || n == "GroundEdge" || n == "DirtOval" || n == "Backdrop") continue;   // GearPic: number badges sit on their own backing over its corner by design; the others are scenery
                     Rect ib = ToCanvasUnits(img.rectTransform, cam, scale);
                     if (ib.width * ib.height > 0.35f * (a.W / scale) * (a.H / scale)) continue;   // full-screen art
                     items.Add(new Item { Rt = img.rectTransform, Box = ib, Name = Path(img.transform) + " [image]", IsImage = true });
@@ -942,6 +942,86 @@ namespace FluffyClimbers.Tests
             Report(problems);
         }
 
+        /// <summary>
+        /// Final Bugs 1 item 4 (owner 2026-11-26): a locked level tile keeps its number and badges under a translucent black layer of its own shape, with the small padlock bottom right
+        /// INSIDE the tile and clear of the badges; tapping it opens the normal level popup whose PLAY is disabled (still 48 dp), with a "Clear level N first" line that sits inside the
+        /// panel, between the content and PLAY, on every aspect, with and without a notch, at 100 and 130 percent text.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator LockedLevelTileAndPopupFitEveryAspectAt100And130Percent()
+        {
+            int prevPct = GameSettings.TextPercent;
+            var problems = new List<string>();
+            foreach (int pct in new[] { 100, 130 })
+            {
+                GameSettings.TextPercent = pct;
+                yield return Load("Meta");
+                var meta = Object.FindFirstObjectByType<MetaController>();
+                RegionDef r1 = GameSession.Repo.GetRegionByIndex(1);
+                var levels = GameSession.Repo.LevelsOf(r1.Id);
+                int last = GameSession.Progress.LastOpenLevelIndex(r1, GameSettings.Difficulty);
+                var holder = new RenderTexture[1];
+                foreach (Aspect a in Aspects)
+                {
+                    foreach (Rect safe in new[] { FullSafe, NotchSafe })
+                    {
+                        Rect sf = safe;
+                        UiKit.SafeAreaNormalized = () => sf;
+                        string tag = "locked@" + a.Name + (safe == NotchSafe ? "+notch" : "") + "/" + pct;
+                        meta.ShowLevels(r1);
+                        yield return ApplyAspect(a, holder);
+                        yield return null;
+                        // every locked tile of the region: number, black layer of the tile's own shape, padlock inside the tile and clear of the corner badges
+                        for (int i = last; i < levels.Count; i++)
+                        {
+                            RectTransform node = FindRt("Level" + levels[i].Index);
+                            if (node == null) { problems.Add(tag + ": no tile for level " + levels[i].Index); continue; }
+                            string who = tag + " level " + levels[i].Index;
+                            RectTransform shade = node.Find(MetaController.LockedShadeName) as RectTransform, lk = node.Find(MetaController.LockedIconName) as RectTransform;
+                            bool crown = levels[i].LevelClass == LevelDef.ClassHighlyComplex;   // the crown bubble carries a crown instead of the number
+                            if (!crown && node.Find("Num") == null) problems.Add(who + ": a locked tile lost its number");
+                            if (shade == null || lk == null) { problems.Add(who + ": black layer or padlock missing"); continue; }
+                            Rect nb = CanvasBox(node), sb = CanvasBox(shade), lb = CanvasBox(lk);
+                            if (Mathf.Abs(sb.width - nb.width) > 1f || Mathf.Abs(sb.height - nb.height) > 1f || Mathf.Abs(sb.center.x - nb.center.x) > 1f || Mathf.Abs(sb.center.y - nb.center.y) > 1f) problems.Add(who + ": the black layer is not the tile's shape");
+                            if (Mathf.Abs(shade.localScale.x - shade.localScale.y) > 0.001f || Mathf.Abs(lk.localScale.x - lk.localScale.y) > 0.001f) problems.Add(who + ": non-uniform scale");
+                            if (!nb.Contains(lb.center) && Mathf.Abs(lb.center.x - nb.xMax) > 4f && Mathf.Abs(lb.center.y - nb.yMin) > 4f) problems.Add(who + ": the padlock is not on the tile corner");   // it hangs off the bottom right corner like the lock of a region pin (half outside)
+                            if (lb.center.x < nb.center.x || lb.center.y > nb.center.y) problems.Add(who + ": the padlock is not at the bottom right");
+                            foreach (string badge in new[] { MetaController.GemBadgeName, MetaController.SpecialBadgeName, "MedalBadge" })
+                            {
+                                RectTransform bt = node.Find(badge) as RectTransform;
+                                if (bt != null && CanvasBox(bt).Overlaps(lb)) problems.Add(who + ": the padlock overlaps the " + badge);
+                            }
+                        }
+                        // the popup of the first locked level
+                        meta.OnLevelTapped(levels[last]);
+                        yield return null;
+                        RectTransform popup = FindRt("Popup");
+                        RectTransform panel = popup != null ? popup.Find("Panel") as RectTransform : null;
+                        if (panel == null) { problems.Add(tag + ": the locked level opens no level popup"); continue; }
+                        RectTransform playRt = FindRt("PLAY", panel), lineRt = FindRt(MetaController.LockedLineName, panel);
+                        if (playRt == null || lineRt == null) { problems.Add(tag + ": PLAY or the lock line is missing"); continue; }
+                        Button play = playRt.GetComponent<Button>();
+                        if (play == null || play.interactable) problems.Add(tag + ": PLAY must be disabled on a locked level");
+                        string lineText = lineRt.GetComponent<Text>().text;
+                        if (lineText != LevelLockText.ClearFirst(last)) problems.Add(tag + ": the line says '" + lineText + "', expected '" + LevelLockText.ClearFirst(last) + "'");
+                        Rect pb = CanvasBox(panel), playBox = CanvasBox(playRt), lineBox = CanvasBox(lineRt);
+                        if (playBox.width < UiKit.MinTouchPx - 1f || playBox.height < UiKit.MinTouchPx - 1f) problems.Add(tag + ": the disabled PLAY is below 48 dp");
+                        if (lineBox.xMin < pb.xMin - 0.5f || lineBox.xMax > pb.xMax + 0.5f || lineBox.yMin < pb.yMin - 0.5f || lineBox.yMax > pb.yMax + 0.5f) problems.Add(tag + ": the lock line leaves the panel");
+                        if (lineBox.yMin < playBox.yMax - 0.5f) problems.Add(tag + ": the lock line overlaps PLAY");
+                        foreach (Transform t in panel)
+                        {
+                            bool content = t.name == "Goal" || t.name == "Rule" || t.name.StartsWith("Star") || t.name == CrownInfoUi.RowName;
+                            if (content && t.gameObject.activeInHierarchy && CanvasBox((RectTransform)t).Overlaps(lineBox)) problems.Add(tag + ": the lock line overlaps " + t.name);
+                        }
+                        meta.ShowLevels(r1);   // closes the popup for the next round
+                    }
+                }
+                Restore(holder);
+            }
+            GameSettings.TextPercent = prevPct;
+            Report(problems);
+        }
+
         /// <summary>Settings (Bug List 6 item 7): no ScrollRect anywhere, every row inside the popup, at 100 and 130 percent text on every aspect and with a notch.</summary>
         [UnityTest]
         public IEnumerator SettingsHasNoScrollViewAndFitsAt130Percent()
@@ -1219,9 +1299,12 @@ namespace FluffyClimbers.Tests
                 if (starArt) Assert.AreEqual(3, NodeStars(n2), "Relaxed: level 2 shows its 3 Relaxed stars");
                 StringAssert.Contains("3 of 3 stars on Relaxed", n2.GetComponent<A11yLabel>().Text);
                 Assert.IsNotNull(n7.Find("Num"), "Relaxed: level 7 is open");
+                Assert.IsNull(n7.Find(MetaController.LockedShadeName), "Relaxed: an open tile has no black layer");
                 Assert.AreEqual(1.15f, n7.localScale.x, 0.01f, "Relaxed: level 7 is the current level (bigger node)");
                 StringAssert.Contains("current level", n7.GetComponent<A11yLabel>().Text);
-                Assert.IsNull(n8.Find("Num"), "Relaxed: level 8 is locked");
+                Assert.IsNotNull(n8.Find("Num"), "Relaxed: a locked tile keeps its number (Final Bugs 1)");
+                Assert.IsNotNull(n8.Find(MetaController.LockedShadeName), "Relaxed: level 8 is locked: black layer over the tile");
+                Assert.IsNotNull(n8.Find(MetaController.LockedIconName), "Relaxed: level 8 is locked: small padlock bottom right");
                 Assert.AreEqual(-1, NodeStars(n8), "a locked level shows no stars");
                 StringAssert.Contains("locked on Relaxed", n8.GetComponent<A11yLabel>().Text);
                 Rect vpBox = CanvasBox(FindRt("PathViewport"));
@@ -1246,8 +1329,9 @@ namespace FluffyClimbers.Tests
                 Assert.IsNotNull(n5.Find("Num"), "Hard: level 5 is open (level 4 is cleared on Hard)");
                 Assert.AreEqual(1.15f, n5.localScale.x, 0.01f, "Hard: level 5 is the current level");
                 if (starArt) Assert.AreEqual(0, NodeStars(n5), "Hard: level 5 has no Hard star yet");
-                Assert.IsNull(n6.Find("Num"), "Hard: level 6 is locked although it is cleared on Relaxed");
-                Assert.IsNull(n7.Find("Num"), "Hard: level 7 is locked");
+                Assert.IsNotNull(n6.Find(MetaController.LockedShadeName), "Hard: level 6 is locked although it is cleared on Relaxed");
+                Assert.IsNotNull(n6.Find("Num"), "Hard: a locked tile keeps its number");
+                Assert.IsNotNull(n7.Find(MetaController.LockedShadeName), "Hard: level 7 is locked");
                 Assert.AreEqual(1f, n7.localScale.x, 0.01f, "Hard: level 7 is no longer the current level");
                 if (gemArt)
                 {
@@ -1273,7 +1357,8 @@ namespace FluffyClimbers.Tests
                 Assert.AreEqual("100%", FindRt(CrownInfoUi.SecondValueName, panel).GetComponent<Text>().text, "Hard has 1 star: a clear still pays in full");
                 meta.OnLevelTapped(levels[6]);   // level 7 is locked on Hard
                 yield return null;
-                Assert.AreEqual("Clear level 6 on Hard first.", FindRt("Body").GetComponent<Text>().text, "the lock message names the setting");
+                Assert.AreEqual("Clear level 5 first", FindRt(MetaController.LockedLineName).GetComponent<Text>().text, "the line names the player's last OPEN level on Hard (1..4 cleared, 5 open)");
+                Assert.IsFalse(FindRt("PLAY").GetComponent<Button>().interactable, "PLAY is disabled on a locked level");
 
                 // ---- back to Relaxed ----
                 meta.ShowLevels(r1);
@@ -2797,6 +2882,46 @@ namespace FluffyClimbers.Tests
         [UnityTest]
         public IEnumerator BundlesPageAndTimerOfferSurvive130PercentText() { return BundlesAudit(130); }
 
+        /// <summary>Final Bugs 1 item 9: the yellow "Worth x4.2" pill on the purchase-result card is wide enough for its text (one line) at 100 and 130 percent on every aspect.</summary>
+        [UnityTest]
+        public IEnumerator BundleRevealWorthPillTextIsOneLineAt100And130Percent()
+        {
+            int prevPct = GameSettings.TextPercent;
+            var problems = new List<string>();
+            yield return Load("Meta");
+            foreach (int pct in new[] { 100, 130 })
+            {
+                GameSettings.TextPercent = pct;
+                var holder = new RenderTexture[1];
+                foreach (Aspect a in Aspects)
+                {
+                    UiKit.SafeAreaNormalized = () => FullSafe;
+                    ShopScreen.Host h = ShowBundlesPage(5000, 0);
+                    BundleDef def = GameSession.Progress.Bundles.All[0];
+                    BundlesScreen.ShowReveal(h, def, CharacterDefs.Get("candygirl_u"), def.PriceGems);
+                    yield return ApplyAspect(a, holder);
+                    yield return null;
+                    Canvas.ForceUpdateCanvases();
+                    RectTransform pill = FindRt("WorthPill");
+                    if (pill == null) { problems.Add("worth-pill@" + a.Name + "/" + pct + ": no worth pill on the reveal card"); continue; }
+                    Text t = pill.GetComponentInChildren<Text>();
+                    string tag = "worth-pill@" + a.Name + "/" + pct;
+                    if (t == null) { problems.Add(tag + ": no worth text"); continue; }
+                    if (t.cachedTextGenerator.lineCount > 1) problems.Add(tag + ": the worth text wraps onto " + t.cachedTextGenerator.lineCount + " lines");
+                    if (t.fontSize < Mathf.RoundToInt(UiKit.MinBodyTextPx) - 1) problems.Add(tag + ": the worth text is below 16 sp");
+                    Rect pb = CanvasBox(pill), tb = CanvasBox(t.rectTransform);
+                    if (tb.xMin < pb.xMin - 0.5f || tb.xMax > pb.xMax + 0.5f) problems.Add(tag + ": the worth text leaves the pill");
+                    RectTransform card = FindRt("CardReveal");
+                    if (card != null) { Rect cb = CanvasBox(card); if (pb.xMin < cb.xMin - 0.5f || pb.xMax > cb.xMax + 0.5f) problems.Add(tag + ": the pill leaves the card"); }
+                }
+                Restore(holder);
+            }
+            DropBundlesCanvas();
+            MetaUiActive(true);
+            GameSettings.TextPercent = prevPct;
+            Report(problems);
+        }
+
         static GameObject bundlesTestCanvas;
 
         static void MetaUiActive(bool on)
@@ -2971,7 +3096,7 @@ namespace FluffyClimbers.Tests
                             if (ch.name == "Chip" && ch.gameObject.activeInHierarchy && CanvasBox((RectTransform)ch).Overlaps(fb)) problems.Add(tag + ": " + card.name + " frame overlaps a chip");
                     }
                     if (cards == 0) problems.Add(tag + ": no bundle cards found");
-                    foreach (string refresh in new[] { "RefreshGems", "RefreshCoins" })
+                    foreach (string refresh in new[] { "RefreshGems" })
                     {
                         RectTransform rb = FindRt(refresh);
                         if (rb != null && rb.parent.name == "BuyFrame") problems.Add(tag + ": " + refresh + " must not have the brown frame");
@@ -3003,7 +3128,7 @@ namespace FluffyClimbers.Tests
                 BundlesScreen.ShowReveal(h, four ?? GameSession.Progress.Bundles.All[0], CharacterDefs.Get("candygirl_u"));
             }, problems);
             yield return CheckScreen("bundles-card-reveal-no-hero-fallback", () => { ShopScreen.Host h = ShowBundlesPage(5000, 0); BundlesScreen.ShowReveal(h, GameSession.Progress.Bundles.All[0], null); }, problems);
-            yield return CheckScreen("bundles-refreshed-with-coins", () => { ShowBundlesPage(5000, 500); ClickByName("RefreshCoins"); }, problems);
+            yield return CheckScreen("bundles-refreshed-with-gems", () => { ShowBundlesPage(5000, 500); ClickByName("RefreshGems"); }, problems);
             yield return CheckScreen("bundles-refresh-toast-broke", () => { ShowBundlesPage(0, 0); ClickByName("RefreshGems"); }, problems);
             DropBundlesCanvas();
             MetaUiActive(true);
@@ -3017,7 +3142,7 @@ namespace FluffyClimbers.Tests
         }
 
         // ---- special level types (owner Final Change 1, 2026-11-22): tile badge, level popup, run intro, One Life (no revive), No Power-ups (no buttons), Keep Moving (ring + cue) ----
-        // Region 1 placement (Final Change 6): L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L17 Boss Rise, L21 Sprint and Rest, L24 Sky Hoops (Combo Gates was retired 2026-11-26), L25 Boss Rise (a gem level: its tile keeps the gem badge, the popup names the type).
+        // Region 1 placement (Final Change 6): L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L21 Sprint and Rest, L24 Sky Hoops (Combo Gates was retired 2026-11-26).
 
         [UnityTest]
         public IEnumerator SpecialLevelTilesAndPopupsFitEveryAspect() { return SpecialLevelMetaAudit(100); }
@@ -3112,7 +3237,7 @@ namespace FluffyClimbers.Tests
                     if (star != null) Assert.IsFalse(CanvasBox((RectTransform)star).Overlaps(bb), "level " + level.Index + ": badge over star " + s);
                 }
             }
-            Assert.AreEqual(SpecialLevels.Count + 1, badges, "one tile per special level among the open levels 1 to 24: eight types, Sky Hoops twice (Boss Rise has its second level on the locked gem level 25)");
+            Assert.AreEqual(SpecialLevels.Count + 1, badges, "one tile per special level among the open levels 1 to 24: seven types, Sky Hoops twice (Boss Rise was removed 2026-11-26)");
             Assert.AreEqual(medalLevels.Length, medalBadges, "the two-digit tiles 16 and 20 show their medal");
             if (GameSession.Art != null && GameSession.Art.GemIcon != null) Assert.AreEqual(4, gemBadges, "the open gem levels 5, 10, 15 and 20 carry the gem badge");
 
@@ -3120,7 +3245,7 @@ namespace FluffyClimbers.Tests
             foreach (LevelDef level in levels)
             {
                 SpecialLevelType type = level.SpecialType;
-                if (type == SpecialLevelType.None || level.Index > 24) continue;   // level 25 stays locked here (no popup); it is a Boss Rise gem level
+                if (type == SpecialLevelType.None || level.Index > 24) continue;   // level 25 stays locked here (no popup)
                 LevelDef l = level;
                 yield return CheckScreen("level-popup-special-" + type, () => { meta.ShowLevels(r1); meta.OnLevelTapped(l); }, problems);
                 RectTransform panel = FindRt("Popup").Find("Panel") as RectTransform;
@@ -3293,9 +3418,9 @@ namespace FluffyClimbers.Tests
             Report(problems);
         }
 
-        // ---- owner 2026-11-26: ALL level text (Gates, Rings, Rival, Boss, Shelter, Keep Moving) sits in ONE dark glass chip in the top strip, right beside the run timer ----
+        // ---- owner 2026-11-26: ALL level text (Gates, Rings, Rival, Shelter, Keep Moving) sits in ONE dark glass chip in the top strip, right beside the run timer ----
 
-        static readonly string[] LevelChipLevels = { "lvl_001_08", "lvl_001_12", "lvl_001_16", "lvl_001_17", "lvl_001_21" };   // Sky Hoops, Rival Race, Keep Moving, Boss Rise, Sprint and Rest
+        static readonly string[] LevelChipLevels = { "lvl_001_08", "lvl_001_12", "lvl_001_16", "lvl_001_21" };   // Sky Hoops, Rival Race, Keep Moving, Sprint and Rest
 
         [UnityTest]
         public IEnumerator LevelChipSitsInTheTopStripNextToTheTimerOnEveryAspect() { return LevelChipAudit(100, false); }

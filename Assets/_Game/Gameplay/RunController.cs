@@ -33,8 +33,8 @@ namespace FluffyClimbers.Gameplay
 
         /// <summary>The leaderboard seed ticket of the run that is playing (null = a local seed: the run is never uploaded). Set when the run begins, read when it ends.</summary>
         public StartTicket CurrentTicket { get; private set; }
-        /// <summary>Longest wait for a leaderboard ticket before the first run of the scene starts with a local seed (the call usually answers in well under a second).</summary>
-        const float TicketWaitSeconds = 1.5f;
+        /// <summary>True when the player takes part but the current run began without a server ticket: the results card says so (owner item 11).</summary>
+        public bool UnrankedNoConnection { get; private set; }
 
         void Start()
         {
@@ -53,10 +53,12 @@ namespace FluffyClimbers.Gameplay
         System.Collections.IEnumerator StartAfterTicket(string kind, string target)
         {
             bool answered = false;
-            LeaderboardHub.RequestTicket(kind, target, GameSettings.Difficulty, t => answered = true);
-            float deadline = Time.unscaledTime + TicketWaitSeconds;
-            while (!answered && Time.unscaledTime < deadline) yield return null;
-            StartSelected();
+            int mode = GameSettings.Difficulty;
+            LeaderboardHub.RequestTicket(kind, target, mode, t => answered = true);
+            float start = Time.unscaledTime;
+            // up to TicketWaitPolicy.MaxWaitSeconds: a ticket that is still on its way (also an earlier prefetch) is awaited; a failed request ends the wait at once and the run starts unranked
+            while (TicketWaitPolicy.KeepWaiting(LeaderboardHub.HasTicket(kind, target, mode), !answered || LeaderboardHub.TicketInFlight(kind, target, mode), Time.unscaledTime - start)) yield return null;
+            StartSelected();   // a ticket that arrives after this point is only cached for the NEXT run: the run never reseeds mid-run
         }
 
         void StartSelected()
@@ -105,6 +107,7 @@ namespace FluffyClimbers.Gameplay
             StartTicket ticket = GameSession.FixedAttemptSeed == 0 ? TakeTicket("level", levelId) : null;   // a QA seed override is never ranked
             GameSession.AttemptSeed = ticket != null ? ticket.Seed : GameSession.NewAttemptSeed();
             CurrentTicket = ticket;
+            UnrankedNoConnection = TicketWaitPolicy.ShowUnrankedNote(LeaderboardHub.WantsTicket && GameSession.FixedAttemptSeed == 0, ticket != null);
             // Strip-gems flag: the gems of a level are paid once, so a level cleared in ANY Gameplay setting holds none on a replay (IsLevelCleared without a setting = any setting).
             BeginRun(new RunSession(GameSession.Repo, GameSession.BuildRunCfg(GameSession.RegionIndexOfLevel(levelId)), levelId, GameSession.Progress != null && GameSession.Progress.IsLevelCleared(levelId), GameSession.AttemptSeed));
             Debug.Log("Run layout: " + Session.LayoutInfo);
@@ -120,6 +123,7 @@ namespace FluffyClimbers.Gameplay
             StartTicket ticket = TakeTicket("endless", regionId);
             GameSession.EndlessSeed = ticket != null ? ticket.Seed : GameSession.NewEndlessSeed();
             CurrentTicket = ticket;
+            UnrankedNoConnection = TicketWaitPolicy.ShowUnrankedNote(LeaderboardHub.WantsTicket && GameSession.FixedAttemptSeed == 0, ticket != null);
             BeginRun(new RunSession(GameSession.Repo, GameSession.BuildRunCfg(GameSession.RegionIndexOf(regionId)), GameSession.Repo.GetRegion(regionId), GameSession.EndlessSeed));
         }
 
@@ -133,6 +137,7 @@ namespace FluffyClimbers.Gameplay
             StartTicket ticket = TakeTicket("timeattack", regionId);
             GameSession.EndlessSeed = ticket != null ? ticket.Seed : GameSession.NewEndlessSeed();
             CurrentTicket = ticket;
+            UnrankedNoConnection = TicketWaitPolicy.ShowUnrankedNote(LeaderboardHub.WantsTicket && GameSession.FixedAttemptSeed == 0, ticket != null);
             BeginRun(new RunSession(GameSession.Repo, GameSession.BuildRunCfg(GameSession.RegionIndexOf(regionId)), GameSession.Repo.GetRegion(regionId), GameSession.EndlessSeed, true));
         }
 
@@ -282,6 +287,7 @@ namespace FluffyClimbers.Gameplay
                 ReportRunStats();
                 LeaderboardRunGlue.Upload(endlessRecord, Session.State.Score, CurrentTicket, GameSession.Progress);   // the fresh record of the run; revived runs count too
                 GameSession.LastResult = new RunResult { Endless = true, TimeAttack = Session.IsTimeAttack, RegionId = Session.Region.Id, Floors = Session.State.Row, Score = Session.State.Score, EndlessReward = er, Ticks = endlessRecord.Ticks, PaceNumerator = endlessRecord.Floors, PaceDenominator = endlessRecord.Ticks, Revived = endlessRecord.Revived, Record = endlessRecorded };
+                Hud.UnrankedNote = UnrankedNoConnection ? TicketWaitPolicy.UnrankedNoteText : null;
                 Hud.ShowEndlessFailed(Session, er);
                 return;
             }
@@ -299,6 +305,7 @@ namespace FluffyClimbers.Gameplay
                 GameSession.LastResult = new RunResult { LevelId = Session.Level.Id, Completed = true, Reward = reward, Stars = reward.Stars, Score = Session.State.Score, Floors = levelRecord.Floors, Ticks = levelRecord.Ticks, PaceNumerator = levelRecord.Floors, PaceDenominator = levelRecord.Ticks, Revived = levelRecord.Revived, Record = levelRecorded };
                 doubleCoinsUsed = false;
                 bool offerDouble = ProgressService.DoubleCoinsAmount(reward) > 0 && AdGate.IsRewardedReady(AdPlacements.DoubleReward);   // hidden when no ad is ready
+                Hud.UnrankedNote = UnrankedNoConnection ? TicketWaitPolicy.UnrankedNoteText : null;
                 Hud.ShowResults(Session, reward, nextForTicket != null, offerDouble);   // "Next level" only when the next level is open in the setting of this run
             }
             else
@@ -351,42 +358,37 @@ namespace FluffyClimbers.Gameplay
         }
 
         /// <summary>
-        /// Every restart (Retry on the failed popup, Restart in the pause menu, "Play again" on the results) goes through here. Every 3rd one may show a full-screen interstitial first
-        /// (<see cref="InterstitialPolicy"/>: 4 minutes apart, consent needed, an ad already loaded); in every other case the restart happens in the same tap. The new run starts when
-        /// the ad closes or fails, never later (CUX-7: the one-tap retry is never blocked).
+        /// Restart (Retry on a failed popup or game over, Restart in a pause popup, "Play again" on the results). Final Bugs 1 item 7: from a PAUSED run (pause or "Get ready" popup)
+        /// an interstitial is attempted every time; from a failed or finished run it follows the every-2nd-exit counter (<see cref="InterstitialPolicy"/>). Consent, a loaded ad
+        /// and 120 s since the last close apply to both. The new run starts when the ad closes or fails, never later (CUX-7: the one-tap retry is never blocked).
         /// </summary>
         void Restart()
         {
-            if (adBusy || Session == null) return;
-            InterstitialPolicy policy = InterstitialPolicy.Shared;
-            bool show = policy.OnRestart(Time.realtimeSinceStartup, Services.ConsentGiven, AdGate.IsInterstitialReady(AdPlacements.RestartInterstitial));
-            if (!show) { RestartNow(); return; }
-            adBusy = true;
-            AdGate.ShowInterstitial(AdPlacements.RestartInterstitial, shown =>
-            {
-                adBusy = false;
-                if (shown) policy.MarkShown(Time.realtimeSinceStartup);   // the 4 minute pause counts from the close
-                if (this == null) return;                                  // left the scene while the ad was up
-                RestartNow();
-            });
+            ExitWithAd(RestartNow);
         }
 
+        /// <summary>True while the run is paused by the player (pause popup or the "Get ready" pause after a revive), not after a fail or finish.</summary>
+        bool InPausedRun { get { return Paused && Session != null && !Session.Over; } }
+
         /// <summary>
-        /// Home / Shop buttons of a run (owner 2026-11-25): same shared counter as <see cref="Restart"/>. The ad (when due) shows BEFORE the player goes on; then
-        /// <paramref name="go"/> runs whether the ad showed, failed or was not due, so leaving is never blocked.
+        /// Every way out of a run (Restart, Retry, Play again, Next, Home, X, Shop gate) goes through here. The ad (when due) shows BEFORE the player goes on; then
+        /// <paramref name="go"/> runs whether the ad showed, failed or was not due, so leaving is never blocked. Paused run: <c>OnPausedExit</c> (every time); otherwise <c>OnExit</c> (every 2nd).
         /// </summary>
         void ExitWithAd(System.Action go)
         {
             if (adBusy || Session == null) return;
             InterstitialPolicy policy = InterstitialPolicy.Shared;
-            bool show = policy.OnExit(Time.realtimeSinceStartup, Services.ConsentGiven, AdGate.IsInterstitialReady(AdPlacements.RestartInterstitial));
+            float now = Time.realtimeSinceStartup;
+            bool consent = Services.ConsentGiven;
+            bool ready = AdGate.IsInterstitialReady(AdPlacements.RestartInterstitial);
+            bool show = InPausedRun ? policy.OnPausedExit(now, consent, ready) : policy.OnExit(now, consent, ready);
             if (!show) { go(); return; }
             adBusy = true;
             AdGate.ShowInterstitial(AdPlacements.RestartInterstitial, shown =>
             {
                 adBusy = false;
-                if (shown) policy.MarkShown(Time.realtimeSinceStartup);
-                if (this == null) return;
+                if (shown) policy.MarkShown(Time.realtimeSinceStartup);   // the 120 s pause counts from the close
+                if (this == null) return;                                  // left the scene while the ad was up
                 go();
             });
         }
@@ -465,8 +467,8 @@ namespace FluffyClimbers.Gameplay
         void PlayNext()
         {
             LevelDef next = GameSession.NextLevel(Session.Level, Session.Mode);   // per-setting path (Final Change 1): the next level must be open in the setting of this run
-            if (next == null) { ExitToMeta(); return; }
-            StartRun(next.Id);
+            if (next == null) { ExitWithAd(ExitToMeta); return; }
+            ExitWithAd(() => StartRun(next.Id));   // Results "Next level" counts as a failed-type exit event (Final Bugs 1 item 7)
         }
 
         public void ExitToMeta()

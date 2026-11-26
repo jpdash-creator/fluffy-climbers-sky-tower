@@ -402,38 +402,37 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void RefreshCosts500CoinsOr25GemsAndDrawsSixNewDistinctOnes()
+        public void RefreshCosts25GemsOnlyAndDrawsSixNewDistinctOnes()
         {
             ProgressService svc = NewService();
             svc.AddCoins(650);
             svc.AddGems(60);
             List<string> first = svc.CurrentBundleOffers().Select(b => b.Id).ToList();
 
-            Assert.AreEqual(BundleResult.Ok, svc.RefreshBundleOffers(true));
-            Assert.AreEqual(150, svc.Coins);
-            Assert.AreEqual(60, svc.Gems);
+            Assert.AreEqual(BundleResult.Ok, svc.RefreshBundleOffers());
+            Assert.AreEqual(650, svc.Coins, "no coins are taken");
+            Assert.AreEqual(35, svc.Gems);
             List<string> second = svc.CurrentBundleOffers().Select(b => b.Id).ToList();
             Assert.AreEqual(6, second.Distinct().Count());
             Assert.IsEmpty(second.Intersect(first), "all six are new");
 
-            Assert.AreEqual(BundleResult.Ok, svc.RefreshBundleOffers(false));
-            Assert.AreEqual(150, svc.Coins);
-            Assert.AreEqual(35, svc.Gems);
+            Assert.AreEqual(BundleResult.Ok, svc.RefreshBundleOffers());
+            Assert.AreEqual(650, svc.Coins);
+            Assert.AreEqual(10, svc.Gems);
             List<string> third = svc.CurrentBundleOffers().Select(b => b.Id).ToList();
             Assert.AreEqual(6, third.Distinct().Count());
             Assert.IsEmpty(third.Intersect(second));
         }
 
         [Test]
-        public void RefreshWithAShortWalletChangesNothing()
+        public void RefreshWithAShortWalletChangesNothingAndCoinsNeverPay()
         {
             ProgressService svc = NewService();
-            svc.AddCoins(499);
+            svc.AddCoins(100000);
             svc.AddGems(24);
             svc.CurrentBundleOffers();
             string before = Snapshot(svc);
-            Assert.AreEqual(BundleResult.NotEnoughCoins, svc.RefreshBundleOffers(true));
-            Assert.AreEqual(BundleResult.NotEnoughGems, svc.RefreshBundleOffers(false));
+            Assert.AreEqual(BundleResult.NotEnoughGems, svc.RefreshBundleOffers());
             Assert.AreEqual(before, Snapshot(svc));
         }
 
@@ -441,12 +440,12 @@ namespace FluffyClimbers.Tests
         public void DrawsAreRepeatableFromTheStoredSeedAndCounter()
         {
             ProgressService a = NewService();
-            a.AddCoins(1000);
+            a.AddGems(100);
             ProgressService b = new ProgressService(repo, new MemorySaveStore(), 5) { Bundles = catalog, BundleClock = () => now };
-            b.AddCoins(1000);
+            b.AddGems(100);
             CollectionAssert.AreEqual(a.CurrentBundleOffers().Select(x => x.Id), b.CurrentBundleOffers().Select(x => x.Id));
-            a.RefreshBundleOffers(true);
-            b.RefreshBundleOffers(true);
+            a.RefreshBundleOffers();
+            b.RefreshBundleOffers();
             CollectionAssert.AreEqual(a.CurrentBundleOffers().Select(x => x.Id), b.CurrentBundleOffers().Select(x => x.Id));
         }
 
@@ -456,13 +455,13 @@ namespace FluffyClimbers.Tests
             var defs = new List<BundleDef>();
             for (int i = 0; i < 8; i++) defs.Add(Def("s" + i, 200, 1000 + i, Pw("pw_safety_net", 1)));
             ProgressService svc = NewService(BundleCatalog.FromDefs(defs));
-            svc.AddCoins(600);
+            svc.AddGems(100);
             Assert.AreEqual(6, svc.CurrentBundleOffers().Select(b => b.Id).Distinct().Count());
-            Assert.AreEqual(BundleResult.Ok, svc.RefreshBundleOffers(true));
+            Assert.AreEqual(BundleResult.Ok, svc.RefreshBundleOffers());
             Assert.AreEqual(6, svc.CurrentBundleOffers().Select(b => b.Id).Distinct().Count());
             ProgressService empty = NewService(BundleCatalog.FromDefs(new BundleDef[0]));
             Assert.AreEqual(0, empty.CurrentBundleOffers().Count);
-            Assert.AreEqual(BundleResult.Invalid, empty.RefreshBundleOffers(true));
+            Assert.AreEqual(BundleResult.Invalid, empty.RefreshBundleOffers());
         }
 
         // ---- the timer offer ----
@@ -597,9 +596,9 @@ namespace FluffyClimbers.Tests
         public void SaveRoundTripKeepsOffersAndCounters()
         {
             ProgressService svc = NewService();
-            svc.AddCoins(500);
+            svc.AddGems(100);
             svc.CurrentBundleOffers();
-            svc.RefreshBundleOffers(true);
+            svc.RefreshBundleOffers();
             svc.TickPlayTime(120);
             SaveData loaded = store.Load();
             Assert.AreEqual(6, loaded.Bundles.Offers.Count);

@@ -112,7 +112,7 @@ namespace FluffyClimbers.Simulation.Tests
         public void Region1OffersTheTwoKindsFromLevel2AndNeverOnLevel1()
         {
             PlatformKind[] set = RegionPlatformSets.For(SignatureKind.BounceFlowers);
-            Assert.Equal(11, set.Length);   // 7 (doc 24) + Dragonfly Dart + Dewdrop Mirror Leaf + Clover Swap + Pollen Puff (2026-11-26)
+            Assert.Equal(10, set.Length);   // 7 (doc 24) + Dragonfly Dart + Dewdrop Mirror Leaf + Clover Swap (2026-11-26; Pollen Puff was removed again)
             Assert.All(new[] { PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf }, k => Assert.Contains(k, set));
             PlatformKind sig = SignatureKinds.PlatformFor(SignatureKind.BounceFlowers);
             foreach (LoadedLevel ll in Region1())

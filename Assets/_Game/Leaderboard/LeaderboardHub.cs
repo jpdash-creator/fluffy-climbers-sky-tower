@@ -134,6 +134,13 @@ namespace FluffyClimbers.Leaderboard
             Raise();
         }
 
+        /// <summary>Set by the game: warms a run ticket for the run the player is most likely to start next (the selected Endless region or level). Called after a reset, a wipe and every successful profile sync.</summary>
+        public static Action WarmTickets;
+        static void Warm() { if (CanUpload && WarmTickets != null) WarmTickets(); }
+
+        /// <summary>A /start-run request for exactly this run is still open (a prefetch counts): the run start keeps waiting for it.</summary>
+        public static bool TicketInFlight(string kind, string target, int mode) { return ticketsInFlight.Contains(TicketKey(kind, target, mode)); }
+
         static long Now { get { return LeaderboardTime.ToUnix(Clock()); } }
         static void Raise() { if (Changed != null) Changed(); }
 
@@ -250,7 +257,7 @@ namespace FluffyClimbers.Leaderboard
         /// </summary>
         public static void OnProgressReset()
         {
-            tickets.Clear(); ticketsInFlight.Clear(); boards.Clear(); boardsAt.Clear(); myWeek = null; myWeekAt = 0;
+            tickets.Clear(); ticketsInFlight.Clear(); boards.Clear(); boardsAt.Clear(); myWeek = null; myWeekAt = 0; profileKey = "";
             Raise();
             RunPendingWipe();
         }
@@ -265,6 +272,7 @@ namespace FluffyClimbers.Leaderboard
                 wiping = false;
                 if (!ok) return;
                 if (progress != null) progress.ClearLeaderboardWipePending();
+                profileKey = ""; SyncProfile(); Warm();   // the wipe may have removed the weekly row: the player is on the boards again (0 crowns) right away, same name and uid
                 MarkStale();
                 Raise();
                 Pump();   // runs played while the wipe was pending go up now
@@ -316,7 +324,7 @@ namespace FluffyClimbers.Leaderboard
             {
                 if (!ok) { profileKey = ""; return; }
                 // Final Change 4: the profile exists now, so the service lists the player on all three boards (0 crowns until the first score); a failure retries with the next profile sync
-                client.RegisterMe(done => { if (!done) profileKey = ""; else { MarkStale(); Raise(); } });
+                client.RegisterMe(done => { if (!done) profileKey = ""; else { MarkStale(); Raise(); Warm(); } });   // joined again: a ticket is ready before the first run
             });
         }
 
@@ -380,7 +388,7 @@ namespace FluffyClimbers.Leaderboard
                 if (run.InputsB64 != null && run.InputsB64.Length > ProgressService.LeaderboardMaxRunChars && !sending)
                 {
                     sending = true;
-                    client.SubmitRun(run, r => { sending = false; if (r.Ok) MarkStale(); Pump(); });
+                    client.SubmitRun(run, r => { sending = false; if (r.Ok) MarkStale(); Pump(); }, new LbProfile { DisplayName = ShownName, AvatarUrl = auth.Profile.AvatarUrl });
                 }
                 return;
             }
@@ -399,10 +407,19 @@ namespace FluffyClimbers.Leaderboard
             client.SubmitRun(run, r =>
             {
                 sending = false;
-                if (r.Ok) { progress.RemoveLeaderboardRun(id); MarkStale(); Pump(); }
-                else if (r.Retryable) progress.LeaderboardRunFailed(id, Now);   // backoff: 30 s, 1 min, 2 min ... at most 30 min, dropped after 12 tries
-                else progress.RemoveLeaderboardRun(id);   // the service refused it for good (mismatch, ticket used or expired, update the app): never retried
-            });
+                switch (LeaderboardRetryPolicy.Classify(r, run.Tries))
+                {
+                    case SubmitVerdict.Done: progress.RemoveLeaderboardRun(id); MarkStale(); Pump(); break;
+                    case SubmitVerdict.Retry: progress.LeaderboardRunFailed(id, Now); break;   // backoff: 30 s, 1 min, 2 min ... at most 30 min, dropped after 12 tries
+                    case SubmitVerdict.RejoinThenRetry:
+                        // the service no longer knows the player (profile or weekly row removed): write the profile and register again, keep the run and send it again soon
+                        profileKey = "";
+                        SyncProfile();
+                        progress.LeaderboardRunFailed(id, Now);
+                        break;
+                    default: progress.RemoveLeaderboardRun(id); break;   // the service refused THIS run for good (mismatch, ticket used or expired, update the app): never retried
+                }
+            }, new LbProfile { DisplayName = ShownName, AvatarUrl = auth.Profile.AvatarUrl });
         }
 
         /// <summary>The slow tick: retry the queue, retry the silent sign-in, notice a new week.</summary>

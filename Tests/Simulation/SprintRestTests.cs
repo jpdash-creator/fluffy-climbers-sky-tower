@@ -23,7 +23,7 @@ namespace FluffyClimbers.Simulation.Tests
             LoadedLevel ll = ContentLoader.LoadRegions(root, region, region).First(l => l.Spec.LevelIndex == levelIndex);
             LevelSpec spec = ll.Spec.WithAttemptSeed(0);
             spec.Special = SpecialLevelType.SprintRest;
-            spec.SprintRestRule = true; spec.BossRiseRule = false;
+            spec.SprintRestRule = true;
             spec.Ramp = false;
             spec.Goal = new GoalSpec { Type = GoalType.ReachFloor, Value = ll.Spec.RowsFor() };
             return spec;
@@ -262,7 +262,7 @@ namespace FluffyClimbers.Simulation.Tests
                         foreach (bool rest in new[] { false, true })
                         {
                             BotResult r;
-                            bool finished = BotTimeBox.Solve(out r, cfg, spec, data, BossRiseTests.Budget(spec), bot => bot.RestOnShelters = rest, BotTimeBox.StepTableSeconds);
+                            bool finished = BotTimeBox.Solve(out r, cfg, spec, data, (SolvabilityT4Tests.NodeBudget * System.Math.Max(1, spec.RowsFor() / 60)), bot => bot.RestOnShelters = rest, BotTimeBox.StepTableSeconds);
                             string line = "R" + region + " L" + level + " mode " + mode + (rest ? " rest" : " plain") + ": "
                                           + (finished ? (r.Solved ? "solved" : "NOT solved, best row " + r.BestRow + "/" + data.Rows) : "timeout")
                                           + (finished ? " nodes " + r.Nodes + " shelters " + r.Final.ShelterCount : "");

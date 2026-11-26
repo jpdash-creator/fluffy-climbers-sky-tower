@@ -1,5 +1,6 @@
 using System;
 using FluffyClimbers.Economy;
+using FluffyClimbers.Leaderboard;
 using FluffyClimbers.Monetization;
 using UnityEngine;
 
@@ -113,11 +114,13 @@ namespace FluffyClimbers.Gameplay
             GameSettings.EnsureInSave(progress);   // the first upload of a save without settings carries the device's current ones
             byte[] bytes = SaveSync.Serialize(progress.Data);
             ProgressService p = progress;
+            bool resetPending = progress.Data.CloudResetPending;   // a reset save must replace the Firebase copy at once too
+            int version = progress.Data.Version;
             Account.SaveCloud(bytes, ok =>
             {
                 uploading = false;
                 if (!ReferenceEquals(p, progress)) return;
-                if (ok) progress.MarkCloudSynced();
+                if (ok) { progress.MarkCloudSynced(); SaveBackup.UploadIfDue(bytes, version, Time.unscaledTime, resetPending); }   // Firebase copy with the normal upload (at most every 5 min)
                 else { dirty = true; uploadAt = Time.unscaledTime + RetrySeconds; }   // ignored now, retried later
             });
         }
@@ -139,12 +142,34 @@ namespace FluffyClimbers.Gameplay
 
         static void LoadAndResolve(Action after)
         {
-            Account.LoadCloudSave(bytes =>
+            LoadCloudWithFallback((bytes, failed) =>
             {
                 startInFlight = false;
-                if (Account.LastLoadFailed) { pendingCheck = true; if (after != null) after(); return; }
+                if (failed) { pendingCheck = true; if (after != null) after(); return; }
                 pendingCheck = false;
                 Resolve(bytes, Account.PlayerId, after);
+            });
+        }
+
+        /// <summary>
+        /// Reads the cloud save: Play Games Saved Games first; when it has no usable save, or cannot be read, the Firebase backup copy is tried (owner decision, Final Bugs 1 item 12; the rules are
+        /// <see cref="SaveBackupRules.PickRestoreBytes"/>). The bytes then go through the normal <see cref="SaveSync.Decide"/>, so the choose-your-save popup, the reset guard and the newer-app guard all still apply.
+        /// done(bytes, failed): failed = neither source could be asked (check again later, upload nothing meanwhile).
+        /// </summary>
+        static void LoadCloudWithFallback(Action<byte[], bool> done)
+        {
+            Account.LoadCloudSave(googleBytes =>
+            {
+                bool googleFailed = Account.LastLoadFailed;
+                bool resetPending = progress != null && progress.Data.CloudResetPending;
+                if ((!googleFailed && SaveSync.TryDeserialize(googleBytes) != null) || !SaveBackup.IsAvailable) { done(googleBytes, googleFailed); return; }   // Play Games has a save, or there is no Firebase here
+                SaveBackup.Fetch(fb =>
+                {
+                    RestoreSource source;
+                    byte[] pick = SaveBackupRules.PickRestoreBytes(googleFailed, googleBytes, fb, resetPending, out source);
+                    if (source == RestoreSource.Firebase) Debug.Log("[Account] Play Games has no usable save: restoring from the Firebase backup copy");
+                    done(pick, SaveBackupRules.LoadFailed(googleFailed, googleBytes, fb, source));
+                });
             });
         }
 
@@ -178,9 +203,9 @@ namespace FluffyClimbers.Gameplay
                     return;
                 }
                 string id = Account.PlayerId;
-                Account.LoadCloudSave(bytes =>
+                LoadCloudWithFallback((bytes, failed) =>
                 {
-                    if (Account.LastLoadFailed)
+                    if (failed)
                     {
                         // signed in, but the cloud is out of reach: link now, compare later (uploads wait until then)
                         progress.SetAccount(SaveSync.ModeGoogle, id);
@@ -223,12 +248,14 @@ namespace FluffyClimbers.Gameplay
                 GameSettings.EnsureInSave(progress);
                 byte[] bytes = SaveSync.Serialize(progress.Data);
                 ProgressService p = progress;
+                bool resetPending = progress.Data.CloudResetPending;
+                int version = progress.Data.Version;
                 Account.SaveCloud(bytes, ok =>
                 {
                     uploading = false;
                     if (ReferenceEquals(p, progress))
                     {
-                        if (ok) progress.MarkCloudSynced();
+                        if (ok) { progress.MarkCloudSynced(); SaveBackup.UploadIfDue(bytes, version, Time.unscaledTime, resetPending); }
                         else { dirty = true; uploadAt = Time.unscaledTime + RetrySeconds; }
                     }
                     if (done != null) done(ok, ok ? "Synced." : "Could not sync. It will be tried again later.");
@@ -245,6 +272,28 @@ namespace FluffyClimbers.Gameplay
             {
                 if (!r.Success) { startInFlight = false; pendingCheck = true; finish("Could not reach your account. Check your connection."); return; }
                 LoadAndResolve(() => finish(null));
+            });
+        }
+
+        /// <summary>
+        /// The device is in step with the account (no pending choose-your-save, no newer cloud save), so writing the Firebase backup copy cannot overwrite a save the player has not chosen against.
+        /// Independent of whether the Google upload itself just worked: the two targets are reported separately.
+        /// </summary>
+        public static bool CanBackup { get { return progress != null && syncReady && !blockUpload && IsGoogleMode && Account.IsSignedIn; } }
+
+        /// <summary>
+        /// Settings > Save Progress, second target: writes the full Firebase backup copy now (also signs in to Firebase quietly through Play Games when needed). done(result) runs once:
+        /// Skipped when this build or state has no Firebase backup (guest, not in step, no Firebase), Ok, or Failed (offline, refused ...; <see cref="SaveBackup.LastFailure"/> says why).
+        /// </summary>
+        public static void BackupNow(Action<SaveTargetResult> done)
+        {
+            if (!CanBackup || !SaveBackup.IsAvailable) { if (done != null) done(SaveTargetResult.Skipped); return; }
+            GameSettings.EnsureInSave(progress);
+            byte[] bytes = SaveSync.Serialize(progress.Data);
+            SaveBackup.Upload(bytes, progress.Data.Version, Time.unscaledTime, o =>
+            {
+                if (o != BackupOutcome.Ok) Debug.LogWarning("[Account] Firebase backup: " + o);
+                if (done != null) done(o == BackupOutcome.Ok ? SaveTargetResult.Ok : SaveTargetResult.Failed);
             });
         }
 

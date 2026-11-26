@@ -486,7 +486,7 @@ namespace FluffyClimbers.Simulation
             {
                 Fx cc = x, cw = w;
                 if (OptionalFits(y, 3) && SpecialPlatforms.CloverPair(cfg, prevX, dxLimit - w / 2, screen, ref cc, ref cw, out cloverH)) { clover = true; x = cc; w = cw; }
-                else kind = PlatformKind.PollenPuff;   // no pair fits: a helpful Pollen Puff slab keeps the row special (same rule as LevelBuilder)
+                // no pair fits: a lone clover slab (Amplitude 0, never moves) keeps the row special, same rule as LevelBuilder
             }
 
             Fx amp = Fx.Zero;

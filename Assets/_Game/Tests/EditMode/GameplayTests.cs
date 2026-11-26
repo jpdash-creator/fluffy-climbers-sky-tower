@@ -142,33 +142,31 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual("This level fails on any wall touch.", s.FailReason);
         }
 
-        // ---- special level types (owner Final Change 1, 2026-11-22; map of Final Change 6, 2026-11-25). Region 1: L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L17 Boss Rise, L21 Sprint and Rest, L24 Sky Hoops (Combo Gates was retired 2026-11-26), L25 Boss Rise ----
+        // ---- special level types (owner Final Change 1, 2026-11-22; map of Final Change 6, 2026-11-25). Region 1: L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L21 Sprint and Rest, L24 Sky Hoops (Combo Gates was retired 2026-11-26), L25 Boss Rise ----
 
         [Test]
-        public void EveryRegionHasItsTenSpecialLevelsAndTheGemLevelsAreRegularRunsExceptLevel25()
+        public void EveryRegionHasItsEightSpecialLevelsAndTheGemLevelsAreRegularRuns()
         {
             for (int region = 1; region <= 5; region++)
             {
                 RegionDef r = repo.GetRegionByIndex(region);
                 var seen = new HashSet<SpecialLevelType>();
-                int bossLevels = 0, hoopsLevels = 0;
+                int hoopsLevels = 0;
                 foreach (LevelDef level in repo.LevelsOf(r.Id))
                 {
                     SpecialLevelType type = level.SpecialType;
                     Assert.AreEqual(type, SpecialLevels.TypeOf(LevelSpecFactory.Build(level, r)), level.Id + ": the content lookup and the spec lookup agree");
                     if (level.Index % 5 == 0)
                     {
-                        // gem levels 5, 10, 15 and 20 are plain Regular Runs; level 25 is a gem level AND a Boss Rise level (Final Change 6)
-                        Assert.AreEqual(level.Index == 25 ? SpecialLevelType.BossRise : SpecialLevelType.None, type, level.Id + " is a gem level");
+                        // gem levels 5, 10, 15, 20 and 25 are plain Regular Runs (Boss Rise was removed 2026-11-26)
+                        Assert.AreEqual(SpecialLevelType.None, type, level.Id + " is a gem level");
                         Assert.AreEqual("reachFloor", level.Goal.Type, level.Id);
                     }
-                    if (type != SpecialLevelType.None && type != SpecialLevelType.BossRise && type != SpecialLevelType.SkyHoops) Assert.IsTrue(seen.Add(type), level.Id + ": a second " + type + " level in the region");
-                    if (type == SpecialLevelType.BossRise) { seen.Add(type); bossLevels++; }
+                    if (type != SpecialLevelType.None && type != SpecialLevelType.SkyHoops) Assert.IsTrue(seen.Add(type), level.Id + ": a second " + type + " level in the region");
                     if (type == SpecialLevelType.SkyHoops) { seen.Add(type); hoopsLevels++; }
                     Assert.IsTrue(type == SpecialLevelType.None || SpecialLevels.IsActive(type), level.Id + ": no level uses a retired type");
                 }
-                Assert.AreEqual(SpecialLevels.Count, seen.Count, "region " + region + " has all eight special types");
-                Assert.AreEqual(2, bossLevels, "region " + region + " has two Boss Rise levels");
+                Assert.AreEqual(SpecialLevels.Count, seen.Count, "region " + region + " has all seven special types");
                 Assert.AreEqual(2, hoopsLevels, "region " + region + " has two Sky Hoops levels");
             }
             Assert.AreEqual(SpecialLevelType.NoWallTouch, repo.GetLevel("lvl_001_06").SpecialType);
@@ -179,8 +177,8 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(SpecialLevelType.SkyHoops, repo.GetLevel("lvl_001_24").SpecialType);
             Assert.AreEqual(SpecialLevelType.SkyHoops, repo.GetLevel("lvl_001_08").SpecialType);
             Assert.AreEqual(SpecialLevelType.RivalRace, repo.GetLevel("lvl_001_12").SpecialType);
-            Assert.AreEqual(SpecialLevelType.BossRise, repo.GetLevel("lvl_001_17").SpecialType);
-            Assert.AreEqual(SpecialLevelType.BossRise, repo.GetLevel("lvl_001_25").SpecialType);
+            Assert.AreEqual(SpecialLevelType.None, repo.GetLevel("lvl_001_17").SpecialType);   // the former Boss Rise levels are Regular Runs
+            Assert.AreEqual(SpecialLevelType.None, repo.GetLevel("lvl_001_25").SpecialType);
         }
 
         [Test]

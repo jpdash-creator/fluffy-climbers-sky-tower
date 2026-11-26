@@ -45,13 +45,13 @@ class ShippedContent(unittest.TestCase):
         self.assertEqual(coins, [(1000, 50), (2000, 100), (5000, 250), (10000, 500), (20000, 900), (50000, 2200), (100000, 4000)])
 
     def test_special_levels_follow_the_approved_placement(self):
-        # owner Final Change 6 (2026-11-25): ten special levels per region, eight types (Boss Rise and Sky Hoops twice; owner 2026-11-26 Combo Gates retired into Sky Hoops); gem levels 5, 10, 15, 20 are plain reachFloor levels
+        # owner Final Change 6 (2026-11-25): eight special levels per region, seven types (Sky Hoops twice; owner 2026-11-26 Combo Gates retired into Sky Hoops and Boss Rise removed completely); gem levels 5, 10, 15, 20 are plain reachFloor levels
         approved = {
-            1: {6: "noWallTouch", 8: "skyHoops", 9: "oneLife", 12: "rivalRace", 14: "noPowerUps", 16: "keepMoving", 17: "bossRise", 21: "sprintRest", 24: "skyHoops", 25: "bossRise"},
-            2: {4: "noWallTouch", 7: "oneLife", 9: "skyHoops", 12: "rivalRace", 13: "noPowerUps", 14: "bossRise", 16: "skyHoops", 18: "keepMoving", 23: "sprintRest", 25: "bossRise"},
-            3: {4: "sprintRest", 6: "oneLife", 8: "skyHoops", 11: "noPowerUps", 13: "rivalRace", 17: "skyHoops", 18: "bossRise", 21: "noWallTouch", 23: "keepMoving", 25: "bossRise"},
-            4: {4: "noPowerUps", 6: "keepMoving", 7: "skyHoops", 11: "skyHoops", 13: "rivalRace", 16: "bossRise", 19: "noWallTouch", 22: "sprintRest", 24: "oneLife", 25: "bossRise"},
-            5: {4: "noWallTouch", 6: "sprintRest", 9: "keepMoving", 12: "skyHoops", 14: "skyHoops", 16: "bossRise", 18: "oneLife", 21: "rivalRace", 24: "noPowerUps", 25: "bossRise"},
+            1: {6: "noWallTouch", 8: "skyHoops", 9: "oneLife", 12: "rivalRace", 14: "noPowerUps", 16: "keepMoving", 21: "sprintRest", 24: "skyHoops"},
+            2: {4: "noWallTouch", 7: "oneLife", 9: "skyHoops", 12: "rivalRace", 13: "noPowerUps", 16: "skyHoops", 18: "keepMoving", 23: "sprintRest"},
+            3: {4: "sprintRest", 6: "oneLife", 8: "skyHoops", 11: "noPowerUps", 13: "rivalRace", 17: "skyHoops", 21: "noWallTouch", 23: "keepMoving"},
+            4: {4: "noPowerUps", 6: "keepMoving", 7: "skyHoops", 11: "skyHoops", 13: "rivalRace", 19: "noWallTouch", 22: "sprintRest", 24: "oneLife"},
+            5: {4: "noWallTouch", 6: "sprintRest", 9: "keepMoving", 12: "skyHoops", 14: "skyHoops", 18: "oneLife", 21: "rivalRace", 24: "noPowerUps"},
         }
         rows = {1: 60}
         rows.update({i: 75 for i in range(2, 6)})
@@ -84,7 +84,7 @@ class ShippedContent(unittest.TestCase):
                     self.assertEqual(lv["goal"], {"type": "reachFloor", "value": rows[i]})   # floor counts did not change
                     self.assertNotIn("overrides", lv)
                 if i % 5 == 0:
-                    self.assertEqual(t, "bossRise" if i == 25 else "", "%s is a gem level" % lv["id"])
+                    self.assertEqual(t, "", "%s is a gem level" % lv["id"])
             self.assertEqual(found, approved[n])
             self.assertEqual(sorted(set(found.values())), sorted(content.SPECIAL_TYPES))
         # the legacy regions carry no rule field

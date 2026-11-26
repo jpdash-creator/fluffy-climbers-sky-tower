@@ -94,9 +94,9 @@ namespace FluffyClimbers.Leaderboard
         }
 
         /// <summary>POST /submit-run with a queued run (the fresh RunRecord of the run, never the stored best).</summary>
-        public void SubmitRun(QueuedRun run, Action<HttpReply> done)
+        public void SubmitRun(QueuedRun run, Action<HttpReply> done, LbProfile profile = null)
         {
-            Call("POST", cfg.Url("/submit-run"), LbJson.BuildSubmitBody(run), done);
+            Call("POST", cfg.Url("/submit-run"), LbJson.BuildSubmitBody(run, profile), done);
         }
 
         /// <summary>GET /my-week (totals, ranks and, with <paramref name="withPrizes"/>, the claimable prizes of the closed weeks). null on failure.</summary>

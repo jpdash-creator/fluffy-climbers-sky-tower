@@ -132,7 +132,7 @@ namespace FluffyClimbers.Simulation
             if (spec.LevelIndex <= 1) list.RemoveAll(k => PlatformKinds.NoTutorial(k));
             // doc 30 section 4: the Surf Boost Wave can carry a landing player into a wall, so a no-wall-bounce level never has one
             // doc 30 section 8 item 8: the same for the Pinwheel Gust, which pushes airborne players sideways
-            if (spec.Goal != null && spec.Goal.Type == GoalType.NoWallBounce) list.RemoveAll(k => k == PlatformKind.SurfBoostWave || k == PlatformKind.PinwheelGust || k == PlatformKind.SporeFunnel || k == PlatformKind.CaramelMagnet || k == PlatformKind.WaterBambooTipper);   // Spore Funnel (Final Change 6): the pull toward its axis can carry the player into a wall
+            if (spec.Goal != null && spec.Goal.Type == GoalType.NoWallBounce) list.RemoveAll(k => k == PlatformKind.SurfBoostWave || k == PlatformKind.PinwheelGust || k == PlatformKind.CaramelMagnet || k == PlatformKind.WaterBambooTipper);
             // Final Change 6, region 1: the dragonfly carries the hero sideways, so a no-wall-bounce level never has one (the four new kinds are hazard types, so level 1 has none of them)
             if (spec.Goal != null && spec.Goal.Type == GoalType.NoWallBounce) list.RemoveAll(k => k == PlatformKind.DragonflyDart);
             return list.ToArray();
@@ -218,11 +218,11 @@ namespace FluffyClimbers.Simulation
                     PlatformKind k = options[o];
                     if (beside && (k == PlatformKind.HiveLift || k == PlatformKind.Sticky || k == PlatformKind.SproutLift || k == PlatformKind.OrbitCap || k == PlatformKind.SinkingRaft || k == PlatformKind.SandcastleStep
                         || k == PlatformKind.FizzVent || k == PlatformKind.PinwheelGust || k == PlatformKind.LicoriceBelt || k == PlatformKind.TaffyStretch
-                        || k == PlatformKind.LanternLift || k == PlatformKind.SwingPlank || k == PlatformKind.PagodaRidge || k == PlatformKind.TeeterCap || k == PlatformKind.SporeFunnel || k == PlatformKind.DizzySpores   // Dizzy Spores: its next platform must overlap it, a ladder start cannot be moved (found by DizzySpores_TheNextRowsSpine... after the Final Change 6 re-roll)
+                        || k == PlatformKind.LanternLift || k == PlatformKind.SwingPlank || k == PlatformKind.PagodaRidge || k == PlatformKind.TeeterCap || k == PlatformKind.DizzySpores   // Dizzy Spores: its next platform must overlap it, a ladder start cannot be moved (found by DizzySpores_TheNextRowsSpine... after the Final Change 6 re-roll)
                         || k == PlatformKind.MoonJellyChain || k == PlatformKind.UndertowPad   // Final Change 6, region 3: their gap rules do not fit beside a ladder or chunk
                         || k == PlatformKind.ToriiLintel || k == PlatformKind.IncenseMistBank || k == PlatformKind.PrayerScrollRunner || k == PlatformKind.MeltingScoop || k == PlatformKind.CaramelMagnet || k == PlatformKind.SourSprinklerCannon || k == PlatformKind.SugarGlassLedge || PlatformKinds.IsLaunch(k))) continue;
                     if (restricted && k == PlatformKind.Vanishing) continue;   // the finish never blinks
-                    if (beside && (k == PlatformKind.DragonflyDart || k == PlatformKind.DewdropMirrorLeaf || k == PlatformKind.CloverSwap || k == PlatformKind.PollenPuff)) continue;   // 2026-11-26: the pair's reach rules and the cloud's gap rule do not fit beside an authored chunk either   // Final Change 6, region 1: gap and position rules do not fit beside a ladder or chunk
+                    if (beside && (k == PlatformKind.DragonflyDart || k == PlatformKind.DewdropMirrorLeaf || k == PlatformKind.CloverSwap)) continue;   // 2026-11-26: the pair's reach rules do not fit beside an authored chunk either   // Final Change 6, region 1: gap and position rules do not fit beside a ladder or chunk
                     if (PlatformKinds.IsHazardType(k) && hazardsPlaced >= hazardBudget) continue;
                     if (PlatformKinds.IsLaunch(k) && launchesPlaced >= launchBudget) continue;
                     if (k == PlatformKind.MoonJellyChain && (jellyGroups >= jellyBudget || r - lastJellyEnd < SimConfig.JellySpacingRows || !JellyGroupFits(r, rows, locked, gemRow) || !GroupRowsRemovable(chosen, ci, r, SimConfig.JellyChainLength))) continue;
@@ -391,8 +391,6 @@ namespace FluffyClimbers.Simulation
             if (prevKind == PlatformKind.UndertowPad) gap = Fx.Min(gap, cfg.UndertowGapMax);
             // Bamboo Flick: the flick peaks 2.76 u, so the next row is FlickGapMin to FlickGapMax higher (the flight lands on the way down).
             if (prevKind == PlatformKind.BambooFlick) gap = Fx.Clamp(gap, cfg.FlickGapMin, cfg.FlickGapMax);
-            // Pollen Puff (2026-11-26): the cloud hangs PollenHeight above its slab, so the row above is at least PollenGapMin higher (the painted cloud never sits in the next slab); at most a normal jump.
-            if (prevKind == PlatformKind.PollenPuff) gap = Fx.Min(Fx.Max(gap, cfg.PollenGapMin), cfg.NormalGapMax);
             if (prevKind == PlatformKind.KelpTangle) gap = Fx.Min(gap, cfg.KelpNextGapMax);   // integration 2026-11-25: the jump lock leaves less time, so the next row is closer
             // Torii Lintel (Final Change 6): the lintel stands LintelHeight above its slab, so the row above is at least LintelGapMin higher (the lintel never sits in the next platform).
             if (prevKind == PlatformKind.ToriiLintel) gap = Fx.Clamp(gap, cfg.LintelGapMin, cfg.NormalGapMax);
@@ -569,7 +567,6 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.FogPuffDrift:
                     phase = rng.Next(FogPhaseRange);   // the cloud path (amplitude and period) follows the final painted width inside Sim.FogX; only the start offset is drawn
                     break;
-                // Spore Funnel: no per-platform parameter (the column is a function of the width)
             }
         }
 

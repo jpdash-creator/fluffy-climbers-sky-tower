@@ -312,8 +312,7 @@
         "min": 0,
         "max": 0
       }
-    },
-    "special": "bossRise"
+    }
   },
   {
     "id": "lvl_004_17",
@@ -486,7 +485,6 @@
         "min": 0,
         "max": 0
       }
-    },
-    "special": "bossRise"
+    }
   }
 ]

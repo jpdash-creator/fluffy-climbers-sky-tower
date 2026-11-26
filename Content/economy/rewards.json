@@ -572,10 +572,10 @@
       "coins": 400
     },
     {
-      "id": "w2_special_bossrise",
-      "title": "Clear the Boss Rise level",
+      "id": "w2_special_sprintrest",
+      "title": "Clear the Sprint and Rest level",
       "group": "special",
-      "stat": "specialType.9",
+      "stat": "specialType.10",
       "target": 1,
       "coins": 400
     },

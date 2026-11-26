@@ -280,7 +280,6 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.RollingLog: return "r";
                 case PlatformKind.TeeterCap: return "q";
                 case PlatformKind.FogPuffDrift: return "u";
-                case PlatformKind.SporeFunnel: return "h";
                 default: return "?";
             }
         }

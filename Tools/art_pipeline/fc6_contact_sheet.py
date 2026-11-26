@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fc6_common as fc  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 
-KINDS = {1: ["dewdropmirrorleaf", "dragonflydart"], 2: ["teetercap", "fogpuffdrift", "sporefunnel"],
+KINDS = {1: ["dewdropmirrorleaf", "dragonflydart"], 2: ["teetercap", "fogpuffdrift"],
          3: ["moonjellychain", "seafoampad", "splittingpier", "undertowpad"], 4: ["meltingscoop", "caramelmagnet", "soursprinklercannon", "sugarglassledge"],
          5: ["waterbambootipper", "prayerscrollrunner", "toriilintel", "incensemistbank"]}
 SCALE = 120.0 / fc.PPU

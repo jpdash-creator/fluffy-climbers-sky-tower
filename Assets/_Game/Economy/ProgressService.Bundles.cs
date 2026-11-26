@@ -11,8 +11,7 @@ namespace FluffyClimbers.Economy
     public sealed partial class ProgressService
     {
         public const int BundleOfferCount = 6;
-        public const int BundleRefreshCoins = 500;   // owner 2026-11-26: 25 gems or 500 coins (1 gem = 20 coins)
-        public const int BundleRefreshGems = 25;
+        public const int BundleRefreshGems = 25;   // owner 2026-11-26 (Final Bugs 1): gems only, no coin option
         /// <summary>Gems cost above which the page asks the player to confirm (docs/26: confirm above 50 gems).</summary>
         public const int BundleConfirmAboveGems = 50;
         public const int BundleTimerPercentOff = 30;
@@ -134,21 +133,20 @@ namespace FluffyClimbers.Economy
         }
 
         /// <summary>
-        /// Draws 6 new distinct bundles (none of the current ones while the catalog is big enough) and saves them. Costs 500 coins or 25 gems;
+        /// Draws 6 new distinct bundles (none of the current ones while the catalog is big enough) and saves them. Costs 25 gems (gems only);
         /// nothing changes when the wallet is short.
         /// </summary>
-        public BundleResult RefreshBundleOffers(bool payWithCoins)
+        public BundleResult RefreshBundleOffers()
         {
             if (Bundles.Count == 0) return BundleResult.Invalid;
             BundleSaveData b = BundleState;
-            if (payWithCoins ? Data.Coins < BundleRefreshCoins : Data.Gems < BundleRefreshGems)
-                return payWithCoins ? BundleResult.NotEnoughCoins : BundleResult.NotEnoughGems;
+            if (Data.Gems < BundleRefreshGems) return BundleResult.NotEnoughGems;
             List<BundleDef> old = CurrentBundleOffers();   // also makes sure the first set exists
             var avoid = new List<string>(old.Count);
             foreach (BundleDef d in old) avoid.Add(d.Id);
             EnsureBundleSeed(b);
             List<BundleDef> fresh = DrawBundleOffers(b, avoid);
-            if (payWithCoins) Data.Coins -= BundleRefreshCoins; else Data.Gems -= BundleRefreshGems;
+            Data.Gems -= BundleRefreshGems;
             b.Offers.Clear();
             foreach (BundleDef d in fresh) b.Offers.Add(d.Id);
             Commit();

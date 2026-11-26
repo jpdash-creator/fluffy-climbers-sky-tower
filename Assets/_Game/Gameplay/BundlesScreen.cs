@@ -615,10 +615,10 @@ namespace FluffyClimbers.Gameplay
                 return;
             }
 
-            // fixed header: ribbon, then caption + the two refresh buttons
-            // The header grows with the text scale: title (right aligned, wraps) and caption (wraps beside the two buttons) are estimated with a
+            // fixed header: ribbon, then caption + the refresh button
+            // The header grows with the text scale: title (right aligned, wraps) and caption (wraps beside the button) are estimated with a
             // generous glyph width so nothing is clipped or overlaps at 130 percent text or on the narrowest canvas.
-            float btnBlockW = 2f * RefreshBtnW + 16f + 8f + 16f;
+            float btnBlockW = RefreshBtnW + 8f + 16f;
             float capFont = CaptionFont * UiKit.TextScale, titleFont = TitleFont * UiKit.TextScale;
             int titleLines = Mathf.Max(1, Mathf.CeilToInt("Refresh Bundles".Length * titleFont * 0.6f / Mathf.Max(100f, bodyW - 16f)));
             int capLines = Mathf.Max(1, Mathf.CeilToInt("Draw 6 new bundles".Length * capFont * 0.6f / Mathf.Max(100f, bodyW - btnBlockW)));
@@ -653,17 +653,14 @@ namespace FluffyClimbers.Gameplay
             crt.pivot = new Vector2(0f, 1f);
             crt.offsetMin = new Vector2(8f, -(rowTop + refreshRowH));
             crt.offsetMax = new Vector2(-btnBlockW, -rowTop);
-            for (int k = 0; k < 2; k++)
             {
-                bool withCoins = k == 1;
-                int cost = withCoins ? ProgressService.BundleRefreshCoins : ProgressService.BundleRefreshGems;
-                bool can = withCoins ? progress.Coins >= cost : progress.Gems >= cost;
-                string unit = withCoins ? "coins" : "gems";
-                Sprite coin = art != null ? art.CoinIcon : null, gem = art != null ? art.GemIcon : null;
-                Button rb = ShopChrome.PriceButton(head, withCoins ? "RefreshCoins" : "RefreshGems", withCoins ? 0 : 1, withCoins ? coin : gem,
-                    cost.ToString(), "Show 6 other bundles for " + cost + " " + unit, () => TapRefresh(body, progress, art, host, refreshWallet, withCoins, cap), 44);
+                int cost = ProgressService.BundleRefreshGems;
+                bool can = progress.Gems >= cost;
+                Sprite gem = art != null ? art.GemIcon : null;
+                Button rb = ShopChrome.PriceButton(head, "RefreshGems", 1, gem,
+                    cost.ToString(), "Show 6 other bundles for " + cost + " gems", () => TapRefresh(body, progress, art, host, refreshWallet, cap), 44);
                 if (!can) rb.GetComponent<Image>().color = new Color(0.55f, 0.55f, 0.55f, 1f);   // dimmed: cannot pay now (the tap explains why)
-                UiKit.Place((RectTransform)rb.transform, new Vector2(1f, 1f), new Vector2(-8f - (withCoins ? 0f : RefreshBtnW + 16f), -(rowTop + (refreshRowH - PriceH) * 0.5f)),
+                UiKit.Place((RectTransform)rb.transform, new Vector2(1f, 1f), new Vector2(-8f, -(rowTop + (refreshRowH - PriceH) * 0.5f)),
                     new Vector2(RefreshBtnW, PriceH));
             }
 
@@ -803,7 +800,7 @@ namespace FluffyClimbers.Gameplay
             nm.horizontalOverflow = HorizontalWrapMode.Wrap;
             PlaceTop((RectTransform)nm.transform, nameY, 780f, nameH);
 
-            AddWorthPill(panel, BundleWorth.Text(def, paid), new Vector2(0.5f, 1f), new Vector2(0f, -pillY), PriceW);   // "Worth x2.1" with the star
+            AddWorthPill(panel, BundleWorth.Text(def, paid), new Vector2(0.5f, 1f), new Vector2(0f, -pillY), 780f);   // "Worth x2.1" with the star; max width = the card text width (was PriceW 260, which wrapped "Worth x4.2", Final Bugs 1)
             AddChipsCentered(panel, def, art, panelW, chipsY, false);   // what else came in the bundle, as icons with amounts
 
             ToyKit.PopupAction(panel, "OK", ToyKit.Button(1), Color.white, 50f, host.CloseOverlay);
@@ -916,9 +913,9 @@ namespace FluffyClimbers.Gameplay
 
         // ---------------- refresh ----------------
 
-        static void TapRefresh(RectTransform body, ProgressService progress, ArtCatalog art, ShopScreen.Host host, Action refreshWallet, bool withCoins, Text caption)
+        static void TapRefresh(RectTransform body, ProgressService progress, ArtCatalog art, ShopScreen.Host host, Action refreshWallet, Text caption)
         {
-            BundleResult r = progress.RefreshBundleOffers(withCoins);
+            BundleResult r = progress.RefreshBundleOffers();
             if (r == BundleResult.Ok)
             {
                 AudioManager.Play(Sfx.Tap);
@@ -927,7 +924,7 @@ namespace FluffyClimbers.Gameplay
                 return;
             }
             // nothing was spent: a short message in the caption's place
-            BundleToast.Show(caption, r == BundleResult.NotEnoughCoins ? "Not enough coins" : (r == BundleResult.NotEnoughGems ? "Not enough gems" : "No bundles right now"));
+            BundleToast.Show(caption, r == BundleResult.NotEnoughGems ? "Not enough gems" : "No bundles right now");
         }
     }
 

@@ -101,7 +101,7 @@ Daily gifts: 100 points = 250 coins (dp2_100), 200 points = 500 coins (dp2_200),
 | w2_special_nowall | Special levels | Clear the No Wall Touch level | specialType.1 | 1 | 400 | 0 | 0 |
 | w2_special_nopowerups | Special levels | Clear the No Power-ups level | specialType.2 | 1 | 400 | 0 | 0 |
 | w2_special_skyhoops | Special levels | Clear the Sky Hoops level | specialType.8 | 1 | 400 | 0 | 0 |
-| w2_special_bossrise | Special levels | Clear the Boss Rise level | specialType.9 | 1 | 400 | 0 | 0 |
+| w2_special_sprintrest | Special levels | Clear the Sprint and Rest level | specialType.10 | 1 | 400 | 0 | 0 |
 | w2_special_onelife | Special levels | Clear the One Life level | specialType.5 | 1 | 400 | 0 | 0 |
 | w2_special_keepmoving | Special levels | Clear the Keep Moving level | specialType.6 | 1 | 400 | 0 | 0 |
 | w2_special_all6 | Special levels | Clear all 6 special level types | specialTypes | 6 | 600 | 5 | 0 |
@@ -177,7 +177,7 @@ Daily gifts: 100 points = 250 coins (dp2_100), 200 points = 500 coins (dp2_200),
 | g2_1_special_nowall | Special levels | Clear the No Wall Touch level | 1 | 100 | 0 | 0 |
 | g2_1_special_nopowerups | Special levels | Clear the No Power-ups level | 1 | 100 | 0 | 0 |
 | g2_1_special_skyhoops | Special levels | Clear the Sky Hoops level | 1 | 100 | 0 | 0 |
-| g2_1_special_bossrise | Special levels | Clear the Boss Rise level | 1 | 100 | 0 | 0 |
+| g2_1_special_sprintrest | Special levels | Clear the Sprint and Rest level | 1 | 100 | 0 | 0 |
 | g2_1_special_onelife | Special levels | Clear the One Life level | 1 | 100 | 0 | 0 |
 | g2_1_special_keepmoving | Special levels | Clear the Keep Moving level | 1 | 100 | 0 | 0 |
 | g2_1_special_all | Special levels | Clear all 6 special levels | 6 | 200 | 0 | 0 |
@@ -257,7 +257,7 @@ Daily gifts: 100 points = 250 coins (dp2_100), 200 points = 500 coins (dp2_200),
 | g2_5_special_nowall | Special levels | Clear the No Wall Touch level | 1 | 110 | 0 | 0 |
 | g2_5_special_nopowerups | Special levels | Clear the No Power-ups level | 1 | 110 | 0 | 0 |
 | g2_5_special_skyhoops | Special levels | Clear the Sky Hoops level | 1 | 110 | 0 | 0 |
-| g2_5_special_bossrise | Special levels | Clear the Boss Rise level | 1 | 110 | 0 | 0 |
+| g2_5_special_sprintrest | Special levels | Clear the Sprint and Rest level | 1 | 110 | 0 | 0 |
 | g2_5_special_onelife | Special levels | Clear the One Life level | 1 | 110 | 0 | 0 |
 | g2_5_special_keepmoving | Special levels | Clear the Keep Moving level | 1 | 110 | 0 | 0 |
 | g2_5_special_all | Special levels | Clear all 6 special levels | 6 | 210 | 0 | 0 |

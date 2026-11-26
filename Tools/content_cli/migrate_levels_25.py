@@ -18,20 +18,20 @@ MIGRATED_REGIONS = 5          # TODO(regions 6-30 migration): raise to 30 when t
 LEVELS = 25
 # Gem levels (GemLevels in Simulation): plain Regular Run goals, never a special type.
 GEM_LEVELS = (5, 10, 15, 20, 25)
-# Owner Final Change 6 (2026-11-25): ten special levels per region, the same for all five Gameplay settings. Owner 2026-11-26: Combo Gates is retired too, its level in every region is a Sky Hoops level, so
-# there are eight types (Boss Rise has two levels: a mid-level one and level 25, which stays a gem level; Sky Hoops has two). Combo Climb, Chase and Combo Gates were retired (their goals and enum values stay decodable; no level uses them). Gem levels 5, 10, 15, 20 are plain Regular Run
+# Owner Final Change 6 (2026-11-25): special levels per region, the same for all five Gameplay settings. Owner 2026-11-26: Combo Gates is retired too, its level in every region is a Sky Hoops level, and Boss Rise was removed completely
+# (its levels, the mid level and level 25, are plain Regular Runs; level 25 stays a gem level), so there are seven types (Sky Hoops has two). Combo Climb, Chase and Combo Gates were retired (their goals and enum values stay decodable; no level uses them). Gem levels 5, 10, 15, 20 are plain Regular Run
 # levels. type -> level indices, per region. Every other level is a Regular Run (reachFloor). Keep in step with Tools/content_cli/content.py (SPECIAL_PLACEMENT is imported there),
 # Simulation/SpecialLevels.cs and Tests/Simulation/SpecialLevelTests.cs (Placement).
-SPECIAL_TYPES = ("noWallTouch", "noPowerUps", "oneLife", "keepMoving", "skyHoops", "bossRise", "sprintRest", "rivalRace")
+SPECIAL_TYPES = ("noWallTouch", "noPowerUps", "oneLife", "keepMoving", "skyHoops", "sprintRest", "rivalRace")
 SPECIAL_PLACEMENT = {
-    1: {"noWallTouch": [6], "skyHoops": [8, 24], "oneLife": [9], "rivalRace": [12], "noPowerUps": [14], "keepMoving": [16], "bossRise": [17, 25], "sprintRest": [21]},
-    2: {"noWallTouch": [4], "oneLife": [7], "skyHoops": [9, 16], "rivalRace": [12], "noPowerUps": [13], "bossRise": [14, 25], "keepMoving": [18], "sprintRest": [23]},
-    3: {"sprintRest": [4], "oneLife": [6], "skyHoops": [8, 17], "noPowerUps": [11], "rivalRace": [13], "bossRise": [18, 25], "noWallTouch": [21], "keepMoving": [23]},
-    4: {"noPowerUps": [4], "keepMoving": [6], "skyHoops": [7, 11], "rivalRace": [13], "bossRise": [16, 25], "noWallTouch": [19], "sprintRest": [22], "oneLife": [24]},
-    5: {"noWallTouch": [4], "sprintRest": [6], "keepMoving": [9], "skyHoops": [12, 14], "bossRise": [16, 25], "oneLife": [18], "rivalRace": [21], "noPowerUps": [24]},
+    1: {"noWallTouch": [6], "skyHoops": [8, 24], "oneLife": [9], "rivalRace": [12], "noPowerUps": [14], "keepMoving": [16], "sprintRest": [21]},
+    2: {"noWallTouch": [4], "oneLife": [7], "skyHoops": [9, 16], "rivalRace": [12], "noPowerUps": [13], "keepMoving": [18], "sprintRest": [23]},
+    3: {"sprintRest": [4], "oneLife": [6], "skyHoops": [8, 17], "noPowerUps": [11], "rivalRace": [13], "noWallTouch": [21], "keepMoving": [23]},
+    4: {"noPowerUps": [4], "keepMoving": [6], "skyHoops": [7, 11], "rivalRace": [13], "noWallTouch": [19], "sprintRest": [22], "oneLife": [24]},
+    5: {"noWallTouch": [4], "sprintRest": [6], "keepMoving": [9], "skyHoops": [12, 14], "oneLife": [18], "rivalRace": [21], "noPowerUps": [24]},
 }
 # The rule-only types (level JSON field "special" on a plain reachFloor level); the other types are goals.
-RULE_TYPES = ("noPowerUps", "oneLife", "keepMoving", "bossRise", "sprintRest")
+RULE_TYPES = ("noPowerUps", "oneLife", "keepMoving", "sprintRest")
 # Sky Hoops: 10 rings in the level, 8 needed.
 RINGS_NEEDED, RINGS_TOTAL = 8, 10
 # Target difficulty score per level (Bug List 6 item 4), see Tests/Simulation/DIFFICULTY_CURVE_REPORT.md

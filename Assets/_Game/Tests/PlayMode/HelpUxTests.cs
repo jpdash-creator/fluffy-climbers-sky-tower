@@ -39,9 +39,17 @@ namespace FluffyClimbers.Tests
             meta.ShowMenu();
             var problems = new List<string>();
             int scrolled = 0;
-            foreach (string[] set in HelpSets)
+            // the card is 25 percent taller since Final Bugs 1 (owner 2026-11-26), so the real topics rarely overflow any more: one synthetic carousel with a long page keeps the scroll covered
+            var cases = new List<KeyValuePair<string, System.Func<HelpPopup>>>();
+            foreach (string[] topic in HelpSets)
             {
-                HelpPopup help = meta.ShowHelpForTests(set);
+                string[] set = topic;
+                cases.Add(new KeyValuePair<string, System.Func<HelpPopup>>(string.Join("+", set), () => meta.ShowHelpForTests(set)));
+            }
+            cases.Add(new KeyValuePair<string, System.Func<HelpPopup>>("long-synthetic", () => LongHelpForTests()));
+            foreach (KeyValuePair<string, System.Func<HelpPopup>> testCase in cases)
+            {
+                HelpPopup help = testCase.Value();
                 if (help == null) continue;
                 yield return null;
                 for (int i = 0; i < help.PageCount; i++)
@@ -67,7 +75,7 @@ namespace FluffyClimbers.Tests
                         UnityEngine.EventSystems.ExecuteEvents.Execute(vp.gameObject, pe, UnityEngine.EventSystems.ExecuteEvents.dragHandler);
                     }
                     UnityEngine.EventSystems.ExecuteEvents.Execute(vp.gameObject, pe, UnityEngine.EventSystems.ExecuteEvents.endDragHandler);
-                    string tag = string.Join("+", set) + " page " + (i + 1) + ": ";
+                    string tag = testCase.Key + " page " + (i + 1) + ": ";
                     if (content.anchoredPosition.y <= 1f) problems.Add(tag + "dragging the finger up did not scroll the text (offset " + content.anchoredPosition.y + ")");
                     else scrolled++;
                     if (help.Index != i) problems.Add(tag + "a vertical drag turned the page");
@@ -82,6 +90,16 @@ namespace FluffyClimbers.Tests
             }
             Assert.IsEmpty(problems, string.Join(" | ", problems));
             Assert.Greater(scrolled, 0, "at least one help page needs scrolling at 130 percent text, otherwise this test checks nothing");
+        }
+
+        /// <summary>A help carousel of ONE page with eight long rows: taller than the cream area on every screen, so it must scroll.</summary>
+        static HelpPopup LongHelpForTests()
+        {
+            var rows = new HelpRow[8];
+            for (int r = 0; r < rows.Length; r++)
+                rows[r] = new HelpRow("icon_star", "Row " + (r + 1) + ": a long help sentence that needs several lines of text on a narrow card, so that this page is taller than the room it has.");
+            GameObject meta = GameObject.Find("MetaUi");
+            return HelpPopup.Show(meta.transform, GameSession.Art, new[] { new HelpPage("Long page", rows) }, null);
         }
 
         [UnityTest]
@@ -172,6 +190,15 @@ namespace FluffyClimbers.Tests
                 Transform more = help.Inner.Find(HelpPopup.MoreName);
                 if (more == null || !more.gameObject.activeInHierarchy) problems.Add(tag + "the page scrolls but shows no more-hint");
                 if (GameSettings.TextPercent <= 100 && rows.Count > 4) problems.Add(tag + "more than 4 rows on a page that needs scrolling");
+            }
+
+            // Final Bugs 1: a page that fits sits CENTRED in the cream area between the ribbon and the button row (the spare height is shared out, never all left under the last row)
+            if (help.UsesArt && !scrolls && rows.Count > 0)
+            {
+                float top = float.MinValue, bottom = float.MaxValue;
+                foreach (KeyValuePair<string, Rect> r in rows) { top = Mathf.Max(top, r.Value.yMax); bottom = Mathf.Min(bottom, r.Value.yMin); }
+                float blockMid = (top + bottom) * 0.5f, vpMid = vb.center.y;
+                if (Mathf.Abs(blockMid - vpMid) > 3f) problems.Add(tag + "the rows are not centred between the ribbon and the buttons (off by " + (blockMid - vpMid).ToString("F1") + ")");
             }
 
             int activeNav = 0;

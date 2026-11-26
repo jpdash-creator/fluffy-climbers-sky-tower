@@ -7,8 +7,8 @@ using Xunit.Abstractions;
 namespace FluffyClimbers.Simulation.Tests
 {
     /// <summary>
-    /// Region 1 (Meadow Springs), owner-approved 2026-11-26: Clover Swap (PlatformKind 62, a timed PAIR of clover slabs that exchange their x positions on the global 300-tick clock) and Pollen Puff
-    /// (PlatformKind 63, a golden cloud 2.0 u above a normal slab: the first rise through it gives vy x 1.10, once per cloud and run). They replace the removed Glowworm Relay (43) and Silk Snare Web (46).
+    /// Region 1 (Meadow Springs), owner-approved 2026-11-26: Clover Swap (PlatformKind 62, a timed PAIR of clover slabs that exchange their x positions on the global 300-tick clock).
+    /// It replaces the removed Glowworm Relay (43) and Silk Snare Web (46). Pollen Puff (63) was removed again on 2026-11-26 (owner Final Bugs 1).
     /// Behaviour tests use small hand-built worlds; generator tests use the shipped region 1 levels with random attempt seeds; the bot proves the shipped layouts solvable on every setting.
     /// </summary>
     [Trait("Category", "Region1NewPlatforms")]
@@ -65,34 +65,28 @@ namespace FluffyClimbers.Simulation.Tests
         public void TheTwoKindsHaveTheirStableIdsAndGroups()
         {
             Assert.Equal(62, (int)PlatformKind.CloverSwap);
-            Assert.Equal(63, (int)PlatformKind.PollenPuff);
             Assert.True(PlatformKinds.IsDemanding(PlatformKind.CloverSwap));
             Assert.False(PlatformKinds.IsHazardType(PlatformKind.CloverSwap), "a pair never hurts");
-            Assert.False(PlatformKinds.IsLaunch(PlatformKind.CloverSwap) || PlatformKinds.IsLaunch(PlatformKind.PollenPuff));
+            Assert.False(PlatformKinds.IsLaunch(PlatformKind.CloverSwap));
             Assert.True(PlatformKinds.NoTutorial(PlatformKind.CloverSwap), "the demanding pair stays out of level 1");
-            Assert.False(PlatformKinds.NoTutorial(PlatformKind.PollenPuff), "the helpful cloud is allowed from level 1");
-            Assert.False(PlatformKinds.IsDemanding(PlatformKind.PollenPuff) || PlatformKinds.IsHazardType(PlatformKind.PollenPuff));
             Assert.True(PlatformKinds.IsTimeDependent(PlatformKind.CloverSwap));
-            Assert.All(new[] { PlatformKind.CloverSwap, PlatformKind.PollenPuff }, k => Assert.True(PlatformKinds.IsRegion1New(k) && PlatformKinds.IsRegionNew(k)));
-            Assert.All(new[] { PlatformKind.CloverSwap, PlatformKind.PollenPuff }, k => Assert.False(PlatformKinds.IsRegion2New(k) || PlatformKinds.IsRegion3New(k) || PlatformKinds.IsRegion4New(k) || PlatformKinds.IsRegion5New(k)));
+            Assert.All(new[] { PlatformKind.CloverSwap }, k => Assert.True(PlatformKinds.IsRegion1New(k) && PlatformKinds.IsRegionNew(k)));
+            Assert.All(new[] { PlatformKind.CloverSwap }, k => Assert.False(PlatformKinds.IsRegion2New(k) || PlatformKinds.IsRegion3New(k) || PlatformKinds.IsRegion4New(k) || PlatformKinds.IsRegion5New(k)));
         }
 
         [Fact]
-        public void Region1OffersCloverSwapFromLevel2AndPollenPuffFromLevel1()
+        public void Region1OffersCloverSwapFromLevel2()
         {
             PlatformKind[] set = RegionPlatformSets.For(SignatureKind.BounceFlowers);
             Assert.Contains(PlatformKind.CloverSwap, set);
-            Assert.Contains(PlatformKind.PollenPuff, set);
             foreach (SignatureKind other in new[] { SignatureKind.BounceCaps, SignatureKind.DriftingPlatforms, SignatureKind.StickyGum, SignatureKind.SwingingGongs })
             {
                 Assert.DoesNotContain(PlatformKind.CloverSwap, RegionPlatformSets.For(other));
-                Assert.DoesNotContain(PlatformKind.PollenPuff, RegionPlatformSets.For(other));
             }
             PlatformKind sig = SignatureKinds.PlatformFor(SignatureKind.BounceFlowers);
             foreach (LoadedLevel ll in Region1())
             {
                 PlatformKind[] o = SpecialPlatforms.Options(ll.Spec, sig);
-                Assert.Contains(PlatformKind.PollenPuff, o);
                 if (ll.Spec.LevelIndex == 1) Assert.DoesNotContain(PlatformKind.CloverSwap, o);
                 else Assert.Contains(PlatformKind.CloverSwap, o);
             }
@@ -182,114 +176,13 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Equal(1, s.Row);
         }
 
-        // ------------------------------------------------------------------ Pollen Puff
-
-        [Fact]
-        public void Pollen_AFreshCloudBoostsTheFirstRiseExactlyOnce()
-        {
-            SimConfig cfg = new SimConfig();
-            Assert.Equal(110, cfg.PollenBoostPercent);
-            Sim pollen = World(Start(), P(1, 1, PlatformKind.PollenPuff, 500, 300, 400), P(2, 2, PlatformKind.Normal, 500, 700, 400));
-            Sim plain = World(Start(), P(1, 1, PlatformKind.Normal, 500, 300, 400), P(2, 2, PlatformKind.Normal, 500, 700, 400));
-            SimState a = Stand(pollen, 1), b = Stand(plain, 1);
-            Assert.Equal(-1, a.CrumbleTick[1]);
-            int fired = -1;
-            double peakA = 0, peakB = 0;
-            for (int t = 0; t < 120; t++)
-            {
-                int input = t == 0 ? SimInput.Jump : 0;
-                pollen.Step(ref a, input);
-                plain.Step(ref b, input);
-                if (fired < 0 && a.CrumbleTick[1] >= 0)
-                {
-                    fired = t;
-                    Assert.Equal(b.Vy * 110 / 100, a.Vy);   // exactly vy x 110 / 100 at the tick the cloud was met
-                    Assert.True(a.Vy > Fx.Zero, "the boost only happens on the way up");
-                    double dy = D(a.Y) - 3.0;
-                    Assert.True(Math.Abs(dy - 2.0) < 0.5 + 1e-6, "inside the band around the cloud centre, 2.0 u above the slab: " + dy);
-                    Assert.True(Math.Abs(a.CrumbleTick[1] - a.Tick) <= 1, "the used mark is the tick of the encounter");
-                }
-                if (a.Y.Raw > 0) peakA = Math.Max(peakA, D(a.Y));
-                peakB = Math.Max(peakB, D(b.Y));
-            }
-            Assert.True(fired > 0, "the cloud was never met");
-            Assert.True(peakA > peakB + 0.3, "the boosted jump is higher: " + peakA + " vs " + peakB);
-        }
-
-        [Fact]
-        public void Pollen_AUsedCloudStaysSpentForTheRestOfTheRun()
-        {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.PollenPuff, 500, 300, 400));
-            Sim plain = World(Start(), P(1, 1, PlatformKind.Normal, 500, 300, 400));
-            SimState a = Stand(sim, 1), b = Stand(plain, 1);
-            for (int t = 0; t < 400; t++)
-            {
-                int input = t == 0 ? SimInput.Jump : 0;
-                sim.Step(ref a, input);
-                plain.Step(ref b, input);
-            }
-            Assert.True(a.CrumbleTick[1] >= 0);
-            int used = a.CrumbleTick[1];
-            // a second jump from the same slab: identical to the plain slab (no second boost)
-            a = Stand(sim, 1, 0); a.CrumbleTick[1] = used;
-            b = Stand(plain, 1, 0);
-            for (int t = 0; t < 120; t++)
-            {
-                int input = t == 0 ? SimInput.Jump : 0;
-                sim.Step(ref a, input);
-                plain.Step(ref b, input);
-                Assert.Equal(b.Y, a.Y);
-                Assert.Equal(b.Vy, a.Vy);
-            }
-            Assert.Equal(used, a.CrumbleTick[1]);
-        }
-
-        [Fact]
-        public void Pollen_OutsideTheZoneNothingHappens_AndTheSlabLandsLikeANormalOne()
-        {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.PollenPuff, 500, 300, 400));
-            SimState s = Stand(sim, 1);
-            s.X = F(500 + 150);   // 1.5 u off the centre: outside PollenHalfWidth (1.1 u), still on the 4 u slab
-            sim.Step(ref s, SimInput.Jump);
-            for (int t = 0; t < 100; t++) sim.Step(ref s, 0);
-            Assert.Equal(-1, s.CrumbleTick[1]);
-            // landing on it: a plain landing, no launch
-            SimState d = sim.NewState();
-            d.GroundId = 0; d.Grounded = false; d.Coyote = 0; d.X = F(500); d.Y = F(450); d.Vy = -F(1, 100);
-            d.MaxY = d.Y; d.KillY = d.Y - Fx.FromInt(10);
-            for (int t = 0; t < 200 && !d.Grounded; t++) sim.Step(ref d, 0);
-            Assert.True(d.Grounded);
-            Assert.Equal(1, d.GroundId);
-            Assert.Equal(F(300), d.Y);
-        }
-
-        [Fact]
-        public void Pollen_TheUsedMarkFollowsTheEndlessRebaseAndGrowth()
-        {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.PollenPuff, 500, 300, 400), P(2, 2, PlatformKind.Normal, 500, 700, 400), P(3, 3, PlatformKind.PollenPuff, 500, 1100, 400));
-            SimState s = Stand(sim, 2);
-            s.CrumbleTick[1] = 77;   // cloud 1 used at tick 77
-            Sim.ShiftState(ref s, 1, F(300));
-            Assert.Equal(3, s.CrumbleTick.Length);
-            Assert.Equal(77, s.CrumbleTick[0]);   // the used cloud (old id 1) is the new id 0
-            Assert.Equal(-1, s.CrumbleTick[1]);   // the old normal platform
-            Assert.Equal(-1, s.CrumbleTick[2]);   // the old fresh cloud
-            // the used mark of a platform that stays moves down with its id
-            SimState t = Stand(sim, 3);
-            t.CrumbleTick[3] = 90;
-            Sim.ShiftState(ref t, 2, F(700));
-            Assert.Equal(2, t.CrumbleTick.Length);
-            Assert.Equal(90, t.CrumbleTick[1]);
-            Assert.Equal(-1, t.CrumbleTick[0]);
-        }
-
         // ------------------------------------------------------------------ generator
 
         [Fact]
-        public void BothKindsAppearInRegion1_PairsAreWellFormed_NeverOnLevel1_CloudsLeaveRoomAbove()
+        public void PairsAppearInRegion1_AreWellFormed_AndNeverOnLevel1()
         {
             SimConfig cfg = new SimConfig();
-            int pairs = 0, clouds = 0, cloudsOnLevel1 = 0;
+            int pairs = 0;
             foreach (LoadedLevel ll in Region1())
                 for (int i = 0; i < 8; i++)
                 {
@@ -301,7 +194,7 @@ namespace FluffyClimbers.Simulation.Tests
                         {
                             Assert.NotEqual(1, ll.Spec.LevelIndex);
                             Assert.False(SpecialPlatforms.Restricted(p.Row, d.Rows, d.HiddenGemRow), ll.Id + ": a pair in the restricted rows");
-                            if (p.Phase != 0) continue;
+                            if (p.Phase != 0 || p.Amplitude == Fx.Zero) continue;   // a lone slab (no pair fitted the row) has Amplitude 0
                             pairs++;
                             Platform mate = d.Platforms[k + 1];
                             Assert.Equal(PlatformKind.CloverSwap, mate.Kind);
@@ -314,30 +207,21 @@ namespace FluffyClimbers.Simulation.Tests
                             Assert.Equal(D(p.Width) + D(cfg.CloverAir), D(p.Amplitude), 4);
                             Assert.True(D(p.X) - D(p.Width) / 2 >= -1e-9 && D(mate.X) + D(mate.Width) / 2 <= 10.0 + 1e-9, ll.Id + ": a home outside the walls");
                         }
-                        else if (p.Kind == PlatformKind.PollenPuff)
-                        {
-                            clouds++;
-                            if (ll.Spec.LevelIndex == 1) cloudsOnLevel1++;
-                            int above = -1;
-                            for (int j = k + 1; j < d.Platforms.Length; j++) if (d.Platforms[j].Row == p.Row + 1) { above = j; break; }
-                            if (above >= 0) Assert.True(D(d.Platforms[above].Y) - D(p.Y) >= D(cfg.PollenGapMin) - 1e-6, ll.Id + " row " + p.Row + ": the next row is only " + (D(d.Platforms[above].Y) - D(p.Y)) + " u higher");
-                        }
                     }
                 }
-            output.WriteLine("pairs " + pairs + ", clouds " + clouds + " (level 1: " + cloudsOnLevel1 + ")");
-            Assert.True(pairs > 20 && clouds > 20);
-            Assert.True(cloudsOnLevel1 > 0, "the helpful cloud is part of level 1");
+            output.WriteLine("pairs " + pairs);
+            Assert.True(pairs > 20);
         }
 
         [Fact]
-        public void NeitherKindEverAppearsInRegions2To5()
+        public void TheKindNeverAppearsInRegions2To5()
         {
             string root = ContentLoader.FindRoot();
             if (root == null) return;
             SimConfig cfg = new SimConfig();
             foreach (LoadedLevel ll in ContentLoader.LoadRegions(root, 2, 5))
                 foreach (Platform p in LevelBuilder.Build(cfg, ll.Spec).Platforms)
-                    Assert.False(p.Kind == PlatformKind.CloverSwap || p.Kind == PlatformKind.PollenPuff, ll.Id + " has " + p.Kind);
+                    Assert.False(p.Kind == PlatformKind.CloverSwap, ll.Id + " has " + p.Kind);
         }
 
         [Fact]
@@ -352,7 +236,7 @@ namespace FluffyClimbers.Simulation.Tests
                     Assert.True(v == null, ll.Id + " seed " + i + ": " + v);
                     foreach (Platform p in d.Platforms)
                     {
-                        if (p.Kind != PlatformKind.CloverSwap || p.Phase != 0) continue;
+                        if (p.Kind != PlatformKind.CloverSwap || p.Phase != 0 || p.Amplitude == Fx.Zero) continue;
                         foreach (Platform q in d.Platforms)
                             if (q.Row == p.Row - 1)   // the row below: no hazard, launcher or other demanding kind (SpecialPlatforms.Allowed)
                                 Assert.False(PlatformKinds.IsHazardType(q.Kind) || PlatformKinds.IsDemanding(q.Kind) || PlatformKinds.IsLaunch(q.Kind), ll.Id + " row " + p.Row + " above " + q.Kind);
@@ -361,10 +245,10 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void EndlessTowerBuildsPairsAndCloudsInRegion1_WithTheSameRules()
+        public void EndlessTowerBuildsPairsInRegion1_WithTheSameRules()
         {
             SimConfig cfg = new SimConfig();
-            int pairs = 0, clouds = 0;
+            int pairs = 0;
             for (int seed = 1; seed <= 12; seed++)
             {
                 LevelData d = EndlessTower.BuildFixed(cfg, EndlessTower.MakeSpec(seed * 7919, Fx.Zero, SignatureKind.BounceFlowers, 400), 330);
@@ -373,8 +257,7 @@ namespace FluffyClimbers.Simulation.Tests
                 for (int k = 0; k < d.Platforms.Length; k++)
                 {
                     Platform p = d.Platforms[k];
-                    if (p.Kind == PlatformKind.PollenPuff) clouds++;
-                    if (p.Kind != PlatformKind.CloverSwap || p.Phase != 0) continue;
+                    if (p.Kind != PlatformKind.CloverSwap || p.Phase != 0 || p.Amplitude == Fx.Zero) continue;
                     pairs++;
                     Platform mate = d.Platforms[k + 1];
                     Assert.True(mate.Kind == PlatformKind.CloverSwap && mate.Phase == 1 && mate.Row == p.Row && mate.Y == p.Y && mate.Width == p.Width);
@@ -382,8 +265,8 @@ namespace FluffyClimbers.Simulation.Tests
                     Assert.True(p.Row > LevelGenerator.FixedRows);
                 }
             }
-            output.WriteLine("endless: pairs " + pairs + ", clouds " + clouds);
-            Assert.True(pairs > 0 && clouds > 0);
+            output.WriteLine("endless: pairs " + pairs);
+            Assert.True(pairs > 0);
         }
 
         // ------------------------------------------------------------------ bot proofs
@@ -408,7 +291,7 @@ namespace FluffyClimbers.Simulation.Tests
             foreach (LoadedLevel ll in ContentLoader.LoadRegions(root, 1, 1))
             {
                 LevelData data = LevelBuilder.Build(cfg, ll.Spec);
-                if (data.Platforms.Any(p => p.Kind == PlatformKind.CloverSwap || p.Kind == PlatformKind.PollenPuff)) withNew++;
+                if (data.Platforms.Any(p => p.Kind == PlatformKind.CloverSwap)) withNew++;
                 int budget = SolvabilityT4Tests.NodeBudget * Math.Max(1, ll.Spec.RowsFor() / 60);
                 BotResult r; bool finished = BotTimeBox.Solve(out r, cfg, ll.Spec, data, budget, BotTimeBox.StepTableSeconds);
                 output.WriteLine("mode " + mode + " " + ll.Id + " finished=" + finished + " solved=" + r.Solved + " bestRow=" + r.BestRow + "/" + data.Rows);

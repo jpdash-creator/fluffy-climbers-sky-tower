@@ -61,7 +61,7 @@ namespace FluffyClimbers.Simulation.Tests
                 // Combo Climb (comboChain 3 x 3 with its ladder) and Chase (bossChase with the row ramp), one level each per region (SpecialLevelTests pins the places).
                 SpecialLevelType type = SpecialLevels.TypeOf(ll.Spec);
                 // Final Change 6 (2026-11-25): Combo Gates (comboGates 3 x 3, explicit rows) and Sky Hoops (skyHoops 8 of 10, explicit rows) replace Combo Climb; Rival Race is a reach-the-top goal with a baked ghost;
-                // Boss Rise, Sprint and Rest are rules on reach-the-top levels.
+                // Sprint and Rest is a rule on a reach-the-top level (Boss Rise was removed 2026-11-26).
                 Assert.NotEqual(SpecialLevelType.ComboGates, type);   // owner 2026-11-26: Combo Gates is retired, Sky Hoops took its levels
                 if (type == SpecialLevelType.NoWallTouch) Assert.Equal(GoalType.NoWallBounce, g);
                 else if (type == SpecialLevelType.SkyHoops) Assert.Equal(GoalType.SkyHoops, g);
@@ -110,7 +110,6 @@ namespace FluffyClimbers.Simulation.Tests
             foreach (LoadedLevel ll in All())
             {
                 int idx = ll.Spec.LevelIndex;
-                if (ll.Spec.BossRiseRule) continue;   // Final Change 6: the top rows of a Boss Rise level are a plain boss arena by design, so its top third is not held to the ramp
                 for (int i = 0; i < 6; i++)
                 {
                     LevelData d = LevelBuilder.Build(cfg, ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i)));

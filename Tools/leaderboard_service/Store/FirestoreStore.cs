@@ -55,7 +55,8 @@ namespace FluffyClimbers.LeaderboardService
                 ApplyOutcome o = SlotMath.Apply(input, slot, tot, pl, out ns, out nt, out np);
                 if (!o.Accepted) return o;
                 // client-owned fields (displayName, avatarUrl, updatedAt) are merged, never overwritten: the player doc is written with MergeFields of the server-owned ones only
-                tx.Set(plRef, np, SetOptions.MergeFields("pid", "heroVariants", "lastSubmitAt", "dayKey", "ticksToday", "createdAt"));
+                if (o.ProfileCreated) tx.Set(plRef, np, SetOptions.MergeFields("pid", "heroVariants", "lastSubmitAt", "dayKey", "ticksToday", "createdAt", "displayName", "avatarUrl", "updatedAt"));   // the profile was gone: it is created again from the submission
+                else tx.Set(plRef, np, SetOptions.MergeFields("pid", "heroVariants", "lastSubmitAt", "dayKey", "ticksToday", "createdAt"));
                 if (ns != null) tx.Set(slotRef, ns);
                 if (nt != null) tx.Set(totRef, nt);
                 return o;

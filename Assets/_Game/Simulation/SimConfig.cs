@@ -52,7 +52,8 @@ namespace FluffyClimbers.Simulation
         public int JumpBufferTicks = 6;                      // 100 ms
 
         // Platform behaviours
-        public Fx BounceMultiplier = Fx.FromRatio(14, 10);
+        /// <summary>Plain Bounce launch multiplier. Since 2026-11-26 (owner Final Bugs 1) equal to <see cref="BounceCapMultiplier"/>: the Sim launches every Bounce and BounceCap with BounceCapMultiplier; this value only feeds the hero sheet numbers (CharacterStats), keep both in step.</summary>
+        public Fx BounceMultiplier = Fx.FromRatio(18, 10);
         public Fx StickyJumpMultiplier = Fx.FromRatio(7, 10);
         public Fx SlipperyFriction = Fx.FromRatio(15, 100);
         public Fx SlipperyAccel = Fx.FromRatio(6, 10);
@@ -165,7 +166,7 @@ namespace FluffyClimbers.Simulation
         public Fx PlayerHitRadius = Fx.FromRatio(45, 100);
 
         // Signature platforms
-        /// <summary>BounceCap launch multiplier on the jump speed (Bounce is BounceMultiplier = 1.4; caps are higher).</summary>
+        /// <summary>BounceCap launch multiplier on the jump speed (since 2026-11-26 the plain Bounce launches the same, all regions alike).</summary>
         public Fx BounceCapMultiplier = Fx.FromRatio(18, 10);
         /// <summary>Drifting platform (region 3 Moving) swing half-amplitude range, u (plain Moving uses 0.5 to 1.0).</summary>
         public Fx DriftAmplitudeMin = Fx.FromRatio(3, 2);
@@ -361,7 +362,7 @@ namespace FluffyClimbers.Simulation
         /// <summary>Moon Jelly Chain: the climb INTO pad 0 is at most this high and at most this far sideways (centre distance); integration 2026-11-25.</summary>
         public Fx JellyEntryGapMax = Fx.FromRatio(42, 10);
         public Fx JellyEntryDxMax = Fx.FromRatio(30, 10);
-        /// <summary>Kelp Tangle (integration 2026-11-25): after the 0.6 s jump lock the climb to the next row is at most this high and the sideways step at most KelpNextDxMax beyond the platform edges (a random Boss Rise layout had no solution).</summary>
+        /// <summary>Kelp Tangle (integration 2026-11-25): after the 0.6 s jump lock the climb to the next row is at most this high and the sideways step at most KelpNextDxMax beyond the platform edges (a random layout had no solution).</summary>
         public Fx KelpNextGapMax = Fx.FromRatio(34, 10);
         public Fx KelpNextDxMax = Fx.FromRatio(15, 10);
         public Fx JellyGap1 = Fx.FromRatio(46, 10);
@@ -581,18 +582,11 @@ namespace FluffyClimbers.Simulation
         /// Clover Swap (62, owner-approved 2026-11-26): a PAIR of clover slabs on one row. On the global clock of CloverSwapPeriodTicks (300 = 5 s) the two members exchange their x positions: the last
         /// CloverSwapTelegraphTicks (45) before the slide plus the slide itself (CloverSwapSlideTicks, 40) show the 'swap' pose, the slide is a smoothstep, then the pair stays calm. CloverAir (1.0 u) is the air between the
         /// members at rest (Platform.Amplitude = width + CloverAir = the distance between the two homes). Painted widths 2, 3, 4.
-        /// Pollen Puff (63): the golden cloud hangs PollenHeight (2.0 u) above its slab; a rising hero inside PollenHalfWidth (1.1 u) of the centre and within PollenBand / 2 (0.5 u) of the cloud centre gets vy x PollenBoostPercent / 100
-        /// (110) once per cloud and run. The row above a Pollen Puff is at least PollenGapMin (3.0 u) higher so the painted cloud never sits in the next slab.
         /// </summary>
         public int CloverSwapPeriodTicks = 300;
         public int CloverSwapTelegraphTicks = 45;
         public int CloverSwapSlideTicks = 40;
         public Fx CloverAir = Fx.One;
-        public Fx PollenHeight = Fx.FromInt(2);
-        public Fx PollenHalfWidth = Fx.FromRatio(11, 10);
-        public Fx PollenBand = Fx.One;
-        public int PollenBoostPercent = 110;
-        public Fx PollenGapMin = Fx.FromInt(3);
         // ---- Final Change 6: new Region 5 (Bamboo Temple) kinds (owner-approved 2026-11-25). Numbers: Planning/FINAL-CHANGE-6-NEW-PLATFORMS-R4-R5.md, kept by the bot proof. Units per tick unless noted. ----
         /// <summary>
         /// Prayer Scroll Runner (painted 3, 4.5, 6 u): the scroll starts open. ScrollOpenTicks (90) after a landing it rolls up from the back end toward the roll end (side Platform.Dir, the middle of the screen)
@@ -665,16 +659,6 @@ namespace FluffyClimbers.Simulation
         public Fx FogMinAmplitude = Fx.FromRatio(6, 10);
         public Fx FogMaxAmplitude = Fx.FromInt(3);
         public int FogSpeedCapPercent = 35;
-        /// <summary>
-        /// Spore Funnel (PlatformKind 49): in the column FunnelHalfExtra (0.6 u) wider than the platform half width (at least FunnelHalfMin 1.35 u) and FunnelHeight (3.5 u) high above the
-        /// platform an airborne player is pulled toward the column axis (the platform centre) at up to FunnelPull (2.5 u/s; never past the axis). The platform after a funnel sits at most
-        /// FunnelNextDxMax (3.0 u) plus the half widths away, so a counter-steer always reaches it. No Wall Touch levels have none (the pull can carry the player to a wall).
-        /// </summary>
-        public Fx FunnelPull = Fx.FromRatio(25, 600);
-        public Fx FunnelHalfMin = Fx.FromRatio(135, 100);
-        public Fx FunnelHalfExtra = Fx.FromRatio(6, 10);
-        public Fx FunnelHeight = Fx.FromRatio(35, 10);
-        public Fx FunnelNextDxMax = Fx.FromInt(3);
 
         // ---- Generator: how many rows carry a new special platform (percent of free rows), by campaign level ----
         /// <summary>Share of rows with a new special platform: SpecialShareLevel3Percent at level 3 rising linearly to SpecialShareLevel25Percent at level 25 (the top level of the 25-level rule).</summary>
@@ -771,21 +755,6 @@ namespace FluffyClimbers.Simulation
         /// (RivalRace.PaceByMode: Relaxed 65, Easy 75, Normal 85, Hard 90, Insane 95), GameSession.ApplyDifficulty and RunReplayer.ConfigFor do the same. 85 = the baked path as stored.
         /// </summary>
         public int RivalPacePercent = 85;
-
-        // Boss Rise levels (owner Final Change 6, 2026-11-25; LevelSpec.BossRise, Planning/FINAL-CHANGE-6-LEVEL-TYPE-OPTIONS.md H3): see Sim.BossRoarTicksLeft
-        /// <summary>A boss phase starts every this many floors (the first when the hero first reaches that row).</summary>
-        public int BossPhaseRows = 25;
-        /// <summary>Roar telegraph before a lunge (1.5 s).</summary>
-        public int BossRoarTicks = 90;
-        /// <summary>The lunge lasts this many ticks (0.5 s) and moves the danger line up BossLungeDistance in total (on top of the normal scroll).</summary>
-        public int BossLungeTicks = 30;
-        public Fx BossLungeDistance = Fx.FromInt(2);
-        /// <summary>A lunge never carries the line closer than this under the hero's feet (it squeezes the buffer, it never kills by itself: CUX-7 no unavoidable damage).</summary>
-        public Fx BossLungeMinGap = Fx.FromRatio(1, 2);
-        /// <summary>Speed gain per lunge, percent of the speed at that point (cumulative: +8, +16, ...). Applied before the 4 u/s ceiling, multiplied on the setting steps like the Chase row ramp.</summary>
-        public int BossLungeSpeedPercent = 8;
-        /// <summary>The top this many rows of a boss level are the boss arena: wide painted platforms (6 or 8 u), no special platforms, no hazards.</summary>
-        public int BossArenaRows = 10;
 
         // Sprint and Rest levels (owner Final Change 6, 2026-11-25; LevelSpec.SprintRest, H4): see Sim.ShelterRestTicksLeft and SprintRestRules
         /// <summary>A shelter platform sits on every this many floors (25, 50, ...), except in the top SprintTopReserveRows rows.</summary>

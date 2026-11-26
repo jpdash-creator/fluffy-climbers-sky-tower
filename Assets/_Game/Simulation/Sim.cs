@@ -134,16 +134,6 @@ namespace FluffyClimbers.Simulation
         /// <summary>Sky Hoops: rings that can no longer be taken (the danger line rose above them) and the scan position in Sim's ring list; read through GoalEvaluator.RingsStillPossible.</summary>
         public int RingsGone, RingScan;
 
-        // ---- Boss Rise levels (owner Final Change 6, 2026-11-25). Four ints, all 0 on every other level, so old runs, replays and goldens are unchanged. ----
-        /// <summary>Boss phases started so far (phase n starts when the hero first reaches row n x SimConfig.BossPhaseRows).</summary>
-        public int BossPhase;
-        /// <summary>Lunges that have started: each makes the danger line SimConfig.BossLungeSpeedPercent faster for the rest of the run.</summary>
-        public int BossLunged;
-        /// <summary>Ticks of the roar telegraph left (0 = none); the lunge starts when it reaches 0. Read it through Sim.BossRoarTicksLeft.</summary>
-        public int BossRoar;
-        /// <summary>Ticks of the running lunge left (0 = none).</summary>
-        public int BossLunge;
-
         // ---- Sprint and Rest levels (owner Final Change 6, 2026-11-25). Three ints, 0 on every other level. ----
         /// <summary>Bit (n - 1) set = shelter n (row n x SimConfig.ShelterRows) has been taken (landed on).</summary>
         public int ShelterMask;
@@ -258,10 +248,10 @@ namespace FluffyClimbers.Simulation
         /// </summary>
         public readonly bool NoPowerUps, OneLife, KeepMoving;
         /// <summary>
-        /// Boss Rise level (a boss lunges every BossPhaseRows floors, see <see cref="BossRoarTicksLeft"/>) and Sprint and Rest level (shelters hold the danger line, see
-        /// <see cref="ShelterRestTicksLeft"/>); owner Final Change 6, 2026-11-25. Both false in endless and on every plain level. <see cref="LevelRows"/> = the top row of the level.
+        /// Sprint and Rest level (shelters hold the danger line, see <see cref="ShelterRestTicksLeft"/>); owner Final Change 6, 2026-11-25. False in endless and on every plain level.
+        /// <see cref="LevelRows"/> = the top row of the level.
         /// </summary>
-        public readonly bool BossRise, SprintRest;
+        public readonly bool SprintRest;
         public readonly int LevelRows;
         private readonly Fx scrollPerTick;
         /// <summary>Sky Hoops: pickup indices of the rings, Y ascending (null when none).</summary>
@@ -287,9 +277,6 @@ namespace FluffyClimbers.Simulation
         /// <summary>True when the level has a Caramel Magnet or a Sour Sprinkler Cannon (Final Change 6; scanned by <see cref="ApplyCandyZones"/> only then) and the tallest of their zones.</summary>
         private readonly bool hasCandyZones;
         private readonly Fx candyZoneReach;
-        /// <summary>True when the level has a Pollen Puff (2026-11-26; the cloud scan of <see cref="ApplyPollen"/> only runs then) and the height of the top of its band above the slab.</summary>
-        private readonly bool hasPollen;
-        private readonly Fx pollenReach;
 
         /// <param name="difficulty">0..1 level difficulty; scales the scroll pressure.</param>
         public Sim(SimConfig cfg, Platform[] platforms, Fx difficulty, bool endless)
@@ -304,7 +291,6 @@ namespace FluffyClimbers.Simulation
             NoPowerUps = spec.NoPowerUps;
             OneLife = spec.OneLife;
             KeepMoving = spec.KeepMoving;
-            BossRise = spec.BossRise;
             SprintRest = spec.SprintRest;
             LevelRows = level.Rows;
         }
@@ -354,7 +340,6 @@ namespace FluffyClimbers.Simulation
                 else if (bk == PlatformKind.PinwheelGust) { zones = true; if (cfg.PinwheelHeight > reach) reach = cfg.PinwheelHeight; }
                 else if (bk == PlatformKind.UndertowPad) { zones = true; if (cfg.UndertowHeight > reach) reach = cfg.UndertowHeight; }   // Final Change 6, region 3
                 else if (bk == PlatformKind.FogPuffDrift) { zones = true; if (cfg.FogHeight > reach) reach = cfg.FogHeight; }
-                else if (bk == PlatformKind.SporeFunnel) { zones = true; if (cfg.FunnelHeight > reach) reach = cfg.FunnelHeight; }
                 if (bk == PlatformKind.HiveLift && cfg.HiveBobAmplitude > bob) bob = cfg.HiveBobAmplitude;
                 else if (bk == PlatformKind.SproutLift && cfg.SproutRise > bob) bob = cfg.SproutRise;
                 else if (bk == PlatformKind.LanternLift && cfg.LanternRise > bob) bob = cfg.LanternRise;
@@ -369,12 +354,6 @@ namespace FluffyClimbers.Simulation
                 if (Platforms[i].Kind == PlatformKind.DewdropMirrorLeaf) mirrors = true;
             }
             hasMirror = mirrors;
-            {
-                bool pollen = false;
-                for (int i = 0; i < Platforms.Length && !pollen; i++) pollen = Platforms[i].Kind == PlatformKind.PollenPuff;
-                hasPollen = pollen;
-                pollenReach = cfg.PollenHeight + cfg.PollenBand / 2 + Fx.One;
-            }
             bobMargin = bob;
             hasAirZones = zones;
             zoneReach = reach;
@@ -527,9 +506,6 @@ namespace FluffyClimbers.Simulation
             s.KoiStill = 0;
             s.KoiAir = 0;
             s.StandTicks = 0;   // Keep Moving: a revive restarts the timer (and the revive invulnerability pauses it)
-            s.BossRoar = 0;     // Boss Rise: a roar or lunge in progress is over with the revive (the lunge still counts for the speed)
-            s.BossLunge = 0;
-            if (s.BossLunged < s.BossPhase) s.BossLunged = s.BossPhase;
             s.ShelterLeft = 0;  // Sprint and Rest: a revive on a shelter does not rest again (the shelter stays taken)
             s.Dead = false;
             s.GroundId = s.BestGroundId;
@@ -885,7 +861,7 @@ namespace FluffyClimbers.Simulation
         }
 
         // ------------------------------------------------------------------------------------------
-        // Region 1 additions 2026-11-26: Clover Swap (62, a pair of slabs that exchange places) and Pollen Puff (63, a one-shot launch boost cloud). Integer maths only; never a hazard.
+        // Region 1 additions 2026-11-26: Clover Swap (62, a pair of slabs that exchange places). Integer maths only; never a hazard.
         // ------------------------------------------------------------------------------------------
 
         /// <summary>Clover Swap: how far the pair has travelled toward the exchanged state at a tick, 0 (resting at the home x) to 1 (exchanged). The exchange runs in the last CloverSwapSlideTicks of every period (smoothstep) and alternates direction.</summary>
@@ -912,28 +888,6 @@ namespace FluffyClimbers.Simulation
             int period = Cfg.CloverSwapPeriodTicks;
             int c = tick % period;
             return c >= period - Cfg.CloverSwapTelegraphTicks - Cfg.CloverSwapSlideTicks;
-        }
-
-        /// <summary>Pollen Puff: the tick the cloud of platform <paramref name="id"/> was used, or -1 while it is fresh (<paramref name="aux"/> is SimState.CrumbleTick).</summary>
-        public int PollenUsedTick(int id, int[] aux)
-        {
-            return aux == null || Platforms[id].Kind != PlatformKind.PollenPuff ? -1 : aux[id];
-        }
-
-        /// <summary>
-        /// Pollen Puff: a rising hero inside the zone of a fresh cloud (PollenHalfWidth either side of the slab centre, PollenBand around the cloud centre PollenHeight above the slab) gets vy x PollenBoostPercent / 100 once
-        /// and the cloud is marked used (SimState.CrumbleTick[id] = the tick, so it shifts and grows with the other per-platform state and clones with it). No allocation.
-        /// </summary>
-        private void ApplyPollen(ref SimState s, int tick)
-        {
-            Fx half = Cfg.PollenBand / 2;
-            for (int i = LowerBound(s.Y - pollenReach); i < Platforms.Length && Platforms[i].Y < s.Y; i++)
-            {
-                if (Platforms[i].Kind != PlatformKind.PollenPuff || s.CrumbleTick[i] >= 0) continue;
-                if (Fx.Abs(s.Y - Platforms[i].Y - Cfg.PollenHeight) >= half || Fx.Abs(s.X - Platforms[i].X) >= Cfg.PollenHalfWidth) continue;
-                s.Vy = s.Vy * Cfg.PollenBoostPercent / 100;
-                s.CrumbleTick[i] = tick;
-            }
         }
 
         /// <summary>Sour Sprinkler Cannon: true while the jet fires (the last SprinklerOnTicks of the global SprinklerCycleTicks cycle).</summary>
@@ -1145,12 +1099,6 @@ namespace FluffyClimbers.Simulation
             return ticks < 2 ? 2 : ticks;
         }
 
-        /// <summary>Spore Funnel: half width of the pull column (platform half width + FunnelHalfExtra, at least FunnelHalfMin).</summary>
-        public Fx FunnelHalfWidth(in Platform p)
-        {
-            return Fx.Max(Cfg.FunnelHalfMin, p.Width / 2 + Cfg.FunnelHalfExtra);
-        }
-
         // ---- Final Change 6, region 3 (Moon Jelly Chain, Splitting Pier) ----
 
         /// <summary>Moon Jelly Chain: member index (0 to 2) of a jelly pad = the run of jelly rows directly below it; 0 for every other platform.</summary>
@@ -1334,8 +1282,7 @@ namespace FluffyClimbers.Simulation
                 if (pct > Cfg.CampaignRampCapPercent) pct = Cfg.CampaignRampCapPercent;
                 scroll = scroll * (100 + pct) / 100;   // the row ramp is level design: multiplied on top of the setting steps
             }
-            // Boss Rise (+BossLungeSpeedPercent per lunge) and Sprint and Rest (+ShelterSpeedPercent per shelter taken): cumulative, multiplied on top of the setting steps, before the ceiling.
-            if (s.BossLunged > 0) scroll = scroll * (100 + s.BossLunged * Cfg.BossLungeSpeedPercent) / 100;
+            // Sprint and Rest (+ShelterSpeedPercent per shelter taken): cumulative, multiplied on top of the setting steps, before the ceiling.
             if (s.ShelterCount > 0) scroll = scroll * (100 + s.ShelterCount * Cfg.ShelterSpeedPercent) / 100;
             return scroll;
         }
@@ -1438,52 +1385,6 @@ namespace FluffyClimbers.Simulation
             int left = Cfg.KeepMovingLimitTicks - s.StandTicks;
             return left < 0 ? 0 : left;
         }
-
-        // ---- Boss Rise (owner Final Change 6, 2026-11-25; Planning/FINAL-CHANGE-6-LEVEL-TYPE-OPTIONS.md H3). Row based, no RNG, integers only. ----
-
-        /// <summary>
-        /// One tick of the boss, called after the normal scroll of the tick was decided (<paramref name="scroll"/>); returns the extra upward move of the danger line (0 outside a lunge).
-        /// A phase starts the first time the hero's highest row reaches n x BossPhaseRows (queued one after the other if several rows are skipped at once): the boss roars for BossRoarTicks,
-        /// then lunges: BossLungeDistance over BossLungeTicks, never closer than BossLungeMinGap under the hero's feet (a lunge squeezes the buffer but never kills by itself), and from the
-        /// lunge on the line is BossLungeSpeedPercent faster, cumulative (SimState.BossLunged). A hero who climbs during the roar is never reached.
-        /// </summary>
-        private Fx BossTick(ref SimState s, Fx scroll)
-        {
-            Fx add = Fx.Zero;
-            if (s.BossLunge > 0)
-            {
-                s.BossLunge--;
-                Fx step = Cfg.BossLungeDistance / Cfg.BossLungeTicks;
-                Fx room = (s.Y - Cfg.BossLungeMinGap) - (s.KillY + scroll);
-                add = room <= Fx.Zero ? Fx.Zero : (room < step ? room : step);
-            }
-            else if (s.BossRoar > 0)
-            {
-                if (--s.BossRoar == 0) { s.BossLunge = Cfg.BossLungeTicks; s.BossLunged++; }
-            }
-            else if (s.BossPhase < BossRiseRules.PhasesOf(Cfg, LevelRows) && s.Row >= BossRiseRules.PhaseRow(Cfg, s.BossPhase + 1))
-            {
-                s.BossPhase++;
-                s.BossRoar = Cfg.BossRoarTicks;
-            }
-            return add;
-        }
-
-        /// <summary>Boss Rise: ticks of the roar telegraph left (HUD cue and the boss roar pose); 0 when the boss is not roaring or the level is not a Boss Rise level.</summary>
-        public int BossRoarTicksLeft(in SimState s) { return BossRise ? s.BossRoar : 0; }
-
-        /// <summary>Boss Rise: true while the lunge runs (the boss reaches up).</summary>
-        public bool BossLunging(in SimState s) { return BossRise && s.BossLunge > 0; }
-
-        /// <summary>Boss Rise: phases started so far / phases of the level (HUD pips).</summary>
-        public int BossPhasesStarted(in SimState s) { return BossRise ? s.BossPhase : 0; }
-        public int BossPhasesTotal { get { return BossRise ? BossRiseRules.PhasesOf(Cfg, LevelRows) : 0; } }
-
-        /// <summary>Boss Rise: the boss speed-up shown to the player in percent (lunges so far x BossLungeSpeedPercent).</summary>
-        public int BossSpeedUpPercent(in SimState s) { return BossRise ? s.BossLunged * Cfg.BossLungeSpeedPercent : 0; }
-
-        /// <summary>Boss Rise: true while the hero stands in the boss arena (the top BossArenaRows rows).</summary>
-        public bool InBossArena(in SimState s) { return BossRise && BossRiseRules.IsArenaRow(Cfg, s.Row, LevelRows); }
 
         // ---- Sprint and Rest (owner Final Change 6, 2026-11-25; H4) ----
 
@@ -1727,7 +1628,6 @@ namespace FluffyClimbers.Simulation
                 {
                     s.Vy = s.Vy - gravity / d;
                 }
-                if (hasPollen && !flying && !holding && s.Vy > Fx.Zero) ApplyPollen(ref s, tick);   // Pollen Puff (2026-11-26): the first rise through a fresh cloud gives vy x 1.10
                 s.Y = s.Y + s.Vy / d;
                 s.X = s.X + (s.Vx + zonePush) / d;
                 if (hasCandyZones && !flying && !holding) ApplyCandyZones(ref s, tick, d);   // Caramel Magnet pull, Sour Sprinkler push (Final Change 6)
@@ -1890,7 +1790,6 @@ namespace FluffyClimbers.Simulation
                 if (s.SlowTicks > 0) scroll = scroll * (100 - Cfg.SlowTimePercent) / 100;
                 scroll = scroll / d;   // Glide slow-mo: the danger line crawls too while the player is in the air
                 if (SprintRest && ShelterHolds(ref s)) scroll = Fx.Zero;   // Sprint and Rest: the danger line waits while the hero rests on a shelter
-                if (BossRise) scroll = scroll + BossTick(ref s, scroll);   // Boss Rise: the lunge moves the line up on top of the normal scroll
                 s.KillY = s.KillY + scroll;
             }
             if (ringIdx != null) ScanRings(ref s);
@@ -2435,7 +2334,7 @@ namespace FluffyClimbers.Simulation
             if (p.Kind == PlatformKind.Crumble && s.CrumbleTick[id] < 0) s.CrumbleTick[id] = tick;
             if (p.Kind == PlatformKind.Bounce || p.Kind == PlatformKind.BounceCap)
             {
-                Fx mul = p.Kind == PlatformKind.Bounce ? Cfg.BounceMultiplier : Cfg.BounceCapMultiplier;
+                Fx mul = Cfg.BounceCapMultiplier;   // owner Final Bugs 1 (2026-11-26): every region's spring (Bounce and BounceCap) launches exactly as high as Region 2's Bounce Cap
                 s.Vy = Cfg.JumpSpeed(Fx.Abs(s.Vx)) * mul;
                 s.Grounded = false;
                 s.Coyote = 0;
@@ -2756,12 +2655,6 @@ namespace FluffyClimbers.Simulation
                 {
                     // the cloud drifts over the lane; inside it the horizontal air speed is capped (flag only, the cap is applied by Step)
                     if (s.Y - p.Y < Cfg.FogHeight && Fx.Abs(s.X - FogX(p.Id, tick)) < Cfg.FogCloudWidth / 2) fogCap = Fx.One;
-                }
-                else if (p.Kind == PlatformKind.SporeFunnel)
-                {
-                    // pulled toward the column axis, never past it: the pull is min(FunnelPull, distance)
-                    Fx off = p.X - s.X;
-                    if (Fx.Abs(off) < FunnelHalfWidth(in p) && s.Y - p.Y < Cfg.FunnelHeight) push = push + (Fx.Abs(off) < Cfg.FunnelPull ? off : Cfg.FunnelPull * off.Sign());
                 }
             }
         }

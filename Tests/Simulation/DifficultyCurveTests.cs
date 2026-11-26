@@ -310,7 +310,7 @@ namespace FluffyClimbers.Simulation.Tests
                     SpecialLevelType type = SpecialLevels.TypeOf(ls[i].Spec);
                     GoalType want2 = type == SpecialLevelType.NoWallTouch ? GoalType.NoWallBounce : type == SpecialLevelType.ComboGates ? GoalType.ComboGates : type == SpecialLevelType.SkyHoops ? GoalType.SkyHoops : type == SpecialLevelType.RivalRace ? GoalType.RivalRace : GoalType.ReachFloor;
                     Assert.True(g == want2, ls[i].Id + " goal " + g);
-                    if (idx % 5 == 0) Assert.True((type == SpecialLevelType.None || (idx == 25 && type == SpecialLevelType.BossRise)) && g == GoalType.ReachFloor, ls[i].Id + " is a gem level: Regular Run (level 25: Boss Rise)");
+                    if (idx % 5 == 0) Assert.True(type == SpecialLevelType.None && g == GoalType.ReachFloor, ls[i].Id + " is a gem level: Regular Run");
                 }
             }
         }

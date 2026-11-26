@@ -62,10 +62,8 @@ namespace FluffyClimbers.Content
             {
                 spec.Special = SpecialLevels.RuleFromId(level.Special);
                 if (spec.Special == SpecialLevelType.None) throw new ContentException(level.Id, "Unknown special level rule '" + level.Special + "'.");
-                // Final Change 6: the rules of Boss Rise and Sprint and Rest are flags of the spec (the builder and the Sim read them); the boss follows the region.
-                spec.BossRiseRule = spec.Special == SpecialLevelType.BossRise;
+                // Final Change 6: the rule of Sprint and Rest is a flag of the spec (the builder and the Sim read it).
                 spec.SprintRestRule = spec.Special == SpecialLevelType.SprintRest;
-                if (spec.BossRiseRule) spec.BossRegion = region.Index;
             }
             if (level.GhostRowAtTick != null && level.GhostRowAtTick.Count > 0) spec.GhostRowAtTick = level.GhostRowAtTick.ToArray();   // Rival Race: the baked ghost path
             return spec;

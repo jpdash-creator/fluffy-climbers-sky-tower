@@ -588,18 +588,18 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void EveryPlayableRegionHasTheTenSpecialLevelsAndOnlyLevel25IsAGemLevel()
+        public void EveryPlayableRegionHasTheEightSpecialLevelsAndNoGemLevelIsSpecial()
         {
             ProgressService svc = NewService();
             for (int r = 1; r <= 5; r++)
             {
                 LevelDef[] specials = svc.RegionSpecialLevels(r);
-                Assert.AreEqual(SpecialLevels.Count + 2, specials.Length, "region " + r);   // ten special levels, eight types: Boss Rise and Sky Hoops twice
+                Assert.AreEqual(SpecialLevels.Count + 1, specials.Length, "region " + r);   // eight special levels, seven types: Sky Hoops twice (Boss Rise was removed 2026-11-26)
                 var seen = new HashSet<SpecialLevelType>();
                 foreach (LevelDef l in specials)
                 {
-                    Assert.IsTrue(seen.Add(l.SpecialType) || l.SpecialType == SpecialLevelType.BossRise || l.SpecialType == SpecialLevelType.SkyHoops, "region " + r + ": " + l.SpecialType + " twice");
-                    Assert.IsTrue(l.Index % 5 != 0 || (l.Index == 25 && l.SpecialType == SpecialLevelType.BossRise), l.Id + " is a gem level");
+                    Assert.IsTrue(seen.Add(l.SpecialType) || l.SpecialType == SpecialLevelType.SkyHoops, "region " + r + ": " + l.SpecialType + " twice");
+                    Assert.IsTrue(l.Index % 5 != 0, l.Id + " is a gem level");
                     Assert.AreEqual(l.SpecialType, svc.SpecialTypeOfLevel(l.Id));
                 }
             }
@@ -633,10 +633,10 @@ namespace FluffyClimbers.Tests
             // weekly: the type tasks take the level of that type of ANY region
             Assert.IsTrue(WeeklyDone(svc, "w2_special_nowall"));
             Assert.IsTrue(WeeklyDone(svc, "w2_special_onelife"));
-            Assert.IsFalse(WeeklyDone(svc, "w2_special_bossrise"));
+            Assert.IsFalse(WeeklyDone(svc, "w2_special_sprintrest"));
             Assert.AreEqual(2, Weekly(svc, RewardStat.SpecialTypes));
-            svc.ApplyRun(SpecialOf(svc, 3, SpecialLevelType.BossRise).Id, Won(1, Hard));
-            Assert.IsTrue(WeeklyDone(svc, "w2_special_bossrise"), "region 3's Boss Rise level counts for the weekly Boss Rise task");
+            svc.ApplyRun(SpecialOf(svc, 3, SpecialLevelType.SprintRest).Id, Won(1, Hard));
+            Assert.IsTrue(WeeklyDone(svc, "w2_special_sprintrest"), "region 3's Sprint and Rest level counts for the weekly Sprint and Rest task");
             svc.ApplyRun(SpecialOf(svc, 2, SpecialLevelType.NoWallTouch).Id, Won(1, Insane));
             Assert.AreEqual(3, Weekly(svc, RewardStat.SpecialTypes), "a second No Wall Touch level is not a new type");
             Assert.AreEqual(4, Weekly(svc, RewardStat.Special), "but it is a fourth different special level");
@@ -658,7 +658,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(7, Weekly(again, RewardStat.Special));
             now = now.AddDays(1);
             Assert.AreEqual(0, Daily(svc, RewardStat.Special));
-            svc.ApplyRun(SpecialOf(svc, 1, SpecialLevelType.BossRise).Id, new RunOutcome { Completed = false, Mode = Insane });
+            svc.ApplyRun(SpecialOf(svc, 1, SpecialLevelType.SprintRest).Id, new RunOutcome { Completed = false, Mode = Insane });
             Assert.AreEqual(0, Daily(svc, RewardStat.Special));
             Assert.AreEqual(7, Weekly(svc, RewardStat.Special));
             now = Monday.AddDays(7);
@@ -1971,7 +1971,7 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual("clock", Src(c.Find(RewardTab.Weekly, "w2_ta100")));
             Assert.AreEqual("task_boss_skull", Slot(DailyRow(c, "d2_special1")), "special levels: the challenge skull");
             Assert.AreEqual("task_boss_skull", Slot(c.Find(RewardTab.Weekly, "w2_special_all6")));
-            Assert.AreEqual("task_boss_skull", Slot(c.Find(RewardTab.Weekly, "w2_special_bossrise")));
+            Assert.AreEqual("task_boss_skull", Slot(c.Find(RewardTab.Weekly, "w2_special_sprintrest")));
             Assert.AreEqual("wall", Src(c.Find(RewardTab.Weekly, "w2_special_nowall")), "the No Wall Touch level: the wall");
             Assert.IsTrue(RewardsScreen.IsGoldMedalTask(c.Find(RewardTab.Weekly, "w2_gold5")));
             Assert.IsTrue(RewardsScreen.IsGoldMedalTask(c.Find(RewardTab.Weekly, "w2_normal_gold3")));

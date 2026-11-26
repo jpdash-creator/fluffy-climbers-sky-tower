@@ -9,6 +9,7 @@ Who this is for: the owner, when a player asks by e-mail to have their data dele
 | Game save (progress, wallet, heroes, power-ups, settings, chosen hero, purchase ledger, leaderboard queue) | The device, in the app private folder (save file plus `.bak` and `.tmp`) | The player: Reset progress, or uninstall. An Android device backup (a Google service) may hold a copy; the player controls it in Android settings. |
 | Cloud save | Google Play Games Saved Games, file `fluffy_save`, in the player's own Google account (hidden Drive app data). We have no server copy and no access. | The player only (see section 4). |
 | Leaderboard data (only players who confirmed the weekly leaderboards) | Firebase project `fluffy-climbers-tower-jump`, Firestore Mumbai (asia-south1): `players/{uid}` (display name, picture link, public id, hero variants), `weeks/{weekKey}/slots/{uid}_{slot}`, `weeks/{weekKey}/totals/{uid}`, `weeks/{weekKey}/breakdowns/{uid}`, `weeks/{weekKey}/boards/{board}` (rebuilt boards that name the player), `prizeClaims/{id}`, `tickets/{ticketId}` (one-time run tickets with the uid, short lived) | The app (Reset progress calls the service) for slots, totals and breakdowns; the owner for the rest. |
+| Firebase save backup copy (Final Bugs 1 item 12, DRAFT for owner review) | Firestore Mumbai: `saveBackups/{uid}` (one document per Firebase uid: gzip of the whole save envelope, size, SHA-256, `updatedAt`, `expireAt` = last write + 730 days). Written and read only by the Cloud Run service (`PUT/GET/DELETE /v1/save`); the Firestore rules deny every client access. | The app replaces it with the reset save (Reset progress, while signed in); the owner deletes it on request; TTL removes it 730 days after the last write. |
 | Firebase Authentication user | Firebase console > Authentication, one user per signed-in player (the uid used above) | The owner. |
 | Cloud Run request logs | Google Cloud Logging (IP address, uid) | They expire by the log retention setting; the owner can delete entries in Logs Explorer. |
 
@@ -16,7 +17,7 @@ Who this is for: the owner, when a player asks by e-mail to have their data dele
 
 1. **Settings > Reset progress > confirm.** The game wipes the device save except the shop purchase ledger and the purchase records, sets `cloudResetPending`, and (when signed in) uploads the empty save to Play Games Saved Games at once. If that upload fails the flag stays, and the next sign-in uploads the reset save BEFORE any cloud download is applied (`AccountSync.Resolve`), so an old cloud copy can never bring the data back. The chosen hero goes back to Momo copy 0; the player's settings are kept on purpose (they are preferences, not progress).
 2. The same reset sets `leaderboardWipePending` (when the player ever confirmed the leaderboards). `LeaderboardHub` then calls `POST /delete-my-entries` (`LeaderboardClient.DeleteMyEntries`) now, at the next sign-in and on every slow tick until the service answers 2xx; nothing new is uploaded while it is pending. The service removes slots, weekly totals and breakdowns of every week and rebuilds the open boards without the player. It keeps the profile row, the prize claims and boards of weeks that are already final (they expire by TTL).
-3. **Unlink Google account** (Settings) stops uploads; the cloud copy stays until deleted as in section 4.
+3. **Unlink Google account** (Settings) stops uploads; the cloud copy stays until deleted as in section 4. The Firebase backup copy stays too until it expires, a reset replaces it, or the owner deletes it (section 3 step 2a).
 4. Uninstalling removes the device files only.
 
 ## 3. What the owner does on an e-mail request (jpdash.creator@gmail.com)
@@ -26,11 +27,12 @@ Answer within one month (POLICY section 4a). Ask for the Play Games player name 
 1. **Find the uid.** Firebase console > Firestore > `players`: search the name field for the Play Games name; the document id is the uid. Note it.
 2. **Delete the leaderboard rows.** Firestore > `weeks` > for every week: delete the `slots` documents whose field `uid` equals the uid, the `totals/{uid}` document and the `breakdowns/{uid}` document. Then the `prizeClaims` documents with `uid` equal to the uid and the `tickets` documents with `uid` equal to the uid. Finally the `players/{uid}` document. (The player can do the slots, totals and breakdowns part alone with Reset progress; `players`, `prizeClaims` and final weeks still need the owner.)
 3. **Boards.** The rebuilt `weeks/{weekKey}/boards/{board}` documents of open weeks keep the name until the next rebuild (the scheduled admin tick or the next score write). To remove it at once, open the document and delete the row with the uid.
+   **2a. Delete the save backup.** Firestore > `saveBackups` > the document whose id is the uid (it holds only the compressed save, no name). The uid comes from step 1 (a player who never used the leaderboards has no `players` row: use Firebase console > Authentication > Users, the Play Games player name is the display name of the user, then copy the User UID). Alternatively the player's own app can delete it: `DELETE /v1/save` with their Firebase ID token (no in-app button yet).
 4. **Delete the Authentication user.** Firebase console > Authentication > Users > the uid > Delete account.
 5. **Logs.** Google Cloud console > Logging > Logs Explorer, query the uid. Delete entries only if the retention would exceed one month; otherwise the default retention applies.
 6. **Reply** to the player with the date and what was deleted and what cannot be deleted by us (section 4).
 
-This runbook needs no deploy and no code change.
+This runbook needs no deploy and no code change. (The backup copy is also replaced by a Reset: after the reset save reaches Google, the next upload writes the reset save to `saveBackups/{uid}` at once, and a pending reset blocks restoring from the backup, `SaveBackupRules.PickRestoreBytes`.)
 
 ## 4. What the owner cannot delete
 

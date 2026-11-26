@@ -128,8 +128,16 @@ namespace FluffyClimbers.LeaderboardService
 
             DateTime t = now();
             string weekKey = WeekMath.WeekKey(t);
-            ApplyOutcome o = await store.ApplyRunAsync(new ApplyInput { Uid = uid, Pid = PidOf(uid), WeekKey = weekKey, Run = sub, Replay = rr, Now = t, Limits = lim });
+            ApplyOutcome o = await store.ApplyRunAsync(new ApplyInput { Uid = uid, Pid = PidOf(uid), WeekKey = weekKey, Run = sub, Replay = rr, Now = t, Limits = lim, DisplayName = sub.DisplayName, AvatarUrl = sub.AvatarUrl });
             if (!o.Accepted) return ApiResult.Fail(o.Error == "rate_limited" ? 429 : 422, o.Error);
+
+            // a player whose profile or weekly row was removed (Reset progress, a clean-up, a manual delete) is back on the boards with this run, even when the run itself adds no crowns (an Endless run of 0, a lower repeat)
+            if (!o.Improved && (o.ProfileCreated || o.Totals == null))
+            {
+                PlayerDoc pl = await store.GetPlayerAsync(uid);
+                if (pl != null && !string.IsNullOrWhiteSpace(pl.DisplayName))
+                    await store.EnsureTotalsAsync(weekKey, uid, PidOf(uid), pl.DisplayName, pl.AvatarUrl, t, WeekMath.WeekEndUtc(t).AddDays(lim.RetentionDays));
+            }
 
             if (o.Improved) await MaybeRebuildAsync(weekKey, o, lim, t);
             // previousCrown / slotCrown are what the slot counts: the best crown of a level slot, the sum of the three best runs of an Endless / Time Attack slot (slotRuns = how many it holds now)

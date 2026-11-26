@@ -75,11 +75,11 @@ namespace FluffyClimbers.Simulation.Tests
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 BotResult res;
                 int budget = SolvabilityT4Tests.NodeBudget * Math.Max(1, s.RowsFor() / 60) * int.Parse(Environment.GetEnvironmentVariable("TRACE_BUDGETX") ?? "1");
-                bool ok = BotTimeBox.Solve(out res, cfg, s, d, budget, bot => { string g = Environment.GetEnvironmentVariable("TRACE_GUARD"); if (g != null) bot.BossGuardGap = Fx.FromRatio(int.Parse(g), 10); }, secs);
+                bool ok = BotTimeBox.Solve(out res, cfg, s, d, budget, secs);
                 lines.Add(jid + " seed " + i + " budget " + budget + " finished " + ok + " solved " + res.Solved + " nodes " + res.Nodes + " best " + res.BestRow + "/" + d.Rows + " secs " + sw.Elapsed.TotalSeconds.ToString("F1"));
                 if (Environment.GetEnvironmentVariable("TRACE_DUMP") == "1" && ok && !res.Solved)
                 {
-                    lines.Add("  best state: row " + res.Final.Row + " tick " + res.Final.Tick + " x " + Fs(res.Final.X, "F2") + " y " + Fs(res.Final.Y, "F2") + " kill " + Fs(res.Final.KillY, "F2") + " lunged " + res.Final.BossLunged);
+                    lines.Add("  best state: row " + res.Final.Row + " tick " + res.Final.Tick + " x " + Fs(res.Final.X, "F2") + " y " + Fs(res.Final.Y, "F2") + " kill " + Fs(res.Final.KillY, "F2"));
                     int lo = res.BestRow - 12, hi = res.BestRow + 6;
                     foreach (Platform p in d.Platforms) if (p.Row >= lo && p.Row <= hi) lines.Add("  r" + p.Row + " " + p.Kind + " x " + Fs(p.X, "F2") + " y " + Fs(p.Y, "F2") + " w " + Fs(p.Width, "F1") + " amp " + Fs(p.Amplitude, "F2"));
                 }

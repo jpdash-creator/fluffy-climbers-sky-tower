@@ -10,7 +10,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
     /// <summary>
     /// Owner Final Change 1 (2026-11-22) and Final Change 6 (2026-11-25): the special level types against the REAL RunSession and the server replay. One Life offers and accepts no revive (client and server),
     /// No Power-ups ignores every activation (also in a forged recording), Keep Moving ends the run after 3 s on one platform and still allows a revive, Sky Hoops replays exactly (Combo Gates was retired on 2026-11-26 and its levels became Sky Hoops levels).
-    /// Region 1 placement: L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L17 Boss Rise, L21 Sprint and Rest, L24 Sky Hoops, L25 Boss Rise.
+    /// Region 1 placement: L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L21 Sprint and Rest, L24 Sky Hoops (Boss Rise was removed 2026-11-26: L17 and L25 are plain).
     /// </summary>
     public class SpecialLevelReplayTests
     {
@@ -43,16 +43,16 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.Equal(SpecialLevelType.KeepMoving, Harness.NewLevelSession(KeepMoving, 2, 1).SpecialType);
             Assert.Equal(SpecialLevelType.SkyHoops, Harness.NewLevelSession(Hoops, 2, 1).SpecialType);
             Assert.Equal(SpecialLevelType.SkyHoops, Harness.NewLevelSession(Hoops2, 2, 1).SpecialType);
-            Assert.Equal(SpecialLevelType.BossRise, Harness.NewLevelSession("lvl_001_17", 2, 1).SpecialType);
+            Assert.Equal(SpecialLevelType.None, Harness.NewLevelSession("lvl_001_17", 2, 1).SpecialType);   // the former Boss Rise level is a Regular Run
             Assert.Equal(SpecialLevelType.SprintRest, Harness.NewLevelSession("lvl_001_21", 2, 1).SpecialType);
             Assert.Equal(SpecialLevelType.RivalRace, Harness.NewLevelSession("lvl_001_12", 2, 1).SpecialType);
-            Assert.Equal(SpecialLevelType.BossRise, Harness.NewLevelSession("lvl_001_25", 2, 1).SpecialType);   // the level-25 gem level is a Boss Rise level
+            Assert.Equal(SpecialLevelType.None, Harness.NewLevelSession("lvl_001_25", 2, 1).SpecialType);   // the level-25 gem level is a Regular Run
             Assert.Equal(SpecialLevelType.None, Harness.NewLevelSession("lvl_001_10", 2, 1).SpecialType);   // a gem level is a Regular Run
             Assert.Equal(SpecialLevelType.None, Harness.NewEndlessSession("region_001_meadow_springs", 2, 1, false).SpecialType);
             // the content model gives the same answer without a session (level tiles, rewards)
             Assert.Equal(SpecialLevelType.OneLife, Harness.Repo.GetLevel(OneLife).SpecialType);
             Assert.Equal(SpecialLevelType.SkyHoops, Harness.Repo.GetLevel(Hoops2).SpecialType);   // the old Combo Gates level
-            Assert.Equal(SpecialLevelType.BossRise, Harness.Repo.GetLevel("lvl_001_25").SpecialType);
+            Assert.Equal(SpecialLevelType.None, Harness.Repo.GetLevel("lvl_001_25").SpecialType);
             Assert.Equal(SpecialLevelType.None, Harness.Repo.GetLevel("lvl_001_15").SpecialType);
             Assert.Equal(SpecialLevelType.NoWallTouch, Harness.Repo.GetLevel("lvl_006_07").SpecialType);   // the legacy 15-level regions keep their old goals: the lookup reads the goal, never an index
         }

@@ -245,7 +245,7 @@ namespace FluffyClimbers.Gameplay
 
             // Combo and speed-up are transient banners in the CENTRE of the screen (owner 2026-11-02): horizontally centred, combo just above and speed-up just below the vertical middle.
             // The centre is clear of the top HUD rows, the pads and the power-up buttons (those sit at the sides / bottom); anchors are symmetric, so left-handed mirroring needs no change.
-            // Level text (Gates, Rings, Rival, Boss, Shelter, Keep Moving, speedrun clock) lives in ONE chip at the top, next to the run timer (owner 2026-11-26); the bottom keeps only the pads.
+            // Level text (Gates, Rings, Rival, Shelter, Keep Moving, speedrun clock) lives in ONE chip at the top, next to the run timer (owner 2026-11-26); the bottom keeps only the pads.
             comboRoot = BannerRoot(root, "ComboBanner", "icon_flame", new Color(1f, 0.85f, 0.2f), BannerComboY, out comboText);
             speedRoot = BannerRoot(root, "SpeedBanner", "icon_speed", new Color(1f, 0.7f, 0.4f), BannerSpeedY, out speedText);
             comboRoot.gameObject.SetActive(false);
@@ -285,9 +285,9 @@ namespace FluffyClimbers.Gameplay
         int lastKeepSecs = -1, lastComboJumps = -1;
         string[] comboProgressTexts;
 
-        // ---- ONE level chip (owner 2026-11-26): every in-run line about the level (Gates n / N, Rings n / N, Combo jumps, Rival, Boss, Shelter, Keep Moving and its MOVE! cue, ROAR / LUNGE / REST cues,
+        // ---- ONE level chip (owner 2026-11-26): every in-run line about the level (Gates n / N, Rings n / N, Combo jumps, Rival, Shelter, Keep Moving and its MOVE! cue, REST cue,
         // the speedrun clock) is shown in a dark glass chip in the top strip, in the timer row right beside the run timer. Fixed height (RunLayout.Row3H), text shrinks to fit (two lines at most),
-        // never leaves the strip. A cue (MOVE!, ROAR!, REST) replaces the base text while it lasts, in a warm colour AND words (CUX-6). Texts are cached; only swapped on a change (CUX-1). ----
+        // never leaves the strip. A cue (MOVE!, REST) replaces the base text while it lasts, in a warm colour AND words (CUX-6). Texts are cached; only swapped on a change (CUX-1). ----
         /// <summary>Name of the level chip and of its text child (tests).</summary>
         public const string LevelChipName = "LevelChip", LevelChipTextName = "Value";
         /// <summary>The chip's share of the timer row: wider than the timer so a line like "Shelter at floor 40  Line +10%" fits in two lines.</summary>
@@ -380,30 +380,21 @@ namespace FluffyClimbers.Gameplay
         string[] rivalTexts;
         int rivalOffset, lastRivalAhead = int.MinValue, lastRivalRow = -1;
 
-        // ---- Boss Rise and Sprint and Rest cues (owner Final Change 6, 2026-11-25; moved into the top level chip 2026-11-26). The cue replaces the chip's base line while it lasts; all texts are cached once. ----
-        /// <summary>Boss Rise cue texts: index 0 = the lunge, 1 and 2 = the whole seconds of the roar telegraph left (1.5 s: "ROAR! 2" then "ROAR! 1"). Text AND the boss pose AND a sound, so the warning is never one channel only (CUX-6).</summary>
-        public static readonly string[] BossCueTexts = { "LUNGE!", "ROAR! 1", "ROAR! 2" };
+        // ---- Sprint and Rest cues (owner Final Change 6, 2026-11-25; moved into the top level chip 2026-11-26; Boss Rise removed 2026-11-26). The cue replaces the chip's base line while it lasts; all texts are cached once. ----
         /// <summary>Sprint and Rest cue texts by whole seconds of rest left (index 0 = the last ticks, 3 = a full rest).</summary>
         public static readonly string[] RestCueTexts = { "REST", "REST 1", "REST 2", "REST 3" };
         string[] levelChipTexts;
         int lastPhaseCue = -2, lastLevelChip = -1;
-        bool bossLevelHud, restLevelHud;
+        bool restLevelHud;
 
         /// <summary>
-        /// Boss Rise: the chip line "Boss n / N +P%" (the roar and lunge cue replaces it while it lasts); Sprint and Rest: "Shelter at floor F  Line +P%" (the "REST n" cue replaces it).
+        /// Sprint and Rest: "Shelter at floor F  Line +P%" (the "REST n" cue replaces it).
         /// Cached strings only (CUX-1); the chip has an own text for every state the level can reach.
         /// </summary>
         void BuildLevelRuleCues(RectTransform root, RunSession session)
         {
             SimConfig cfg = session.Cfg;
-            if (session.Sim.BossRise)
-            {
-                bossLevelHud = true;
-                int total = session.Sim.BossPhasesTotal;
-                levelChipTexts = new string[total + 1];
-                for (int n = 0; n <= total; n++) levelChipTexts[n] = "Boss " + n + " / " + total + "  +" + (n * cfg.BossLungeSpeedPercent) + "%";
-            }
-            else if (session.Sim.SprintRest)
+            if (session.Sim.SprintRest)
             {
                 restLevelHud = true;
                 int shelters = 0;
@@ -417,29 +408,19 @@ namespace FluffyClimbers.Gameplay
             }
         }
 
-        /// <summary>Per frame: the boss / shelter cue and chip line. Swaps cached strings only when the value changed; no allocation.</summary>
+        /// <summary>Per frame: the shelter cue and chip line. Swaps cached strings only when the value changed; no allocation.</summary>
         void RefreshLevelRuleCues(RunSession s, in SimState st)
         {
-            if (!bossLevelHud && !restLevelHud) return;
+            if (!restLevelHud) return;
             int cue;   // -1 none, otherwise the index into the cue texts
-            if (bossLevelHud)
-            {
-                int roar = s.Sim.BossRoarTicksLeft(in st);
-                cue = s.Sim.BossLunging(in st) ? 0 : (roar > 0 ? Mathf.Clamp((roar + SimConfig.TicksPerSecond - 1) / SimConfig.TicksPerSecond, 1, 2) : -1);
-            }
-            else
-            {
-                int rest = s.Sim.ShelterRestTicksLeft(in st);
-                cue = rest > 0 ? Mathf.Clamp((rest + SimConfig.TicksPerSecond - 1) / SimConfig.TicksPerSecond, 0, 3) : -1;
-            }
+            int rest = s.Sim.ShelterRestTicksLeft(in st);
+            cue = rest > 0 ? Mathf.Clamp((rest + SimConfig.TicksPerSecond - 1) / SimConfig.TicksPerSecond, 0, 3) : -1;
             if (cue != lastPhaseCue)
             {
-                bool starts = lastPhaseCue < 0 && cue >= 0;
                 lastPhaseCue = cue;
-                ChipCue(cue >= 0 ? (bossLevelHud ? BossCueTexts[cue] : RestCueTexts[cue]) : null);
-                if (starts && bossLevelHud) AudioManager.Play(Sfx.SpeedUp);   // the roar is audible too (CUX-6)
+                ChipCue(cue >= 0 ? RestCueTexts[cue] : null);
             }
-            int chip = bossLevelHud ? s.Sim.BossPhasesStarted(in st) : st.ShelterCount;
+            int chip = st.ShelterCount;
             if (levelChipTexts != null && chip != lastLevelChip)
             {
                 lastLevelChip = chip;
@@ -694,6 +675,17 @@ namespace FluffyClimbers.Gameplay
         Image[] starIcons;
         int lastRow = -1, lastStarMask = -1, lastGems = -1, lastTimeKey = -1, lastCombo2 = -1, lastBest = -1;
 
+        /// <summary>
+        /// The number in the top gem pill (Final Bugs 1 item 5). During a run: the wallet plus the gems picked up so far (Endless shows only the picked ones). Once the run has ended in a
+        /// fall (failed popup, Endless or Time Attack game over) the pill shows the REAL wallet again, because picked gems only pay on a clear; a revive makes the run live again
+        /// (<paramref name="over"/> false) and the pill returns to the in-run value. A cleared run is not touched by this rule. Pure.
+        /// </summary>
+        public static int GemPillValue(bool over, bool goalReached, bool endless, bool hasWallet, int walletGems, int pickedGems, int hiddenGems)
+        {
+            if (over && !goalReached && hasWallet) return walletGems;
+            return pickedGems + hiddenGems + (endless || !hasWallet ? 0 : walletGems);
+        }
+
         public void Refresh(RunSession s, float deltaTime)
         {
             SimState st = s.State;
@@ -735,7 +727,7 @@ namespace FluffyClimbers.Gameplay
                 lastStarMask = st.StarMask;
                 for (int i = 0; i < 3; i++) if (starIcons[i] != null) starIcons[i].color = (st.StarMask & (1 << i)) != 0 ? Color.white : new Color(0.35f, 0.35f, 0.4f, 0.9f);
             }
-            int gems = st.Gems + st.HiddenGems + (endless || GameSession.Progress == null ? 0 : GameSession.Progress.Gems);
+            int gems = GemPillValue(s.Over, s.GoalReached, endless, GameSession.Progress != null, GameSession.Progress != null ? GameSession.Progress.Gems : 0, st.Gems, st.HiddenGems);
             if (gems != lastGems) { lastGems = gems; UiKit.SetText(gemText, gems.ToString()); }
             if (s.Spec.Goal.Type == GoalType.Speedrun)
             {
@@ -1155,6 +1147,7 @@ namespace FluffyClimbers.Gameplay
                 MakeAct("Shop", "Shop", 0, ToyKit.Get("icon_shop"), 150f, OpenShop),
                 MakeAct("Home", "Level select", 2, ToyKit.Get("icon_home"), 150f, () => { if (OnMenu != null) OnMenu(); }));
             FitPanelToSafeArea();
+            AddUnrankedNote();
         }
 
         public void ShowResults(RunSession s, RewardResult reward, bool hasNext, bool doubleOffer = false)
@@ -1257,6 +1250,7 @@ namespace FluffyClimbers.Gameplay
                 MakeAct("Retry", "Play again", 0, Glyphs.Restart, 150f, () => { if (OnRetry != null) OnRetry(); }),
                 MakeAct("Home", "Level select", 2, ToyKit.Get("icon_home"), 150f, () => { if (OnMenu != null) OnMenu(); }));
             FitPanelToSafeArea();
+            AddUnrankedNote();
         }
 
         public const string DoubleCoinsButtonName = "DoubleCoins";
@@ -1287,6 +1281,28 @@ namespace FluffyClimbers.Gameplay
         /// Guard for tall popups (CUX-3): centres the overlay panel in the safe area. It NEVER scales the panel: scaling shrank the buttons and the close X below 48 dp. The callers budget the height
         /// from the real line heights instead (compact rows); if a panel is still taller than the safe area the overflow is logged so the layout test and the owner see it.
         /// </summary>
+        /// <summary>Set by RunController before the end card: "Not ranked: no connection" when the run began without a server ticket (owner item 11). Cleared once drawn.</summary>
+        public string UnrankedNote;
+
+        /// <summary>A small one-line note with its own dark backing at the bottom of the safe area, OUTSIDE the result panel, so it never overlaps the panel content (CUX-3).</summary>
+        void AddUnrankedNote()
+        {
+            string note = UnrankedNote;
+            UnrankedNote = null;
+            if (string.IsNullOrEmpty(note) || overlay == null) return;
+            Rect sa = UiKit.SafeAreaNormalized();
+            Vector2 canvasSize = UiKit.CanvasSizeRef();
+            Image back = UiKit.AddPanel(overlay, "UnrankedNote", new Color(0.08f, 0.10f, 0.2f, 0.92f));
+            var br = (RectTransform)back.transform;
+            br.anchorMin = br.anchorMax = new Vector2(0.5f, 0f);
+            br.pivot = new Vector2(0.5f, 0f);
+            br.sizeDelta = new Vector2(640f, 72f);
+            br.anchoredPosition = new Vector2(0f, sa.yMin * canvasSize.y + 24f);
+            Text t = UiKit.AddText(br, "Text", note, 36, Color.white);
+            var tr = (RectTransform)t.transform;
+            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one; tr.offsetMin = new Vector2(16f, 0f); tr.offsetMax = new Vector2(-16f, 0f);
+        }
+
         void FitPanelToSafeArea()
         {
             Transform p = overlay != null ? overlay.Find("Panel") : null;

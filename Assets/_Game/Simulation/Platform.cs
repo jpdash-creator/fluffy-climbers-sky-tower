@@ -114,12 +114,7 @@ namespace FluffyClimbers.Simulation
         /// Never a hazard, never kills. A pure function of the tick and the platform data (Sim.PlatformX).
         /// </summary>
         CloverSwap = 62,
-        /// <summary>
-        /// Pollen Puff (helpful, air zone; owner-approved 2026-11-26): a NORMAL slab (landing, art and widths exactly as Normal) with a golden pollen cloud PollenHeight above it. A hero RISING through the cloud's zone
-        /// (PollenHalfWidth either side of the platform centre, PollenBand around the cloud centre) that has not used this cloud yet gets vy x PollenBoostPercent / 100 once; the cloud is spent for the rest of the run
-        /// (SimState.CrumbleTick[id] = the tick it was used, -1 = fresh). Never a hazard.
-        /// </summary>
-        PollenPuff = 63,
+        // Pollen Puff (63) was REMOVED 2026-11-26 (owner Final Bugs 1, never shipped): the id stays unused.
 
         // ---- Final Change 6: new Region 5 (Bamboo Temple) kinds, ids 58 to 61 (owner-approved 2026-11-25); values are stable ----
         /// <summary>Prayer Scroll Runner (demanding, retract race): an open scroll; ScrollOpenTicks after a landing it rolls up from the back end toward the roll end on side Platform.Dir (the middle of the screen) at ScrollRetractSpeed down to a ScrollRollWidth roll that never retracts, holds, then unfurls again. Standing on the retracting part drops the player (never lethal).</summary>
@@ -141,13 +136,12 @@ namespace FluffyClimbers.Simulation
         /// <summary>Sugar Glass Ledge (hazard type, decoy edges): a solid centre with sugar-glass ends of GlassEndWidth each; standing on an end for GlassCrackTicks cracks it (it drops away, re-forms after GlassReformTicks) and drops the player only if he is still on it.</summary>
         SugarGlassLedge = 57,
 
-        // ---- Final Change 6: new Region 2 (Mushroom Grove) kinds, ids 47 to 49 (43 to 46 and 50 up belong to the other regions); values are stable ----
+        // ---- Final Change 6: new Region 2 (Mushroom Grove) kinds, ids 47 and 48 (43 to 46 and 50 up belong to the other regions); values are stable ----
         /// <summary>Teeter Cap (demanding): a balanced cap; standing on it drifts the player outward faster the farther out (TeeterGrowth, capped at TeeterDriftMax). A jump from within the centre zone is x1.00, falling linearly to x0.78 at the edge.</summary>
         TeeterCap = 47,
         /// <summary>Fog Puff Drift (hazard type, air field): a spore cloud drifts over the lane above the platform; inside it the airborne horizontal speed is capped at FogSpeedCapPercent of the top speed. Never pushes, never kills.</summary>
-        FogPuffDrift = 48,
-        /// <summary>Spore Funnel (hazard type, air field): in the column above the platform the airborne player is pulled toward the column axis at FunnelPull (steering beats it). Never kills.</summary>
-        SporeFunnel = 49
+        FogPuffDrift = 48
+        // Spore Funnel (49) was REMOVED 2026-11-26 (owner Final Bugs 1, never shipped): the id stays unused.
     }
 
     /// <summary>Static helpers that classify platform kinds (used by the builder, the endless tower, the bot and the view).</summary>
@@ -163,7 +157,7 @@ namespace FluffyClimbers.Simulation
                 || k == PlatformKind.DragonflyDart   // Final Change 6, region 1
                 || k == PlatformKind.DewdropMirrorLeaf   // Final Change 6, region 1: also demanding; a hazard type so level 1 never has it and no two hazards touch
                 || k == PlatformKind.CaramelMagnet || k == PlatformKind.SourSprinklerCannon || k == PlatformKind.SugarGlassLedge   // Final Change 6, region 4
-                || k == PlatformKind.FogPuffDrift || k == PlatformKind.SporeFunnel
+                || k == PlatformKind.FogPuffDrift
                 || k == PlatformKind.ToriiLintel || k == PlatformKind.IncenseMistBank || k == PlatformKind.WaterBambooTipper;   // Final Change 6, region 5
         }
 
@@ -192,13 +186,13 @@ namespace FluffyClimbers.Simulation
         public static bool IsRegion1New(PlatformKind k)
         {
             return (k >= PlatformKind.WindPetal && k <= PlatformKind.Seesaw) || k == PlatformKind.DragonflyDart || k == PlatformKind.DewdropMirrorLeaf   // 44 and 45: Final Change 6
-                || k == PlatformKind.CloverSwap || k == PlatformKind.PollenPuff;   // 62 and 63: owner 2026-11-26
+                || k == PlatformKind.CloverSwap;   // 62: owner 2026-11-26
         }
 
         /// <summary>True for the seven region 2 platforms added by doc 30.</summary>
         public static bool IsRegion2New(PlatformKind k)
         {
-            return (k >= PlatformKind.SquishCap && k <= PlatformKind.SporePop) || (k >= PlatformKind.TeeterCap && k <= PlatformKind.SporeFunnel);   // 47 to 49: Final Change 6
+            return (k >= PlatformKind.SquishCap && k <= PlatformKind.SporePop) || (k >= PlatformKind.TeeterCap && k <= PlatformKind.FogPuffDrift);   // 47 and 48: Final Change 6
         }
 
         /// <summary>True for the seven region 3 platforms added by doc 30.</summary>
@@ -222,7 +216,7 @@ namespace FluffyClimbers.Simulation
         /// <summary>True for every region special platform (regions 1 to 5): they carry Params, painted pieces and the view's motion layer.</summary>
         public static bool IsRegionNew(PlatformKind k)
         {
-            return (k >= PlatformKind.WindPetal && k <= PlatformKind.RollingLog) || (k >= PlatformKind.MoonJellyChain && k <= PlatformKind.SeaFoamPad) || (k >= PlatformKind.DragonflyDart && k <= PlatformKind.DewdropMirrorLeaf) || k == PlatformKind.CloverSwap || k == PlatformKind.PollenPuff || (k >= PlatformKind.TeeterCap && k <= PlatformKind.SporeFunnel)
+            return (k >= PlatformKind.WindPetal && k <= PlatformKind.RollingLog) || (k >= PlatformKind.MoonJellyChain && k <= PlatformKind.SeaFoamPad) || (k >= PlatformKind.DragonflyDart && k <= PlatformKind.DewdropMirrorLeaf) || k == PlatformKind.CloverSwap || (k >= PlatformKind.TeeterCap && k <= PlatformKind.FogPuffDrift)
                 || (k >= PlatformKind.MeltingScoop && k <= PlatformKind.SugarGlassLedge)   // 54 to 57: Final Change 6, region 4
                 || (k >= PlatformKind.PrayerScrollRunner && k <= PlatformKind.WaterBambooTipper);   // 58 to 61: Final Change 6, region 5
         }

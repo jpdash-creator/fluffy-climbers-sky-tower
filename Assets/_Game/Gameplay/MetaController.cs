@@ -1972,11 +1972,10 @@ namespace FluffyClimbers.Gameplay
             int stars = unlocked ? progress.StarsOf(level.Id, mode) : 0;
             bool boss = level.LevelClass == LevelDef.ClassHighlyComplex;
             bool complex = level.LevelClass == LevelDef.ClassComplex;
-            // Final Change 6 (owner 2026-11-25): a Boss Rise level (the mid boss and level 25) shows its region's painted boss badge INSTEAD of the number (Sprite null = the number stays).
             SpecialLevelType special = level.SpecialType;   // owner Final Change 1: one of the special types, or None (Regular Run)
-            Sprite bossBadge = special == SpecialLevelType.BossRise && unlocked ? SpecialIcons.BossBadge(level.Region) : null;
-            if (bossBadge != null) boss = false;   // the crown bubble has its crown in the middle of the badge's area: the plain / cleared bubble carries the badge
-            int sprite = !unlocked ? 3 : (boss ? 2 : (cleared ? 5 : 0));
+            // Final Bugs 1 (owner 2026-11-26): a LOCKED tile is the normal tile (its number and badges) under a translucent black layer with the small pin lock at the bottom right,
+            // so it no longer uses the padlock bubble (sprite 3) that hid the number. It stays tappable (OnLevelTapped explains what to clear first).
+            int sprite = boss ? 2 : (unlocked && cleared ? 5 : 0);
             Color tint = Color.white;
             if (unlocked && !boss && cleared) tint = new Color(1f, 0.93f, 0.55f, 1f);   // completed: warm gold bubble
             else if (isCurrent) tint = new Color(1f, 1f, 0.7f, 1f);                     // current: bright
@@ -1986,9 +1985,8 @@ namespace FluffyClimbers.Gameplay
             b.GetComponent<Image>().preserveAspect = true;
             string setting = GameSettings.DifficultyNames[Mathf.Clamp(mode, 0, GameSettings.DifficultyNames.Length - 1)];
             b.GetComponent<A11yLabel>().Text = "Level " + level.Index + (special != SpecialLevelType.None ? ", " + SpecialLevels.Name(special) : "")
-                + (unlocked ? ", " + stars + " of 3 stars on " + setting + (isCurrent ? ", current level" : "") : ", locked on " + setting);
-            if (bossBadge != null) AddBossBadge(rt, bossBadge);
-            else if (unlocked && !boss)
+                + (unlocked ? ", " + stars + " of 3 stars on " + setting + (isCurrent ? ", current level" : "") : ", locked on " + setting + ", " + LockedLine(level, mode).ToLowerInvariant());
+            if (!boss)
             {
                 Text num = UiKit.AddText(rt, "Num", level.Index.ToString(), 72, UiKit.ButtonInk);
                 DropOutline(num);
@@ -1996,9 +1994,10 @@ namespace FluffyClimbers.Gameplay
             }
             // Economy review 2026-11-13: the gem icon alone (no numeral, no tick since 2026-11-16) marks the levels that hold gems (via the gem-level helper).
             int milestoneGems = RewardCalculator.MilestoneGemsOf(level);
-            if (unlocked && milestoneGems > 0 && art != null && art.GemIcon != null) AddGemBadge(rt, milestoneGems, progress.IsLevelCleared(level.Id));   // collected = cleared in ANY setting
-            else if (unlocked && special != SpecialLevelType.None) AddSpecialBadge(rt, special);   // a special level is never a gem level: the badge takes the gem badge's corner
-            ApplyMedalBadge(rt, level, unlocked);
+            if (milestoneGems > 0 && art != null && art.GemIcon != null) AddGemBadge(rt, milestoneGems, progress.IsLevelCleared(level.Id));   // collected = cleared in ANY setting
+            else if (special != SpecialLevelType.None) AddSpecialBadge(rt, special);   // a special level is never a gem level: the badge takes the gem badge's corner
+            ApplyMedalBadge(rt, level, true);   // none on a locked level (nothing cleared in this setting yet)
+            if (!unlocked) AddLockedShade(rt, nodeSprite);
             for (int s = 0; s < 3 && unlocked; s++)
             {
                 Sprite star = art != null ? (s < stars ? art.StarFilled : art.StarEmpty) : null;
@@ -2064,21 +2063,42 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Size of the special badge (reference px). It is a corner pip like the gem badge (<see cref="CornerPipPosition"/>): x 130..186 of the 150 px tile, y 0..56.</summary>
         public const float SpecialBadgeSize = 56f;
 
-        /// <summary>Name of the painted boss badge that replaces the number on a Boss Rise level tile.</summary>
-        public const string BossBadgeName = "BossBadge";
-        /// <summary>Side of the boss badge (reference px): it fills the column of the number on the 150 px tile (x 23..127 of 20..130, the box of a two-digit number at 130 percent text), so it is clear of both corner pips (gem or special badge from x 130, medal up to x 20), CUX-3.</summary>
-        public const float BossBadgeSize = 104f;
+        /// <summary>Name of the translucent black layer over a locked level tile and of the small padlock in its bottom right corner (Final Bugs 1).</summary>
+        public const string LockedShadeName = "LockedShade", LockedIconName = "LockIcon";
+        /// <summary>Name, font (reference px) and width of the "Clear level N first" line on the level popup of a locked level.</summary>
+        public const string LockedLineName = "LockedLine";
+        public const float LockedLineFont = 40f, LockedLineWidth = 760f;
+        /// <summary>Alpha of the black layer over a locked tile (about 55 percent).</summary>
+        public const float LockedShadeAlpha = 0.55f;
+        /// <summary>Side of the padlock in the bottom right corner of a locked tile (reference px); it stays fully inside the 150 px tile and below the number.</summary>
+        public const float LockedIconSize = 44f;
 
-        /// <summary>The region's boss badge in the middle of a level tile, in place of the number (Final Change 6). Not a button of its own: the tile carries the accessibility label (level number and "Boss Rise").</summary>
-        void AddBossBadge(RectTransform node, Sprite sprite)
+        /// <summary>The line that says what to clear first for a locked level: the last OPEN level of the region in this Gameplay setting, or the region unlock reason when the whole region is locked.</summary>
+        string LockedLine(LevelDef level, int mode)
         {
-            Image img = UiKit.AddImage(node, BossBadgeName, sprite, Color.white);
-            img.preserveAspect = true;
-            img.raycastTarget = false;
-            img.rectTransform.anchorMin = img.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-            img.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            img.rectTransform.anchoredPosition = Vector2.zero;
-            img.rectTransform.sizeDelta = new Vector2(BossBadgeSize, BossBadgeSize);
+            RegionDef region = repo.GetRegion(level.Region);
+            int lastOpen = progress.LastOpenLevelIndex(region, mode);
+            RegionDef prev = region != null ? repo.TryGetRegionByIndex(region.Index - 1) : null;
+            return LevelLockText.Line(lastOpen, region != null ? region.Name : "", prev != null ? prev.Name : "", prev != null && prev.Levels != null ? prev.Levels.Count : 0);
+        }
+
+        /// <summary>
+        /// A locked tile (Final Bugs 1): the tile's own shape in 55 percent black over its number and badges (same sprite, same rect, one uniform scale), and the pin lock
+        /// (icon_lock, the sprite of the locked region pins) at the bottom right, inside the tile. Neither takes taps: the tile button underneath opens the level popup.
+        /// </summary>
+        void AddLockedShade(RectTransform node, Sprite tileSprite)
+        {
+            Image shade = UiKit.AddImage(node, LockedShadeName, tileSprite, new Color(0f, 0f, 0f, LockedShadeAlpha));
+            shade.preserveAspect = true;
+            shade.raycastTarget = false;
+            UiKit.Stretch(shade.rectTransform);
+            Image lk = UiKit.AddImage(node, LockedIconName, ToyKit.Get("icon_lock"), Color.white);
+            lk.preserveAspect = true;
+            lk.raycastTarget = false;
+            lk.rectTransform.anchorMin = lk.rectTransform.anchorMax = new Vector2(1f, 0f);
+            lk.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            lk.rectTransform.anchoredPosition = new Vector2(-2f, 0f);   // centred on the tile's bottom right corner like the lock on a region pin: it never reaches into the number's box (CUX-3)
+            lk.rectTransform.sizeDelta = new Vector2(LockedIconSize, LockedIconSize);
         }
 
         /// <summary>
@@ -2140,12 +2160,7 @@ namespace FluffyClimbers.Gameplay
         {
             // Everything on this popup is the SELECTED Gameplay setting's (Final Change 1): each setting has its own path, stars and locks.
             int mode = GameSettings.Difficulty;
-            if (!progress.IsLevelUnlocked(level, mode))
-            {
-                string setting = GameSettings.DifficultyNames[Mathf.Clamp(mode, 0, GameSettings.DifficultyNames.Length - 1)];
-                ShowMessage("Locked", "Clear level " + (level.Index - 1) + " on " + setting + " first.");
-                return;
-            }
+            bool levelOpen = progress.IsLevelUnlocked(level, mode);   // Final Bugs 1: a locked level opens the same popup, with PLAY disabled and a line saying what to clear first
             LevelSpec spec = LevelSpecFactory.Build(level, repo.GetRegion(level.Region));
             int starsHave = progress.StarsOf(level.Id, mode);
             // Content-sized: the content ends at 536 (pills) or 646 (best score); then a gap, the PLAY button (at least 48 dp) and a bottom margin.
@@ -2171,9 +2186,12 @@ namespace FluffyClimbers.Gameplay
             float yRecord = yRow + rowH + 14f;
             float contentEnd = yRecord + TimedUi.RecordBlockHeight(hasRecord);
             // Region penalty (owner Final Change 2): a non-Common hero away from its home region shows a penalty icon right of PLAY and the short message above the row.
-            CharacterSpec penalised = PenaltyUi.PenalisedHero(repo.GetRegion(level.Region));
+            CharacterSpec penalised = levelOpen ? PenaltyUi.PenalisedHero(repo.GetRegion(level.Region)) : null;   // a locked level cannot be played, so no penalty hint there
             float penaltyH = penalised != null ? PenaltyUi.NoteHeight() + 10f : 0f;
-            OpenPopup(specialName != null ? "Level " + level.Index + "\n" + specialName : "Level " + level.Index, "", contentEnd + 30f + penaltyH + playSize + 56f);
+            // Locked level (Final Bugs 1): one line under the disabled PLAY button says what to clear first; the panel grows by its measured height (wraps at 130 percent text).
+            string lockLine = levelOpen ? null : LockedLine(level, mode);
+            float lockH = lockLine != null ? BundlesScreen.TextHeight(lockLine, LockedLineFont, LockedLineWidth) + 10f : 0f;
+            OpenPopup(specialName != null ? "Level " + level.Index + "\n" + specialName : "Level " + level.Index, "", contentEnd + 30f + penaltyH + lockH + playSize + 56f);
             Transform panel = popup.Find("Panel");
             Destroy(panel.Find("Body").gameObject);
 
@@ -2219,12 +2237,25 @@ namespace FluffyClimbers.Gameplay
                 milestoneGems > 0 && art != null ? art.GemIcon : null, milestoneGems > 0 ? milestoneGems.ToString() : null,
                 milestoneGems > 0 ? milestoneGems + (milestoneGems == 1 ? " gem" : " gems") + " for the first clear" + (gemsClaimed ? ", claimed" : "") : null, gemsClaimed);
             TimedUi.RecordBlock(panel, yRecord, mode, bestPace, bestTicks, false);
-            ToyKit.PopupAction(popup.Find("Panel"), "PLAY", Btn(1), Color.white, 60f, () =>
+            Button play = ToyKit.PopupAction(popup.Find("Panel"), "PLAY", Btn(1), Color.white, 60f, () =>
             {
+                if (!levelOpen) return;   // belt and braces: the button is not interactable on a locked level
                 GameSession.CurrentLevelId = level.Id;
                 GameSession.EndlessMode = false;
                 LoadRunScene();
             }, 0f);
+            if (!levelOpen)
+            {
+                // disabled: faded and not tappable (never colour alone: the line above it says why), still the full touch size; the label tells a screen reader why
+                play.interactable = false;
+                var fade = play.gameObject.AddComponent<CanvasGroup>();
+                fade.alpha = 0.45f;
+                play.GetComponent<A11yLabel>().Text = "Play, not available. " + lockLine;
+                Text why = UiKit.AddText(panel, LockedLineName, lockLine, (int)LockedLineFont, Theme.Ink, TextAnchor.MiddleCenter, true);
+                UiKit.OnPanel(why);
+                why.horizontalOverflow = HorizontalWrapMode.Wrap;
+                UiKit.Place((RectTransform)why.transform, new Vector2(0.5f, 0f), new Vector2(0f, 60f + playSize + 10f), new Vector2(LockedLineWidth, lockH - 10f));
+            }
             if (penalised != null)
             {
                 float badge = PenaltyUi.BadgeSize();

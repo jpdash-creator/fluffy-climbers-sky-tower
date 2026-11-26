@@ -405,7 +405,7 @@ namespace FluffyClimbers.Leaderboard
         }
 
         /// <summary>Serialises a queued run as the /submit-run body (camelCase; the level kind has no regionId and the other kinds no levelId).</summary>
-        public static string BuildSubmitBody(FluffyClimbers.Economy.QueuedRun r)
+        public static string BuildSubmitBody(FluffyClimbers.Economy.QueuedRun r, LbProfile profile = null)
         {
             var body = new JObject
             {
@@ -423,6 +423,8 @@ namespace FluffyClimbers.Leaderboard
                 ["claimed"] = new JObject { ["floors"] = r.Floors, ["ticks"] = r.Ticks, ["score"] = r.Score, ["crown"] = r.Crown }
             };
             if (r.Kind == "level") body["levelId"] = r.LevelId; else body["regionId"] = r.RegionId;
+            // the shown name and picture: the service uses them only to create a profile that is missing (a reset or clean-up removed it); an existing name is never changed by a run
+            if (profile != null) { body["displayName"] = SafeName(profile.DisplayName); string av = SafeAvatar(profile.AvatarUrl); if (av.Length > 0) body["avatarUrl"] = av; }
             return body.ToString(Formatting.None);
         }
     }

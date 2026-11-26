@@ -85,8 +85,8 @@ namespace FluffyClimbers.Simulation
             // Final Change 6 (owner-approved 2026-11-25): four new region 1 kinds
             // Glowworm Relay (43) and Silk Snare Web (46) were removed 2026-11-26 (owner: not good; never shipped): ids 43 and 46 are unused.
             PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf,
-            // owner-approved 2026-11-26 (ids 62 and 63): Clover Swap (a timed pair of slabs, demanding) and Pollen Puff (a one-shot boost cloud, helpful) take the places of the two removed kinds
-            PlatformKind.CloverSwap, PlatformKind.PollenPuff
+            // owner-approved 2026-11-26 (id 62): Clover Swap (a timed pair of slabs, demanding) takes the place of a removed kind (Pollen Puff, id 63, was removed again 2026-11-26)
+            PlatformKind.CloverSwap
         };
 
         /// <summary>
@@ -102,8 +102,8 @@ namespace FluffyClimbers.Simulation
             // Fairy Ring (PlatformKind 18) was removed from the plans 2026-11-25 (owner: useless); the enum value and its rules stay so old data and replays still load.
             PlatformKind.SquishCap, PlatformKind.SproutLift, PlatformKind.PuffFloat,
             PlatformKind.OrbitCap, PlatformKind.DizzySpores, PlatformKind.SporePop,
-            // Final Change 6 (owner-approved 2026-11-25, ids 47 to 49): Teeter Cap (demanding), Fog Puff Drift and Spore Funnel (air-field hazards)
-            PlatformKind.TeeterCap, PlatformKind.FogPuffDrift, PlatformKind.SporeFunnel
+            // Final Change 6 (owner-approved 2026-11-25, ids 47 and 48): Teeter Cap (demanding), Fog Puff Drift (air-field hazard); Spore Funnel (49) was removed 2026-11-26
+            PlatformKind.TeeterCap, PlatformKind.FogPuffDrift
         };
         /// <summary>Generic kinds a region keeps next to its new set (doc 30 section 7; region 2: rotting log Crumble and dew moss Slippery).</summary>
         private static readonly PlatformKind[] Region2Generics = { PlatformKind.Crumble, PlatformKind.Slippery };
@@ -333,14 +333,11 @@ namespace FluffyClimbers.Simulation
         /// </summary>
         public int[] GhostRowAtTick;
         /// <summary>
-        /// Boss Rise / Sprint and Rest rules (owner Final Change 6, 2026-11-25), carried by the level JSON field "special" (<see cref="Special"/> = BossRise / SprintRest, set by the content
-        /// factory). <see cref="BossRiseRule"/> and <see cref="SprintRestRule"/> are plain override flags for tests and tools that build a spec by hand. Neither changes a level that does not carry
-        /// the rule (golden hashes). BossRise: a region boss rises under the danger line, a lunge every 25 floors, the top 10 rows are an arena (builder + Sim). SprintRest: an 8 u shelter every
-        /// 25 floors holds the danger line up to 3 s once, then it is 15 percent faster (builder + Sim). <see cref="BossRegion"/>: region 1..5 whose boss shows (0 = from the signature, <see cref="BossRoster.RegionOf"/>).
+        /// Sprint and Rest rule (owner Final Change 6, 2026-11-25), carried by the level JSON field "special" (<see cref="Special"/> = SprintRest, set by the content factory).
+        /// <see cref="SprintRestRule"/> is a plain override flag for tests and tools that build a spec by hand. It changes no level that does not carry the rule (golden hashes).
+        /// SprintRest: an 8 u shelter every 25 floors holds the danger line up to 3 s once, then it is 15 percent faster (builder + Sim). (Boss Rise was removed 2026-11-26.)
         /// </summary>
-        public bool BossRiseRule, SprintRestRule;
-        public int BossRegion;
-        public bool BossRise { get { return !Endless && (BossRiseRule || Special == SpecialLevelType.BossRise); } }
+        public bool SprintRestRule;
         public bool SprintRest { get { return !Endless && (SprintRestRule || Special == SpecialLevelType.SprintRest); } }
         /// <summary>Authored chunk ids (chunk_complex_a ...) spliced into the level, empty for none.</summary>
         public string[] FixedChunks = new string[0];

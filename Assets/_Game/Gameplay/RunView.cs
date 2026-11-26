@@ -245,7 +245,6 @@ namespace FluffyClimbers.Gameplay
             BuildHazards();
             BuildPlayer();
             BuildPowerFx();
-            BuildBoss();
             if (!endless) BuildPortal();   // endless towers have no goal
             for (int i = 0; i < pops.Length; i++) pops[i] = MakePop();
 
@@ -514,7 +513,7 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.MalletSmash: return session.Sim.MalletDown(p.Id, tick) ? 1 : -1;
                 // Final Change 6: the painted state of the new kinds follows the Sim clocks (mirror motion, chain arm window, melt width, glass crack, sprinkler lid, tipper fill, scroll length)
                 case PlatformKind.DewdropMirrorLeaf: return !session.Sim.MirrorFrozen(p.Id, tick, s.CrumbleTick) && session.Sim.MirrorOffset(p.Id, s.CrumbleTick).Raw != 0 ? 1 : -1;
-                case PlatformKind.CloverSwap: return session.Sim.CloverTelegraph(tick) ? 1 : -1;   // 2026-11-26: the swap pose from the telegraph until the slide ends (the Sim clock)
+                case PlatformKind.CloverSwap: return p.Amplitude.Raw != 0 && session.Sim.CloverTelegraph(tick) ? 1 : -1;   // 2026-11-26: the swap pose from the telegraph until the slide ends (the Sim clock)
                 case PlatformKind.MoonJellyChain:
                     {
                         int k = session.Sim.JellyIndexOf(p.Id);
@@ -1611,7 +1610,6 @@ namespace FluffyClimbers.Gameplay
 
             UpdatePortal(deltaTime);
             UpdateCamera(Mathf.Lerp(prevKill, curKill, alpha));
-            UpdateBoss(Mathf.Lerp(prevKill, curKill, alpha), deltaTime);
             UpdateBackground();
             UpdateWalls();
         }
@@ -1681,8 +1679,6 @@ namespace FluffyClimbers.Gameplay
             }
         }
 
-        // ---- Boss Rise (owner Final Change 6, 2026-11-25): the region boss fills the bottom of the screen, its head is the danger line ----
-
         /// <summary>Painted roof of a Sprint and Rest shelter (owner Final Change 6, batch 7: Art/Fc6/shelter/shelter_r1..r5). Drawn behind its platform (order -1, the hero is 10), one uniform scale: the roof is as wide as the platform
         /// (8 u) but never taller than <see cref="ShelterRoofMaxHeight"/> (the tall pagoda is scaled down as a whole), centred on the platform, its pole bottoms on the walking line (sunk <see cref="ShelterRoofSink"/>).</summary>
         public const string ShelterRoofName = "ShelterRoof";
@@ -1721,107 +1717,6 @@ namespace FluffyClimbers.Gameplay
 
         /// <summary>Tint of a Sprint and Rest shelter platform while no painted shelter art exists (a warm mint, never the only cue: it is the one 8 u wide platform of its row).</summary>
         static readonly Color ShelterTint = new Color(0.62f, 1f, 0.78f, 1f);
-        public const string BossBodyName = "BossBody", BossHeadName = "BossHead";
-        /// <summary>World height of the boss under the line and the head block of the placeholder; the painted boss keeps its own proportions (uniform scale to the screen width).</summary>
-        const float BossBodyHeight = 6f, BossPlaceholderHeadH = 1.7f, BossPlaceholderHeadW = 4.2f;
-        /// <summary>How far the boss head top stands ABOVE the simulation's danger line (world units). The danger line is the real screen bottom (RunLayout bottom strip = 0, the pads float over the field), so a boss
-        /// drawn only below it would never show (bug owner 2026-11-26). 4.2 u shows the whole face of the painted boss (crown to nose) clearly above the control pads (about 2.3 u); the boss sits behind every platform and the hero.</summary>
-        public const float BossHeadRise = 4.2f, BossLungeLift = 0.6f;
-        /// <summary>Test hook: pretend the painted boss art is missing (CUX-10 fallback test).</summary>
-        public static bool BossArtDisabledForTests;
-        /// <summary>World rectangle (min y, max y) the boss body covers right now, for tests.</summary>
-        public Bounds BossBodyBounds
-        {
-            get
-            {
-                if (bossBody == null) return default(Bounds);
-                Bounds b = bossBody.bounds;
-                if (bossHead != null) b.Encapsulate(bossHead.bounds);   // placeholder: body and head block
-                return b;
-            }
-        }
-        /// <summary>True when the boss renderers carry no collider (they must never block a touch, CUX-2).</summary>
-        public bool BossHasNoColliders { get { return bossBody == null || (bossBody.GetComponent<Collider2D>() == null && bossBody.GetComponent<Collider>() == null); } }
-        /// <summary>World y of the bottom edge of the visible field (the camera bottom) and of its top edge under the top strip, for tests.</summary>
-        public float FieldBottomY { get { return camY - camHalfH + bottomWorld; } }
-        public float FieldTopY { get { return camY + camHalfH - topWorld; } }
-        SpriteRenderer bossBody, bossHead, bossEyeL, bossEyeR;
-        Sprite bossIdle, bossRoar, bossLunge;
-        BossDef bossDef;
-        float bossShake;
-        /// <summary>The pose the boss shows (tests and the HUD tests): 0 idle, 1 roar, 2 lunge; -1 when the level has no boss.</summary>
-        public int BossPose { get; private set; } = -1;
-        /// <summary>True while the boss is drawn (tests).</summary>
-        public bool BossShown { get { return bossBody != null && bossBody.enabled; } }
-        /// <summary>True when the painted boss art was found; false while the plain tinted placeholder is drawn.</summary>
-        public bool BossHasArt { get { return bossIdle != null; } }
-
-        /// <summary>
-        /// Builds the boss of a Boss Rise level once. Art: Resources/Art/Boss/&lt;id&gt;/idle, roar, lunge (one picture each, the head at the top edge, as wide as the screen at most). Missing art is not
-        /// an error (CUX-10): a body block, a head block and two eyes in the boss tint are drawn instead; they are code-drawn shapes under the danger line, not cues on a platform (CUX-7).
-        /// </summary>
-        void BuildBoss()
-        {
-            if (endless || !session.Sim.BossRise) return;
-            bossDef = BossRoster.Of(session.Spec);
-            bossIdle = BossArtDisabledForTests ? null : Resources.Load<Sprite>(bossDef.ArtPath + "/idle");
-            bossRoar = BossArtDisabledForTests ? null : Resources.Load<Sprite>(bossDef.ArtPath + "/roar");
-            bossLunge = BossArtDisabledForTests ? null : Resources.Load<Sprite>(bossDef.ArtPath + "/lunge");
-            if (bossRoar == null) bossRoar = bossIdle;
-            if (bossLunge == null) bossLunge = bossRoar;
-            Color tint = new Color(bossDef.TintR / 255f, bossDef.TintG / 255f, bossDef.TintB / 255f, 0.96f);
-            bossBody = NewSprite(BossBodyName, bossIdle != null ? bossIdle : white, -40);
-            bossBody.color = bossIdle != null ? Color.white : tint;
-            if (bossIdle == null)
-            {
-                bossHead = NewSprite(BossHeadName, white, -39);
-                bossHead.color = Color.Lerp(tint, Color.white, 0.18f);
-                bossEyeL = NewSprite("BossEyeL", white, -38);
-                bossEyeR = NewSprite("BossEyeR", white, -38);
-                bossEyeL.color = bossEyeR.color = new Color(1f, 1f, 1f, 1f);
-            }
-            BossPose = 0;
-        }
-
-        /// <summary>
-        /// Per frame: puts the boss under the interpolated danger line (its head top is the line) and picks the pose from the simulation (idle, roar, lunge). Reduced motion: no shake, the pose
-        /// still changes and the HUD banner carries the warning. The shake follows the simulation tick (frame rate independent), no allocation.
-        /// </summary>
-        void UpdateBoss(float killY, float deltaTime)
-        {
-            if (bossBody == null) return;
-            SimState st = session.State;
-            int roar = session.Sim.BossRoarTicksLeft(in st);
-            bool lunge = session.Sim.BossLunging(in st);
-            BossPose = lunge ? 2 : (roar > 0 ? 1 : 0);
-            bossShake = reduced ? 0f : (BossPose == 1 ? Mathf.Sin(st.Tick * 0.9f) * 0.09f : 0f);
-            float width = camHalfW * 2f;
-            if (bossIdle != null)
-            {
-                Sprite pic = BossPose == 2 ? bossLunge : (BossPose == 1 ? bossRoar : bossIdle);
-                bossBody.sprite = pic;
-                Bounds pb = pic.bounds;
-                float sc = width / Mathf.Max(0.01f, pb.size.x);   // one uniform scale (CUX-9)
-                bossBody.transform.localScale = new Vector3(sc, sc, 1f);
-                // The picture's top edge sits BossHeadRise above the danger line (= the screen bottom, there is no bottom strip), so the head and upper body show in the field; the rest is below the screen.
-                float top = killY + BossHeadRise + (BossPose == 2 ? BossLungeLift : 0f);
-                bossBody.transform.position = new Vector3(camHalfW + bossShake - pb.center.x * sc, top - pb.max.y * sc, 0f);
-            }
-            else
-            {
-                float lift = BossPose == 2 ? BossLungeLift : 0f;   // the head rises with the lunge
-                float headTop = killY + BossHeadRise + lift;
-                bossBody.transform.localScale = new Vector3(width + 2f, BossBodyHeight, 1f);
-                bossBody.transform.position = new Vector3(camHalfW, headTop - BossBodyHeight * 0.5f - BossPlaceholderHeadH * 0.85f, 0f);
-                bossHead.transform.localScale = new Vector3(BossPlaceholderHeadW, BossPlaceholderHeadH, 1f);
-                bossHead.transform.position = new Vector3(camHalfW + bossShake, headTop - BossPlaceholderHeadH * 0.5f, 0f);
-                float eyeY = headTop - BossPlaceholderHeadH * (BossPose == 1 ? 0.35f : 0.42f);
-                float eyeS = BossPose == 1 ? 0.55f : 0.4f;   // the eyes widen in the roar: a shape cue next to the banner, never colour alone
-                bossEyeL.transform.localScale = bossEyeR.transform.localScale = new Vector3(eyeS, eyeS, 1f);
-                bossEyeL.transform.position = new Vector3(camHalfW - 0.9f + bossShake, eyeY, 0f);
-                bossEyeR.transform.position = new Vector3(camHalfW + 0.9f + bossShake, eyeY, 0f);
-            }
-        }
 
         void UpdateKillZone(float killY)
         {

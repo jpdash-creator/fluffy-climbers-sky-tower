@@ -20,6 +20,7 @@ namespace FluffyClimbers.Gameplay
         void StartLeaderboard()
         {
             LeaderboardHub.AccountModeIsGoogle = () => AccountSync.IsGoogleMode;
+            LeaderboardHub.WarmTickets = GameSession.WarmNextTicket;   // after a reset and every profile sync a run ticket is cached before the first run
             LeaderboardHub.Init(progress, repo != null ? repo.RemoteConfig : null, GameSettings.LeaderboardTest);
             LeaderboardHub.OnMenuStart();
             if (LeaderboardRunGlue.ConsentPending)

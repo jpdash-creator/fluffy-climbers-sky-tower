@@ -128,7 +128,16 @@ namespace FluffyClimbers.Gameplay
                 return;
             }
             if (!AccountSync.IsGoogleMode) { if (done != null) done(true, SavedLocalText); return; }
-            AccountSync.SyncNow((ok, text) => { if (done != null) done(ok, ok ? SavedGoogleText : SavedLocalOnlyText); });
+            // Final Bugs 1 item 12: two targets, reported separately. Google Saved Games first (also compares with the account save); then the Firebase backup copy, only when the device is in step with the account.
+            AccountSync.SyncNow((ok, text) =>
+            {
+                SaveTargetResult google = ok ? SaveTargetResult.Ok : SaveTargetResult.Failed;
+                AccountSync.BackupNow(firebase =>
+                {
+                    if (done == null) return;
+                    done(SaveBackupRules.AnyOk(google, firebase), SaveBackupRules.ResultText(google, firebase));
+                });
+            });
         }
 
         // ---------------- view ----------------

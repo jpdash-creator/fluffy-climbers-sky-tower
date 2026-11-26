@@ -122,12 +122,6 @@ namespace FluffyClimbers.Simulation
         /// </summary>
         public bool RestOnShelters;
 
-        /// <summary>
-        /// Boss Rise levels (owner Final Change 6, 2026-11-25): landings with the danger line closer than this under the hero's feet are cut from the search. The lunges and the faster line
-        /// leave little slack, and a depth-first search that does not look at the gap walks into a dead end around row 100 and then backtracks for ever; keeping a gap steers it onto the
-        /// fast lines a good player takes. Search heuristic only (a line that keeps the gap is a real line); 0 turns it off.
-        /// </summary>
-        public Fx BossGuardGap = Fx.FromInt(2);
         /// <summary>Waits on a shelter when <see cref="RestOnShelters"/> is on: the full rest, then a short extra wait to start the run-up from a steady stand.</summary>
         private int[] shelterWaits;
         private int pendingPower;
@@ -192,7 +186,6 @@ namespace FluffyClimbers.Simulation
         private bool Prune(SimState c)
         {
             if (c.Hits > MaxHits) return true;
-            if (BossGuardGap > Fx.Zero && sim.BossRise && c.Grounded && c.Y - c.KillY < BossGuardGap) return true;   // Boss Rise: a landing with the line this close under the feet is a trap, cut it early (see BossGuardGap)
             if (c.RivalWon) return true;   // Rival Race: the ghost got to the top first, this line has lost
             if (spec == null) return false;
             switch (spec.Goal.Type)
@@ -240,23 +233,11 @@ namespace FluffyClimbers.Simulation
                     bool solved = false;
                     bool multi = UseHoming;
                     int quarter = System.Math.Max(1, maxNodes / 4);
-                    // Pass 1: the plain search. On a Boss Rise level it runs WITHOUT the buffer guard (the guard is a search heuristic that cut the only line of several layouts: a long
-                    // Moon Jelly flight lands with the line close under the feet). Passes 2 and 3 only run when the earlier ones found nothing, each from scratch: 2 = the guarded Boss Rise search
-                    // (a different order of tries), 3 = finer run-ups, back-offs and waits ("Rich"); a line any pass finds is a real line.
-                    Fx guard = BossGuardGap;
-                    bool boss = sim.BossRise && guard > Fx.Zero;
-                    if (boss) BossGuardGap = Fx.Zero;
+                    // Pass 1: the plain search; pass 2 (only when it found nothing, from scratch) = finer run-ups, back-offs and waits ("Rich"); a line any pass finds is a real line.
                     nodeCap = multi ? quarter : maxNodes;
                     solved = Search(start, 0);
                     if (!solved && multi)
                     {
-                        if (boss)
-                        {
-                            BossGuardGap = guard;
-                            visited.Clear(); bufferGap.Clear(); nodes = 0; best = start; pathRev.Clear();
-                            solved = Search(start, 0);
-                            BossGuardGap = Fx.Zero;
-                        }
                         if (!solved)
                         {
                             Rich = true;
@@ -266,7 +247,6 @@ namespace FluffyClimbers.Simulation
                             Rich = false;
                         }
                     }
-                    BossGuardGap = guard;
                     result = Result(solved);
                     if (RecordInputs && solved) BuildTrace();
                 }
@@ -570,7 +550,7 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.MalletSmash: return ((tick + p.Phase) % sim.Cfg.MalletCycleTicks) / 12;
                 case PlatformKind.RollingLog: return ((tick + p.Phase) % sim.Cfg.LogPeriodTicks) / 12;
                 case PlatformKind.SourSprinklerCannon: return ((tick + p.Phase) % sim.Cfg.SprinklerCycleTicks) / 12;   // Final Change 6: the jet clock
-                case PlatformKind.CloverSwap: return (tick % sim.Cfg.CloverSwapPeriodTicks) / 12;   // 2026-11-26: the global swap clock (300 ticks, 25 buckets); the member that is where depends on the period parity, which the x bucket tells
+                case PlatformKind.CloverSwap: return p.Amplitude.Raw == 0 ? 0 : (tick % sim.Cfg.CloverSwapPeriodTicks) / 12;   // a lone slab (Amplitude 0, no pair fitted the row) never moves: no clock in its state key;   // 2026-11-26: the global swap clock (300 ticks, 25 buckets); the member that is where depends on the period parity, which the x bucket tells
                 default: return (tick / 20) % 24;
             }
         }

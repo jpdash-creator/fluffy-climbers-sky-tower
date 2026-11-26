@@ -106,7 +106,7 @@ Points per group: General 60, Levels 100, Gameplay setting 145, Endless 90, Time
 | Special levels | `w2_special_nowall` | Clear the No Wall Touch level | 400 | | |
 | Special levels | `w2_special_nopowerups` | Clear the No Power-ups level | 400 | | |
 | Special levels | `w2_special_skyhoops` | Clear the Sky Hoops level | 400 | | |
-| Special levels | `w2_special_bossrise` | Clear the Boss Rise level | 400 | | |
+| Special levels | `w2_special_sprintrest` | Clear the Sprint and Rest level | 400 | | |   <!-- 2026-11-26: Boss Rise was removed, its slot is Sprint and Rest (old id w2_special_bossrise retired) -->
 | Special levels | `w2_special_onelife` | Clear the One Life level | 400 | | |
 | Special levels | `w2_special_keepmoving` | Clear the Keep Moving level | 400 | | |
 | Special levels | `w2_special_all6` | Clear all 6 special level types | 600 | 5 | |

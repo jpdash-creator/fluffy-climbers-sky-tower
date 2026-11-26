@@ -8,19 +8,22 @@ using UnityEngine.UI;
 namespace FluffyClimbers.Gameplay
 {
     /// <summary>
-    /// SWAP POINT for the help popup frame (owner 2026-11-25): the painted rope frame <c>Assets/Resources/Art/Ui/help_frame.png</c> (1616 x 1698) and the blank title ribbon <c>help_ribbon.png</c> (1340 x 306).
+    /// SWAP POINT for the help popup frame (owner 2026-11-25): the painted rope frame <c>Assets/Resources/Art/Ui/help_frame_tall.png</c> (1616 x 2116: the original 1616 x 1698 frame with two rope periods (418 px in all) inserted in the middle by <c>Tools/art_pipeline/make_help_frame_tall.py</c>, owner Final Bugs 1 2026-11-26: taller, never stretched) and the blank title ribbon <c>help_ribbon.png</c> (1340 x 306).
     /// When BOTH exist the card IS the frame picture, drawn at one uniform scale (Simple, preserve aspect, never stretched, CUX-9) and all content sits inside the measured cream inner rect
     /// (<see cref="InnerX0"/> to <see cref="InnerY1"/>, fractions of the picture); the title is on the ribbon over the frame's top edge. Without either file the code-drawn card stays as it is.
     /// </summary>
     public static class HelpFrameArt
     {
-        public const string Resource = "Art/Ui/help_frame", RibbonResource = "Art/Ui/help_ribbon";
+        public const string Resource = "Art/Ui/help_frame_tall", RibbonResource = "Art/Ui/help_ribbon";
 
-        /// <summary>The cream interior of the frame picture as fractions of its width (x) and height (y, from the top); measured on the 1616 x 1698 art (rope and corner clouds lie outside it).</summary>
-        public const float InnerX0 = 0.13f, InnerX1 = 0.85f, InnerY0 = 0.14f, InnerY1 = 0.90f;
+        /// <summary>Pixel size of the frame picture; the fractions below are px / these. Top rows 0 to 592 are the original ones, so the pixel positions of the rope, the clouds and the ribbon are unchanged.</summary>
+        public const float PictureW = 1616f, PictureH = 2116f;
+
+        /// <summary>The cream interior of the frame picture as fractions of its width (x) and height (y, from the top); measured on the original 1616 x 1698 art (rope and corner clouds lie outside it) and moved for the inserted 418 px: top 237.7 px (was 0.14 x 1698), bottom 1528.2 + 418 = 1946.2 px.</summary>
+        public const float InnerX0 = 0.13f, InnerX1 = 0.85f, InnerY0 = 237.7f / 2116f, InnerY1 = (1528.2f + 418f) / 2116f;
 
         /// <summary>Ribbon width as a fraction of the frame width, centre height as a fraction of the frame height (its lower edge meets the inner rect), text box as fractions of the ribbon.</summary>
-        public const float RibbonW = 0.66f, RibbonCenterY = 0.075f, RibbonTextW = 0.76f, RibbonTextH = 0.60f;
+        public const float RibbonW = 0.66f, RibbonCenterY = 127.35f / 2116f, RibbonTextW = 0.76f, RibbonTextH = 0.60f;
 
         /// <summary>Vertical centre of the ribbon's BODY as a fraction of the ribbon picture's height from its top (measured on help_ribbon.png: the opaque body spans 3 to 192 of 306 px at the middle column, 8 to 197 at 35 percent, so about 0.33; the lower part of the picture is the folds and shadow). The title is centred on this line, whatever the screen size.</summary>
         public const float RibbonBodyCenterY = 0.335f;
@@ -51,6 +54,8 @@ namespace FluffyClimbers.Gameplay
 
         const float PanelMaxW = 1010f, SideMargin = 8f, EdgeMargin = 24f, Pad = 40f, TitleTop = 196f, RowGap = 10f, RowPad = 10f, IconSize = 88f, ChromeGap = 16f, BottomPad = 36f, MoreH = 56f;
         // inside the frame art's cream rect (smaller: the rect is only about 72 percent of the card width, 76 percent of its height)
+        /// <summary>A short page spreads at most this much extra between its rows (reference px per gap); the rest of its spare height is the margin above and below the block (Final Bugs 1).</summary>
+        public const float MaxExtraRowGap = 44f;
         const float ArtPad = 10f, ArtTitleTop = 16f, ArtBottomPad = 8f, ArtChromeGap = 8f, ArtMaxW = 1100f, DotSlotMax = 30f;
 
         RectTransform root, panel, inner, strip, viewport;
@@ -59,6 +64,7 @@ namespace FluffyClimbers.Gameplay
         Image[] dots;
         RectTransform[] contents;
         float[] pageMax;      // vertical scroll range of every page
+        float[] centerOffset; // spare height above a short page so its rows sit centred between the ribbon and the button row (0 on a page that scrolls)
         HelpPage[] pageData;
         Action onClosed;
         Canvas canvas;
@@ -204,12 +210,31 @@ namespace FluffyClimbers.Gameplay
             float bodyMax = panelMaxH - titleTop - chromeBottom;
             bool overflow = tallest > bodyMax + 0.5f;
             float more = overflow ? MoreH : 0f;
-            float body = Mathf.Min(tallest + more, bodyMax);
+            float body = art ? bodyMax : Mathf.Min(tallest + more, bodyMax);   // the painted card has a fixed size: its viewport always fills the room between the ribbon and the buttons (centring uses the real height)
             float panelH = titleTop + body + chromeBottom;
             if (!art) panel.sizeDelta = new Vector2(panelW, panelH);
             vp.offsetMin = new Vector2(pad, chromeBottom + more);
             vp.offsetMax = new Vector2(-pad, -titleTop);
             float vpH = body - more;
+            // Final Bugs 1: the card is taller, so a short page has spare height. Half of it (capped) goes between the rows, and the rows block is centred in the cream area between the ribbon
+            // and the button row. A page that needs more than the room keeps its normal gaps and scrolls from the top.
+            h.centerOffset = new float[n];
+            for (int i = 0; i < n; i++)
+            {
+                int rowsN = h.pageData[i].Rows.Length;
+                float spare = vpH - heights[i];
+                if (spare > 0f)
+                {
+                    float extraGap = rowsN > 1 ? Mathf.Min(MaxExtraRowGap, spare * 0.5f / (rowsN - 1)) : 0f;
+                    if (extraGap > 0f)
+                    {
+                        SpaceRows(h.contents[i], extraGap);
+                        heights[i] += extraGap * (rowsN - 1);
+                        h.contents[i].sizeDelta = new Vector2(vw, heights[i]);
+                    }
+                    h.centerOffset[i] = Mathf.Max(0f, Mathf.Floor((vpH - heights[i]) * 0.5f));
+                }
+            }
             for (int i = 0; i < n; i++) h.pageMax[i] = Mathf.Max(0f, heights[i] - vpH);
             strip.sizeDelta = new Vector2(n * vw, vpH);
             for (int i = 0; i < n; i++) ((RectTransform)h.contents[i].parent).sizeDelta = new Vector2(vw, vpH);
@@ -318,6 +343,19 @@ namespace FluffyClimbers.Gameplay
             return Mathf.Max(0f, y - RowGap);
         }
 
+        /// <summary>Moves every row of a page down by <paramref name="extraGap"/> per row before it (row r by r x extraGap): the same rows, more air between them.</summary>
+        static void SpaceRows(RectTransform content, float extraGap)
+        {
+            for (int c = 0; c < content.childCount; c++)
+            {
+                var row = content.GetChild(c) as RectTransform;
+                if (row == null || !row.name.StartsWith(RowName)) continue;
+                int r;
+                if (!int.TryParse(row.name.Substring(RowName.Length), out r)) continue;
+                row.anchoredPosition = new Vector2(row.anchoredPosition.x, row.anchoredPosition.y - r * extraGap);
+            }
+        }
+
         /// <summary>The height the text needs at the given width, measured with its real font and size.</summary>
         static float Measure(Text t, float width)
         {
@@ -374,7 +412,7 @@ namespace FluffyClimbers.Gameplay
         {
             if (i != Index || instant) scrollY = 0f;
             Index = i;
-            for (int p = 0; p < contents.Length; p++) contents[p].anchoredPosition = Vector2.zero;
+            for (int p = 0; p < contents.Length; p++) contents[p].anchoredPosition = new Vector2(0f, -centerOffset[p]);
             targetX = -i * vw;
             if (instant || GameSettings.ReducedMotion)
             {
@@ -414,7 +452,7 @@ namespace FluffyClimbers.Gameplay
         void SetScroll(float y)
         {
             scrollY = Mathf.Clamp(y, 0f, pageMax[Index]);
-            contents[Index].anchoredPosition = new Vector2(0f, scrollY);
+            contents[Index].anchoredPosition = new Vector2(0f, scrollY - centerOffset[Index]);
             UpdateMore();
         }
 

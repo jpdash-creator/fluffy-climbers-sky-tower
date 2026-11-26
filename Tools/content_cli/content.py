@@ -249,8 +249,8 @@ def validate():
                 errors.append("%s: overrides should be %s" % (lid, want_ov))
             if lv.get("special") != want_special:
                 errors.append("%s: special should be %s" % (lid, want_special))
-            if i in GEM_LEVELS and special_type_of(lv) and not (i == 25 and special_type_of(lv) == "bossRise"):
-                errors.append("%s: a gem level is a plain Regular Run (only level 25 may be a Boss Rise level)" % lid)
+            if i in GEM_LEVELS and special_type_of(lv):
+                errors.append("%s: a gem level is a plain Regular Run" % lid)
         else:
             if lv["class"] != CLASS_BY_LEVEL[i]:
                 errors.append("%s: class should be %s" % (lid, CLASS_BY_LEVEL[i]))

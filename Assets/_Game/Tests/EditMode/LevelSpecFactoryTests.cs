@@ -72,12 +72,10 @@ namespace FluffyClimbers.Tests
             LevelSpec sprint = LevelSpecFactory.Build(repo, "lvl_001_21");
             Assert.AreEqual(GoalType.ReachFloor, sprint.Goal.Type);
             Assert.AreEqual(SpecialLevelType.SprintRest, sprint.Special);
-            Assert.IsTrue(sprint.SprintRestRule && !sprint.BossRiseRule, "the rule flags follow the special type");
+            Assert.IsTrue(sprint.SprintRestRule, "the rule flags follow the special type");
             Assert.AreEqual(SpecialLevelType.SprintRest, SpecialLevels.TypeOf(sprint));
-            LevelSpec boss = LevelSpecFactory.Build(repo, "lvl_003_18");
-            Assert.AreEqual(SpecialLevelType.BossRise, boss.Special);
-            Assert.IsTrue(boss.BossRiseRule);
-            Assert.AreEqual(3, boss.BossRegion, "the region selects the boss");
+            LevelSpec formerBoss = LevelSpecFactory.Build(repo, "lvl_003_18");
+            Assert.AreEqual(SpecialLevelType.None, formerBoss.Special, "Boss Rise was removed: the former boss level is a Regular Run");
             LevelSpec hoops = LevelSpecFactory.Build(repo, "lvl_001_08");
             Assert.AreEqual(GoalType.SkyHoops, hoops.Goal.Type);
             Assert.AreEqual(8, hoops.Goal.Value);

@@ -647,7 +647,7 @@ namespace FluffyClimbers.Simulation.Tests
         public void Region2UsesItsSevenKindsWithTheSignatureCapAndTwoGenericsAndTheOtherRegionsAreUntouched()
         {
             PlatformKind[] set = RegionPlatformSets.For(SignatureKind.BounceCaps);
-            Assert.Equal(9, set.Length);   // Fairy Ring (18) was removed from the plans 2026-11-25 (enum value and rules stay for old data); Final Change 6 added Teeter Cap, Fog Puff Drift, Spore Funnel (47 to 49)
+            Assert.Equal(8, set.Length);   // Fairy Ring (18) was removed from the plans 2026-11-25 (enum value and rules stay for old data); Final Change 6 added Teeter Cap, Fog Puff Drift (47, 48); Spore Funnel (49) was removed 2026-11-26
             Assert.DoesNotContain(PlatformKind.FairyRing, set);
             Assert.All(set, k => Assert.True(PlatformKinds.IsRegion2New(k)));
             Assert.Equal(new[] { PlatformKind.Crumble, PlatformKind.Slippery }, RegionPlatformSets.GenericsFor(SignatureKind.BounceCaps));
@@ -910,7 +910,7 @@ namespace FluffyClimbers.Simulation.Tests
             output.WriteLine("endless special share: floors 5-40 " + ep.ToString("F1") + " percent, floors 200-320 " + lp.ToString("F1") + " percent");
             Assert.InRange(ep, 8, 16);   // endless cycle: floors 5-40 are the start of level 1 (10 to 30 percent ramp over its 100 floors)
             Assert.InRange(lp, 18, 30);   // floors 200-320 are levels 2 to 4 (Bug List 6 curve: 10 to 35 percent ramps)
-            Assert.Equal(12, seen.Count);   // nine new platforms (six + Teeter Cap, Fog Puff Drift, Spore Funnel of Final Change 6) (Fairy Ring removed 2026-11-25), the cap and the two generics appear
+            Assert.Equal(11, seen.Count);   // eight new platforms (six + Teeter Cap, Fog Puff Drift of Final Change 6) (Fairy Ring removed 2026-11-25), the cap and the two generics appear
         }
 
         [Fact]

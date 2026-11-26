@@ -28,7 +28,6 @@ def main():
     print("teetercap")
     res["teetercap"] = fc.bake_pose_set(R, "teetercap", [("level", 0, rows("A1_teeter.png", [0, 1, 2]))], [1.5, 2, 3, 4, 6, 8])
     res["fogpuffdrift"] = fc.copy_normal_set(R, "fogpuffdrift")
-    res["sporefunnel"] = fc.copy_normal_set(R, "sporefunnel")
     finish(res)
 
 

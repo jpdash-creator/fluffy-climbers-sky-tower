@@ -16,21 +16,21 @@ namespace FluffyClimbers.Simulation.Tests
         // ------------------------------------------------------------------ the approved placement (decision 2), written out once more so a generator slip is caught
 
         /// <summary>
-        /// Region (1..5) -> level indices per type, in the order of SpecialLevels.All: NoWallTouch, NoPowerUps, OneLife, KeepMoving, SkyHoops (two levels, the old Combo Gates level is the second), BossRise (two levels, the second is level 25), SprintRest, RivalRace.
+        /// Region (1..5) -> level indices per type, in the order of SpecialLevels.All: NoWallTouch, NoPowerUps, OneLife, KeepMoving, SkyHoops (two levels, the old Combo Gates level is the second), SprintRest, RivalRace.
         /// Owner 2026-11-26: Combo Gates is retired, its level in every region is a Sky Hoops level.
         /// The owner-approved map of Final Change 6 (2026-11-25), written out once more so a generator slip is caught.
         /// </summary>
         public static readonly int[][][] Placement =
         {
-            new[] { new[] { 6 }, new[] { 14 }, new[] { 9 }, new[] { 16 }, new[] { 8, 24 }, new[] { 17, 25 }, new[] { 21 }, new[] { 12 } },    // Meadow Springs
-            new[] { new[] { 4 }, new[] { 13 }, new[] { 7 }, new[] { 18 }, new[] { 9, 16 }, new[] { 14, 25 }, new[] { 23 }, new[] { 12 } },    // Mushroom Grove
-            new[] { new[] { 21 }, new[] { 11 }, new[] { 6 }, new[] { 23 }, new[] { 8, 17 }, new[] { 18, 25 }, new[] { 4 }, new[] { 13 } },    // Sunny Beach
-            new[] { new[] { 19 }, new[] { 4 }, new[] { 24 }, new[] { 6 }, new[] { 7, 11 }, new[] { 16, 25 }, new[] { 22 }, new[] { 13 } },    // Candy Canyon
-            new[] { new[] { 4 }, new[] { 24 }, new[] { 18 }, new[] { 9 }, new[] { 12, 14 }, new[] { 16, 25 }, new[] { 6 }, new[] { 21 } },    // Bamboo Temple
+            new[] { new[] { 6 }, new[] { 14 }, new[] { 9 }, new[] { 16 }, new[] { 8, 24 }, new[] { 21 }, new[] { 12 } },    // Meadow Springs
+            new[] { new[] { 4 }, new[] { 13 }, new[] { 7 }, new[] { 18 }, new[] { 9, 16 }, new[] { 23 }, new[] { 12 } },    // Mushroom Grove
+            new[] { new[] { 21 }, new[] { 11 }, new[] { 6 }, new[] { 23 }, new[] { 8, 17 }, new[] { 4 }, new[] { 13 } },    // Sunny Beach
+            new[] { new[] { 19 }, new[] { 4 }, new[] { 24 }, new[] { 6 }, new[] { 7, 11 }, new[] { 22 }, new[] { 13 } },    // Candy Canyon
+            new[] { new[] { 4 }, new[] { 24 }, new[] { 18 }, new[] { 9 }, new[] { 12, 14 }, new[] { 6 }, new[] { 21 } },    // Bamboo Temple
         };
 
         public static int[] LevelsOf(int region, SpecialLevelType type) { return Placement[region - 1][Array.IndexOf(SpecialLevels.All, type)]; }
-        /// <summary>The first (for Boss Rise the mid-level) level of a type in a region.</summary>
+        /// <summary>The first level of a type in a region.</summary>
         public static int LevelOf(int region, SpecialLevelType type) { return LevelsOf(region, type)[0]; }
 
         static List<LoadedLevel> Shipped()
@@ -56,20 +56,20 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void EveryRegionHasTheTenSpecialLevelsOfTheMapAndTheGemLevelsAreRegularRunsExceptLevel25()
+        public void EveryRegionHasTheEightSpecialLevelsOfTheMapAndTheGemLevelsAreRegularRuns()
         {
             List<LoadedLevel> all = Shipped();
             for (int region = 1; region <= 5; region++)
             {
                 foreach (SpecialLevelType t in SpecialLevels.All)
-                    Assert.Equal(t == SpecialLevelType.BossRise || t == SpecialLevelType.SkyHoops ? 2 : 1, all.Count(l => l.Region == region && SpecialLevels.TypeOf(l.Spec) == t));
+                    Assert.Equal(t == SpecialLevelType.SkyHoops ? 2 : 1, all.Count(l => l.Region == region && SpecialLevels.TypeOf(l.Spec) == t));
                 Assert.True(all.Count(l => l.Region == region && !SpecialLevels.IsActive(SpecialLevels.TypeOf(l.Spec)) && SpecialLevels.TypeOf(l.Spec) != SpecialLevelType.None) == 0, "the retired types are used by no level");
-                Assert.Equal(15, all.Count(l => l.Region == region && SpecialLevels.TypeOf(l.Spec) == SpecialLevelType.None));
+                Assert.Equal(17, all.Count(l => l.Region == region && SpecialLevels.TypeOf(l.Spec) == SpecialLevelType.None));
                 foreach (LoadedLevel ll in all.Where(l => l.Region == region && GemLevels.IsCollectibleGemLevelIndex(l.Spec.LevelIndex)))
                 {
-                    // gem levels 5, 10, 15 and 20 are plain Regular Runs; level 25 is a gem level AND a Boss Rise level (a rule on a reach-the-top level, its gems unchanged)
+                    // gem levels 5, 10, 15, 20 and 25 are plain Regular Runs (Boss Rise, which used to own level 25, was removed 2026-11-26)
                     SpecialLevelType type = SpecialLevels.TypeOf(ll.Spec);
-                    Assert.True(type == SpecialLevelType.None || (ll.Spec.LevelIndex == 25 && type == SpecialLevelType.BossRise), ll.Id + " is a gem level and must be a Regular Run (level 25: Boss Rise)");
+                    Assert.True(type == SpecialLevelType.None, ll.Id + " is a gem level and must be a Regular Run");
                     Assert.Equal(GoalType.ReachFloor, ll.Spec.Goal.Type);
                 }
             }
@@ -110,12 +110,6 @@ namespace FluffyClimbers.Simulation.Tests
                     case SpecialLevelType.RivalRace:
                         Assert.Equal(GoalType.RivalRace, ll.Spec.Goal.Type);
                         Assert.Equal(SpecialLevelType.None, ll.Spec.Special);
-                        break;
-                    case SpecialLevelType.BossRise:
-                        Assert.Equal(GoalType.ReachFloor, ll.Spec.Goal.Type);
-                        Assert.Equal(SpecialLevelType.BossRise, ll.Spec.Special);
-                        Assert.True(ll.Spec.BossRiseRule, ll.Id);
-                        Assert.Equal(ll.Region, ll.Spec.BossRegion);   // the region selects the boss
                         break;
                     case SpecialLevelType.SprintRest:
                         Assert.Equal(GoalType.ReachFloor, ll.Spec.Goal.Type);
@@ -159,8 +153,9 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void TheLookupNamesEveryTypeAndMapsGoalsAndRuleIds()
         {
-            Assert.Equal(8, SpecialLevels.Count);
-            Assert.Equal(8, SpecialLevels.All.Length);
+            Assert.Equal(7, SpecialLevels.Count);
+            Assert.Equal(7, SpecialLevels.All.Length);
+            Assert.False(SpecialLevels.IsActive((SpecialLevelType)9));   // Boss Rise was removed 2026-11-26: the value stays unused
             Assert.Equal(6, SpecialLevels.RewardCount);
             Assert.Equal(6, SpecialLevels.RewardTypes.Length);
             foreach (SpecialLevelType t in SpecialLevels.RewardTypes) Assert.Contains(t, SpecialLevels.All);
@@ -200,7 +195,6 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Equal("Keep Moving", SpecialLevels.Name(SpecialLevelType.KeepMoving));
             Assert.Equal("Combo Gates", SpecialLevels.Name(SpecialLevelType.ComboGates));
             Assert.Equal("Sky Hoops", SpecialLevels.Name(SpecialLevelType.SkyHoops));
-            Assert.Equal("Boss Rise", SpecialLevels.Name(SpecialLevelType.BossRise));
             Assert.Equal("Sprint and Rest", SpecialLevels.Name(SpecialLevelType.SprintRest));
             Assert.Equal("Rival Race", SpecialLevels.Name(SpecialLevelType.RivalRace));
             Assert.False(glyphs.Contains(SpecialLevels.Glyph(SpecialLevelType.ComboClimb)) && SpecialLevels.Glyph(SpecialLevelType.ComboClimb) == SpecialLevels.Glyph(SpecialLevelType.Chase));
@@ -211,9 +205,9 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Equal(SpecialLevelType.ComboGates, SpecialLevels.TypeOf("comboGates", null));
             Assert.Equal(SpecialLevelType.SkyHoops, SpecialLevels.TypeOf("skyHoops", null));
             Assert.Equal(SpecialLevelType.RivalRace, SpecialLevels.TypeOf("rivalRace", null));
-            Assert.Equal(SpecialLevelType.BossRise, SpecialLevels.TypeOf("reachFloor", "bossRise"));
+            Assert.Equal(SpecialLevelType.None, SpecialLevels.TypeOf("reachFloor", "bossRise"));   // removed: an old id decodes as a plain level
             Assert.Equal(SpecialLevelType.SprintRest, SpecialLevels.TypeOf("reachFloor", "sprintRest"));
-            foreach (SpecialLevelType t in new[] { SpecialLevelType.NoPowerUps, SpecialLevelType.OneLife, SpecialLevelType.KeepMoving, SpecialLevelType.BossRise, SpecialLevelType.SprintRest })
+            foreach (SpecialLevelType t in new[] { SpecialLevelType.NoPowerUps, SpecialLevelType.OneLife, SpecialLevelType.KeepMoving, SpecialLevelType.SprintRest })
             {
                 Assert.True(SpecialLevels.IsRule(t));
                 Assert.Equal(t, SpecialLevels.RuleFromId(SpecialLevels.RuleId(t)));
@@ -233,8 +227,8 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Equal(SpecialLevelType.None, SpecialLevels.TypeOf(endless));
             Assert.False(endless.KeepMoving);
             // stable numbers: saves and the server may store them
-            Assert.Equal(new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 }, new[] { (int)SpecialLevelType.NoWallTouch, (int)SpecialLevelType.NoPowerUps, (int)SpecialLevelType.ComboClimb, (int)SpecialLevelType.Chase, (int)SpecialLevelType.OneLife, (int)SpecialLevelType.KeepMoving,
-                (int)SpecialLevelType.ComboGates, (int)SpecialLevelType.SkyHoops, (int)SpecialLevelType.BossRise, (int)SpecialLevelType.SprintRest, (int)SpecialLevelType.RivalRace });
+            Assert.Equal(new[] { 1, 2, 3, 4, 5, 6, 7, 8, 10, 11 }, new[] { (int)SpecialLevelType.NoWallTouch, (int)SpecialLevelType.NoPowerUps, (int)SpecialLevelType.ComboClimb, (int)SpecialLevelType.Chase, (int)SpecialLevelType.OneLife, (int)SpecialLevelType.KeepMoving,
+                (int)SpecialLevelType.ComboGates, (int)SpecialLevelType.SkyHoops, (int)SpecialLevelType.SprintRest, (int)SpecialLevelType.RivalRace });
         }
 
         // ------------------------------------------------------------------ hand-built world for the rule tests

@@ -223,7 +223,6 @@ namespace FluffyClimbers.Economy
                 case SpecialLevelType.KeepMoving: return "keepmoving";
                 case SpecialLevelType.ComboGates: return "combogates";
                 case SpecialLevelType.SkyHoops: return "skyhoops";
-                case SpecialLevelType.BossRise: return "bossrise";
                 case SpecialLevelType.SprintRest: return "sprintrest";
                 case SpecialLevelType.RivalRace: return "rivalrace";
                 default: return "none";
@@ -275,7 +274,7 @@ namespace FluffyClimbers.Economy
                 W(E, "w2_ta100", "Time Attack: 100 floors", RewardStat.TimeAttackFloors, 100, 300),
                 W(E, "w2_taruns5", "Finish 5 Time Attack runs", RewardStat.TimeAttackRuns, 5, 300),
             };
-            // Final Change 6: the owner's reward tables keep six slots (SpecialLevels.RewardTypes: Combo Gates took the Combo Climb slot, Boss Rise the Chase slot)
+            // Final Change 6: the owner's reward tables keep six slots (SpecialLevels.RewardTypes: Sky Hoops took the Combo Climb slot, Sprint and Rest the Boss Rise slot since 2026-11-26)
             foreach (SpecialLevelType type in SpecialLevels.RewardTypes)
                 list.Add(W(X, "w2_special_" + SpecialToken(type), SpecialClearTitle(type), RewardStat.SpecialTypeStat(type), 1, 400));
             list.Add(W(X, "w2_special_all6", "Clear all 6 special level types", RewardStat.SpecialTypes, SpecialLevels.RewardCount, 600, 5));

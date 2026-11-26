@@ -6,7 +6,7 @@
 Picks (owner 2026-11-25):
   R1 dragonflydart   = r1_slabs_A rows 1-3 (lily pad slabs)
   R2 fogpuffdrift    = r2_slabs_B rows 1-2 (fur shelf, long widths = the plain middle repeated)
-  R2 sporefunnel     = r2_slabs_A rows 5-6 (glowing vent = fixed centred shape; the slab is cut / repeated on BOTH sides of it by the same amount, the vent never stretches)
+  (R2 sporefunnel was removed 2026-11-26, owner Final Bugs 1)
   R3 moonjellychain  = r3_jelly_B whole (rows 1-3 unarmed, rows 4-6 armed; each armed row has its own glow, keyed from its own band)
   R3 undertowpad     = r3_pier_A rows 4-6
   R3 splittingpier   = the batch 3 raft (Art/_candidates/reg003_fc6_platforms/B1_foampier.png row 5) straightened by one small uniform rotation
@@ -108,7 +108,7 @@ def spread(rows, widths):
     return {w: min(rows, key=lambda r: (abs(r.natural - w), -rows.index(r))) for w in widths}
 
 
-# ---------------------------------------------------------------- centred feature (Spore Funnel vent)
+# ---------------------------------------------------------------- centred feature
 
 def teal_feature(a, bl, br, surf, bot):
     """x-span of the glowing vent (a teal disc with a dark ring on the top face): the biggest teal blob above the rim stripe, nearest the body centre."""
@@ -194,27 +194,6 @@ def bake_fog():
     items = rows_of(P("r2_slabs_B"), [0, 1], 8, peel={"light_min": 140, "sat_max": 0.34})
     rows = make_rows(items, cols=((0.25, 0.75),))
     return _bake_plain(2, "fogpuffdrift", spread(rows, WIDTHS), WIDTHS)
-
-
-def bake_funnel():
-    items = rows_of(P("r2_slabs_A"), [4, 5], 8, peel={"light_min": 140, "sat_max": 0.34})
-    rows = [fc.Row(a, cols=((0.55, 0.9),), name=n) for a, n in items]   # columns away from the vent for the slab thickness
-    outdir = os.path.join(fc.tiles_dir(2), "sporefunnel_widths")
-    fc.clear_dir(outdir)
-    pieces = []
-    sel = spread(rows, WIDTHS)
-    feats = {}
-    for w in WIDTHS:
-        row = sel[w]
-        if row.name not in feats:
-            feats[row.name] = teal_feature(row.a, row.bl, row.br, row.surf, row.bot)
-            print("   %s vent span %s (body %d..%d)" % (row.name, feats[row.name], row.bl, row.br))
-        feat = feats[row.name]
-        arr, bl, br = sized_centered(row, w, feat) if feat else row.sized(w)
-        m = fc.save_piece(2, "sporefunnel", arr, row.surf, row.bot, w, "", 0, pieces, outdir)
-        print("   %-44s body %4d px = %.2f u (want %g) from %s (natural %.2f)" % (m["file"], m["bodyRight"] - m["bodyLeft"], (m["bodyRight"] - m["bodyLeft"]) / fc.PPU, w, row.name, row.natural))
-    fc.write_set(outdir, "sporefunnel", pieces)
-    return pieces, outdir
 
 
 def bake_jelly():
@@ -314,7 +293,7 @@ def bake_glass():
     return pieces, outdir
 
 
-KINDS = {"dragonflydart": bake_dragonfly, "fogpuffdrift": bake_fog, "sporefunnel": bake_funnel, "moonjellychain": bake_jelly,
+KINDS = {"dragonflydart": bake_dragonfly, "fogpuffdrift": bake_fog, "moonjellychain": bake_jelly,
          "undertowpad": bake_undertow, "splittingpier": bake_pier, "sugarglassledge": bake_glass}
 
 
