@@ -88,12 +88,6 @@ namespace FluffyClimbers.Simulation
         /// <summary>Times a thorn bush hopped the player away (it never damages or ends the run).</summary>
         public int ThornKnocks;
 
-        // ---- Final Change 6, region 1 (Silk Snare Web): two plain ints, 0 in every other run, so old replays and goldens are unchanged ----
-        /// <summary>Silk Snare Web: id of the web the current air phase already cut (a web cuts once per pass; cleared by every landing). 0 = none (platform 0 is never a web).</summary>
-        public int WebId;
-        /// <summary>Silk Snare Web: how many times a web cut the vertical speed (diagnostic; it never damages or ends the run).</summary>
-        public int WebCuts;
-
         // ---- Region 2 special platforms (doc 30). Per-platform dynamic state lives in CrumbleTick (Spore Pop: landing tick, Sprout Lift: rise clock). ----
         /// <summary>Dizzy Spores: ticks left in which left/right input is ignored (cleared by every landing).</summary>
         public int SteerLock;
@@ -134,9 +128,7 @@ namespace FluffyClimbers.Simulation
         /// </summary>
         public int StandTicks;
 
-        // ---- Final Change 6 level types Combo Gates and Sky Hoops (registry worker). Two ints; they stay 0 on every other level, so old runs, replays and goldens are unchanged. ----
-        /// <summary>Combo Gates: bit k is set when a landing inside gate k gained at least LevelData.GateFloors floors (GateRules, read through GoalEvaluator.GatesCleared).</summary>
-        public int GateMask;
+        // ---- Final Change 6 level type Sky Hoops. Stays 0 on every other level, so old runs, replays and goldens are unchanged. (Combo Gates and its gate mask were removed 2026-11-26.) ----
         /// <summary>Sky Hoops: rings taken (PickupKind.Ring).</summary>
         public int Rings;
         /// <summary>Sky Hoops: rings that can no longer be taken (the danger line rose above them) and the scan position in Sim's ring list; read through GoalEvaluator.RingsStillPossible.</summary>
@@ -284,8 +276,8 @@ namespace FluffyClimbers.Simulation
         private readonly Fx bobMargin;
         /// <summary>True when the level has a Fizz Vent or Pinwheel Gust (the air zones are only scanned then).</summary>
         private readonly bool hasAirZones;
-        /// <summary>True when the level has a Silk Snare Web or a Dewdrop Mirror Leaf (Final Change 6, region 1): the web band and the mirror slide are only scanned then.</summary>
-        private readonly bool hasWebs, hasMirror;
+        /// <summary>True when the level has a Dewdrop Mirror Leaf (Final Change 6, region 1): the mirror slide is only scanned then.</summary>
+        private readonly bool hasMirror;
         /// <summary>Moon Jelly Chain member index per platform id (0 to 2), null when the level has no jelly pad.</summary>
         private readonly int[] jellyIndex;
         /// <summary>Largest height of an air zone above its platform (scan window below the player).</summary>
@@ -295,6 +287,9 @@ namespace FluffyClimbers.Simulation
         /// <summary>True when the level has a Caramel Magnet or a Sour Sprinkler Cannon (Final Change 6; scanned by <see cref="ApplyCandyZones"/> only then) and the tallest of their zones.</summary>
         private readonly bool hasCandyZones;
         private readonly Fx candyZoneReach;
+        /// <summary>True when the level has a Pollen Puff (2026-11-26; the cloud scan of <see cref="ApplyPollen"/> only runs then) and the height of the top of its band above the slab.</summary>
+        private readonly bool hasPollen;
+        private readonly Fx pollenReach;
 
         /// <param name="difficulty">0..1 level difficulty; scales the scroll pressure.</param>
         public Sim(SimConfig cfg, Platform[] platforms, Fx difficulty, bool endless)
@@ -368,14 +363,18 @@ namespace FluffyClimbers.Simulation
                 else if (bk == PlatformKind.SinkingRaft && cfg.RaftSinkDepth > bob) bob = cfg.RaftSinkDepth;
                 else if (bk == PlatformKind.SandcastleStep && Platforms[i].Amplitude > bob) bob = Platforms[i].Amplitude;
             }
-            bool webs = false, mirrors = false;
+            bool mirrors = false;
             for (int i = 0; i < Platforms.Length; i++)
             {
-                if (Platforms[i].Kind == PlatformKind.SilkSnareWeb) webs = true;
-                else if (Platforms[i].Kind == PlatformKind.DewdropMirrorLeaf) mirrors = true;
+                if (Platforms[i].Kind == PlatformKind.DewdropMirrorLeaf) mirrors = true;
             }
-            hasWebs = webs;
             hasMirror = mirrors;
+            {
+                bool pollen = false;
+                for (int i = 0; i < Platforms.Length && !pollen; i++) pollen = Platforms[i].Kind == PlatformKind.PollenPuff;
+                hasPollen = pollen;
+                pollenReach = cfg.PollenHeight + cfg.PollenBand / 2 + Fx.One;
+            }
             bobMargin = bob;
             hasAirZones = zones;
             zoneReach = reach;
@@ -488,7 +487,6 @@ namespace FluffyClimbers.Simulation
             if (s.NetTicks > 0) { s.NetY0 = s.NetY0 - yShift; s.NetK0 = s.NetK0 - yShift; s.NetTarget -= dropPlatforms; }   // a running Safety Net jump follows the re-base
             s.GroundId -= dropPlatforms;
             s.BestGroundId -= dropPlatforms;
-            if (s.WebId > 0) { s.WebId -= dropPlatforms; if (s.WebId < 0) s.WebId = 0; }   // Silk Snare Web (Final Change 6): the id of the web the air phase already cut is a platform index too
             if (dropPlatforms > 0 && s.CrumbleTick != null)
             {
                 int keep = s.CrumbleTick.Length - dropPlatforms;
@@ -519,7 +517,6 @@ namespace FluffyClimbers.Simulation
             if ((rk == PlatformKind.Crumble || rk == PlatformKind.SnapDaisy || rk == PlatformKind.SporePop || rk == PlatformKind.JellyWobble || rk == PlatformKind.TaffyStretch || rk == PlatformKind.PrayerScrollRunner || rk == PlatformKind.WaterBambooTipper || rk == PlatformKind.MeltingScoop || rk == PlatformKind.SugarGlassLedge) && s.CrumbleTick != null) s.CrumbleTick[rid] = -1;
             s.GlassDwell = 0;
             if (rk == PlatformKind.DragonflyDart && s.CrumbleTick != null) s.CrumbleTick[rid] = -1;   // the dragonfly rests again
-            if (rk == PlatformKind.GlowwormRelay && s.CrumbleTick != null) RelayStart(ref s, rid, s.WorldTick - Platforms[rid].Phase * Cfg.RelayStepTicks);   // the revived pad is live (start of its window)
             Platform p = Platforms[s.BestGroundId];
             p.Y = PlatformY(s.BestGroundId, s.WorldTick, s.CrumbleTick);   // a Bee Hive Lift is somewhere on its bob, a Sprout Lift somewhere on its rise
             s.TiltDir = 0;
@@ -617,6 +614,7 @@ namespace FluffyClimbers.Simulation
             else if (p.Kind == PlatformKind.PrayerScrollRunner) return p.X + (p.Width - ScrollLength(in p, id, tick, aux)) * (p.Dir == 0 ? 1 : p.Dir) / 2;   // Final Change 6: the scroll rolls up toward its roll end (side Dir)
             else if (p.Kind == PlatformKind.DragonflyDart) return p.X + DartOffset(in p, id, tick, aux);
             else if (p.Kind == PlatformKind.DewdropMirrorLeaf) return p.X + MirrorOffset(id, aux);
+            else if (p.Kind == PlatformKind.CloverSwap) return p.X + CloverOffset(in p, tick);   // 2026-11-26: the pair swaps places on the global clock
             else if (p.Kind != PlatformKind.Moving) return p.X;
             int half = p.Period / 2;
             int phase = (tick + p.Phase + shift) % p.Period;
@@ -883,6 +881,58 @@ namespace FluffyClimbers.Simulation
                 {
                     if (SprinklerFiring(in p, tick) && Fx.Abs(s.X - p.X) < Cfg.SprinklerHalfWidth && s.Y - p.Y < Cfg.SprinklerHeight) s.Y = s.Y - Cfg.SprinklerPush / d;
                 }
+            }
+        }
+
+        // ------------------------------------------------------------------------------------------
+        // Region 1 additions 2026-11-26: Clover Swap (62, a pair of slabs that exchange places) and Pollen Puff (63, a one-shot launch boost cloud). Integer maths only; never a hazard.
+        // ------------------------------------------------------------------------------------------
+
+        /// <summary>Clover Swap: how far the pair has travelled toward the exchanged state at a tick, 0 (resting at the home x) to 1 (exchanged). The exchange runs in the last CloverSwapSlideTicks of every period (smoothstep) and alternates direction.</summary>
+        public Fx CloverSwapProgress(int tick)
+        {
+            int period = Cfg.CloverSwapPeriodTicks;
+            int slide = Cfg.CloverSwapSlideTicks;
+            int n = tick / period;
+            int c = tick - n * period;
+            Fx u = c >= period - slide ? Ease(c - (period - slide) + 1, slide) : Fx.Zero;   // the last tick of the period is exactly 1, so the next period starts where this one ended
+            return (n & 1) == 1 ? Fx.One - u : u;
+        }
+
+        /// <summary>Clover Swap: sideways offset of a member from its home x at a tick (member 0 = Platform.Phase 0 moves right by Platform.Amplitude, member 1 moves left by it).</summary>
+        public Fx CloverOffset(in Platform p, int tick)
+        {
+            Fx f = CloverSwapProgress(tick) * p.Amplitude;
+            return p.Phase == 0 ? f : -f;
+        }
+
+        /// <summary>Clover Swap: true while the 'swap' pose is shown: the CloverSwapTelegraphTicks before the slide and the slide itself, i.e. the last (telegraph + slide) ticks of each period.</summary>
+        public bool CloverTelegraph(int tick)
+        {
+            int period = Cfg.CloverSwapPeriodTicks;
+            int c = tick % period;
+            return c >= period - Cfg.CloverSwapTelegraphTicks - Cfg.CloverSwapSlideTicks;
+        }
+
+        /// <summary>Pollen Puff: the tick the cloud of platform <paramref name="id"/> was used, or -1 while it is fresh (<paramref name="aux"/> is SimState.CrumbleTick).</summary>
+        public int PollenUsedTick(int id, int[] aux)
+        {
+            return aux == null || Platforms[id].Kind != PlatformKind.PollenPuff ? -1 : aux[id];
+        }
+
+        /// <summary>
+        /// Pollen Puff: a rising hero inside the zone of a fresh cloud (PollenHalfWidth either side of the slab centre, PollenBand around the cloud centre PollenHeight above the slab) gets vy x PollenBoostPercent / 100 once
+        /// and the cloud is marked used (SimState.CrumbleTick[id] = the tick, so it shifts and grows with the other per-platform state and clones with it). No allocation.
+        /// </summary>
+        private void ApplyPollen(ref SimState s, int tick)
+        {
+            Fx half = Cfg.PollenBand / 2;
+            for (int i = LowerBound(s.Y - pollenReach); i < Platforms.Length && Platforms[i].Y < s.Y; i++)
+            {
+                if (Platforms[i].Kind != PlatformKind.PollenPuff || s.CrumbleTick[i] >= 0) continue;
+                if (Fx.Abs(s.Y - Platforms[i].Y - Cfg.PollenHeight) >= half || Fx.Abs(s.X - Platforms[i].X) >= Cfg.PollenHalfWidth) continue;
+                s.Vy = s.Vy * Cfg.PollenBoostPercent / 100;
+                s.CrumbleTick[i] = tick;
             }
         }
 
@@ -1230,7 +1280,6 @@ namespace FluffyClimbers.Simulation
         {
             Platform p = Platforms[id];
             if (p.Kind == PlatformKind.SnapDaisy) return SnapPhase(id, tick, crumbleTick) != 2;
-            if (p.Kind == PlatformKind.GlowwormRelay) return RelaySolid(id, tick, crumbleTick);
             if (p.Kind == PlatformKind.Vanishing)
             {
                 return (tick + p.Phase) % (Cfg.VanishVisibleTicks + Cfg.VanishHiddenTicks) < Cfg.VanishVisibleTicks;
@@ -1678,10 +1727,10 @@ namespace FluffyClimbers.Simulation
                 {
                     s.Vy = s.Vy - gravity / d;
                 }
+                if (hasPollen && !flying && !holding && s.Vy > Fx.Zero) ApplyPollen(ref s, tick);   // Pollen Puff (2026-11-26): the first rise through a fresh cloud gives vy x 1.10
                 s.Y = s.Y + s.Vy / d;
                 s.X = s.X + (s.Vx + zonePush) / d;
                 if (hasCandyZones && !flying && !holding) ApplyCandyZones(ref s, tick, d);   // Caramel Magnet pull, Sour Sprinkler push (Final Change 6)
-                if (hasWebs && !flying && !holding) ApplyWebs(ref s, prevY);                  // Silk Snare Web: the first pass up through a web band cuts the climb (Final Change 6, region 1)
                 if (hasLintel && !flying && s.Vy > Fx.Zero) LintelBump(ref s, prevY);   // Torii Lintel (Final Change 6): the ceiling stops a rising head
                 if (flying && s.Y >= powerCapY)
                 {
@@ -2201,55 +2250,10 @@ namespace FluffyClimbers.Simulation
             }
         }
 
-        /// <summary>Combo Gates: a landing on <paramref name="row"/> that gained <paramref name="gained"/> floors clears the gate the row belongs to when it gained GateFloors or more.</summary>
-        private void MarkGate(ref SimState s, int row, int gained)
-        {
-            if (gained < Level.GateFloors) return;
-            for (int k = 0; k < Level.GateStartRows.Length; k++)
-                if (row >= Level.GateStartRows[k] && row < Level.GateStartRows[k] + Level.GateLength) s.GateMask |= 1 << k;
-        }
-
         // ------------------------------------------------------------------------------------------
-        // Final Change 6, region 1 (ids 43 to 46): Glowworm Relay, Dragonfly Dart, Dewdrop Mirror Leaf, Silk Snare Web.
+        // Final Change 6, region 1 (ids 44 and 45; 43 and 46 were removed 2026-11-26): Dragonfly Dart, Dewdrop Mirror Leaf.
         // All fixed point; per-platform state lives in SimState.CrumbleTick; none of them can end the run by itself.
         // ------------------------------------------------------------------------------------------
-
-        /// <summary>Glowworm Relay: true when the relay is idle: never started (<paramref name="start"/> -1) or RelayTotalTicks over. Only the head is solid then.</summary>
-        public bool RelayIdle(int start, int tick)
-        {
-            return start < 0 || tick - start >= Cfg.RelayTotalTicks;
-        }
-
-        /// <summary>Glowworm Relay: ticks since the relay started (0 to RelayTotalTicks - 1), or -1 when it is idle. <paramref name="aux"/> is SimState.CrumbleTick.</summary>
-        public int RelayElapsed(int id, int tick, int[] aux)
-        {
-            if (aux == null) return -1;
-            int start = aux[id];
-            return RelayIdle(start, tick) ? -1 : tick - start;
-        }
-
-        /// <summary>
-        /// Glowworm Relay: true while the pad holds. Pad k (Platform.Phase) is solid from RelayStepTicks x k to RelayStepTicks x k + RelayHoldTicks after the start; idle: only the head (k 0).
-        /// The glowworm glow of the painted pad shows exactly this state.
-        /// </summary>
-        public bool RelaySolid(int id, int tick, int[] aux)
-        {
-            int k = Platforms[id].Phase;
-            int e = RelayElapsed(id, tick, aux);
-            if (e < 0) return k == 0;
-            int open = k * Cfg.RelayStepTicks;
-            return e >= open && e < open + Cfg.RelayHoldTicks;
-        }
-
-        /// <summary>Glowworm Relay: starts the clock of all four pads of the relay that <paramref name="id"/> belongs to (the same start tick in each pad's CrumbleTick; the pads are the Glowworm platforms of the rows of the head).</summary>
-        private void RelayStart(ref SimState s, int id, int startTick)
-        {
-            int row0 = Platforms[id].Row - Platforms[id].Phase;
-            int lo = id;
-            while (lo > 0 && Platforms[lo - 1].Row >= row0) lo--;
-            for (int i = lo; i < Platforms.Length && Platforms[i].Row <= row0 + SimConfig.RelayLength - 1; i++)
-                if (Platforms[i].Kind == PlatformKind.GlowwormRelay && Platforms[i].Phase == Platforms[i].Row - row0) s.CrumbleTick[i] = startTick;
-        }
 
         /// <summary>Dragonfly Dart: ticks of the dart (Amplitude at DartSpeed, rounded; at least 1).</summary>
         public int DartOutTicks(in Platform p)
@@ -2354,39 +2358,10 @@ namespace FluffyClimbers.Simulation
             }
         }
 
-        /// <summary>Silk Snare Web: width of the web band (WebWidthSmall at platform widths up to 2, else the width plus WebWidthPad, at most WebWidthMax), centred on the platform.</summary>
-        public Fx WebWidthOf(in Platform p)
-        {
-            if (p.Width <= Fx.FromInt(2)) return Cfg.WebWidthSmall;
-            return Fx.Min(Cfg.WebWidthMax, p.Width + Cfg.WebWidthPad);
-        }
-
-        /// <summary>
-        /// Silk Snare Web: a rising player whose move of this tick (from <paramref name="prevY"/> to s.Y) touches a web band (WebHeight to WebHeight + WebThickness above its platform, inside WebWidthOf) loses WebCutPercent of
-        /// the vertical speed, once per air phase and web (SimState.WebId), but only when the climb started at or near the web platform's own level (the platform last stood on is at most WebLaunchMargin above it). Never damages.
-        /// </summary>
-        private void ApplyWebs(ref SimState s, Fx prevY)
-        {
-            if (s.Vy <= Fx.Zero) return;
-            Fx top = Cfg.WebHeight + Cfg.WebThickness;
-            for (int i = LowerBound(prevY - top); i < Platforms.Length && Platforms[i].Y + Cfg.WebHeight <= s.Y; i++)
-            {
-                Platform p = Platforms[i];
-                if (p.Kind != PlatformKind.SilkSnareWeb || s.WebId == i) continue;
-                if (Platforms[s.GroundId].Y > p.Y + Cfg.WebLaunchMargin) continue;   // the climb started above the web platform (the row above it): the band is behind him
-                if (Fx.Abs(s.X - p.X) >= WebWidthOf(in p) / 2) continue;
-                s.Vy = s.Vy * (100 - Cfg.WebCutPercent) / 100;
-                s.WebId = i;
-                s.WebCuts++;
-                return;
-            }
-        }
-
         private void Land(ref SimState s, int id, int tick, Fx surfaceY)
         {
             Platform p = Platforms[id];
             s.AirJumpUsed = false;   // Double Jump: every landing (also on a bounce platform) gives the next air phase its extra jump back
-            s.WebId = 0;             // Silk Snare Web: the next air phase can be cut again
             p.Y = p.Kind == PlatformKind.SandcastleStep ? surfaceY : PlatformY(id, tick, s.CrumbleTick);   // the surface of a Bee Hive Lift is somewhere on its bob, an Orbit Cap on its lap, a Sprout Lift on its rise, a raft on its sink, a Sandcastle Step at the player's x
             s.JumpLock = 0;
             s.GlideTicks = 0;   // Floss Glide ends with the next landing
@@ -2450,7 +2425,6 @@ namespace FluffyClimbers.Simulation
             if (newRow && Endless && continuesCombo) s.Coins += Cfg.ComboLandingCoins;
 
             s.LastJumpFloors = gained;
-            if (gained >= 1 && Level.GateStartRows != null) MarkGate(ref s, p.Row, gained);   // Combo Gates: a combo jump landed inside a gate clears it
             if (gained > s.BestJumpFloors) s.BestJumpFloors = gained;
             if (gained >= 1)
             {
@@ -2584,10 +2558,6 @@ namespace FluffyClimbers.Simulation
                         if (landed < 0 || tick - landed >= Cfg.SporePopTicks + Cfg.SporePopFlatTicks) s.CrumbleTick[id] = tick;
                         break;
                     }
-                case PlatformKind.GlowwormRelay:
-                    // landing on the head of an idle relay starts the relay clock of all four pads (a landing on a running relay changes nothing)
-                    if (p.Phase == 0 && RelayIdle(s.CrumbleTick[id], tick)) RelayStart(ref s, id, tick);
-                    break;
                 case PlatformKind.DragonflyDart:
                     {
                         // a new episode starts unless the dragonfly is still darting, pausing or gliding back from the last landing
@@ -2698,6 +2668,10 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.DragonflyDart:
                     // the dragonfly carries the player along its dart and glide back (the whole move)
                     s.X = s.X + PlatformX(id, tick, s.CrumbleTick) - PlatformX(id, s.WorldTick, s.CrumbleTick);
+                    break;
+                case PlatformKind.CloverSwap:
+                    // a clover slab carries the player along its slide to the other home
+                    s.X = s.X + PlatformX(id, tick) - PlatformX(id, s.WorldTick);
                     break;
                 case PlatformKind.CandyBowl:
                     {

@@ -438,8 +438,6 @@ namespace FluffyClimbers.Gameplay
         {
             int s = sim.Platforms[st.GroundId].Row * 1000;
             s += (st.Coins + st.Gems * 10) * coinWeight + st.Stars * 40 + st.HiddenGems * 3000 - st.Hits * 60 - st.Tick / 16;
-            if (spec != null && spec.Goal.Type == GoalType.ComboChain) s += GoalEvaluator.JumpsWithFloors(st, spec.Goal.Value) * 1200;
-            if (spec != null && spec.Goal.Type == GoalType.ComboGates) s += GoalEvaluator.GatesCleared(spec, st) * 1200;   // Final Change 6: the gates and the rings pull the autopilot like the old combo jumps did
             if (spec != null && spec.Goal.Type == GoalType.SkyHoops) s += st.Rings * 300;
             if (goalDone) s += DoneBonus;
             return s;
@@ -455,8 +453,6 @@ namespace FluffyClimbers.Gameplay
                     return c.Tick > spec.Goal.TimeSec * SimConfig.TicksPerSecond;
                 case GoalType.FindHiddenGem:
                     return data != null && data.HiddenGemRow >= 0 && c.HiddenGems == 0 && c.Row > data.HiddenGemRow + 1;
-                case GoalType.ComboGates:
-                    return GateRules.MissedGate(spec, c.Row, c.GateMask) >= 0;   // a gate left behind without its combo jump ends the run
                 case GoalType.SkyHoops:
                     return GoalEvaluator.RingsStillPossible(spec, c) < RingRules.Needed(spec);
                 default:
@@ -468,7 +464,7 @@ namespace FluffyClimbers.Gameplay
         {
             long vb = (c.Vx.Raw * 20L / Fx.OneRaw) + 16;
             long xb = c.X.Raw * 4L / Fx.OneRaw;
-            long extra = spec != null ? (spec.Goal.Type == GoalType.ComboGates ? c.GateMask : (spec.Goal.Type == GoalType.SkyHoops ? c.Rings : 0)) : 0;
+            long extra = spec != null ? (spec.Goal.Type == GoalType.SkyHoops ? c.Rings : 0) : 0;
             return c.GroundId + (vb << 20) + (xb << 36) + (extra << 44);
         }
 

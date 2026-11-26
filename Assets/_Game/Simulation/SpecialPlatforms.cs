@@ -201,12 +201,6 @@ namespace FluffyClimbers.Simulation
             int jellyBudget = jellyOptions == 0 ? 0 : (chosen.Count * jellyOptions + 3 * options.Length - 1) / (3 * options.Length);
             int jellyGroups = 0;
             int lastJellyEnd = -1000;   // integration 2026-11-26: two chains never within JellySpacingRows rows (a chain right after another one had no solution: lvl_003_23, 17, 25 layouts)
-            // Glowworm Relay (Final Change 6): a group of RelayLength consecutive rows; at most one per about four times the share of the options, never within RelaySpacingRows of the previous one
-            int relayOptions = 0;
-            for (int o = 0; o < options.Length; o++) if (options[o] == PlatformKind.GlowwormRelay) relayOptions++;
-            int relayBudget = relayOptions == 0 ? 0 : (chosen.Count * relayOptions + 4 * options.Length - 1) / (4 * options.Length);
-            int relayGroups = 0;
-            int lastRelayEnd = -1000;
             int lastHazardRow = -1000;
             PlatformKind prevKind = PlatformKind.Normal;
             int prevRow = -10;
@@ -228,8 +222,7 @@ namespace FluffyClimbers.Simulation
                         || k == PlatformKind.MoonJellyChain || k == PlatformKind.UndertowPad   // Final Change 6, region 3: their gap rules do not fit beside a ladder or chunk
                         || k == PlatformKind.ToriiLintel || k == PlatformKind.IncenseMistBank || k == PlatformKind.PrayerScrollRunner || k == PlatformKind.MeltingScoop || k == PlatformKind.CaramelMagnet || k == PlatformKind.SourSprinklerCannon || k == PlatformKind.SugarGlassLedge || PlatformKinds.IsLaunch(k))) continue;
                     if (restricted && k == PlatformKind.Vanishing) continue;   // the finish never blinks
-                    if (beside && (k == PlatformKind.GlowwormRelay || k == PlatformKind.DragonflyDart || k == PlatformKind.DewdropMirrorLeaf || k == PlatformKind.SilkSnareWeb)) continue;   // Final Change 6, region 1: gap and position rules do not fit beside a ladder or chunk
-                    if (k == PlatformKind.GlowwormRelay && (relayGroups >= relayBudget || r - lastRelayEnd < SimConfig.RelaySpacingRows || chosen.Count - ci - 1 < SimConfig.RelayLength - 1 || !RelayGroupFits(r, rows, locked, gemRow))) continue;
+                    if (beside && (k == PlatformKind.DragonflyDart || k == PlatformKind.DewdropMirrorLeaf || k == PlatformKind.CloverSwap || k == PlatformKind.PollenPuff)) continue;   // 2026-11-26: the pair's reach rules and the cloud's gap rule do not fit beside an authored chunk either   // Final Change 6, region 1: gap and position rules do not fit beside a ladder or chunk
                     if (PlatformKinds.IsHazardType(k) && hazardsPlaced >= hazardBudget) continue;
                     if (PlatformKinds.IsLaunch(k) && launchesPlaced >= launchBudget) continue;
                     if (k == PlatformKind.MoonJellyChain && (jellyGroups >= jellyBudget || r - lastJellyEnd < SimConfig.JellySpacingRows || !JellyGroupFits(r, rows, locked, gemRow) || !GroupRowsRemovable(chosen, ci, r, SimConfig.JellyChainLength))) continue;
@@ -279,22 +272,6 @@ namespace FluffyClimbers.Simulation
                     prevRow = r + SimConfig.JellyChainLength - 1;
                     lastJellyEnd = prevRow;
                 }
-                if (options[o2] == PlatformKind.GlowwormRelay)
-                {
-                    // the whole relay: RelayLength consecutive rows; the rows it takes from the draw come off the later special rows, so the level keeps its exact count
-                    relayGroups++;
-                    int need = SimConfig.RelayLength - 1;
-                    for (int g = 1; g < SimConfig.RelayLength; g++)
-                    {
-                        plan[r + g] = PlatformKind.GlowwormRelay;
-                        int at = chosen.IndexOf(r + g);
-                        if (at > ci) { chosen.RemoveAt(at); need--; }
-                    }
-                    // the rest comes off the specials right after the group (not the last ones of the level), so the share keeps its ramp inside the level
-                    while (need > 0 && ci + 1 < chosen.Count) { chosen.RemoveAt(ci + 1); need--; }
-                    prevRow = r + SimConfig.RelayLength - 1;
-                    lastRelayEnd = prevRow;
-                }
                 if (PlatformKinds.IsHazardType(options[o2])) { lastHazardRow = r; hazardsPlaced++; }
                 if (PlatformKinds.IsLaunch(options[o2])) launchesPlaced++;
             }
@@ -323,18 +300,6 @@ namespace FluffyClimbers.Simulation
             return true;
         }
 
-        /// <summary>
-        /// Glowworm Relay: true when a relay of SimConfig.RelayLength pads fits on the rows <paramref name="r"/> to r + 3: none of them and the rows just below and above are owned by a ladder (combo ladder rows are excluded) or chunk
-        /// or are the hidden gem row, and none lies in the restricted zone (never the last three rows or around the gem).
-        /// </summary>
-        public static bool RelayGroupFits(int r, int rows, bool[] locked, int gemRow)
-        {
-            int last = r + SimConfig.RelayLength - 1;
-            for (int i = r - 1; i <= last + 1 && i < locked.Length; i++) if (i >= 0 && (locked[i] || i == gemRow)) return false;
-            for (int i = r; i <= last; i++) if (Restricted(i, rows, gemRow)) return false;
-            return true;
-        }
-
         /// <summary>The last three rows before the goal and the two rows either side of the hidden gem avoid launchers and hazards.</summary>
         public static bool Restricted(int row, int rows, int gemRow)
         {
@@ -358,7 +323,6 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.HiveLift: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));
                 case PlatformKind.SnapDaisy: return Fx.Max(w, Fx.FromInt(2));
                 case PlatformKind.SproutLift: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));
-                case PlatformKind.GlowwormRelay: return Fx.Clamp(w, Fx.FromInt(3), Fx.FromInt(6));              // Final Change 6: painted 3, 4 and 6 u (1.5, 2 and 8 are excluded)
                 case PlatformKind.FairyRing: return cfg.FairyRingWidth;   // two halves of at least 1.4 u around the hole
                 case PlatformKind.OrbitCap: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));
                 case PlatformKind.DizzySpores: return Fx.Max(w, Fx.FromInt(2));
@@ -393,6 +357,7 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.PagodaRidge: return Fx.Clamp(w, cfg.RidgeMinWidth, cfg.RidgeMaxWidth);       // painted 2.5, 3.5 or 4.5 u
                 case PlatformKind.MalletSmash: return Fx.Clamp(w, cfg.MalletMinWidth, cfg.MalletMaxWidth);     // 2.9 u safe + the 1.6 u zone: painted 4.5 or 6 u
                 case PlatformKind.RollingLog: return cfg.LogPlatformWidth;                                      // one painted track (5 u)
+                case PlatformKind.CloverSwap: return Fx.Clamp(w, Fx.FromInt(2), Fx.FromInt(4));                   // 2026-11-26: painted 2, 3, 4 u (CloverPair may take it down to fit the pair between the walls)
                 case PlatformKind.PrayerScrollRunner: return Fx.Clamp(w, cfg.ScrollMinWidth, cfg.ScrollMaxWidth);   // Final Change 6: painted open 3, 4.5 or 6 u
                 case PlatformKind.ToriiLintel: return Fx.Clamp(w, cfg.LintelMinWidth, cfg.LintelMaxWidth);          // the arch needs a base: 4.5 or 6 u (1.25 u of open slab each side of the 2 u lintel at 4.5)
                 case PlatformKind.IncenseMistBank: return Fx.Clamp(w, cfg.MistMinWidth, cfg.MistMaxWidth);          // painted 3 or 4.5 u
@@ -424,12 +389,10 @@ namespace FluffyClimbers.Simulation
             if (prevKind == PlatformKind.TeeterCap) gap = Fx.Min(gap, cfg.TeeterGapMax);
             // Undertow Pad (Final Change 6): the gravity column above it cuts the reach, so the row above is at most UndertowGapMax (3.0 u) higher.
             if (prevKind == PlatformKind.UndertowPad) gap = Fx.Min(gap, cfg.UndertowGapMax);
-            // Glowworm Relay (Final Change 6): the pads of one relay are RelayGapMin to RelayGapMax apart, so a flight of 36 to 54 ticks lands inside the window of the next pad.
-            if (kind == PlatformKind.GlowwormRelay && prevKind == PlatformKind.GlowwormRelay) gap = Fx.Clamp(gap, cfg.RelayGapMin, cfg.RelayGapMax);
-            // Silk Snare Web (Final Change 6): the web cuts the climb to about 3.46 u, so the row above is at most WebGapMax (2.9 u) higher.
-            if (prevKind == PlatformKind.SilkSnareWeb) gap = Fx.Min(gap, cfg.WebGapMax);
             // Bamboo Flick: the flick peaks 2.76 u, so the next row is FlickGapMin to FlickGapMax higher (the flight lands on the way down).
             if (prevKind == PlatformKind.BambooFlick) gap = Fx.Clamp(gap, cfg.FlickGapMin, cfg.FlickGapMax);
+            // Pollen Puff (2026-11-26): the cloud hangs PollenHeight above its slab, so the row above is at least PollenGapMin higher (the painted cloud never sits in the next slab); at most a normal jump.
+            if (prevKind == PlatformKind.PollenPuff) gap = Fx.Min(Fx.Max(gap, cfg.PollenGapMin), cfg.NormalGapMax);
             if (prevKind == PlatformKind.KelpTangle) gap = Fx.Min(gap, cfg.KelpNextGapMax);   // integration 2026-11-25: the jump lock leaves less time, so the next row is closer
             // Torii Lintel (Final Change 6): the lintel stands LintelHeight above its slab, so the row above is at least LintelGapMin higher (the lintel never sits in the next platform).
             if (prevKind == PlatformKind.ToriiLintel) gap = Fx.Clamp(gap, cfg.LintelGapMin, cfg.NormalGapMax);
@@ -612,17 +575,14 @@ namespace FluffyClimbers.Simulation
 
         /// <summary>
         /// Final Change 6, region 1: the parameters that need the final width and the previous row. Call it right after <see cref="Params"/> (builder and endless tower).
-        /// Glowworm Relay: Phase = member index (0 head to 3), counted up from the previous row when that is a relay pad too. Dragonfly Dart: Amplitude = the dart length, 2.4 u (1.6 u at widths 1.5 and 2) but never more than
+        /// Dragonfly Dart: Amplitude = the dart length, 2.4 u (1.6 u at widths 1.5 and 2) but never more than
         /// the free room to the wall on the dart side. Dewdrop Mirror Leaf: Amplitude = the slide limit (1.2 u at widths 1.5 and 2, 1.8 u at 3 and 4, 1.0 u at 6 and 8, never more than the room to the nearer wall),
         /// Period = the mirror factor in percent (35 at widths 1.5 and 2, else 50).
         /// </summary>
-        public static void FinishParams(SimConfig cfg, PlatformKind kind, Fx x, Fx w, Fx screen, PlatformKind prevKind, int prevPhase, ref Fx amp, ref int period, ref int phase, ref int dir)
+        public static void FinishParams(SimConfig cfg, PlatformKind kind, Fx x, Fx w, Fx screen, PlatformKind prevKind, ref Fx amp, ref int period, ref int phase, ref int dir)
         {
             switch (kind)
             {
-                case PlatformKind.GlowwormRelay:
-                    phase = prevKind == PlatformKind.GlowwormRelay ? prevPhase + 1 : 0;
-                    break;
                 case PlatformKind.DragonflyDart:
                     {
                         Fx len = w <= Fx.FromInt(2) ? cfg.DartLengthSmall : cfg.DartLength;
@@ -650,6 +610,32 @@ namespace FluffyClimbers.Simulation
         {
             Fx dd = Fx.Min(dx, Fx.Max(Fx.Zero, dxLimit - prevAmp));
             return Fx.Clamp(prevX - dd * prevDir, w / 2, screen - w / 2);
+        }
+
+        /// <summary>
+        /// Clover Swap (2026-11-26): fits a PAIR of slabs on one row. <paramref name="c"/> is the wanted centre of the pair, <paramref name="w"/> the wanted member width (2 to 4 u), <paramref name="baseReach"/> the layout reach of the
+        /// row WITHOUT the width of the new row (dxLimit - w / 2), <paramref name="prevX"/> the centre of the row below. The members rest at c - h and c + h (h = (width + CloverAir) / 2), so both homes lie inside the walls, and both
+        /// are within reach of the row below (|c - prevX| + h at most baseReach + width / 2). Tries the wanted width, then 3 u, then 2 u. On success returns the width, the centre and h; false = no pair fits (the caller makes the row Normal).
+        /// </summary>
+        public static bool CloverPair(SimConfig cfg, Fx prevX, Fx baseReach, Fx screen, ref Fx c, ref Fx w, out Fx h)
+        {
+            Fx cw = w;
+            h = Fx.Zero;
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                if (attempt == 1) { if (w <= Fx.FromInt(3)) continue; cw = Fx.FromInt(3); }
+                else if (attempt == 2) { if (w <= Fx.FromInt(2)) continue; cw = Fx.FromInt(2); }
+                Fx hh = (cw + cfg.CloverAir) / 2;
+                Fx wallLo = cw / 2 + hh, wallHi = screen - cw / 2 - hh;
+                Fx reach = baseReach + cw / 2 - hh;
+                Fx lo = Fx.Max(wallLo, prevX - reach), hi = Fx.Min(wallHi, prevX + reach);
+                if (lo > hi) continue;
+                c = Fx.Clamp(c, lo, hi);
+                w = cw;
+                h = hh;
+                return true;
+            }
+            return false;
         }
 
         /// <summary>The x of the platform after a Licorice Belt: toward the middle, opposite to the belt's Dir (it carries away from the next platform), dx away, kept inside the walls.</summary>

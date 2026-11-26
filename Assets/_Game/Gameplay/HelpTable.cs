@@ -68,7 +68,7 @@ namespace FluffyClimbers.Gameplay
                     R("icon_gem", "Levels 5, 10, 15, 20, 25 pay gems on the first clear."),
                     R("icon_penalty", "Away from home, your hero is a little weaker.")),
                 P("Special levels",
-                    R("icon_flame", "Six special levels per region, each with its own rule."),
+                    R("icon_flame", "Ten special levels per region, each with its own rule."),
                     R("icon_star", "Every level holds 3 stars to collect."),
                     R("medal_gold", "Fast climbs win Bronze, Silver and Gold medals."),
                     R("icon_play", "The rule is written in the pop-up. PLAY starts."))),

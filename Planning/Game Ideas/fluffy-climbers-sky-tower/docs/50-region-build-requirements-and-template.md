@@ -1123,7 +1123,7 @@ All ranges are linear in d = `spec.EffectiveDifficulty(cfg)`:
 
 #### Fixed-position elements (planned before the rows)
 
-- **Combo ladder** (ComboChain goals only; no shipped level): `Value x Count + 2` rungs at the top (`ladderStart = rows - 2 - ladderLen`), rung = `ComboLadderSpan` 3.6 / Value, two staggered columns when the rung would be under 1.2 u (`Sim/LevelBuilder.cs:142-154, 273-311`).
+- **Combo ladder**: REMOVED 2026-11-26 (owner), together with the Combo Gates ladders; no level builds a stacked ladder of rungs.
 - **Authored chunks** (`FixedChunks`; no shipped level): 12 chunks in `Sim/Chunks.cs`, placed from `ChunkStartRow` 10 every `ChunkInterval` 14 rows plus one ending the level (`Sim/LevelBuilder.cs:156-197, 314-362`).
 - **Hidden gem** (FindHiddenGem goals = level 15): gem row = `rows / 2`; a 2.4 u Normal side platform on that row, the gem floats `HiddenGemHeight` 1.0 u above it; the spine platform of that row is capped at 3.5 u (`Sim/LevelBuilder.cs:199-207, 409, 464-498`). The level has 105 rows but the run ends when the gem is taken (about row 52).
 - **Wave** (SurviveWave goals; no shipped level): rows 35 to 65 percent get gongs at 85 percent per row.

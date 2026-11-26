@@ -18,8 +18,7 @@ MAXSIDE = 512
 
 # region -> name -> (sheet file, row, column)   (rows and columns counted from 0, top left)
 PARTS = {
-    1: {"dewdrop": ("P1_parts.png", 0, 0), "dragonfly_perched": ("P2_parts.png", 0, 1), "dragonfly_buzz": ("P2_parts.png", 0, 2),
-        "web_wide": ("P2_parts.png", 1, 0), "web_small": ("P2_parts.png", 1, 1)},
+    1: {"dewdrop": ("P1_parts.png", 0, 0), "dragonfly_perched": ("P2_parts.png", 0, 1), "dragonfly_buzz": ("P2_parts.png", 0, 2)},
     2: {"spore_cloud_1": ("P2_parts.png", 0, 1), "spore_cloud_2": ("P2_parts.png", 0, 2), "spore_cloud_3": ("P2_parts.png", 1, 0),
         "spore_cone_narrow_a": ("P1_parts.png", 1, 1), "spore_cone_narrow_b": ("P1_parts.png", 1, 2),
         "spore_cone_wide_a": ("P1_parts.png", 2, 0), "spore_cone_wide_b": ("P1_parts.png", 2, 1)},
@@ -34,7 +33,7 @@ def cut_all():
     out = {}
     for region, parts in PARTS.items():
         for name, (sheet, r, c) in parts.items():
-            a = fc.cell_part(fc.sheet_path(region, sheet), r, c, global_key=name.startswith("web") or name == "dewdrop")
+            a = fc.cell_part(fc.sheet_path(region, sheet), r, c, global_key=name == "dewdrop")
             if name == "dewdrop":   # the dewdrop sits on its tuft: drop the loose water drop hanging below the tuft
                 wide = (a[:, :, 3] > 128).sum(axis=1)
                 keep = int(np.nonzero(wide > 0.25 * wide.max())[0].max()) + 6

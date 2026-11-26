@@ -8,8 +8,8 @@ using Xunit.Abstractions;
 namespace FluffyClimbers.Simulation.Tests
 {
     /// <summary>
-    /// Final Change 6 (owner-approved 2026-11-25), region 1 (Meadow Springs): the four new platform kinds Glowworm Relay (43), Dragonfly Dart (44), Dewdrop Mirror Leaf (45) and
-    /// Silk Snare Web (46) (Planning/FINAL-CHANGE-6-NEW-PLATFORMS-R1-R3.md R1-3, R1-4, R1-6, R1-7). Behaviour tests use small hand-built worlds; generator tests use the shipped
+    /// Final Change 6 (owner-approved 2026-11-25), region 1 (Meadow Springs): the two platform kinds Dragonfly Dart (44) and Dewdrop Mirror Leaf (45) (Glowworm Relay 43 and
+    /// Silk Snare Web 46 were deleted 2026-11-26) (Planning/FINAL-CHANGE-6-NEW-PLATFORMS-R1-R3.md R1-3, R1-4, R1-6, R1-7). Behaviour tests use small hand-built worlds; generator tests use the shipped
     /// region 1 levels with random attempt seeds; the bot proves every layout solvable. The seven doc 24 kinds are tested in Region1PlatformTests.
     /// </summary>
     [Trait("Category", "Region1NewPlatforms")]
@@ -85,145 +85,44 @@ namespace FluffyClimbers.Simulation.Tests
             return root == null ? new List<LoadedLevel>() : ContentLoader.LoadRegions(root, 1, 1);
         }
 
+        /// <summary>The two region 1 kinds of Final Change 6 that stay in the plans (Glowworm Relay and Silk Snare Web were deleted 2026-11-26).</summary>
         private static bool IsNew(PlatformKind k)
         {
-            return k == PlatformKind.GlowwormRelay || k == PlatformKind.DragonflyDart || k == PlatformKind.DewdropMirrorLeaf || k == PlatformKind.SilkSnareWeb;
+            return k == PlatformKind.DragonflyDart || k == PlatformKind.DewdropMirrorLeaf;
         }
 
         // ------------------------------------------------------------------ ids, groups, the region 1 set
 
         [Fact]
-        public void TheFourKindsHaveTheirStableIdsAndGroups()
+        public void TheTwoKindsHaveTheirStableIdsAndGroups_43And46AreUnused()
         {
-            Assert.Equal(43, (int)PlatformKind.GlowwormRelay);
             Assert.Equal(44, (int)PlatformKind.DragonflyDart);
             Assert.Equal(45, (int)PlatformKind.DewdropMirrorLeaf);
-            Assert.Equal(46, (int)PlatformKind.SilkSnareWeb);
-            Assert.True(PlatformKinds.IsDemanding(PlatformKind.GlowwormRelay) && PlatformKinds.IsDemanding(PlatformKind.DewdropMirrorLeaf));
-            Assert.True(PlatformKinds.IsHazardType(PlatformKind.DragonflyDart) && PlatformKinds.IsHazardType(PlatformKind.SilkSnareWeb));
-            Assert.True(PlatformKinds.IsHazardType(PlatformKind.DewdropMirrorLeaf));
-            Assert.False(PlatformKinds.IsHazardType(PlatformKind.GlowwormRelay), "a relay is four consecutive rows: it cannot be a hazard type (two hazard types never touch)");
-            Assert.All(new[] { PlatformKind.GlowwormRelay, PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf, PlatformKind.SilkSnareWeb }, k => Assert.True(PlatformKinds.NoTutorial(k), "all four stay out of level 1"));
-            Assert.False(PlatformKinds.IsLaunch(PlatformKind.GlowwormRelay) || PlatformKinds.IsLaunch(PlatformKind.DragonflyDart) || PlatformKinds.IsLaunch(PlatformKind.DewdropMirrorLeaf) || PlatformKinds.IsLaunch(PlatformKind.SilkSnareWeb));
-            Assert.All(new[] { PlatformKind.GlowwormRelay, PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf, PlatformKind.SilkSnareWeb }, k => Assert.True(PlatformKinds.IsRegion1New(k) && PlatformKinds.IsRegionNew(k)));
-            Assert.False(PlatformKinds.IsRegion2New(PlatformKind.GlowwormRelay) || PlatformKinds.IsRegion5New(PlatformKind.SilkSnareWeb));
+            Assert.False(System.Enum.IsDefined(typeof(PlatformKind), 43), "43 (Glowworm Relay) was removed 2026-11-26");
+            Assert.False(System.Enum.IsDefined(typeof(PlatformKind), 46), "46 (Silk Snare Web) was removed 2026-11-26");
+            Assert.True(PlatformKinds.IsDemanding(PlatformKind.DewdropMirrorLeaf));
+            Assert.True(PlatformKinds.IsHazardType(PlatformKind.DragonflyDart) && PlatformKinds.IsHazardType(PlatformKind.DewdropMirrorLeaf));
+            Assert.All(new[] { PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf }, k => Assert.True(PlatformKinds.NoTutorial(k), "both stay out of level 1"));
+            Assert.False(PlatformKinds.IsLaunch(PlatformKind.DragonflyDart) || PlatformKinds.IsLaunch(PlatformKind.DewdropMirrorLeaf));
+            Assert.All(new[] { PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf }, k => Assert.True(PlatformKinds.IsRegion1New(k) && PlatformKinds.IsRegionNew(k)));
+            Assert.False(PlatformKinds.IsRegion2New(PlatformKind.DragonflyDart) || PlatformKinds.IsRegion5New(PlatformKind.DewdropMirrorLeaf));
         }
 
         [Fact]
-        public void Region1OffersTheFourKindsFromLevel2AndNeverOnLevel1()
+        public void Region1OffersTheTwoKindsFromLevel2AndNeverOnLevel1()
         {
             PlatformKind[] set = RegionPlatformSets.For(SignatureKind.BounceFlowers);
-            Assert.Equal(11, set.Length);
-            Assert.All(new[] { PlatformKind.GlowwormRelay, PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf, PlatformKind.SilkSnareWeb }, k => Assert.Contains(k, set));
+            Assert.Equal(11, set.Length);   // 7 (doc 24) + Dragonfly Dart + Dewdrop Mirror Leaf + Clover Swap + Pollen Puff (2026-11-26)
+            Assert.All(new[] { PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf }, k => Assert.Contains(k, set));
             PlatformKind sig = SignatureKinds.PlatformFor(SignatureKind.BounceFlowers);
             foreach (LoadedLevel ll in Region1())
             {
                 PlatformKind[] o = SpecialPlatforms.Options(ll.Spec, sig);
                 int idx = ll.Spec.LevelIndex;
                 if (idx == 1) Assert.DoesNotContain(o, k => IsNew(k));
-                else if (ll.Spec.Goal.Type == GoalType.NoWallBounce) { Assert.DoesNotContain(PlatformKind.DragonflyDart, o); Assert.Contains(PlatformKind.GlowwormRelay, o); }
-                else Assert.All(new[] { PlatformKind.GlowwormRelay, PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf, PlatformKind.SilkSnareWeb }, k => Assert.Contains(k, o));
+                else if (ll.Spec.Goal.Type == GoalType.NoWallBounce) Assert.DoesNotContain(PlatformKind.DragonflyDart, o);
+                else Assert.All(new[] { PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf }, k => Assert.Contains(k, o));
             }
-        }
-
-        // ------------------------------------------------------------------ Glowworm Relay
-
-        private static Sim RelayWorld()
-        {
-            // a head and three more pads on four consecutive rows, 3 u apart
-            return World(Start(),
-                P(1, 1, PlatformKind.GlowwormRelay, 500, 300, 400, phase: 0),
-                P(2, 2, PlatformKind.GlowwormRelay, 500, 600, 400, phase: 1),
-                P(3, 3, PlatformKind.GlowwormRelay, 500, 900, 400, phase: 2),
-                P(4, 4, PlatformKind.GlowwormRelay, 500, 1200, 400, phase: 3));
-        }
-
-        [Fact]
-        public void Relay_IdleOnlyTheHeadHolds_LandingOnTheHeadStartsAllFourPads()
-        {
-            Sim sim = RelayWorld();
-            SimState s = sim.NewState();
-            int[] aux = s.CrumbleTick;
-            Assert.True(sim.RelaySolid(1, 0, aux));
-            Assert.False(sim.RelaySolid(2, 0, aux) || sim.RelaySolid(3, 0, aux) || sim.RelaySolid(4, 0, aux));
-            s = Drop(sim, 1, 500, 200);
-            FallUntilGrounded(sim, ref s);
-            Assert.True(s.Grounded);
-            Assert.Equal(1, s.GroundId);
-            int t0 = s.LandTick;
-            for (int id = 1; id <= 4; id++) Assert.Equal(t0, s.CrumbleTick[id]);
-            Assert.Equal(0, sim.RelayElapsed(1, t0, s.CrumbleTick));
-        }
-
-        [Fact]
-        public void Relay_PadKHoldsFrom45kTo45kPlus75AndTheRelayIsIdleAfter210Ticks()
-        {
-            Sim sim = RelayWorld();
-            SimState s = sim.NewState();
-            int[] aux = s.CrumbleTick;
-            for (int id = 1; id <= 4; id++) aux[id] = 1000;   // a relay started at tick 1000
-            SimConfig cfg = sim.Cfg;
-            Assert.Equal(210, cfg.RelayTotalTicks);
-            for (int k = 0; k < 4; k++)
-            {
-                int id = k + 1, open = 1000 + 45 * k;
-                Assert.False(sim.RelaySolid(id, open - 1, aux) && k > 0, "pad " + k + " is a ghost before its window");
-                Assert.True(sim.RelaySolid(id, open, aux), "pad " + k + " opens at 45k");
-                Assert.True(sim.RelaySolid(id, open + 74, aux), "pad " + k + " still holds at 45k + 74");
-                Assert.False(sim.RelaySolid(id, open + 75, aux), "pad " + k + " is a ghost again at 45k + 75");
-            }
-            // neighbouring windows overlap by 30 ticks
-            Assert.True(sim.RelaySolid(1, 1000 + 45 + 29, aux) && sim.RelaySolid(2, 1000 + 45 + 29, aux));
-            Assert.False(sim.RelaySolid(1, 1000 + 45 + 30, aux));
-            // after RelayTotalTicks: idle, only the head holds
-            Assert.True(sim.RelaySolid(1, 1000 + 210, aux));
-            Assert.False(sim.RelaySolid(2, 1000 + 210, aux) || sim.RelaySolid(3, 1000 + 210, aux) || sim.RelaySolid(4, 1000 + 210, aux));
-        }
-
-        [Fact]
-        public void Relay_AGhostPadDoesNotHoldTheHeroAndTheHeadStaysSolidFor75Ticks()
-        {
-            Sim sim = RelayWorld();
-            // a hero falling onto pad 1 (row 2) while the relay is idle passes through the ghost and lands on the head
-            SimState s = Drop(sim, 2, 500, 150);
-            FallUntilGrounded(sim, ref s);
-            Assert.Equal(1, s.GroundId);
-            // standing on the head: it holds for 75 ticks, then it is a ghost and the hero falls (never dies: the danger line is far below)
-            int t0 = s.LandTick;
-            while (s.Tick < t0 + 74) sim.Step(ref s, 0);
-            Assert.True(s.Grounded && s.GroundId == 1);
-            Steps(sim, ref s, 3);
-            Assert.False(s.Grounded && s.GroundId == 1, "the head is a ghost after its 75 ticks");
-        }
-
-        [Fact]
-        public void Relay_AJumpOffTheHeadReachesTheNextPadInsideItsWindow()
-        {
-            Sim sim = RelayWorld();
-            SimState s = Drop(sim, 1, 500, 200);
-            FallUntilGrounded(sim, ref s);
-            int t0 = s.LandTick;
-            // wait 20 ticks, then jump: the 3 u climb takes about 45 ticks, so the hero arrives while pad 1 (row 2) is live (45 to 120)
-            Steps(sim, ref s, 20);
-            sim.Step(ref s, SimInput.Jump);
-            FallUntilGrounded(sim, ref s);
-            Assert.True(s.Grounded, "landed");
-            Assert.Equal(2, s.GroundId);
-            int e = s.LandTick - t0;
-            Assert.InRange(e, 45, 119);
-        }
-
-        [Fact]
-        public void Relay_ARevivedHeroStandsOnALivePad()
-        {
-            Sim sim = RelayWorld();
-            SimState s = Stand(sim, 3, 500, 400);
-            s.Dead = true; s.BestGroundId = 3;
-            sim.Revive(ref s);
-            Assert.True(s.Grounded && s.GroundId == 3);
-            Assert.True(sim.RelaySolid(3, s.WorldTick, s.CrumbleTick), "the revived pad is live");
-            Steps(sim, ref s, 60);
-            Assert.True(s.Grounded && s.GroundId == 3, "it holds for its window");
         }
 
         // ------------------------------------------------------------------ Dragonfly Dart
@@ -422,87 +321,6 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.True(leaves > 0);
         }
 
-        // ------------------------------------------------------------------ Silk Snare Web
-
-        [Fact]
-        public void Web_CutsTheClimbByAboutAQuarterOfAUnitAndAHalf_ButNotOutsideTheBand()
-        {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.SilkSnareWeb, 500, 300, 600));
-            // plain reference: the same jump from a normal platform peaks about 4.5 u
-            Sim plain = World(Start(), P(1, 1, PlatformKind.Normal, 500, 300, 600));
-            SimState p0 = Stand(plain, 1, 500);
-            plain.Step(ref p0, SimInput.Jump);
-            double plainPeak = Peak(plain, ref p0, 3.0);
-            Assert.InRange(plainPeak, 4.3, 4.42);   // 4.51 u in the continuous case, 4.36 u as integrated
-            // under the web (width min(4, 6 + 0.75) = 4: 2 u either side): the first pass up through the band cuts the vertical speed by 45 percent
-            SimState s = Stand(sim, 1, 500);
-            sim.Step(ref s, SimInput.Jump);
-            double peak = Peak(sim, ref s, 3.0);
-            Assert.InRange(peak, 3.25, 3.55);
-            Assert.Equal(1, s.WebCuts);
-            // outside the band (2.5 u right of the centre): no cut
-            SimState o = Stand(sim, 1, 750);
-            sim.Step(ref o, SimInput.Jump);
-            double outPeak = Peak(sim, ref o, 3.0);
-            Assert.InRange(outPeak, plainPeak - 0.001, plainPeak + 0.001);
-            Assert.Equal(0, o.WebCuts);
-        }
-
-        [Fact]
-        public void Web_DoesNotCutAJumpFromTheRowAboveItsPlatform()
-        {
-            // the row above (2.9 u higher) stands just under the band: its own jump must not be cut, otherwise the next climb would be impossible
-            Sim sim = World(Start(), P(1, 1, PlatformKind.SilkSnareWeb, 500, 300, 400), P(2, 2, PlatformKind.Normal, 500, 590, 400));
-            SimState s = Stand(sim, 2, 500);
-            sim.Step(ref s, SimInput.Jump);
-            double peak = Peak(sim, ref s, 5.9);
-            Assert.InRange(peak, 4.3, 4.42);
-            Assert.Equal(0, s.WebCuts);
-            // a jump from the web platform itself is cut
-            SimState w = Stand(sim, 1, 500);
-            sim.Step(ref w, SimInput.Jump);
-            Peak(sim, ref w, 3.0);
-            Assert.Equal(1, w.WebCuts);
-        }
-
-        [Fact]
-        public void Web_CutsOncePerAirPhaseAndAgainOnTheNextJump()
-        {
-            Sim sim = World(Start(), P(1, 1, PlatformKind.SilkSnareWeb, 500, 300, 400));
-            SimState s = Stand(sim, 1, 500);
-            for (int jump = 1; jump <= 3; jump++)
-            {
-                sim.Step(ref s, SimInput.Jump);
-                for (int t = 0; t < 300 && !(s.Grounded && t > 3); t++) sim.Step(ref s, 0);
-                Assert.True(s.Grounded);
-                Assert.Equal(jump, s.WebCuts);
-            }
-            Assert.Equal(0, s.WebId);   // cleared by the landing
-        }
-
-        [Fact]
-        public void Web_TheRowAboveIsAtMost2Point9UHigherInEveryGeneratedLevel()
-        {
-            SimConfig cfg = new SimConfig();
-            int webs = 0;
-            foreach (LoadedLevel ll in Region1())
-                for (int i = 0; i < 6; i++)
-                {
-                    LevelData d = LevelBuilder.Build(cfg, ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i)));
-                    for (int k = 0; k < d.Platforms.Length; k++)
-                    {
-                        Platform p = d.Platforms[k];
-                        if (p.Kind != PlatformKind.SilkSnareWeb) continue;
-                        webs++;
-                        Assert.True(p.Row > 1 || ll.Spec.LevelIndex > 1, "no web on level 1");
-                        foreach (Platform q in d.Platforms)
-                            if (q.Row == p.Row + 1) Assert.True(D(q.Y) - D(p.Y) <= 2.9 + 0.001, ll.Id + " row " + p.Row + " gap " + (D(q.Y) - D(p.Y)));
-                    }
-                }
-            output.WriteLine("webs seen: " + webs);
-            Assert.True(webs > 0);
-        }
-
         // ------------------------------------------------------------------ generator
 
         private static IEnumerable<Platform> Spine(LevelData d)
@@ -512,47 +330,7 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void EveryRelayIsFourConsecutiveRowsOfPhases0To3_WithSpacedPadsAndPaintedWidths()
-        {
-            SimConfig cfg = new SimConfig();
-            int relays = 0;
-            foreach (LoadedLevel ll in Region1())
-                for (int i = 0; i < 10; i++)
-                {
-                    LevelSpec spec = ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i));
-                    LevelData d = LevelBuilder.Build(cfg, spec);
-                    if (ll.Spec.LevelIndex <= 1) Assert.DoesNotContain(d.Platforms, p => p.Kind == PlatformKind.GlowwormRelay);
-                    Dictionary<int, Platform> byRow = new Dictionary<int, Platform>();
-                    foreach (Platform p in d.Platforms) if (p.Kind == PlatformKind.GlowwormRelay) { Assert.False(byRow.ContainsKey(p.Row), "one relay pad per row"); byRow[p.Row] = p; }
-                    foreach (Platform head in byRow.Values.Where(p => p.Phase == 0))
-                    {
-                        relays++;
-                        Assert.True(head.Row + 3 <= d.Rows - 3, ll.Id + ": a relay never reaches the last three rows");
-                        if (d.LadderStartRow >= 0) Assert.True(head.Row + 4 < d.LadderStartRow || head.Row > d.LadderEndRow + 1, "no relay on or beside the combo ladder");
-                        if (d.HiddenGemRow > 0) Assert.True(head.Row + 3 < d.HiddenGemRow - 2 || head.Row > d.HiddenGemRow + 2, "no relay around the hidden gem");
-                        for (int k = 0; k < 4; k++)
-                        {
-                            Assert.True(byRow.ContainsKey(head.Row + k), ll.Id + ": relay row " + (head.Row + k));
-                            Platform p = byRow[head.Row + k];
-                            Assert.Equal(k, p.Phase);
-                            double w = D(p.Width);
-                            Assert.True(w == 3.0 || w == 4.0 || w == 6.0, "relay width " + w);
-                            if (k > 0)
-                            {
-                                double gap = D(p.Y) - D(byRow[head.Row + k - 1].Y), dx = Math.Abs(D(p.X) - D(byRow[head.Row + k - 1].X));
-                                Assert.InRange(gap, 2.399, 3.801);
-                                Assert.True(dx <= 3.0 + 0.3 + 0.001 || dx <= (w + D(byRow[head.Row + k - 1].Width)) / 2 + 3.0, "relay dx " + dx);
-                            }
-                        }
-                    }
-                    Assert.Equal(0, byRow.Count % 4);
-                }
-            output.WriteLine("relays seen: " + relays);
-            Assert.True(relays > 0);
-        }
-
-        [Fact]
-        public void TheFourKindsAppearOnRegion1AndHazardsNeverOnLevel1()
+        public void TheTwoKindsAppearOnRegion1AndHazardsNeverOnLevel1()
         {
             SimConfig cfg = new SimConfig();
             Dictionary<PlatformKind, int> seen = new Dictionary<PlatformKind, int>();
@@ -569,11 +347,11 @@ namespace FluffyClimbers.Simulation.Tests
                     }
                 }
             foreach (KeyValuePair<PlatformKind, int> kv in seen) output.WriteLine(kv.Key + ": " + kv.Value);
-            Assert.True(seen.ContainsKey(PlatformKind.GlowwormRelay) && seen.ContainsKey(PlatformKind.DragonflyDart) && seen.ContainsKey(PlatformKind.DewdropMirrorLeaf) && seen.ContainsKey(PlatformKind.SilkSnareWeb));
+            Assert.True(seen.ContainsKey(PlatformKind.DragonflyDart) && seen.ContainsKey(PlatformKind.DewdropMirrorLeaf));
         }
 
         [Fact]
-        public void EveryAttemptSeedOfALevelHasTheSameNumberOfSpecialRows_RelaysCountAsOneRowEach()
+        public void EveryAttemptSeedOfALevelHasTheSameNumberOfSpecialRows()
         {
             SimConfig cfg = new SimConfig();
             foreach (LoadedLevel ll in Region1().Where(l => l.Spec.FixedChunks.Length == 0))
@@ -586,7 +364,6 @@ namespace FluffyClimbers.Simulation.Tests
                     foreach (Platform p in Spine(d)) if (p.Kind != PlatformKind.Normal && p.Row >= 1 && p.Row <= d.Rows && (PlatformKinds.IsRegionNew(p.Kind) || p.Kind == PlatformKind.Bounce || p.Kind == PlatformKind.Crumble || p.Kind == PlatformKind.Moving)) n++;
                     counts.Add(n);
                 }
-                // the relay rows replace later special rows, so the total stays the level's (a relay cut short at the end of the draw can leave it one lower)
                 Assert.True(counts.Max() - counts.Min() <= 3, ll.Id + " special row counts differ between seeds: " + string.Join(",", counts));
             }
         }
@@ -637,8 +414,8 @@ namespace FluffyClimbers.Simulation.Tests
                         foreach (Platform p in d.Platforms) if (p.Row == rr) rowsDump += " [r" + rr + " " + p.Kind + " x" + D(p.X).ToString("F2") + " w" + D(p.Width).ToString("F1") + " y" + D(p.Y).ToString("F2") + " ph" + p.Phase + " a" + D(p.Amplitude).ToString("F2") + "]";
                     System.IO.File.AppendAllText(Environment.GetEnvironmentVariable("R1_DIAG_FILE") ?? "r1_bot_timing.txt", "UNSOLVED best row " + r.BestRow + rowsDump + Environment.NewLine);
                 }
-                string line = (ll.Id + " rows " + d.Rows + " solved " + r.Solved + " nodes " + r.Nodes + " ms " + sw.ElapsedMilliseconds + " relay " + d.Platforms.Count(p => p.Kind == PlatformKind.GlowwormRelay) + " dart " + d.Platforms.Count(p => p.Kind == PlatformKind.DragonflyDart)
-                    + " mirror " + d.Platforms.Count(p => p.Kind == PlatformKind.DewdropMirrorLeaf) + " web " + d.Platforms.Count(p => p.Kind == PlatformKind.SilkSnareWeb));
+                string line = (ll.Id + " rows " + d.Rows + " solved " + r.Solved + " nodes " + r.Nodes + " ms " + sw.ElapsedMilliseconds + " dart " + d.Platforms.Count(p => p.Kind == PlatformKind.DragonflyDart)
+                    + " mirror " + d.Platforms.Count(p => p.Kind == PlatformKind.DewdropMirrorLeaf));
                 output.WriteLine(line);
                 System.IO.File.AppendAllText(Environment.GetEnvironmentVariable("R1_DIAG_FILE") ?? "r1_bot_timing.txt", line + Environment.NewLine);
             }
@@ -701,29 +478,22 @@ namespace FluffyClimbers.Simulation.Tests
         private static LevelSpec Endless(int seed) { return EndlessTower.MakeSpec(seed, Fx.Zero, SignatureKind.BounceFlowers, 400); }
 
         [Fact]
-        public void Endless_Region1HasWellFormedRelaysAndAllFourKinds()
+        public void Endless_Region1DrawsBothKindsAndNeverTheRemovedIds()
         {
             SimConfig cfg = new SimConfig();
             HashSet<PlatformKind> seen = new HashSet<PlatformKind>();
-            int relays = 0;
             for (int seed = 1; seed <= 3; seed++)
             {
                 LevelData d = EndlessTower.BuildFixed(cfg, Endless(seed), 2400);
-                Dictionary<int, Platform> byRow = new Dictionary<int, Platform>();
                 foreach (Platform p in d.Platforms)
                 {
                     if (IsNew(p.Kind)) seen.Add(p.Kind);
-                    if (p.Kind == PlatformKind.GlowwormRelay) byRow[p.Row] = p;
-                }
-                foreach (Platform head in byRow.Values.Where(p => p.Phase == 0 && p.Row + 3 < d.Rows))
-                {
-                    relays++;
-                    for (int k = 0; k < 4; k++) { Assert.True(byRow.ContainsKey(head.Row + k)); Assert.Equal(k, byRow[head.Row + k].Phase); }
+                    Assert.NotEqual(43, (int)p.Kind);
+                    Assert.NotEqual(46, (int)p.Kind);
                 }
             }
-            output.WriteLine("endless relays: " + relays + ", kinds: " + string.Join(",", seen));
-            Assert.True(relays > 0);
-            Assert.Equal(4, seen.Count);
+            output.WriteLine("endless kinds: " + string.Join(",", seen));
+            Assert.Equal(2, seen.Count);
         }
 
         private static long StateHash(SimState s)
@@ -732,7 +502,7 @@ namespace FluffyClimbers.Simulation.Tests
             unchecked
             {
                 h = h * 31 + s.Tick; h = h * 31 + s.X.Raw; h = h * 31 + s.Y.Raw; h = h * 31 + s.Row; h = h * 31 + s.Score;
-                h = h * 31 + s.WebCuts; h = h * 31 + s.WebId; h = h * 31 + s.Vx.Raw; h = h * 31 + s.Vy.Raw; h = h * 31 + s.GroundId; h = h * 31 + s.LandTick;
+                h = h * 31 + s.Vx.Raw; h = h * 31 + s.Vy.Raw; h = h * 31 + s.GroundId; h = h * 31 + s.LandTick;
                 if (s.CrumbleTick != null) foreach (int c in s.CrumbleTick) h = h * 31 + c;
             }
             return h;

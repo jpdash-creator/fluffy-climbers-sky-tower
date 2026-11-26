@@ -100,7 +100,7 @@ namespace FluffyClimbers.Simulation.Tests
                     for (int j = i + 1; j < p.Length && p[j].Row == p[i].Row; j++)
                     {
                         if (p[i].Width.Raw >= 9 * 65536 || p[j].Width.Raw >= 9 * 65536) continue;
-                        double gap = Math.Abs(D(p[i].X) - D(p[j].X)) - (D(p[i].Width) / 2 + D(p[i].Amplitude)) - (D(p[j].Width) / 2 + D(p[j].Amplitude));
+                        double gap = Math.Abs(D(p[i].X) - D(p[j].X)) - (D(p[i].Width) / 2 + (p[i].Kind == PlatformKind.CloverSwap ? 0 : D(p[i].Amplitude))) - (D(p[j].Width) / 2 + (p[j].Kind == PlatformKind.CloverSwap ? 0 : D(p[j].Amplitude)));   // a Clover Swap member rests as a plain slab (its Amplitude is the distance to its mate, 2026-11-26)
                         if (gap < D(LevelBuilder.MinRowGap) - 0.001) bad.Add(ll.Id + " #" + p[i].Id + p[i].Kind + " vs #" + p[j].Id + p[j].Kind + " gap=" + gap.ToString("F2", CultureInfo.InvariantCulture));
                     }
             }

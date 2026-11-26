@@ -57,6 +57,20 @@ namespace FluffyClimbers.Simulation
                     if (TryArc(cfg, sim, platforms, rowFirst, r, skip[pass], list, rings, out ring) && FarFromRings(rings, ring)) rings.Add(ring);
                 }
             }
+            // last resort (a level with many special rows can leave too few plain arcs): every arc length, rings only need to stay 2.3 u apart (the rings never overlap)
+            for (int pass = 0; rings.Count < total && pass < 4; pass++)
+            {
+                int start = rng.Next(span);
+                for (int t = 0; t < span && rings.Count < total; t++)
+                {
+                    int r = lo + (start + t) % span;
+                    for (int si = 0; si < skip.Length && rings.Count < total; si++)
+                    {
+                        Pickup ring;
+                        if (TryArc(cfg, sim, platforms, rowFirst, r, skip[si], list, rings, out ring) && FarFromRings(rings, ring, Fx.FromRatio(23, 10), true)) { rings.Add(ring); break; }
+                    }
+                }
+            }
             for (int i = 0; i < rings.Count; i++) { Pickup p = rings[i]; p.Tag = i; rings[i] = p; list.Add(p); }
             list.Sort(ComparePickup);
             Pickup[] arr = list.ToArray();
@@ -74,7 +88,7 @@ namespace FluffyClimbers.Simulation
 
         private static bool Static(in Platform p)
         {
-            return p.Kind == PlatformKind.Normal && p.Amplitude == Fx.Zero && p.Width >= Fx.FromInt(2);
+            return (p.Kind == PlatformKind.Normal || p.Kind == PlatformKind.PollenPuff) && p.Amplitude == Fx.Zero && p.Width >= Fx.FromInt(2);   // a Pollen Puff slab lands exactly like a Normal one (its cloud only adds a 10 percent lift once)
         }
 
         /// <summary>Plays the jump from the spine platform of row <paramref name="row"/> to the one <paramref name="skip"/> rows higher; true with the ring on the highest clear point of the arc.</summary>
@@ -113,9 +127,15 @@ namespace FluffyClimbers.Simulation
         }
 
         /// <summary>A fill-up ring keeps at least 4 u of height from every ring placed before it (the bands already spread the first ones).</summary>
-        private static bool FarFromRings(List<Pickup> rings, Pickup ring)
+        private static bool FarFromRings(List<Pickup> rings, Pickup ring) { return FarFromRings(rings, ring, Fx.FromInt(4), false); }
+
+        private static bool FarFromRings(List<Pickup> rings, Pickup ring, Fx minDist, bool euclid)
         {
-            for (int i = 0; i < rings.Count; i++) if (Fx.Abs(rings[i].Y - ring.Y) < Fx.FromInt(4)) return false;
+            for (int i = 0; i < rings.Count; i++)
+            {
+                Fx dx = rings[i].X - ring.X, dy = rings[i].Y - ring.Y;
+                if (euclid ? (Fx.Abs(dx) < minDist && Fx.Abs(dy) < minDist && dx * dx + dy * dy < minDist * minDist) : Fx.Abs(dy) < minDist) return false;
+            }
             return true;
         }
 

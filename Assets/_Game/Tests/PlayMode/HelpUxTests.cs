@@ -29,6 +29,62 @@ namespace FluffyClimbers.Tests
         }
 
         [UnityTest]
+        public IEnumerator HelpPageScrollsWithAFingerDragAndTheContentFollowsTheFinger()
+        {
+            // owner 2026-11-26: the help text must scroll inside the popup. A drag that moves the finger UP moves the text up (the offset grows); back down returns it.
+            GameSettings.TextPercent = 130;
+            GameSettings.ReducedMotion = true;
+            yield return Load("Meta");
+            var meta = Object.FindFirstObjectByType<MetaController>();
+            meta.ShowMenu();
+            var problems = new List<string>();
+            int scrolled = 0;
+            foreach (string[] set in HelpSets)
+            {
+                HelpPopup help = meta.ShowHelpForTests(set);
+                if (help == null) continue;
+                yield return null;
+                for (int i = 0; i < help.PageCount; i++)
+                {
+                    help.GoTo(i);
+                    yield return null;
+                    Canvas.ForceUpdateCanvases();
+                    RectTransform vp = FindRt(HelpPopup.ViewportName, help.Panel);
+                    RectTransform content = (RectTransform)FindRt(HelpPopup.PageName + i, help.Panel).GetChild(0);
+                    Rect vb = CanvasBox(vp);
+                    bool needs = false;
+                    foreach (Transform child in content) if (child.name.StartsWith(HelpPopup.RowName) && CanvasBox((RectTransform)child).yMin < vb.yMin - 1f) needs = true;
+                    if (!needs) continue;
+                    Canvas root = help.GetComponentInParent<Canvas>().rootCanvas;
+                    Camera cam = root.renderMode == RenderMode.ScreenSpaceOverlay ? null : root.worldCamera;
+                    Vector2 start = RectTransformUtility.WorldToScreenPoint(cam, vp.position);
+                    var pe = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { position = start, pressPosition = start, button = UnityEngine.EventSystems.PointerEventData.InputButton.Left };
+                    UnityEngine.EventSystems.ExecuteEvents.Execute(vp.gameObject, pe, UnityEngine.EventSystems.ExecuteEvents.beginDragHandler);
+                    for (int k = 1; k <= 60; k++)
+                    {
+                        pe.delta = new Vector2(0f, 30f);   // the finger moves up
+                        pe.position = start + new Vector2(0f, 30f * k);
+                        UnityEngine.EventSystems.ExecuteEvents.Execute(vp.gameObject, pe, UnityEngine.EventSystems.ExecuteEvents.dragHandler);
+                    }
+                    UnityEngine.EventSystems.ExecuteEvents.Execute(vp.gameObject, pe, UnityEngine.EventSystems.ExecuteEvents.endDragHandler);
+                    string tag = string.Join("+", set) + " page " + (i + 1) + ": ";
+                    if (content.anchoredPosition.y <= 1f) problems.Add(tag + "dragging the finger up did not scroll the text (offset " + content.anchoredPosition.y + ")");
+                    else scrolled++;
+                    if (help.Index != i) problems.Add(tag + "a vertical drag turned the page");
+                    // the last row is fully visible after scrolling to the end
+                    Canvas.ForceUpdateCanvases();
+                    Rect lastRow = default(Rect);
+                    foreach (Transform child in content) if (child.name.StartsWith(HelpPopup.RowName)) lastRow = CanvasBox((RectTransform)child);
+                    if (lastRow.yMin < CanvasBox(vp).yMin - 2f) problems.Add(tag + "the last row is still cut off after scrolling to the end");
+                }
+                help.Dismiss();
+                yield return null;
+            }
+            Assert.IsEmpty(problems, string.Join(" | ", problems));
+            Assert.Greater(scrolled, 0, "at least one help page needs scrolling at 130 percent text, otherwise this test checks nothing");
+        }
+
+        [UnityTest]
         public IEnumerator HelpPopupFitsEveryAspectAndTextSize()
         {
             var problems = new List<string>();

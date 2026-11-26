@@ -319,9 +319,9 @@
     "class": "complex",
     "difficulty": 0.732,
     "goal": {
-      "type": "comboGates",
-      "value": 3,
-      "count": 3
+      "type": "skyHoops",
+      "value": 8,
+      "count": 10
     },
     "overrides": {
       "rows": 120

@@ -552,25 +552,7 @@ namespace FluffyClimbers.Simulation
         public Fx LogBumpVx = Fx.FromRatio(72, 1000);
         public int LogInvulnTicks = 60;
 
-        // ---- Final Change 6: new Region 1 (Meadow Springs) kinds (ids 43 to 46). Integer / fixed point; units per tick unless noted (60 ticks per second). ----
-        /// <summary>
-        /// Glowworm Relay (PlatformKind 43): RelayLength (4) platforms on 4 consecutive rows. Landing on the head (Platform.Phase 0) while the relay is idle starts the relay clock; pad k (0 to 3) is
-        /// solid only from tick RelayStepTicks x k to RelayStepTicks x k + RelayHoldTicks after the start (45 ticks per row, 75 ticks held, so neighbouring windows overlap by 30 ticks), a ghost that does not
-        /// hold otherwise. RelayTotalTicks (210) after the start the relay is idle again (only the head is solid). The rows of a relay are RelayGapMin to RelayGapMax apart (a flight of 36 to 54 ticks lands inside the next window
-        /// from any take-off 9 to 65 ticks after the pad opened).
-        /// </summary>
-        public const int RelayLength = 4;
-        /// <summary>Rows a relay keeps clear below the next relay (the plan never places two relays closer than this).</summary>
-        public const int RelaySpacingRows = 8;
-        /// <summary>Endless tower: rows between the heads of two relays (about one per level of 100 floors, like the campaign levels).</summary>
-        public const int EndlessRelaySpacingRows = 45;
-        public int RelayStepTicks = 45;
-        public int RelayHoldTicks = 75;
-        public int RelayTotalTicks { get { return (RelayLength - 1) * RelayStepTicks + RelayHoldTicks; } }
-        public Fx RelayGapMin = Fx.FromRatio(24, 10);
-        public Fx RelayGapMax = Fx.FromRatio(38, 10);
-        /// <summary>Largest sideways distance between two pads of one relay (a run-up and a flight must fit inside the 45-tick step).</summary>
-        public Fx RelayDxMax = Fx.FromInt(3);
+        // ---- Final Change 6: new Region 1 (Meadow Springs) kinds (ids 44 and 45 only; 43 Glowworm Relay and 46 Silk Snare Web were removed 2026-11-26, owner). Integer / fixed point; units per tick unless noted (60 ticks per second). ----
         /// <summary>
         /// Dragonfly Dart (44): DartDelayTicks (24, 0.4 s of wing buzz) after a landing the platform darts Platform.Amplitude (2.4 u, 1.6 u at widths 1.5 and 2, never more than the room to the wall) along Platform.Dir at DartSpeed
         /// (0.1 u per tick = 6 u/s), pauses DartPauseTicks (30), then glides back at DartBackSpeed (1 u/s, 144 ticks for 2.4 u) and is idle again. It carries the player. The next row is placed so that it is
@@ -596,19 +578,21 @@ namespace FluffyClimbers.Simulation
         public Fx MirrorLimitMid = Fx.FromRatio(18, 10);
         public Fx MirrorLimitWide = Fx.One;
         /// <summary>
-        /// Silk Snare Web (46): a band WebThickness (0.5 u) thick hangs WebHeight (3.0 u) above the platform, WebWidthSmall (2.5 u) wide at widths 1.5 and 2, else min(WebWidthMax (4 u), width + WebWidthPad (0.75 u)), centred on the platform.
-        /// The first pass UP through it (once per air phase and web) cuts the vertical speed by WebCutPercent (45): a standing jump peaks 4.51 u, 3.46 u after the cut. The row above a web is at most WebGapMax (2.9 u, spec 3.2 u: the integrated cut jump peaks about 3.3 u, so 3.2 left no margin and the bot could not pass) higher.
+        /// Clover Swap (62, owner-approved 2026-11-26): a PAIR of clover slabs on one row. On the global clock of CloverSwapPeriodTicks (300 = 5 s) the two members exchange their x positions: the last
+        /// CloverSwapTelegraphTicks (45) before the slide plus the slide itself (CloverSwapSlideTicks, 40) show the 'swap' pose, the slide is a smoothstep, then the pair stays calm. CloverAir (1.0 u) is the air between the
+        /// members at rest (Platform.Amplitude = width + CloverAir = the distance between the two homes). Painted widths 2, 3, 4.
+        /// Pollen Puff (63): the golden cloud hangs PollenHeight (2.0 u) above its slab; a rising hero inside PollenHalfWidth (1.1 u) of the centre and within PollenBand / 2 (0.5 u) of the cloud centre gets vy x PollenBoostPercent / 100
+        /// (110) once per cloud and run. The row above a Pollen Puff is at least PollenGapMin (3.0 u) higher so the painted cloud never sits in the next slab.
         /// </summary>
-        public Fx WebHeight = Fx.FromInt(3);
-        public Fx WebThickness = Fx.FromRatio(5, 10);
-        public Fx WebWidthSmall = Fx.FromRatio(25, 10);
-        public Fx WebWidthMax = Fx.FromInt(4);
-        public Fx WebWidthPad = Fx.FromRatio(75, 100);
-        public int WebCutPercent = 45;
-        public Fx WebGapMax = Fx.FromRatio(29, 10);
-        /// <summary>A web only catches climbs that started at or near the web platform's own level: a jump from a platform more than WebLaunchMargin (0.5 u) above the web platform (the next rows, whose floor sits just under or inside the band) is never cut.</summary>
-        public Fx WebLaunchMargin = Fx.FromRatio(5, 10);
-
+        public int CloverSwapPeriodTicks = 300;
+        public int CloverSwapTelegraphTicks = 45;
+        public int CloverSwapSlideTicks = 40;
+        public Fx CloverAir = Fx.One;
+        public Fx PollenHeight = Fx.FromInt(2);
+        public Fx PollenHalfWidth = Fx.FromRatio(11, 10);
+        public Fx PollenBand = Fx.One;
+        public int PollenBoostPercent = 110;
+        public Fx PollenGapMin = Fx.FromInt(3);
         // ---- Final Change 6: new Region 5 (Bamboo Temple) kinds (owner-approved 2026-11-25). Numbers: Planning/FINAL-CHANGE-6-NEW-PLATFORMS-R4-R5.md, kept by the bot proof. Units per tick unless noted. ----
         /// <summary>
         /// Prayer Scroll Runner (painted 3, 4.5, 6 u): the scroll starts open. ScrollOpenTicks (90) after a landing it rolls up from the back end toward the roll end (side Platform.Dir, the middle of the screen)
@@ -763,14 +747,6 @@ namespace FluffyClimbers.Simulation
         public int CampaignRampCapPercent = 60;
 
         // Builder shaping
-        /// <summary>Combo ladder (ComboChain goals): height of one goal-sized jump, u. Rung gap = span / Goal.Value.</summary>
-        public Fx ComboLadderSpan = Fx.FromRatio(36, 10);
-        public Fx ComboLadderWidth = Fx.FromInt(6);
-        /// <summary>Ladders whose rung gap would be below this (comboChain value 4+) use rungs of LadderMinRung in two alternating columns of LadderZigWidth, LadderColumnGap apart edge to edge (stack rule, 2026-10-20).</summary>
-        public Fx LadderMinStackGap = Fx.FromRatio(12, 10);
-        public Fx LadderMinRung = Fx.One;
-        public Fx LadderZigWidth = Fx.FromRatio(30, 10);
-        public Fx LadderColumnGap = Fx.FromRatio(22, 10);
         /// <summary>First authored chunk row and spacing (rows between chunks) when LevelSpec.FixedChunks is set.</summary>
         public int ChunkStartRow = 10;
         public int ChunkInterval = 14;

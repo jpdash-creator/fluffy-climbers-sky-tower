@@ -6,6 +6,7 @@ namespace FluffyClimbers.Simulation
     {
         ReachFloor = 0,
         CollectCoins = 1,
+        /// <summary>REMOVED goal (Combo Climb, owner 2026-11-26): kept only so old data and replays decode; it plays as a plain reach-the-top level.</summary>
         ComboChain = 2,
         NoWallBounce = 3,
         FindHiddenGem = 4,
@@ -14,7 +15,7 @@ namespace FluffyClimbers.Simulation
         BossChase = 7,
         /// <summary>Rival Race (Final Change 6): reach the top row before the baked ghost rival does (LevelSpec.GhostRowAtTick). A plain reach-the-top level otherwise.</summary>
         RivalRace = 8,
-        /// <summary>Combo Gates (Final Change 6): Value = floors of a combo jump, Count = number of gates; the level height is the explicit Rows (overrides.rows). Cleared at the top with every gate done.</summary>
+        /// <summary>REMOVED goal (Combo Gates, owner 2026-11-26): kept only so old data, saves and replays decode; no gate or ladder is built and it plays as a plain reach-the-top level.</summary>
         ComboGates = 9,
         /// <summary>Sky Hoops (Final Change 6): Value = rings needed, Count = rings in the level; the level height is the explicit Rows (overrides.rows). Cleared at the top with enough rings.</summary>
         SkyHoops = 10
@@ -82,7 +83,10 @@ namespace FluffyClimbers.Simulation
             PlatformKind.WindPetal, PlatformKind.HiveLift, PlatformKind.SnapDaisy, PlatformKind.Dandelion,
             PlatformKind.ThornBush, PlatformKind.Ladybug, PlatformKind.Seesaw,
             // Final Change 6 (owner-approved 2026-11-25): four new region 1 kinds
-            PlatformKind.GlowwormRelay, PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf, PlatformKind.SilkSnareWeb
+            // Glowworm Relay (43) and Silk Snare Web (46) were removed 2026-11-26 (owner: not good; never shipped): ids 43 and 46 are unused.
+            PlatformKind.DragonflyDart, PlatformKind.DewdropMirrorLeaf,
+            // owner-approved 2026-11-26 (ids 62 and 63): Clover Swap (a timed pair of slabs, demanding) and Pollen Puff (a one-shot boost cloud, helpful) take the places of the two removed kinds
+            PlatformKind.CloverSwap, PlatformKind.PollenPuff
         };
 
         /// <summary>
@@ -371,10 +375,6 @@ namespace FluffyClimbers.Simulation
                     case GoalType.NoWallBounce:
                     case GoalType.FindHiddenGem:   // Bug List 6 item 4: a hidden gem level has Goal.Value rows (the gem sits half way, the level ends on its row)
                         rows = Goal.Value > 0 ? Goal.Value : DefaultRows;
-                        break;
-                    case GoalType.ComboChain:
-                        // Doc 25 / Bug List 8 item 3: the combo level is level 5: 75 rows in the 25-level regions (1 to 5), 90 in the legacy 15-level regions; other combo specs keep the default
-                        rows = LevelIndex == 5 ? (LevelsInRegion >= 25 ? 75 : 90) : DefaultRows;
                         break;
                     default:
                         rows = DefaultRows;

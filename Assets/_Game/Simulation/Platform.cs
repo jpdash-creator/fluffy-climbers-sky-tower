@@ -102,15 +102,24 @@ namespace FluffyClimbers.Simulation
         /// <summary>Sea Foam Pad (hazard type, fading friction): standing on it the friction and the steering fade from normal to the Slippery values over FoamFadeTicks after the landing; every landing starts full again. At full slip a player slides off the edge if he does not jump. Never kills.</summary>
         SeaFoamPad = 53,
 
-        // ---- Final Change 6: new Region 1 (Meadow Springs) kinds, ids 43 to 46 (owner-approved 2026-11-25); values are stable ----
-        /// <summary>Glowworm Relay (demanding, timed sequence): a relay of RelayLength (4) platforms on 4 consecutive rows; Platform.Phase is the member index 0 (head) to 3. Landing on the head starts the relay clock (SimState.CrumbleTick of every member); pad k is solid only from tick RelayStepTicks x k to RelayStepTicks x k + RelayHoldTicks after the start, a faint ghost otherwise. Idle (before the first landing and RelayTotalTicks after it) only the head is solid.</summary>
-        GlowwormRelay = 43,
+        // ---- Final Change 6: new Region 1 (Meadow Springs) kinds, ids 44 and 45 (owner-approved 2026-11-25); ids 43 and 46 are UNUSED (Glowworm Relay and Silk Snare Web were removed 2026-11-26, never shipped); values are stable ----
         /// <summary>Dragonfly Dart (hazard type, carries you): DartDelayTicks after a landing the platform darts Platform.Amplitude sideways along Platform.Dir (away from the next platform) at DartSpeed, pauses DartPauseTicks, then glides back at DartBackSpeed; it carries the player. Never kills.</summary>
         DragonflyDart = 44,
         /// <summary>Dewdrop Mirror Leaf (demanding, mirrored to the hero): while the hero is airborne within MirrorRange it slides to the opposite side of its home x from him (factor Platform.Period percent, limit Platform.Amplitude, at most MirrorSpeed); it freezes while he stands on it and MirrorFreezeTicks after. Controls are never changed.</summary>
         DewdropMirrorLeaf = 45,
-        /// <summary>Silk Snare Web (hazard type, air gate): a web band WebThickness thick hangs WebHeight above the platform, WebWidth wide; the first pass UP through it cuts the vertical speed by WebCutPercent. The row above is at most WebGapMax higher. Never kills.</summary>
-        SilkSnareWeb = 46,
+        /// <summary>
+        /// Clover Swap (demanding, timed pair; owner-approved 2026-11-26, replaces the removed Glowworm Relay and Silk Snare Web): TWO clover-leaf slabs on one row (two Platform entries, Platform.Phase 0 = the left member, 1 = the right one,
+        /// same row and Y, same width 2, 3 or 4 u, both homes inside the walls; Platform.Amplitude = the distance between the two homes). On the GLOBAL clock (CloverSwapPeriodTicks, 300 = 5 s) the members exchange their x positions:
+        /// the last CloverSwapTelegraphTicks + CloverSwapSlideTicks of every period show the 'swap' pose, the slide itself takes CloverSwapSlideTicks (smoothstep); then they stay calm. A hero standing on a member rides it.
+        /// Never a hazard, never kills. A pure function of the tick and the platform data (Sim.PlatformX).
+        /// </summary>
+        CloverSwap = 62,
+        /// <summary>
+        /// Pollen Puff (helpful, air zone; owner-approved 2026-11-26): a NORMAL slab (landing, art and widths exactly as Normal) with a golden pollen cloud PollenHeight above it. A hero RISING through the cloud's zone
+        /// (PollenHalfWidth either side of the platform centre, PollenBand around the cloud centre) that has not used this cloud yet gets vy x PollenBoostPercent / 100 once; the cloud is spent for the rest of the run
+        /// (SimState.CrumbleTick[id] = the tick it was used, -1 = fresh). Never a hazard.
+        /// </summary>
+        PollenPuff = 63,
 
         // ---- Final Change 6: new Region 5 (Bamboo Temple) kinds, ids 58 to 61 (owner-approved 2026-11-25); values are stable ----
         /// <summary>Prayer Scroll Runner (demanding, retract race): an open scroll; ScrollOpenTicks after a landing it rolls up from the back end toward the roll end on side Platform.Dir (the middle of the screen) at ScrollRetractSpeed down to a ScrollRollWidth roll that never retracts, holds, then unfurls again. Standing on the retracting part drops the player (never lethal).</summary>
@@ -151,7 +160,7 @@ namespace FluffyClimbers.Simulation
                 || k == PlatformKind.KelpTangle || k == PlatformKind.PufferfishPad || k == PlatformKind.JellyWobble || k == PlatformKind.PinwheelGust
                 || k == PlatformKind.MalletSmash || k == PlatformKind.RollingLog
                 || k == PlatformKind.UndertowPad || k == PlatformKind.SeaFoamPad   // Final Change 6, region 3
-                || k == PlatformKind.DragonflyDart || k == PlatformKind.SilkSnareWeb   // Final Change 6, region 1
+                || k == PlatformKind.DragonflyDart   // Final Change 6, region 1
                 || k == PlatformKind.DewdropMirrorLeaf   // Final Change 6, region 1: also demanding; a hazard type so level 1 never has it and no two hazards touch
                 || k == PlatformKind.CaramelMagnet || k == PlatformKind.SourSprinklerCannon || k == PlatformKind.SugarGlassLedge   // Final Change 6, region 4
                 || k == PlatformKind.FogPuffDrift || k == PlatformKind.SporeFunnel
@@ -159,12 +168,11 @@ namespace FluffyClimbers.Simulation
         }
 
         /// <summary>
-        /// Kinds the tutorial level (level 1 of a region, and the first 100 floors of the endless tower) never has: every hazard type, every launcher, every demanding kind (owner 2026-11-25) and the Fizz Vent; the Glowworm Relay (Final Change 6; a demanding timed group of four
-        /// consecutive rows, so it cannot be a hazard type: two hazard types never touch).
+        /// Kinds the tutorial level (level 1 of a region, and the first 100 floors of the endless tower) never has: every hazard type, every launcher, every demanding kind (owner 2026-11-25) and the Fizz Vent.
         /// </summary>
         public static bool NoTutorial(PlatformKind k)
         {
-            return IsHazardType(k) || k == PlatformKind.GlowwormRelay
+            return IsHazardType(k)
                 || IsLaunch(k) || k == PlatformKind.MoonJellyChain || IsDemanding(k) || k == PlatformKind.FizzVent;   // owner 2026-11-25 (platform mix): the Demanding, Launch and Air zone groups are off level 1 too (air zone kinds are hazard types, the Fizz Vent is the one that is not)
         }
 
@@ -183,7 +191,8 @@ namespace FluffyClimbers.Simulation
         /// <summary>True for the seven region 1 platforms added by doc 24.</summary>
         public static bool IsRegion1New(PlatformKind k)
         {
-            return (k >= PlatformKind.WindPetal && k <= PlatformKind.Seesaw) || (k >= PlatformKind.GlowwormRelay && k <= PlatformKind.SilkSnareWeb);   // 43 to 46: Final Change 6
+            return (k >= PlatformKind.WindPetal && k <= PlatformKind.Seesaw) || k == PlatformKind.DragonflyDart || k == PlatformKind.DewdropMirrorLeaf   // 44 and 45: Final Change 6
+                || k == PlatformKind.CloverSwap || k == PlatformKind.PollenPuff;   // 62 and 63: owner 2026-11-26
         }
 
         /// <summary>True for the seven region 2 platforms added by doc 30.</summary>
@@ -213,7 +222,7 @@ namespace FluffyClimbers.Simulation
         /// <summary>True for every region special platform (regions 1 to 5): they carry Params, painted pieces and the view's motion layer.</summary>
         public static bool IsRegionNew(PlatformKind k)
         {
-            return (k >= PlatformKind.WindPetal && k <= PlatformKind.RollingLog) || (k >= PlatformKind.MoonJellyChain && k <= PlatformKind.SeaFoamPad) || (k >= PlatformKind.GlowwormRelay && k <= PlatformKind.SilkSnareWeb) || (k >= PlatformKind.TeeterCap && k <= PlatformKind.SporeFunnel)
+            return (k >= PlatformKind.WindPetal && k <= PlatformKind.RollingLog) || (k >= PlatformKind.MoonJellyChain && k <= PlatformKind.SeaFoamPad) || (k >= PlatformKind.DragonflyDart && k <= PlatformKind.DewdropMirrorLeaf) || k == PlatformKind.CloverSwap || k == PlatformKind.PollenPuff || (k >= PlatformKind.TeeterCap && k <= PlatformKind.SporeFunnel)
                 || (k >= PlatformKind.MeltingScoop && k <= PlatformKind.SugarGlassLedge)   // 54 to 57: Final Change 6, region 4
                 || (k >= PlatformKind.PrayerScrollRunner && k <= PlatformKind.WaterBambooTipper);   // 58 to 61: Final Change 6, region 5
         }
@@ -228,7 +237,8 @@ namespace FluffyClimbers.Simulation
                 || k == PlatformKind.LicoriceBelt || k == PlatformKind.TaffyStretch || k == PlatformKind.SwingPlank || k == PlatformKind.PagodaRidge
                 || k == PlatformKind.TeeterCap
                 || k == PlatformKind.SplittingPier   // Final Change 6, region 3
-                || k == PlatformKind.GlowwormRelay || k == PlatformKind.DewdropMirrorLeaf   // Final Change 6, region 1
+                || k == PlatformKind.DewdropMirrorLeaf   // Final Change 6, region 1
+                || k == PlatformKind.CloverSwap   // 2026-11-26, region 1: a timed pair (never level 1, never beside a hazard, launcher or another demanding kind, never in the restricted rows)
                 || k == PlatformKind.MeltingScoop   // Final Change 6, region 4
                 || k == PlatformKind.PrayerScrollRunner;   // Final Change 6, region 5
         }
@@ -242,7 +252,8 @@ namespace FluffyClimbers.Simulation
                 || k == PlatformKind.TaffyStretch || k == PlatformKind.LanternLift || k == PlatformKind.SwingPlank || k == PlatformKind.MalletSmash || k == PlatformKind.RollingLog
                 || k == PlatformKind.FogPuffDrift
                 || k == PlatformKind.SplittingPier   // Final Change 6, region 3: 240-tick cycle (own bot time bucket)
-                || k == PlatformKind.GlowwormRelay || k == PlatformKind.DragonflyDart   // Final Change 6, region 1: relay clock and dart episode (own bot time bucket)
+                || k == PlatformKind.DragonflyDart   // Final Change 6, region 1: dart episode (own bot time bucket)
+                || k == PlatformKind.CloverSwap   // 2026-11-26, region 1: the global 300-tick swap clock (own bot time bucket)
                 || k == PlatformKind.SourSprinklerCannon;   // Final Change 6, region 4: global 150-tick jet clock
         }
     }

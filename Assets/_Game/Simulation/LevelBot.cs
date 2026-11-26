@@ -25,7 +25,7 @@ namespace FluffyClimbers.Simulation
     /// and recurses on every safe landing. Development tooling, not gameplay code.
     ///
     /// Modes (chosen from the goal): depth-first search for most goals (with goal-aware pruning: no wall bounce,
-    /// stay near the hidden gem / combo ladder zone), best-first search on elapsed time for Speedrun, and a
+    /// stay near the hidden gem zone), best-first search on elapsed time for Speedrun, and a
     /// row-layered beam search (MaxCoins) that maximises coins while still completing the goal, used as an oracle
     /// bound for the coin star.
     /// </summary>
@@ -103,7 +103,6 @@ namespace FluffyClimbers.Simulation
         /// <summary>End a flight as soon as the goal is met (depth-first search); the beam needs grounded landings instead.</summary>
         private bool stopWhenDone = true;
         private int topRow { get { return sim.Platforms[sim.Platforms.Length - 1].Row; } }
-        private int comboValue;
         /// <summary>Search cut: states with more gong hits than this are dropped (default unlimited). 0 proves a level can be won without taking damage.</summary>
         public int MaxHits = int.MaxValue;
 
@@ -154,7 +153,6 @@ namespace FluffyClimbers.Simulation
             this.maxNodes = maxNodes;
             this.nodeCap = maxNodes;
             noWall = spec.Goal.Type == GoalType.NoWallBounce;
-            comboValue = spec.Goal.Value;
         }
 
         /// <summary>
@@ -205,12 +203,6 @@ namespace FluffyClimbers.Simulation
                     return c.Tick > spec.Goal.TimeSec * SimConfig.TicksPerSecond;
                 case GoalType.FindHiddenGem:
                     return data != null && data.HiddenGemRow >= 0 && c.HiddenGems == 0 && c.Row > data.HiddenGemRow + 1;
-                case GoalType.ComboChain:
-                    // above the combo ladder without the combo jumps: the top row no longer clears the level (GoalEvaluator.IsFailed)
-                    return data != null && data.LadderEndRow >= 0 && c.Row > data.LadderEndRow + 1 && !GoalEvaluator.ComboJumpsDone(spec, c);
-                case GoalType.ComboGates:
-                    // a gate was left behind without its combo jump: the run would end there (GoalEvaluator.IsFailed)
-                    return GateRules.MissedGate(spec, c.Row, c.GateMask) >= 0;
                 case GoalType.SkyHoops:
                     // too many rings are gone: the 8 of 10 can no longer be reached
                     return GoalEvaluator.RingsStillPossible(spec, c) < RingRules.Needed(spec);
@@ -546,14 +538,12 @@ namespace FluffyClimbers.Simulation
             long tb = 0;
             if (PlatformKinds.IsTimeDependent(p.Kind)) tb = TimeBucket(p, c.Tick);
             if (sim.Hazards.Length > 0) tb = (c.Tick / 24) % 32;
-            if (p.Kind == PlatformKind.GlowwormRelay || p.Kind == PlatformKind.DragonflyDart) tb = EpisodeBucket(c, p);   // Final Change 6, region 1: keyed by the time since the landing that started the relay / dart (12-tick buckets)
+            if (p.Kind == PlatformKind.DragonflyDart) tb = EpisodeBucket(c, p);   // Final Change 6, region 1: keyed by the time since the landing that started the relay / dart (12-tick buckets)
             long xb = c.X.Raw * 4L / Fx.OneRaw;
             long extra = 0;
             if (spec != null)
             {
-                if (spec.Goal.Type == GoalType.ComboChain) extra = GoalEvaluator.JumpsWithFloors(c, comboValue);
-                else if (spec.Goal.Type == GoalType.ComboGates) extra = c.GateMask;
-                else if (spec.Goal.Type == GoalType.SkyHoops) extra = c.Rings;
+                if (spec.Goal.Type == GoalType.SkyHoops) extra = c.Rings;
                 else if (spec.Goal.Type == GoalType.FindHiddenGem) extra = c.HiddenGems;
                 else if (spec.Goal.Type == GoalType.Speedrun) extra = c.Tick / 90;
             }
@@ -580,6 +570,7 @@ namespace FluffyClimbers.Simulation
                 case PlatformKind.MalletSmash: return ((tick + p.Phase) % sim.Cfg.MalletCycleTicks) / 12;
                 case PlatformKind.RollingLog: return ((tick + p.Phase) % sim.Cfg.LogPeriodTicks) / 12;
                 case PlatformKind.SourSprinklerCannon: return ((tick + p.Phase) % sim.Cfg.SprinklerCycleTicks) / 12;   // Final Change 6: the jet clock
+                case PlatformKind.CloverSwap: return (tick % sim.Cfg.CloverSwapPeriodTicks) / 12;   // 2026-11-26: the global swap clock (300 ticks, 25 buckets); the member that is where depends on the period parity, which the x bucket tells
                 default: return (tick / 20) % 24;
             }
         }
@@ -593,7 +584,7 @@ namespace FluffyClimbers.Simulation
             int start = c.CrumbleTick[p.Id];
             if (start < 0) return 30;
             int e = c.Tick - start;
-            int total = p.Kind == PlatformKind.GlowwormRelay ? sim.Cfg.RelayTotalTicks : sim.DartTotalTicks(in p);
+            int total = sim.DartTotalTicks(in p);
             return e >= total ? 30 : e / 12;
         }
 
@@ -722,13 +713,12 @@ namespace FluffyClimbers.Simulation
         {
             int n = 0;
             int ahead = 3;
-            int comboRow = (spec != null && spec.Goal.Type == GoalType.ComboChain) ? s.Row + comboValue : -1;
             for (int i = 0; i < sim.Platforms.Length && n < buf.Length; i++)
             {
                 int r = sim.Platforms[i].Row;
                 if (r <= s.Row - 0 && r != s.Row) continue;
-                if ((r > s.Row && r <= s.Row + ahead) || r == comboRow || (r == s.Row && i != s.GroundId)) buf[n++] = i;
-                else if (r > s.Row + ahead && r > comboRow) break;
+                if ((r > s.Row && r <= s.Row + ahead) || (r == s.Row && i != s.GroundId)) buf[n++] = i;
+                else if (r > s.Row + ahead) break;
             }
             return n;
         }
@@ -932,12 +922,6 @@ namespace FluffyClimbers.Simulation
             if (spec != null)
             {
                 if (spec.Goal.Type == GoalType.FindHiddenGem && s.HiddenGems > 0) progress = 1;
-                else if (spec.Goal.Type == GoalType.ComboChain)
-                {
-                    int have = GoalEvaluator.JumpsWithFloors(s, comboValue);
-                    int need = spec.Goal.Count > 0 ? spec.Goal.Count : 1;
-                    progress = have > need ? need : have;
-                }
             }
             return progress * 1000000 + (s.Coins + s.Gems * 100) * 16 - s.Tick / 8;
         }

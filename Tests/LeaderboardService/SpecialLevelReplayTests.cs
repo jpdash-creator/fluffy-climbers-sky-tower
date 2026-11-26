@@ -9,12 +9,12 @@ namespace FluffyClimbers.LeaderboardService.Tests
 {
     /// <summary>
     /// Owner Final Change 1 (2026-11-22) and Final Change 6 (2026-11-25): the special level types against the REAL RunSession and the server replay. One Life offers and accepts no revive (client and server),
-    /// No Power-ups ignores every activation (also in a forged recording), Keep Moving ends the run after 3 s on one platform and still allows a revive, Combo Gates and Sky Hoops replay exactly.
-    /// Region 1 placement: L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L17 Boss Rise, L21 Sprint and Rest, L24 Combo Gates, L25 Boss Rise.
+    /// No Power-ups ignores every activation (also in a forged recording), Keep Moving ends the run after 3 s on one platform and still allows a revive, Sky Hoops replays exactly (Combo Gates was retired on 2026-11-26 and its levels became Sky Hoops levels).
+    /// Region 1 placement: L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L17 Boss Rise, L21 Sprint and Rest, L24 Sky Hoops, L25 Boss Rise.
     /// </summary>
     public class SpecialLevelReplayTests
     {
-        const string NoWall = "lvl_001_06", OneLife = "lvl_001_09", NoPowers = "lvl_001_14", KeepMoving = "lvl_001_16", Hoops = "lvl_001_08", Combo = "lvl_001_24";
+        const string NoWall = "lvl_001_06", OneLife = "lvl_001_09", NoPowers = "lvl_001_14", KeepMoving = "lvl_001_16", Hoops = "lvl_001_08", Hoops2 = "lvl_001_24";
 
         static void AssertReplayEquals(RunSession s, RunSubmission sub, ReplayResult r)
         {
@@ -42,7 +42,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.Equal(SpecialLevelType.NoPowerUps, Harness.NewLevelSession(NoPowers, 2, 1).SpecialType);
             Assert.Equal(SpecialLevelType.KeepMoving, Harness.NewLevelSession(KeepMoving, 2, 1).SpecialType);
             Assert.Equal(SpecialLevelType.SkyHoops, Harness.NewLevelSession(Hoops, 2, 1).SpecialType);
-            Assert.Equal(SpecialLevelType.ComboGates, Harness.NewLevelSession(Combo, 2, 1).SpecialType);
+            Assert.Equal(SpecialLevelType.SkyHoops, Harness.NewLevelSession(Hoops2, 2, 1).SpecialType);
             Assert.Equal(SpecialLevelType.BossRise, Harness.NewLevelSession("lvl_001_17", 2, 1).SpecialType);
             Assert.Equal(SpecialLevelType.SprintRest, Harness.NewLevelSession("lvl_001_21", 2, 1).SpecialType);
             Assert.Equal(SpecialLevelType.RivalRace, Harness.NewLevelSession("lvl_001_12", 2, 1).SpecialType);
@@ -51,7 +51,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.Equal(SpecialLevelType.None, Harness.NewEndlessSession("region_001_meadow_springs", 2, 1, false).SpecialType);
             // the content model gives the same answer without a session (level tiles, rewards)
             Assert.Equal(SpecialLevelType.OneLife, Harness.Repo.GetLevel(OneLife).SpecialType);
-            Assert.Equal(SpecialLevelType.ComboGates, Harness.Repo.GetLevel(Combo).SpecialType);
+            Assert.Equal(SpecialLevelType.SkyHoops, Harness.Repo.GetLevel(Hoops2).SpecialType);   // the old Combo Gates level
             Assert.Equal(SpecialLevelType.BossRise, Harness.Repo.GetLevel("lvl_001_25").SpecialType);
             Assert.Equal(SpecialLevelType.None, Harness.Repo.GetLevel("lvl_001_15").SpecialType);
             Assert.Equal(SpecialLevelType.NoWallTouch, Harness.Repo.GetLevel("lvl_006_07").SpecialType);   // the legacy 15-level regions keep their old goals: the lookup reads the goal, never an index
@@ -268,49 +268,24 @@ namespace FluffyClimbers.LeaderboardService.Tests
             AssertReplayEquals(s, sub, Harness.Replayer.Replay(sub, Harness.Lim));
         }
 
-        // ------------------------------------------------------------------ Combo Gates, Sky Hoops, No Wall Touch
+        // ------------------------------------------------------------------ Sky Hoops, No Wall Touch
 
         [Theory]
         [InlineData(0)]
         [InlineData(4)]
-        public void ComboGatesIsClearedAtTheTopWithEveryGateAndReplaysExactly(int mode)
+        public void TheSecondSkyHoopsLevelOfARegionIsClearedAtTheTopWithEightRingsAndReplaysExactly(int mode)
         {
-            RunSession s = Harness.NewLevelSession(Combo, mode, 7001 + mode);
-            Assert.Equal(GoalType.ComboGates, s.Spec.Goal.Type);
+            RunSession s = Harness.NewLevelSession(Hoops2, mode, 7001 + mode);
+            Assert.Equal(GoalType.SkyHoops, s.Spec.Goal.Type);
             Assert.Equal(150, s.Spec.TargetRow());
-            Assert.Equal("Floor 150, combo in each gate", RunSession.DescribeGoal(s.Spec));
-            int[] trace = Harness.BotTrace(s, s.State);
-            int gatesBeforeTop = 0;
-            for (int i = 0; i < trace.Length && !s.Over; i++)
-            {
-                s.Step(trace[i]);
-                if (s.State.Row < 150) gatesBeforeTop = Math.Max(gatesBeforeTop, GoalEvaluator.GatesCleared(s.Spec, s.State));
-                Assert.False(s.GoalLost, "a gate was missed at row " + s.State.Row);
-            }
-            Assert.Equal(3, gatesBeforeTop);
+            Assert.Equal("Floor 150 with 8 of 10 rings", RunSession.DescribeGoal(s.Spec));
+            Assert.Equal(10, s.Data.Pickups.Count(p => p.Kind == PickupKind.Ring));
+            Harness.Play(s, Harness.BotTrace(s, s.State));
             Assert.True(s.GoalReached);
+            Assert.True(s.State.Rings >= 8, s.State.Rings + " rings");
             Assert.Equal(150, s.RunFloors);
-            Assert.Equal(3, GoalEvaluator.GatesCleared(s.Spec, s.State));
             RunSubmission sub = Harness.Upload(s, Kinds.Level, 7001 + mode);
             AssertReplayEquals(s, sub, Harness.Replayer.Replay(sub, Harness.Lim));
-        }
-
-        [Fact]
-        public void ComboGatesIsLostTheMomentAGateIsLeftBehindWithoutItsComboJump()
-        {
-            RunSession s = Harness.NewLevelSession(Combo, 1, 5);
-            int end0 = GateRules.EndRow(s.Spec.RowsFor(), 0, 3, GateRules.Length(3));
-            s.State.Row = end0;
-            Assert.False(GoalEvaluator.IsFailed(s.Spec, s.State));
-            s.State.Row = end0 + 1;   // the first row above gate 0 without its bit: the run ends right there, not at the top
-            s.Step(0);
-            Assert.True(s.GoalLost);
-            Assert.False(s.GoalReached);
-            Assert.True(s.Failed);
-            Assert.True(s.GateMissed);
-            Assert.False(s.CanRevive);
-            Assert.Equal("Gate missed!", s.FailTitle);
-            Assert.NotNull(s.FailReason);
         }
 
         [Fact]
@@ -346,7 +321,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
         [Fact]
         public void EverySpecialTypeHasAGoalRuleLineAndARegularRunHasNone()
         {
-            foreach (string id in new[] { NoWall, OneLife, NoPowers, KeepMoving, Hoops, Combo })
+            foreach (string id in new[] { NoWall, OneLife, NoPowers, KeepMoving, Hoops, Hoops2 })
             {
                 RunSession s = Harness.NewLevelSession(id, 2, 3);
                 string rule = RunSession.GoalRule(s.Spec);
@@ -360,7 +335,7 @@ namespace FluffyClimbers.LeaderboardService.Tests
             Assert.Null(RunSession.GoalRule(plain.Spec));
             Assert.Null(RunSession.SpecialName(plain.Spec));
             Assert.Equal("Reach floor 120", RunSession.DescribeGoal(plain.Spec));
-            Assert.Equal("Land a 3-floor combo jump in every gate.", RunSession.GoalRule(Harness.NewLevelSession(Combo, 2, 3).Spec));
+            Assert.Equal("Fly through 8 of the 10 rings, then reach the top.", RunSession.GoalRule(Harness.NewLevelSession(Hoops2, 2, 3).Spec));
         }
     }
 }

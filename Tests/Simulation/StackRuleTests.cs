@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -78,17 +79,44 @@ namespace FluffyClimbers.Simulation.Tests
                 }
         }
 
+        /// <summary>
+        /// Owner 2026-11-26 (ladders removed): no generated level may hold two platforms of different rows closer vertically than the smallest row gap the normal layouts use.
+        /// The floor is MinRowGapFloor (measured over all 125 shipped levels and every attempt seed of the random-layout sweep; the old combo ladders had 1.2 u rungs,
+        /// which is below it), so a closely stacked ladder of rungs cannot come back.
+        /// </summary>
         [Fact]
-        public void ComboLaddersDoNotStack()
+        public void NoTwoPlatformsOfDifferentRowsAreCloserThanTheSmallestNormalRowGap()
         {
+            string root = ContentLoader.FindRoot();
+            Assert.NotNull(root);
             SimConfig cfg = new SimConfig();
-            foreach (int v in new int[] { 3, 4, 5, 6 })
+            Fx min = Fx.FromInt(1000);
+            string where = "";
+            var bad = new List<string>();
+            foreach (LoadedLevel ll in ContentLoader.LoadRegions(root, 1, 5))
             {
-                LevelData d = LevelBuilder.Build(cfg, T3.Spec(9 + v, 400, 5, SignatureKind.None, GoalType.ComboChain, v, 1));
-                Assert.Null(FindViolation(d.Platforms));
-                Assert.True(d.LadderStartRow > 0);
+                for (int i = -1; i < 12; i++)
+                {
+                    LevelSpec spec = i < 0 ? ll.Spec : ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i));
+                    Platform[] ps = LevelBuilder.Build(cfg, spec).Platforms;
+                    Platform[] byY = (Platform[])ps.Clone();
+                    System.Array.Sort(byY, (a, b) => a.Y.Raw.CompareTo(b.Y.Raw));
+                    for (int k = 1; k < byY.Length; k++)
+                    {
+                        if (byY[k].Row == byY[k - 1].Row) continue;
+                        Fx dy = byY[k].Y - byY[k - 1].Y;
+                        if (dy < min) { min = dy; where = ll.Id + " seed " + i + " rows " + byY[k - 1].Row + "/" + byY[k].Row; }
+                        if (dy < MinRowGapFloor) bad.Add(ll.Id + " seed " + i + ": rows " + byY[k - 1].Row + "/" + byY[k].Row + " only " + dy + " u apart");
+                    }
+                }
             }
+            output.WriteLine("smallest vertical gap between platforms of different rows: " + min + " u at " + where);
+            foreach (string b in bad.Take(20)) output.WriteLine(b);
+            Assert.True(bad.Count == 0, bad.Count + " crowded pairs, first: " + (bad.Count > 0 ? bad[0] : ""));
         }
+
+        /// <summary>The smallest vertical gap between platforms of different rows in any shipped level or random-layout attempt (measured, see the test above).</summary>
+        static readonly Fx MinRowGapFloor = Fx.FromRatio(179, 100);   // measured minimum 1.7999 u (12 attempt seeds + the base layout of all 125 levels), so 1.79 u with rounding room
 
         [Fact]
         public void ScrollSpeedFlattensAfterFourMinutesAndStaysUnderTheCeiling()

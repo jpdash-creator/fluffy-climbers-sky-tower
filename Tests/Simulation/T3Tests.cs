@@ -115,7 +115,7 @@ namespace FluffyClimbers.Simulation.Tests
             LevelSpec b = T3.Spec(777, 700, 10, SignatureKind.SwingingGongs, GoalType.SurviveWave);
             b.FixedChunks = new string[] { "chunk_complex_a" };
             b.Class = 3;
-            Assert.Equal(-4264933285507034215L, LevelBuilder.Build(cfg, a).ComputeHash());   // re-rolled 2026-11-26 (Final Change 6 integration; was 4542318949224134653); re-rolled 2026-11-25 (Ladybug and Seesaw fixes; was -1274289823304530343); re-rolled 2026-11-13 (economy review: no gem pickups; was -3181476168520851783); re-rolled 2026-11-10: region 1 got the generics Crumble and Moving (was -7839884808577442138, re-rolled 2026-10-31 for doc 24)
+            Assert.Equal(8661963450143395285L, LevelBuilder.Build(cfg, a).ComputeHash());   // re-rolled 2026-11-26 (Clover Swap and Pollen Puff added to the region 1 plans; was 1056615307241436098); re-rolled 2026-11-26 (Glowworm Relay and Silk Snare Web deleted from the region 1 plans; was -4264933285507034215); re-rolled 2026-11-26 (Final Change 6 integration; was 4542318949224134653); re-rolled 2026-11-25 (Ladybug and Seesaw fixes; was -1274289823304530343); re-rolled 2026-11-13 (economy review: no gem pickups; was -3181476168520851783); re-rolled 2026-11-10: region 1 got the generics Crumble and Moving (was -7839884808577442138, re-rolled 2026-10-31 for doc 24)
             Assert.Equal(-5875272777180945040L, LevelBuilder.Build(cfg, b).ComputeHash());   // re-rolled 2026-11-17 (gem levels restored: 2 or 3 collectible gems; was -3729750187827399642); re-rolled 2026-11-16 (collectible gems on level 10: was 5136200250945043513); re-rolled 2026-11-13 (economy review: no gem pickups; was -9118401508389237609); re-rolled 2026-11-04: SwingingGongs (region 5) now draws from its 7 new kinds (Bug List 3 D5); was -5175047465905895765
         }
 
@@ -303,21 +303,6 @@ namespace FluffyClimbers.Simulation.Tests
                 Assert.True(d.HiddenGemOnSidePlatform);
                 Assert.True(onRow >= 2, "side platform next to the main one (seed " + seed + ")");
                 Assert.True(sideUnderGem);
-            }
-        }
-
-        [Fact]
-        public void ComboLadderHasTightRows()
-        {
-            SimConfig cfg = new SimConfig();
-            LevelData d = LevelBuilder.Build(cfg, T3.Spec(9, 400, 5, SignatureKind.None, GoalType.ComboChain, 3, 2));
-            Assert.True(d.LadderStartRow > 0);
-            Assert.Equal(d.LadderStartRow + 3 * 2 + 1, d.LadderEndRow);
-            Fx rung = cfg.ComboLadderSpan / 3;
-            for (int r = d.LadderStartRow + 1; r <= d.LadderEndRow; r++)
-            {
-                Fx gap = T3.OnRow(d, r).Y - T3.OnRow(d, r - 1).Y;
-                Assert.True(Fx.Abs(gap - rung) < Fx.FromRatio(1, 100));
             }
         }
 
@@ -923,7 +908,7 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void ComboChainCountsJumpsOfEnoughFloors()
+        public void TheJumpHistogramCountsJumpsOfEnoughFloors()
         {
             SimConfig cfg = new SimConfig();
             LevelData d = T3.World(cfg, null, null,
@@ -933,24 +918,12 @@ namespace FluffyClimbers.Simulation.Tests
                 T3.P(4, 5, 7.2, 8, PlatformKind.Normal));
             Sim sim = new Sim(cfg, d, Fx.Zero, false, false);
             SimState s = sim.NewState();
-            LevelSpec two = Spec(GoalType.ComboChain, 2, 2, 0);
-            LevelSpec three = Spec(GoalType.ComboChain, 3, 1, 0);
             sim.Step(ref s, SimInput.Jump);
             for (int i = 0; i < 200 && s.Row < 2; i++) sim.Step(ref s, 0);
-            Assert.False(GoalEvaluator.IsComplete(two, s));
-            Assert.False(GoalEvaluator.ComboJumpsDone(two, s));
             Assert.Equal(1, GoalEvaluator.JumpsWithFloors(s, 2));
             sim.Step(ref s, SimInput.Jump);
             for (int i = 0; i < 200 && s.Row < 4; i++) sim.Step(ref s, 0);
-            // Final Change 1 (2026-11-22): the combo jumps are counted as before, the level is cleared once the top row is reached as well
-            Assert.True(GoalEvaluator.ComboJumpsDone(two, s));
-            Assert.False(GoalEvaluator.IsComplete(two, s), "the top row is still ahead");
-            SimState top = s;
-            top.Row = two.TargetRow();
-            Assert.True(GoalEvaluator.IsComplete(two, top));
-            Assert.False(GoalEvaluator.ComboJumpsDone(three, s), "two 2-floor jumps are not a 3-floor jump");
-            Assert.False(GoalEvaluator.IsComplete(three, top), "two 2-floor jumps are not a 3-floor jump");
-            Assert.True(GoalEvaluator.IsFailed(three, top), "the top without the combo jump loses the goal");
+            Assert.Equal(2, GoalEvaluator.JumpsWithFloors(s, 2));   // two jumps of 2 floors
             Assert.Equal(2, s.BestJumpFloors);
             Assert.Equal(0, GoalEvaluator.JumpsWithFloors(s, 3));
         }

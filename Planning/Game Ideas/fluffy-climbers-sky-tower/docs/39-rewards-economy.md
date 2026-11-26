@@ -105,8 +105,8 @@ Points per group: General 60, Levels 100, Gameplay setting 145, Endless 90, Time
 | Endless and Time Attack | `w2_taruns5` | Finish 5 Time Attack runs | 300 | | |
 | Special levels | `w2_special_nowall` | Clear the No Wall Touch level | 400 | | |
 | Special levels | `w2_special_nopowerups` | Clear the No Power-ups level | 400 | | |
-| Special levels | `w2_special_combo` | Clear the Combo Climb level | 400 | | |
-| Special levels | `w2_special_chase` | Clear the Chase level | 400 | | |
+| Special levels | `w2_special_skyhoops` | Clear the Sky Hoops level | 400 | | |
+| Special levels | `w2_special_bossrise` | Clear the Boss Rise level | 400 | | |
 | Special levels | `w2_special_onelife` | Clear the One Life level | 400 | | |
 | Special levels | `w2_special_keepmoving` | Clear the Keep Moving level | 400 | | |
 | Special levels | `w2_special_all6` | Clear all 6 special level types | 600 | 5 | |

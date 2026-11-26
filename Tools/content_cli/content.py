@@ -101,7 +101,7 @@ TARGET_SCORE = [5, 20, 26.7, 33.3, 40, 44, 48, 52, 56, 60, 63, 66, 69, 72, 75, 7
 # Owner Final Change 1 (2026-11-22): the approved placement of the six special level types (one level each per region, never on a gem level). The table lives
 # next to the generator of the level files (migrate_levels_25.py) and is checked here against the shipped JSON.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from migrate_levels_25 import SPECIAL_PLACEMENT, SPECIAL_TYPES, RULE_TYPES, GEM_LEVELS, COMBO_FLOORS, COMBO_GATES, RINGS_NEEDED, RINGS_TOTAL, rows as rows_25   # noqa: E402
+from migrate_levels_25 import SPECIAL_PLACEMENT, SPECIAL_TYPES, RULE_TYPES, GEM_LEVELS, RINGS_NEEDED, RINGS_TOTAL, rows as rows_25   # noqa: E402
 
 
 def special_type_of(lv):
@@ -116,7 +116,6 @@ def expected_level_25(n, i):
     t = next((k for k, idxs in SPECIAL_PLACEMENT[n].items() if i in idxs), "")
     r = rows_25(i)
     if t == "noWallTouch": return {"type": "noWallBounce", "value": r}, None, None
-    if t == "comboGates": return {"type": "comboGates", "value": COMBO_FLOORS, "count": COMBO_GATES}, {"rows": r}, None
     if t == "skyHoops": return {"type": "skyHoops", "value": RINGS_NEEDED, "count": RINGS_TOTAL}, {"rows": r}, None
     if t == "rivalRace": return {"type": "rivalRace", "value": r}, None, None
     if t: return {"type": "reachFloor", "value": r}, None, t

@@ -161,7 +161,7 @@ namespace FluffyClimbers.Simulation.Tests
             new Row(EndlessTa, "Finish 5 Time Attack runs", 300),
             new Row(Special, "Clear the No Wall Touch level", 400),
             new Row(Special, "Clear the No Power-ups level", 400),
-            new Row(Special, "Clear the Combo Gates level", 400),
+            new Row(Special, "Clear the Sky Hoops level", 400),
             new Row(Special, "Clear the Boss Rise level", 400),
             new Row(Special, "Clear the One Life level", 400),
             new Row(Special, "Clear the Keep Moving level", 400),
@@ -303,7 +303,7 @@ namespace FluffyClimbers.Simulation.Tests
             rows.Add(new Row(TimeAttack, "Time Attack: 100 floors on Normal or harder", 250));
             rows.Add(new Row(TimeAttack, "Time Attack: 100 floors on Hard or Insane", 350));
             // Special levels
-            foreach (string name in new[] { "No Wall Touch", "No Power-ups", "Combo Gates", "Boss Rise", "One Life", "Keep Moving" }) rows.Add(new Row(Special, "Clear the " + name + " level", 100));
+            foreach (string name in new[] { "No Wall Touch", "No Power-ups", "Sky Hoops", "Boss Rise", "One Life", "Keep Moving" }) rows.Add(new Row(Special, "Clear the " + name + " level", 100));
             rows.Add(new Row(Special, "Clear all 6 special levels", 200));
             rows.Add(new Row(Special, "Clear a special level on all 5 settings", 250));
             rows.Add(new Row(Special, "Get 3 stars on all 6 special levels", 300, 2));
@@ -468,7 +468,7 @@ namespace FluffyClimbers.Simulation.Tests
             {
                 "g2_1_clear_5", "g2_1_clear_25", "g2_1_stars_375", "g2_2_stars3_15", "g2_3_gold_25", "g2_1_relaxed_clear_10", "g2_1_insane_clear_25", "g2_4_hard_stars_75",
                 "g2_5_easy_medals_10", "g2_1_endless_100", "g2_1_endless_5000", "g2_2_normal_endless_200", "g2_1_ta_50", "g2_1_ta_200", "g2_1_taruns_20", "g2_1_normalup_ta_100",
-                "g2_1_hardup_ta_100", "g2_1_special_nowall", "g2_1_special_nopowerups", "g2_1_special_combogates", "g2_1_special_bossrise", "g2_1_special_onelife", "g2_1_special_keepmoving",
+                "g2_1_hardup_ta_100", "g2_1_special_nowall", "g2_1_special_nopowerups", "g2_1_special_skyhoops", "g2_1_special_bossrise", "g2_1_special_onelife", "g2_1_special_keepmoving",
                 "g2_1_special_all", "g2_1_special_allsettings", "g2_1_special_stars3", "g2_1_normalup_special_all", "g2_1_hardup_special_all", "g2_5_insane_special_all"
             }) Assert.Contains(id, seen);
         }

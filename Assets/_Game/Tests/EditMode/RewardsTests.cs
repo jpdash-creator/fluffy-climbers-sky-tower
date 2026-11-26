@@ -594,11 +594,11 @@ namespace FluffyClimbers.Tests
             for (int r = 1; r <= 5; r++)
             {
                 LevelDef[] specials = svc.RegionSpecialLevels(r);
-                Assert.AreEqual(SpecialLevels.Count + 1, specials.Length, "region " + r);   // ten special levels, nine types: Boss Rise twice
+                Assert.AreEqual(SpecialLevels.Count + 2, specials.Length, "region " + r);   // ten special levels, eight types: Boss Rise and Sky Hoops twice
                 var seen = new HashSet<SpecialLevelType>();
                 foreach (LevelDef l in specials)
                 {
-                    Assert.IsTrue(seen.Add(l.SpecialType) || l.SpecialType == SpecialLevelType.BossRise, "region " + r + ": " + l.SpecialType + " twice");
+                    Assert.IsTrue(seen.Add(l.SpecialType) || l.SpecialType == SpecialLevelType.BossRise || l.SpecialType == SpecialLevelType.SkyHoops, "region " + r + ": " + l.SpecialType + " twice");
                     Assert.IsTrue(l.Index % 5 != 0 || (l.Index == 25 && l.SpecialType == SpecialLevelType.BossRise), l.Id + " is a gem level");
                     Assert.AreEqual(l.SpecialType, svc.SpecialTypeOfLevel(l.Id));
                 }
@@ -647,7 +647,7 @@ namespace FluffyClimbers.Tests
             svc.ApplyRun(SpecialOf(svc, 4, SpecialLevelType.NoPowerUps).Id, Won(1, Hard));
             Assert.IsTrue(WeeklyDone(svc, "w2_hard_special3"), "clear 3 special levels on Hard or Insane");
             Assert.IsFalse(WeeklyDone(svc, "w2_special_all6"));
-            svc.ApplyRun(SpecialOf(svc, 5, SpecialLevelType.ComboGates).Id, Won());
+            svc.ApplyRun(SpecialOf(svc, 5, SpecialLevelType.SkyHoops).Id, Won());
             svc.ApplyRun(SpecialOf(svc, 5, SpecialLevelType.KeepMoving).Id, Won());
             Assert.AreEqual(6, Weekly(svc, RewardStat.SpecialTypes));
             Assert.IsTrue(WeeklyDone(svc, "w2_special_all6"), "clear all 6 special level types");

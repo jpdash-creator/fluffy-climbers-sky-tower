@@ -62,16 +62,15 @@ namespace FluffyClimbers.Simulation.Tests
                 SpecialLevelType type = SpecialLevels.TypeOf(ll.Spec);
                 // Final Change 6 (2026-11-25): Combo Gates (comboGates 3 x 3, explicit rows) and Sky Hoops (skyHoops 8 of 10, explicit rows) replace Combo Climb; Rival Race is a reach-the-top goal with a baked ghost;
                 // Boss Rise, Sprint and Rest are rules on reach-the-top levels.
+                Assert.NotEqual(SpecialLevelType.ComboGates, type);   // owner 2026-11-26: Combo Gates is retired, Sky Hoops took its levels
                 if (type == SpecialLevelType.NoWallTouch) Assert.Equal(GoalType.NoWallBounce, g);
-                else if (type == SpecialLevelType.ComboGates) Assert.Equal(GoalType.ComboGates, g);
                 else if (type == SpecialLevelType.SkyHoops) Assert.Equal(GoalType.SkyHoops, g);
                 else if (type == SpecialLevelType.RivalRace) Assert.Equal(GoalType.RivalRace, g);
                 else Assert.Equal(GoalType.ReachFloor, g);
-                bool explicitRows = g == GoalType.ComboGates || g == GoalType.SkyHoops;
+                bool explicitRows = g == GoalType.SkyHoops;
                 if (!explicitRows) Assert.Equal(ExpectedRows(idx), ll.Spec.Goal.Value);
                 else Assert.Equal(ExpectedRows(idx), ll.Spec.Rows);
                 if (idx % 5 == 0) { Assert.Equal(GoalType.ReachFloor, g); Assert.Equal(0, ll.Spec.Goal.Count); Assert.Equal(0, ll.Spec.Goal.TimeSec); }
-                Assert.Equal(-1, LevelBuilder.Build(cfg, ll.Spec).LadderStartRow);   // the old Combo Climb ladder is gone; Combo Gates uses GateStartRows
                 Assert.Empty(ll.Spec.FixedChunks);
                 Assert.False(ll.Spec.Ramp);
                 LevelData d = LevelBuilder.Build(cfg, ll.Spec);
@@ -87,7 +86,6 @@ namespace FluffyClimbers.Simulation.Tests
             double sum = 0; int n = 0;
             foreach (LoadedLevel ll in All())
             {
-                if (ll.Spec.Goal.Type == GoalType.ComboChain || ll.Spec.Goal.Type == GoalType.ComboGates) continue;   // the ladder rungs are one platform per row (or two columns), measured apart
                 for (int i = 0; i < 6; i++)
                 {
                     LevelData d = LevelBuilder.Build(cfg, ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i)));
@@ -118,13 +116,9 @@ namespace FluffyClimbers.Simulation.Tests
                     LevelData d = LevelBuilder.Build(cfg, ll.Spec.WithAttemptSeed(RandomLayoutTests.AttemptSeed(i)));
                     PlatformKind[] k = SpineKinds(d);
                     int rows = d.Rows, third = rows / 3;
-                    int ladderLo = d.LadderStartRow, ladderHi = d.LadderEndRow;
-                    // free rows only: the combo ladder is plain
                     int lowN = 0, lowS = 0, highN = 0, highS = 0, all = 0, allS = 0;
                     for (int r = 1; r <= rows; r++)
                     {
-                        if (ladderLo > 0 && r >= ladderLo && r <= ladderHi) continue;
-                        if (d.GateStartRows != null && GateRules.GateOfRow(rows, d.GateStartRows.Length, d.GateLength, r) >= 0) continue;   // the gates are plain ladders too
                         bool sp = k[r] != PlatformKind.Normal;
                         all++; if (sp) allS++;
                         if (r <= third) { lowN++; if (sp) lowS++; }
@@ -133,8 +127,7 @@ namespace FluffyClimbers.Simulation.Tests
                     double lowPct = 100.0 * lowS / Math.Max(1, lowN), highPct = 100.0 * highS / Math.Max(1, highN), allPct = 100.0 * allS / Math.Max(1, all);
                     lowSum[idx] += lowPct; highSum[idx] += highPct; cnt[idx]++;
                     double mean = (cfg.RampLowPercent[idx] + cfg.RampHighPercent[idx]) / 2.0;
-                    // ladder levels carry their plain ladder at the top, so only the mean of the free rows is held to the band there
-                    if (Math.Abs(allPct - mean) > 12 && ll.Spec.Goal.Type != GoalType.ComboChain && ll.Spec.Goal.Type != GoalType.ComboGates) bad.Add(ll.Id + " seed " + i + ": overall " + allPct.ToString("F0") + "% vs " + mean + "%");
+                    if (Math.Abs(allPct - mean) > 12) bad.Add(ll.Id + " seed " + i + ": overall " + allPct.ToString("F0") + "% vs " + mean + "%");
                 }
             }
             for (int idx = 1; idx <= 25; idx++)

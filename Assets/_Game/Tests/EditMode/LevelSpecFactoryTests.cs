@@ -85,13 +85,13 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(90, hoops.Rows);
             Assert.AreEqual(SpecialLevelType.SkyHoops, SpecialLevels.TypeOf(hoops));
 
-            LevelSpec combo = LevelSpecFactory.Build(repo, "lvl_001_24");
-            Assert.AreEqual(GoalType.ComboGates, combo.Goal.Type);
-            Assert.AreEqual(3, combo.Goal.Value);
-            Assert.AreEqual(3, combo.Goal.Count);
-            Assert.AreEqual(150, combo.Rows, "the floor count of a Combo Gates level is written out (overrides.rows)");
-            Assert.AreEqual(150, combo.RowsFor());
-            Assert.AreEqual(150, combo.TargetRow());
+            LevelSpec hoops2 = LevelSpecFactory.Build(repo, "lvl_001_24");   // the old Combo Gates level (retired 2026-11-26)
+            Assert.AreEqual(GoalType.SkyHoops, hoops2.Goal.Type);
+            Assert.AreEqual(8, hoops2.Goal.Value);
+            Assert.AreEqual(10, hoops2.Goal.Count);
+            Assert.AreEqual(150, hoops2.Rows, "the floor count of a Sky Hoops level is written out (overrides.rows)");
+            Assert.AreEqual(150, hoops2.RowsFor());
+            Assert.AreEqual(150, hoops2.TargetRow());
 
             Assert.AreEqual(SpecialLevelType.OneLife, LevelSpecFactory.Build(repo, "lvl_001_09").Special);
             Assert.AreEqual(SpecialLevelType.NoPowerUps, LevelSpecFactory.Build(repo, "lvl_001_14").Special);

@@ -469,9 +469,10 @@ namespace FluffyClimbers.Gameplay
             return k == PlatformKind.SporePop || k == PlatformKind.ClamShellPad || k == PlatformKind.PufferfishPad
                 || k == PlatformKind.LicoriceBelt || k == PlatformKind.TaffyStretch || k == PlatformKind.JellyWobble || k == PlatformKind.PinwheelGust
                 || k == PlatformKind.BambooFlick || k == PlatformKind.MalletSmash
-                // Final Change 6 painted poses (Tools/art_pipeline/bake_region{1..5}_fc6_platforms.py): relay live / ghost, mirror leaf normal / shimmer, moon jelly unarmed / armed, melting scoop full / melted / core,
+                // Final Change 6 painted poses (Tools/art_pipeline/bake_region{1..5}_fc6_platforms.py): mirror leaf normal / shimmer, moon jelly unarmed / armed, melting scoop full / melted / core,
                 // sugar glass intact / cracked left / cracked right, sprinkler closed / lid / firing, tipper empty / full / tipped / pour, prayer scroll open / half / rolled
-                || k == PlatformKind.GlowwormRelay || k == PlatformKind.DewdropMirrorLeaf || k == PlatformKind.MoonJellyChain || k == PlatformKind.MeltingScoop
+                || k == PlatformKind.DewdropMirrorLeaf || k == PlatformKind.MoonJellyChain || k == PlatformKind.MeltingScoop
+                || k == PlatformKind.CloverSwap   // 2026-11-26: clover leaf calm (-1) / swap (1), baked by bake_region1_fc6b_platforms.py (tiles/cloverswap_widths)
                 || k == PlatformKind.SugarGlassLedge || k == PlatformKind.SourSprinklerCannon || k == PlatformKind.WaterBambooTipper || k == PlatformKind.PrayerScrollRunner;
         }
 
@@ -511,9 +512,9 @@ namespace FluffyClimbers.Gameplay
                 // Region 5: the Bamboo Flick is sprung for the half second after it flicked the player (rest -1, sprung 1); the Mallet Smash is down from the smash until it lifts again (raised -1, smashed 1); both read the Sim clocks
                 case PlatformKind.BambooFlick: return s.GroundId == p.Id && tick - s.LandTick < 30 ? 1 : -1;
                 case PlatformKind.MalletSmash: return session.Sim.MalletDown(p.Id, tick) ? 1 : -1;
-                // Final Change 6: the painted state of the new kinds follows the Sim clocks (relay solid window, mirror motion, chain arm window, melt width, glass crack, sprinkler lid, tipper fill, scroll length)
-                case PlatformKind.GlowwormRelay: return session.Sim.RelaySolid(p.Id, tick, s.CrumbleTick) ? -1 : 1;
+                // Final Change 6: the painted state of the new kinds follows the Sim clocks (mirror motion, chain arm window, melt width, glass crack, sprinkler lid, tipper fill, scroll length)
                 case PlatformKind.DewdropMirrorLeaf: return !session.Sim.MirrorFrozen(p.Id, tick, s.CrumbleTick) && session.Sim.MirrorOffset(p.Id, s.CrumbleTick).Raw != 0 ? 1 : -1;
+                case PlatformKind.CloverSwap: return session.Sim.CloverTelegraph(tick) ? 1 : -1;   // 2026-11-26: the swap pose from the telegraph until the slide ends (the Sim clock)
                 case PlatformKind.MoonJellyChain:
                     {
                         int k = session.Sim.JellyIndexOf(p.Id);
@@ -1531,7 +1532,7 @@ namespace FluffyClimbers.Gameplay
                     else if (p.Kind == PlatformKind.SproutLift) y = session.Sim.PlatformY(p.Id, tick, s.CrumbleTick).F();                                  // rises while stood on, sinks when empty
                     else if (p.Kind == PlatformKind.SquishCap) y = p.Y.F() - session.Sim.SquishSink(in s, p.Id).F();                                       // sinks under the player
                     else if (p.Kind == PlatformKind.TurtleShuttle) x = session.Sim.PlatformX(p.Id, tick).F();                                              // region 3: stop-and-go glide from the Sim
-                    else if (p.Kind == PlatformKind.DragonflyDart || p.Kind == PlatformKind.DewdropMirrorLeaf) x = session.Sim.PlatformX(p.Id, tick, s.CrumbleTick).F();   // Final Change 6, region 1: the dart / the mirror slide come from the Sim
+                    else if (p.Kind == PlatformKind.DragonflyDart || p.Kind == PlatformKind.DewdropMirrorLeaf || p.Kind == PlatformKind.CloverSwap) x = session.Sim.PlatformX(p.Id, tick, s.CrumbleTick).F();   // Final Change 6, region 1: the dart / the mirror slide come from the Sim
                     else if (p.Kind == PlatformKind.JellyWobble) x = session.Sim.PlatformX(p.Id, tick, s.CrumbleTick).F();                                 // region 4: the wobble after a landing comes from the Sim
                     else if (p.Kind == PlatformKind.SinkingRaft) y = session.Sim.PlatformY(p.Id, tick, s.CrumbleTick).F();                                 // sinks while stood on, springs back when empty
                     else if (p.Kind == PlatformKind.LanternLift) { x = session.Sim.PlatformX(p.Id, tick).F(); y = session.Sim.PlatformY(p.Id, tick, s.CrumbleTick).F(); }   // region 5: the lantern sways and rises while stood on (Sim)
@@ -1723,6 +1724,27 @@ namespace FluffyClimbers.Gameplay
         public const string BossBodyName = "BossBody", BossHeadName = "BossHead";
         /// <summary>World height of the boss under the line and the head block of the placeholder; the painted boss keeps its own proportions (uniform scale to the screen width).</summary>
         const float BossBodyHeight = 6f, BossPlaceholderHeadH = 1.7f, BossPlaceholderHeadW = 4.2f;
+        /// <summary>How far the boss head top stands ABOVE the simulation's danger line (world units). The danger line is the real screen bottom (RunLayout bottom strip = 0, the pads float over the field), so a boss
+        /// drawn only below it would never show (bug owner 2026-11-26). 4.2 u shows the whole face of the painted boss (crown to nose) clearly above the control pads (about 2.3 u); the boss sits behind every platform and the hero.</summary>
+        public const float BossHeadRise = 4.2f, BossLungeLift = 0.6f;
+        /// <summary>Test hook: pretend the painted boss art is missing (CUX-10 fallback test).</summary>
+        public static bool BossArtDisabledForTests;
+        /// <summary>World rectangle (min y, max y) the boss body covers right now, for tests.</summary>
+        public Bounds BossBodyBounds
+        {
+            get
+            {
+                if (bossBody == null) return default(Bounds);
+                Bounds b = bossBody.bounds;
+                if (bossHead != null) b.Encapsulate(bossHead.bounds);   // placeholder: body and head block
+                return b;
+            }
+        }
+        /// <summary>True when the boss renderers carry no collider (they must never block a touch, CUX-2).</summary>
+        public bool BossHasNoColliders { get { return bossBody == null || (bossBody.GetComponent<Collider2D>() == null && bossBody.GetComponent<Collider>() == null); } }
+        /// <summary>World y of the bottom edge of the visible field (the camera bottom) and of its top edge under the top strip, for tests.</summary>
+        public float FieldBottomY { get { return camY - camHalfH + bottomWorld; } }
+        public float FieldTopY { get { return camY + camHalfH - topWorld; } }
         SpriteRenderer bossBody, bossHead, bossEyeL, bossEyeR;
         Sprite bossIdle, bossRoar, bossLunge;
         BossDef bossDef;
@@ -1742,9 +1764,9 @@ namespace FluffyClimbers.Gameplay
         {
             if (endless || !session.Sim.BossRise) return;
             bossDef = BossRoster.Of(session.Spec);
-            bossIdle = Resources.Load<Sprite>(bossDef.ArtPath + "/idle");
-            bossRoar = Resources.Load<Sprite>(bossDef.ArtPath + "/roar");
-            bossLunge = Resources.Load<Sprite>(bossDef.ArtPath + "/lunge");
+            bossIdle = BossArtDisabledForTests ? null : Resources.Load<Sprite>(bossDef.ArtPath + "/idle");
+            bossRoar = BossArtDisabledForTests ? null : Resources.Load<Sprite>(bossDef.ArtPath + "/roar");
+            bossLunge = BossArtDisabledForTests ? null : Resources.Load<Sprite>(bossDef.ArtPath + "/lunge");
             if (bossRoar == null) bossRoar = bossIdle;
             if (bossLunge == null) bossLunge = bossRoar;
             Color tint = new Color(bossDef.TintR / 255f, bossDef.TintG / 255f, bossDef.TintB / 255f, 0.96f);
@@ -1778,17 +1800,19 @@ namespace FluffyClimbers.Gameplay
             {
                 Sprite pic = BossPose == 2 ? bossLunge : (BossPose == 1 ? bossRoar : bossIdle);
                 bossBody.sprite = pic;
-                float w = pic.bounds.size.x, h = pic.bounds.size.y;
-                float sc = width / Mathf.Max(0.01f, w);   // one uniform scale (CUX-9)
+                Bounds pb = pic.bounds;
+                float sc = width / Mathf.Max(0.01f, pb.size.x);   // one uniform scale (CUX-9)
                 bossBody.transform.localScale = new Vector3(sc, sc, 1f);
-                bossBody.transform.position = new Vector3(camHalfW + bossShake, killY - h * sc * 0.5f, 0f);
+                // The picture's top edge sits BossHeadRise above the danger line (= the screen bottom, there is no bottom strip), so the head and upper body show in the field; the rest is below the screen.
+                float top = killY + BossHeadRise + (BossPose == 2 ? BossLungeLift : 0f);
+                bossBody.transform.position = new Vector3(camHalfW + bossShake - pb.center.x * sc, top - pb.max.y * sc, 0f);
             }
             else
             {
-                float lift = BossPose == 2 ? 0.35f : 0f;   // the head rises with the lunge
+                float lift = BossPose == 2 ? BossLungeLift : 0f;   // the head rises with the lunge
+                float headTop = killY + BossHeadRise + lift;
                 bossBody.transform.localScale = new Vector3(width + 2f, BossBodyHeight, 1f);
-                bossBody.transform.position = new Vector3(camHalfW, killY - BossBodyHeight * 0.5f - BossPlaceholderHeadH * 0.15f, 0f);
-                float headTop = killY + lift;
+                bossBody.transform.position = new Vector3(camHalfW, headTop - BossBodyHeight * 0.5f - BossPlaceholderHeadH * 0.85f, 0f);
                 bossHead.transform.localScale = new Vector3(BossPlaceholderHeadW, BossPlaceholderHeadH, 1f);
                 bossHead.transform.position = new Vector3(camHalfW + bossShake, headTop - BossPlaceholderHeadH * 0.5f, 0f);
                 float eyeY = headTop - BossPlaceholderHeadH * (BossPose == 1 ? 0.35f : 0.42f);

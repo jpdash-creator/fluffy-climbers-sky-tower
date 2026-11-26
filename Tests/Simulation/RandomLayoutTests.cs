@@ -88,7 +88,7 @@ namespace FluffyClimbers.Simulation.Tests
         /// <summary>Sideways reach of a platform's own motion: Platform.Amplitude, except for kinds that use it for something else (Fairy Ring hole, Sandcastle Step riser).</summary>
         public static Fx Swing(Platform p)
         {
-            return p.Kind == PlatformKind.FairyRing || p.Kind == PlatformKind.SandcastleStep || p.Kind == PlatformKind.DragonflyDart ? Fx.Zero : p.Amplitude;   // a Dragonfly Dart's Amplitude is a one-sided dart (Region1NewPlatformTests checks its far end against the wall)
+            return p.Kind == PlatformKind.FairyRing || p.Kind == PlatformKind.SandcastleStep || p.Kind == PlatformKind.DragonflyDart || p.Kind == PlatformKind.CloverSwap ? Fx.Zero : p.Amplitude;   // a Clover Swap member's Amplitude is the distance between the pair's two homes, not a swing about its own x   // a Dragonfly Dart's Amplitude is a one-sided dart (Region1NewPlatformTests checks its far end against the wall)
         }
 
         /// <summary>Layout validity that does not need the bot: returns null when fine, else a description.</summary>
@@ -115,7 +115,6 @@ namespace FluffyClimbers.Simulation.Tests
             Metrics m = Measure(d);
             if (m.Stars != baseM.Stars) return "star pickups " + m.Stars + " != " + baseM.Stars;
             if (spec.Goal.Type == GoalType.FindHiddenGem && d.HiddenGemRow <= 0) return "hidden gem missing";
-            if (spec.Goal.Type == GoalType.ComboChain && d.LadderStartRow < 0) return "combo ladder missing";
             if (spec.Goal.Type == GoalType.SurviveWave && d.WaveEndRow <= d.WaveStartRow) return "wave missing";
             return null;
         }

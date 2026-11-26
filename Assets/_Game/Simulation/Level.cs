@@ -72,11 +72,6 @@ namespace FluffyClimbers.Simulation
         public Fx HiddenGemX;
         /// <summary>True when the hidden gem floats over its own side platform (false = builder fallback: gem over the main platform of that row).</summary>
         public bool HiddenGemOnSidePlatform;
-        public int LadderStartRow = -1;
-        public int LadderEndRow = -1;
-        /// <summary>Combo Gates levels only (null elsewhere): first row of each gate (GateRules.StartRow) and the rungs per gate. The Sim sets SimState.GateMask bit k when a landing inside gate k gains GateFloors or more floors. Not part of the hash (the platforms are).</summary>
-        public int[] GateStartRows;
-        public int GateLength, GateFloors;
         public int WaveStartRow = -1;
         public int WaveEndRow = -1;
 

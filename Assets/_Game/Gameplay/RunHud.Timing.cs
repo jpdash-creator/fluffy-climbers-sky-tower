@@ -113,6 +113,7 @@ namespace FluffyClimbers.Gameplay
             Image ic;
             timerText = TimedPill(row, "TimerPill", ToyKit.Get("icon_dial"), 1.3f, Color.white, h, out ic);
             UiKit.SetText(timerText, TimedText.TimeOfTenths(timeAttack ? TimeRecords.TimeAttackTicks / 6 : 0));
+            if (levelChipWanted) AddLevelChip(row, h);   // owner 2026-11-26: every level line (Gates, Rings, Rival, Boss, Shelter, Keep Moving) sits right next to the timer, dark glass like it
             bestText = TimedPill(row, "BestPill", ToyKit.Get("icon_crown"), 0.9f, new Color(1f, 0.9f, 0.4f), h, out ic);
             UiKit.SetText(bestText, bestLabel);
             bestGraphics = bestText.transform.parent.GetComponentsInChildren<Graphic>(true);
@@ -123,6 +124,8 @@ namespace FluffyClimbers.Gameplay
             deltaText.transform.parent.gameObject.AddComponent<A11yLabel>().Text = "Time against your best run";
             timerText.transform.parent.gameObject.AddComponent<A11yLabel>().Text = timeAttack ? "Time left" : "Run time";
             bestText.transform.parent.gameObject.AddComponent<A11yLabel>().Text = timeAttack ? "Best floors in a Time Attack" : "Best pace in plat per second";
+            // the row is only about 1000 px wide: with the level chip beside the timer the (static) best-pace pill gives its room away; the live delta stays
+            if (levelChipWanted) bestText.transform.parent.gameObject.SetActive(false);
 
             if (!ghostOn) return;
             if (!session.IsEndless && gaugeTrack != null)

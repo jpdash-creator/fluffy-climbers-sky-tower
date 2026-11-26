@@ -1,0 +1,91 @@
+{
+  "asset": "cloverswap_widths",
+  "kind": "cloverswap",
+  "ppuBake": 167.0,
+  "pieces": [
+    {
+      "w": 383,
+      "h": 141,
+      "bodyLeft": 24,
+      "bodyRight": 358,
+      "surfaceY": 33,
+      "bodyBottom": 117,
+      "width": 2.0,
+      "file": "reg001_cloverswap_calm_w2.png",
+      "ppu": 167.0,
+      "kind": "cloverswap",
+      "dir": -1,
+      "pose": "calm"
+    },
+    {
+      "w": 551,
+      "h": 140,
+      "bodyLeft": 25,
+      "bodyRight": 526,
+      "surfaceY": 33,
+      "bodyBottom": 116,
+      "width": 3.0,
+      "file": "reg001_cloverswap_calm_w3.png",
+      "ppu": 167.0,
+      "kind": "cloverswap",
+      "dir": -1,
+      "pose": "calm"
+    },
+    {
+      "w": 718,
+      "h": 140,
+      "bodyLeft": 25,
+      "bodyRight": 693,
+      "surfaceY": 33,
+      "bodyBottom": 116,
+      "width": 4.0,
+      "file": "reg001_cloverswap_calm_w4.png",
+      "ppu": 167.0,
+      "kind": "cloverswap",
+      "dir": -1,
+      "pose": "calm"
+    },
+    {
+      "w": 384,
+      "h": 145,
+      "bodyLeft": 25,
+      "bodyRight": 359,
+      "surfaceY": 38,
+      "bodyBottom": 121,
+      "width": 2.0,
+      "file": "reg001_cloverswap_swap_w2.png",
+      "ppu": 167.0,
+      "kind": "cloverswap",
+      "dir": 1,
+      "pose": "swap"
+    },
+    {
+      "w": 550,
+      "h": 143,
+      "bodyLeft": 24,
+      "bodyRight": 525,
+      "surfaceY": 36,
+      "bodyBottom": 119,
+      "width": 3.0,
+      "file": "reg001_cloverswap_swap_w3.png",
+      "ppu": 167.0,
+      "kind": "cloverswap",
+      "dir": 1,
+      "pose": "swap"
+    },
+    {
+      "w": 718,
+      "h": 145,
+      "bodyLeft": 25,
+      "bodyRight": 693,
+      "surfaceY": 37,
+      "bodyBottom": 120,
+      "width": 4.0,
+      "file": "reg001_cloverswap_swap_w4.png",
+      "ppu": 167.0,
+      "kind": "cloverswap",
+      "dir": 1,
+      "pose": "swap"
+    }
+  ]
+}

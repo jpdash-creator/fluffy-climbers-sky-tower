@@ -197,7 +197,8 @@ namespace FluffyClimbers.Editor
         /// <summary>
         /// Region special platforms (doc 24): every tiles/&lt;kind&gt;_widths folder (windpetal, hivelift, snapdaisy, dandelion, thornbush, ladybug, seesaw) holds a
         /// platform_set.json written by Tools/art_pipeline/bake_region1_new_platforms.py with one real, unscaled piece per width. Fills RegionArt.KindPieces,
-        /// KindSprites (the piece nearest 3 units per kind, the "has art" marker) and the seesaw knob.
+        /// KindSprites (the piece nearest 3 units per kind, the "has art" marker) and the seesaw knob. The kind name of platform_set.json is parsed case-insensitively into PlatformKind, so
+        /// "cloverswap" (tiles/cloverswap_widths, 2026-11-26: poses calm = dir -1, swap = dir 1; widths 2, 3, 4) maps to PlatformKind.CloverSwap without a special case. The Pollen Puff has no set: its slab is the normal art.
         /// </summary>
         static void LoadKindPieces(RegionArt ra, string regionDir)
         {

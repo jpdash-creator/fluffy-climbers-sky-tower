@@ -45,13 +45,13 @@ class ShippedContent(unittest.TestCase):
         self.assertEqual(coins, [(1000, 50), (2000, 100), (5000, 250), (10000, 500), (20000, 900), (50000, 2200), (100000, 4000)])
 
     def test_special_levels_follow_the_approved_placement(self):
-        # owner Final Change 6 (2026-11-25): ten special levels per region, nine types (Boss Rise twice, the second on level 25); gem levels 5, 10, 15, 20 are plain reachFloor levels
+        # owner Final Change 6 (2026-11-25): ten special levels per region, eight types (Boss Rise and Sky Hoops twice; owner 2026-11-26 Combo Gates retired into Sky Hoops); gem levels 5, 10, 15, 20 are plain reachFloor levels
         approved = {
-            1: {6: "noWallTouch", 8: "skyHoops", 9: "oneLife", 12: "rivalRace", 14: "noPowerUps", 16: "keepMoving", 17: "bossRise", 21: "sprintRest", 24: "comboGates", 25: "bossRise"},
-            2: {4: "noWallTouch", 7: "oneLife", 9: "skyHoops", 12: "rivalRace", 13: "noPowerUps", 14: "bossRise", 16: "comboGates", 18: "keepMoving", 23: "sprintRest", 25: "bossRise"},
-            3: {4: "sprintRest", 6: "oneLife", 8: "skyHoops", 11: "noPowerUps", 13: "rivalRace", 17: "comboGates", 18: "bossRise", 21: "noWallTouch", 23: "keepMoving", 25: "bossRise"},
-            4: {4: "noPowerUps", 6: "keepMoving", 7: "skyHoops", 11: "comboGates", 13: "rivalRace", 16: "bossRise", 19: "noWallTouch", 22: "sprintRest", 24: "oneLife", 25: "bossRise"},
-            5: {4: "noWallTouch", 6: "sprintRest", 9: "keepMoving", 12: "skyHoops", 14: "comboGates", 16: "bossRise", 18: "oneLife", 21: "rivalRace", 24: "noPowerUps", 25: "bossRise"},
+            1: {6: "noWallTouch", 8: "skyHoops", 9: "oneLife", 12: "rivalRace", 14: "noPowerUps", 16: "keepMoving", 17: "bossRise", 21: "sprintRest", 24: "skyHoops", 25: "bossRise"},
+            2: {4: "noWallTouch", 7: "oneLife", 9: "skyHoops", 12: "rivalRace", 13: "noPowerUps", 14: "bossRise", 16: "skyHoops", 18: "keepMoving", 23: "sprintRest", 25: "bossRise"},
+            3: {4: "sprintRest", 6: "oneLife", 8: "skyHoops", 11: "noPowerUps", 13: "rivalRace", 17: "skyHoops", 18: "bossRise", 21: "noWallTouch", 23: "keepMoving", 25: "bossRise"},
+            4: {4: "noPowerUps", 6: "keepMoving", 7: "skyHoops", 11: "skyHoops", 13: "rivalRace", 16: "bossRise", 19: "noWallTouch", 22: "sprintRest", 24: "oneLife", 25: "bossRise"},
+            5: {4: "noWallTouch", 6: "sprintRest", 9: "keepMoving", 12: "skyHoops", 14: "skyHoops", 16: "bossRise", 18: "oneLife", 21: "rivalRace", 24: "noPowerUps", 25: "bossRise"},
         }
         rows = {1: 60}
         rows.update({i: 75 for i in range(2, 6)})
@@ -71,10 +71,8 @@ class ShippedContent(unittest.TestCase):
                 if t:
                     found[lv["index"]] = t
                 i = lv["index"]
-                if t == "comboGates":
-                    self.assertEqual(lv["goal"], {"type": "comboGates", "value": 3, "count": 3})
-                    self.assertEqual(lv["overrides"], {"rows": rows[i]})
-                elif t == "skyHoops":
+                self.assertNotEqual(t, "comboGates")
+                if t == "skyHoops":
                     self.assertEqual(lv["goal"], {"type": "skyHoops", "value": 8, "count": 10})
                     self.assertEqual(lv["overrides"], {"rows": rows[i]})
                 elif t == "rivalRace":

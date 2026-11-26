@@ -1433,7 +1433,7 @@ namespace FluffyClimbers.Tests
                 if (FindRt("BottomStrip") != null) problems.Add(a.Name + ": a bottom strip exists (owner 2026-11-02: none)");
                 if (FindRt("DangerLine") != null) problems.Add(a.Name + ": a red danger line exists (owner 2026-11-02: hidden)");
                 Rect tb = CanvasBox(topStrip);
-                foreach (string n in new[] { "FloorPill", "GoalPill", "GemPill", "Gauge", "Pause", "Star0", "Star1", "Star2" })
+                foreach (string n in new[] { "FloorPill", "GoalPill", "GemPill", "Gauge", "Pause", "Star0", "Star1", "Star2", "TimerPill", "BestPill", "DeltaPill", RunHud.LevelChipName })
                 {
                     RectTransform rt = FindRt(n);
                     if (rt == null) continue;
@@ -3017,7 +3017,7 @@ namespace FluffyClimbers.Tests
         }
 
         // ---- special level types (owner Final Change 1, 2026-11-22): tile badge, level popup, run intro, One Life (no revive), No Power-ups (no buttons), Keep Moving (ring + cue) ----
-        // Region 1 placement (Final Change 6): L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L17 Boss Rise, L21 Sprint and Rest, L24 Combo Gates, L25 Boss Rise (a gem level: its tile keeps the gem badge, the popup names the type).
+        // Region 1 placement (Final Change 6): L6 No Wall Touch, L8 Sky Hoops, L9 One Life, L12 Rival Race, L14 No Power-ups, L16 Keep Moving, L17 Boss Rise, L21 Sprint and Rest, L24 Sky Hoops (Combo Gates was retired 2026-11-26), L25 Boss Rise (a gem level: its tile keeps the gem badge, the popup names the type).
 
         [UnityTest]
         public IEnumerator SpecialLevelTilesAndPopupsFitEveryAspect() { return SpecialLevelMetaAudit(100); }
@@ -3112,7 +3112,7 @@ namespace FluffyClimbers.Tests
                     if (star != null) Assert.IsFalse(CanvasBox((RectTransform)star).Overlaps(bb), "level " + level.Index + ": badge over star " + s);
                 }
             }
-            Assert.AreEqual(SpecialLevels.Count, badges, "one tile per special type among the open levels 1 to 24 (Boss Rise has its second level on the locked gem level 25)");
+            Assert.AreEqual(SpecialLevels.Count + 1, badges, "one tile per special level among the open levels 1 to 24: eight types, Sky Hoops twice (Boss Rise has its second level on the locked gem level 25)");
             Assert.AreEqual(medalLevels.Length, medalBadges, "the two-digit tiles 16 and 20 show their medal");
             if (GameSession.Art != null && GameSession.Art.GemIcon != null) Assert.AreEqual(4, gemBadges, "the open gem levels 5, 10, 15 and 20 carry the gem badge");
 
@@ -3293,6 +3293,65 @@ namespace FluffyClimbers.Tests
             Report(problems);
         }
 
+        // ---- owner 2026-11-26: ALL level text (Gates, Rings, Rival, Boss, Shelter, Keep Moving) sits in ONE dark glass chip in the top strip, right beside the run timer ----
+
+        static readonly string[] LevelChipLevels = { "lvl_001_08", "lvl_001_12", "lvl_001_16", "lvl_001_17", "lvl_001_21" };   // Sky Hoops, Rival Race, Keep Moving, Boss Rise, Sprint and Rest
+
+        [UnityTest]
+        public IEnumerator LevelChipSitsInTheTopStripNextToTheTimerOnEveryAspect() { return LevelChipAudit(100, false); }
+
+        [UnityTest]
+        public IEnumerator LevelChipSurvives130PercentTextLeftHandedAndReducedMotion() { return LevelChipAudit(130, true); }
+
+        IEnumerator LevelChipAudit(int textPercent, bool leftHanded)
+        {
+            GameSettings.TextPercent = textPercent;
+            GameSettings.LeftHanded = leftHanded;
+            GameSettings.ReducedMotion = leftHanded;
+            var problems = new List<string>();
+            var holder = new RenderTexture[1];
+            foreach (string levelId in LevelChipLevels)
+            {
+                GameSession.CurrentLevelId = levelId;
+                yield return Load("Run");
+                var rc = Object.FindFirstObjectByType<RunController>();
+                rc.Hud.SkipIntro();
+                for (int f = 0; f < 5; f++) yield return null;
+                foreach (Aspect a in Aspects)
+                {
+                    if (a.Name == "3x4") continue;   // wide tablets: the strips shrink to keep a play field (RunLayout.MinPlayUnits), see RunHudAndPadsStayInTheirStripsAndCameraAgrees
+                    string tag = levelId + " " + a.Name + ": ";
+                    UiKit.SafeAreaNormalized = () => FullSafe;
+                    yield return ApplyAspect(a, holder);
+                    yield return null;
+                    RectTransform chip = FindRt(RunHud.LevelChipName), timer = FindRt("TimerPill"), top = FindRt("TopStrip");
+                    if (chip == null || timer == null || top == null) { problems.Add(tag + "level chip, timer or top strip missing"); continue; }
+                    if (FindRt("Time") != null) problems.Add(tag + "the old bottom text chip ('Time') still exists");
+                    Rect cb = CanvasBox(chip), tb = CanvasBox(timer), sb = CanvasBox(top);
+                    if (cb.yMin < sb.yMin - 1.5f) problems.Add(tag + "the chip reaches into the play field (" + cb.yMin.ToString("F0") + " < " + sb.yMin.ToString("F0") + ")");
+                    if (cb.yMax > sb.yMax + 1.5f) problems.Add(tag + "the chip leaves the top strip upwards");
+                    if (Mathf.Abs(cb.height - tb.height) > 1.5f) problems.Add(tag + "the chip is not the height of the timer chip (" + cb.height.ToString("F0") + " vs " + tb.height.ToString("F0") + ")");
+                    if (Mathf.Abs(cb.center.y - tb.center.y) > 1.5f) problems.Add(tag + "the chip is not on the timer's row");
+                    if (cb.Overlaps(tb)) problems.Add(tag + "the chip overlaps the timer chip");
+                    else if (leftHanded ? cb.xMax > tb.xMin + 0.5f : cb.xMin < tb.xMax - 0.5f) problems.Add(tag + "the chip is not on the " + (leftHanded ? "left" : "right") + " of the timer (mirror " + leftHanded + ")");
+                    foreach (string n in new[] { "FloorPill", "GoalPill", "GemPill", "Gauge", "Pause", "Star0", "Star1", "Star2", "DeltaPill", "BestPill", "PadLeft", "PadRight", "PadJump" })
+                    {
+                        RectTransform other = FindRt(n);
+                        if (other == null || !other.gameObject.activeInHierarchy) continue;
+                        if (cb.Overlaps(CanvasBox(other))) problems.Add(tag + "the chip overlaps " + n);
+                    }
+                    Text t = rc.Hud.LevelChipText;
+                    if (t == null || string.IsNullOrEmpty(t.text)) { problems.Add(tag + "the chip shows no text"); continue; }
+                    if (t.color.r < 0.9f || t.color.g < 0.7f) problems.Add(tag + "the chip text is not light on the dark glass");
+                    Rect xb = CanvasBox((RectTransform)t.transform);
+                    if (xb.xMin < cb.xMin - 1.5f || xb.xMax > cb.xMax + 1.5f || xb.yMin < cb.yMin - 1.5f || xb.yMax > cb.yMax + 1.5f) problems.Add(tag + "the chip text rect leaves the chip");
+                    if (t.verticalOverflow != VerticalWrapMode.Truncate || !t.resizeTextForBestFit) problems.Add(tag + "the chip text can grow out of the fixed height");
+                }
+            }
+            Restore(holder);
+            Report(problems);
+        }
+
         [UnityTest]
         public IEnumerator KeepMovingLevelShowsTheRingAndTheMoveCueForTheLastTwoSeconds() { return KeepMovingAudit(100, false); }
 
@@ -3321,16 +3380,18 @@ namespace FluffyClimbers.Tests
             rc.Input.LatchPower(PowerUp.SafetyNet);
             for (int f = 0; f < 5; f++) yield return null;
             Assert.IsTrue(rc.Session.State.SafetyNetArmed, "the net is armed");
-            RectTransform banner = null;
-            foreach (RectTransform rt in Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include, FindObjectsSortMode.None)) if (rt.name == RunHud.KeepMovingBannerName) banner = rt;
-            Assert.IsNotNull(banner, "the cue banner is built once");
-            Assert.IsFalse(banner.gameObject.activeSelf, "hidden until the warning");
+            // owner 2026-11-26: the MOVE! cue lives in the level chip at the top, next to the timer (no centre banner any more)
+            RectTransform chip = FindRt(RunHud.LevelChipName);
+            Assert.IsNotNull(chip, "the level chip is built once");
+            Text chipText = rc.Hud.LevelChipText;
+            Assert.AreEqual(RunHud.KeepMovingChipText, chipText.text, "the chip names the rule until the warning");
+            Assert.IsNull(FindRt("KeepMovingBanner"), "no centre banner any more");
 
             // waiting on the start platform never starts the timer
             for (int f = 0; f < 240; f++) yield return null;
             Assert.IsFalse(rc.Session.Over, "no timer before the first jump");
             Assert.IsFalse(rc.View.KeepMovingRingShown);
-            Assert.IsFalse(banner.gameObject.activeSelf);
+            Assert.AreEqual(RunHud.KeepMovingChipText, chipText.text);
 
             // standing on a platform after the first jump: the ring and the cue appear for the last 2 seconds only
             int frame = 0;
@@ -3347,8 +3408,7 @@ namespace FluffyClimbers.Tests
                 if (warnFrames == 0) { firstLeft = rc.Session.Sim.KeepMovingTicksLeft(in st); firstDiameter = rc.View.KeepMovingRingDiameter; }
                 warnFrames++;
                 lastDiameter = rc.View.KeepMovingRingDiameter;
-                Assert.IsTrue(banner.gameObject.activeSelf, "the text cue shows with the ring (never the ring alone)");
-                StringAssert.StartsWith("MOVE!", banner.GetComponentInChildren<Text>().text);
+                StringAssert.StartsWith("MOVE!", chipText.text, "the text cue shows in the top chip with the ring (never the ring alone)");
                 if (warnFrames == 30)
                 {
                     rc.enabled = false;   // freeze the run for the layout audit

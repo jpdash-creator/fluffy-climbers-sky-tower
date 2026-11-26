@@ -1,12 +1,12 @@
-"""Final Change 6, region 1 (Meadow Springs): bakes Glowworm Relay, Dewdrop Mirror Leaf (painted slabs) and the Dragonfly Dart / Silk Snare Web slabs (the region's
-plain slab; their dragonfly and web overlays are parts, see bake_fc6_parts.py) from the owner-picked OpenArt sheets in Art/_candidates/reg001_fc6_platforms/.
+"""Final Change 6, region 1 (Meadow Springs): bakes Dewdrop Mirror Leaf (painted slabs) and the Dragonfly Dart slab (the region's
+plain slab; its dragonfly overlay is a part, see bake_fc6_parts.py) from the owner-picked OpenArt sheets in Art/_candidates/reg001_fc6_platforms/.
 
     set PYTHONPATH=E:/pylibs
     python Tools/art_pipeline/bake_region1_fc6_platforms.py
 
-Owner picks 2026-11-25: Glowworm Relay = sheet A2 whole (rows 1-3 live glow 6x, 9x, 12x as long as thick; rows 4-6 ghost); Dewdrop Mirror Leaf = B1 (rows 1-3 normal, rows 4-6 shimmer).
+Owner picks 2026-11-25 (Glowworm Relay and Silk Snare Web were removed 2026-11-26): Dewdrop Mirror Leaf = B1 (rows 1-3 normal, rows 4-6 shimmer).
 Output per kind: Assets/Art/Regions/region_001_meadow_springs/tiles/<kind>_widths/reg001_<kind>_<pose>_w<width>.png + platform_set.json (dir = pose: -1 first pose, 1 second).
-Relay: poses live (-1) and ghost (1) at 3, 4, 6 u. Mirror leaf: normal (-1) and shimmer (1) at 1.5, 2, 3, 4, 6, 8 u. Every piece: one uniform scale per row (slab 0.5 u thick),
+Mirror leaf: normal (-1) and shimmer (1) at 1.5, 2, 3, 4, 6, 8 u. Every piece: one uniform scale per row (slab 0.5 u thick),
 widths reached by cutting / repeating the plain middle, caps untouched.
 """
 import os
@@ -26,17 +26,12 @@ def rows(sheet, tag, idx, **kw):
 
 def main():
     results = {}
-    print("glowwormrelay")
-    live = rows("A2_glowworm.png", "A2", [0, 1, 2])
-    ghost = rows("A2_glowworm.png", "A2", [3, 4, 5])
-    results["glowwormrelay"] = fc.bake_pose_set(R, "glowwormrelay", [("live", -1, live), ("ghost", 1, ghost)], [3, 4, 6])
     print("dewdropmirrorleaf")
     normal = rows("B1_leaf.png", "B1", [0, 1, 2])
     shimmer = rows("B1_leaf.png", "B1", [3, 4, 5])
     results["dewdropmirrorleaf"] = fc.bake_pose_set(R, "dewdropmirrorleaf", [("normal", -1, normal), ("shimmer", 1, shimmer)], [1.5, 2, 3, 4, 6, 8])
-    print("dragonflydart / silksnareweb (region plain slab)")
+    print("dragonflydart (region plain slab)")
     results["dragonflydart"] = fc.copy_normal_set(R, "dragonflydart")
-    results["silksnareweb"] = fc.copy_normal_set(R, "silksnareweb")
     entries = []
     bad = 0
     for kind, (pieces, outdir) in results.items():

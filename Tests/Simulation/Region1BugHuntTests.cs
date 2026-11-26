@@ -41,8 +41,7 @@ namespace FluffyClimbers.Simulation.Tests
             {
                 LevelData d = LevelBuilder.Build(cfg, ll.Spec);
                 double limit = double.MaxValue;
-                if (ll.Spec.Goal.Type == GoalType.ComboChain) limit = RowY(d, d.LadderStartRow);
-                else if (ll.Spec.Goal.Type == GoalType.FindHiddenGem) limit = RowY(d, d.HiddenGemRow);
+                if (ll.Spec.Goal.Type == GoalType.FindHiddenGem) limit = RowY(d, d.HiddenGemRow);
                 int stars = 0;
                 foreach (Pickup p in d.Pickups)
                 {

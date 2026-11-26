@@ -16,16 +16,17 @@ namespace FluffyClimbers.Simulation.Tests
         // ------------------------------------------------------------------ the approved placement (decision 2), written out once more so a generator slip is caught
 
         /// <summary>
-        /// Region (1..5) -> level indices per type, in the order of SpecialLevels.All: NoWallTouch, NoPowerUps, OneLife, KeepMoving, ComboGates, SkyHoops, BossRise (two levels, the second is level 25), SprintRest, RivalRace.
+        /// Region (1..5) -> level indices per type, in the order of SpecialLevels.All: NoWallTouch, NoPowerUps, OneLife, KeepMoving, SkyHoops (two levels, the old Combo Gates level is the second), BossRise (two levels, the second is level 25), SprintRest, RivalRace.
+        /// Owner 2026-11-26: Combo Gates is retired, its level in every region is a Sky Hoops level.
         /// The owner-approved map of Final Change 6 (2026-11-25), written out once more so a generator slip is caught.
         /// </summary>
         public static readonly int[][][] Placement =
         {
-            new[] { new[] { 6 }, new[] { 14 }, new[] { 9 }, new[] { 16 }, new[] { 24 }, new[] { 8 }, new[] { 17, 25 }, new[] { 21 }, new[] { 12 } },    // Meadow Springs
-            new[] { new[] { 4 }, new[] { 13 }, new[] { 7 }, new[] { 18 }, new[] { 16 }, new[] { 9 }, new[] { 14, 25 }, new[] { 23 }, new[] { 12 } },    // Mushroom Grove
-            new[] { new[] { 21 }, new[] { 11 }, new[] { 6 }, new[] { 23 }, new[] { 17 }, new[] { 8 }, new[] { 18, 25 }, new[] { 4 }, new[] { 13 } },    // Sunny Beach
-            new[] { new[] { 19 }, new[] { 4 }, new[] { 24 }, new[] { 6 }, new[] { 11 }, new[] { 7 }, new[] { 16, 25 }, new[] { 22 }, new[] { 13 } },    // Candy Canyon
-            new[] { new[] { 4 }, new[] { 24 }, new[] { 18 }, new[] { 9 }, new[] { 14 }, new[] { 12 }, new[] { 16, 25 }, new[] { 6 }, new[] { 21 } },    // Bamboo Temple
+            new[] { new[] { 6 }, new[] { 14 }, new[] { 9 }, new[] { 16 }, new[] { 8, 24 }, new[] { 17, 25 }, new[] { 21 }, new[] { 12 } },    // Meadow Springs
+            new[] { new[] { 4 }, new[] { 13 }, new[] { 7 }, new[] { 18 }, new[] { 9, 16 }, new[] { 14, 25 }, new[] { 23 }, new[] { 12 } },    // Mushroom Grove
+            new[] { new[] { 21 }, new[] { 11 }, new[] { 6 }, new[] { 23 }, new[] { 8, 17 }, new[] { 18, 25 }, new[] { 4 }, new[] { 13 } },    // Sunny Beach
+            new[] { new[] { 19 }, new[] { 4 }, new[] { 24 }, new[] { 6 }, new[] { 7, 11 }, new[] { 16, 25 }, new[] { 22 }, new[] { 13 } },    // Candy Canyon
+            new[] { new[] { 4 }, new[] { 24 }, new[] { 18 }, new[] { 9 }, new[] { 12, 14 }, new[] { 16, 25 }, new[] { 6 }, new[] { 21 } },    // Bamboo Temple
         };
 
         public static int[] LevelsOf(int region, SpecialLevelType type) { return Placement[region - 1][Array.IndexOf(SpecialLevels.All, type)]; }
@@ -61,7 +62,7 @@ namespace FluffyClimbers.Simulation.Tests
             for (int region = 1; region <= 5; region++)
             {
                 foreach (SpecialLevelType t in SpecialLevels.All)
-                    Assert.Equal(t == SpecialLevelType.BossRise ? 2 : 1, all.Count(l => l.Region == region && SpecialLevels.TypeOf(l.Spec) == t));
+                    Assert.Equal(t == SpecialLevelType.BossRise || t == SpecialLevelType.SkyHoops ? 2 : 1, all.Count(l => l.Region == region && SpecialLevels.TypeOf(l.Spec) == t));
                 Assert.True(all.Count(l => l.Region == region && !SpecialLevels.IsActive(SpecialLevels.TypeOf(l.Spec)) && SpecialLevels.TypeOf(l.Spec) != SpecialLevelType.None) == 0, "the retired types are used by no level");
                 Assert.Equal(15, all.Count(l => l.Region == region && SpecialLevels.TypeOf(l.Spec) == SpecialLevelType.None));
                 foreach (LoadedLevel ll in all.Where(l => l.Region == region && GemLevels.IsCollectibleGemLevelIndex(l.Spec.LevelIndex)))
@@ -100,13 +101,6 @@ namespace FluffyClimbers.Simulation.Tests
                 switch (SpecialLevels.TypeOf(ll.Spec))
                 {
                     case SpecialLevelType.NoWallTouch: Assert.Equal(GoalType.NoWallBounce, ll.Spec.Goal.Type); Assert.Equal(SpecialLevelType.None, ll.Spec.Special); break;
-                    case SpecialLevelType.ComboGates:
-                        Assert.Equal(GoalType.ComboGates, ll.Spec.Goal.Type);
-                        Assert.Equal(3, ll.Spec.Goal.Value);   // floors of a combo jump
-                        Assert.Equal(3, ll.Spec.Goal.Count);   // gates
-                        Assert.Equal(SpecialLevelType.None, ll.Spec.Special);
-                        Assert.Equal(3, GateRules.Count(ll.Spec));
-                        break;
                     case SpecialLevelType.SkyHoops:
                         Assert.Equal(GoalType.SkyHoops, ll.Spec.Goal.Type);
                         Assert.Equal(8, ll.Spec.Goal.Value);   // rings needed
@@ -165,13 +159,17 @@ namespace FluffyClimbers.Simulation.Tests
         [Fact]
         public void TheLookupNamesEveryTypeAndMapsGoalsAndRuleIds()
         {
-            Assert.Equal(9, SpecialLevels.Count);
-            Assert.Equal(9, SpecialLevels.All.Length);
+            Assert.Equal(8, SpecialLevels.Count);
+            Assert.Equal(8, SpecialLevels.All.Length);
             Assert.Equal(6, SpecialLevels.RewardCount);
             Assert.Equal(6, SpecialLevels.RewardTypes.Length);
             foreach (SpecialLevelType t in SpecialLevels.RewardTypes) Assert.Contains(t, SpecialLevels.All);
             Assert.DoesNotContain(SpecialLevelType.ComboClimb, SpecialLevels.All);
             Assert.DoesNotContain(SpecialLevelType.Chase, SpecialLevels.All);
+            Assert.DoesNotContain(SpecialLevelType.ComboGates, SpecialLevels.All);   // retired 2026-11-26 (owner): Sky Hoops took its levels and its reward slot
+            Assert.DoesNotContain(SpecialLevelType.ComboGates, SpecialLevels.RewardTypes);
+            Assert.Contains(SpecialLevelType.SkyHoops, SpecialLevels.RewardTypes);
+            Assert.False(SpecialLevels.IsActive(SpecialLevelType.ComboGates));
             Assert.False(SpecialLevels.IsActive(SpecialLevelType.ComboClimb));
             Assert.False(SpecialLevels.IsActive(SpecialLevelType.Chase));
             Assert.False(SpecialLevels.IsActive(SpecialLevelType.None));
@@ -665,184 +663,6 @@ namespace FluffyClimbers.Simulation.Tests
                 Assert.True(ticks <= half, ticks + " ticks");
         }
 
-        // ------------------------------------------------------------------ Combo Climb
-
-        [Fact]
-        public void ComboClimbNeedsTheComboJumpsAndTheTopRow()
-        {
-            LevelSpec spec = T3.Spec(1, 500, 14, SignatureKind.None, GoalType.ComboChain, 3, 3);
-            spec.Rows = 105;
-            Assert.Equal(105, spec.TargetRow());
-            SimState s = new SimState();
-            s.JumpHist = 3UL << 16;                         // three jumps of exactly 3 floors
-            s.Row = 104;
-            Assert.True(GoalEvaluator.ComboJumpsDone(spec, s));
-            Assert.Equal(3, GoalEvaluator.ComboJumpsMade(spec, s));
-            Assert.False(GoalEvaluator.IsComplete(spec, s), "the jumps alone do not clear the level");
-            Assert.False(GoalEvaluator.IsFailed(spec, s));
-            s.Row = 105;
-            Assert.True(GoalEvaluator.IsComplete(spec, s));
-            Assert.False(GoalEvaluator.IsFailed(spec, s));
-
-            s.JumpHist = (2UL << 16) | (9UL << 8) | 40UL;  // two 3-floor jumps, nine 2-floor jumps, forty 1-floor jumps
-            Assert.Equal(2, GoalEvaluator.ComboJumpsMade(spec, s));
-            Assert.False(GoalEvaluator.IsComplete(spec, s));
-            Assert.True(GoalEvaluator.IsFailed(spec, s), "at the top without the combo jumps the goal is lost");
-            s.Row = 104;
-            Assert.False(GoalEvaluator.IsFailed(spec, s), "below the top the jumps can still be made");
-            s.JumpHist |= 1UL << 32;                        // one 5-floor jump counts as a 3+ floor jump
-            s.Row = 105;
-            Assert.True(GoalEvaluator.IsComplete(spec, s));
-            Assert.Equal(3, GoalEvaluator.ComboJumpsMade(spec, s));
-        }
-
-        // ------------------------------------------------------------------ Combo Gates (Final Change 6)
-
-        [Fact]
-        public void GateRowsAreAPureFunctionOfTheHeightAboutAQuarterHalfAndThreeQuartersUp()
-        {
-            int len = GateRules.Length(3);
-            Assert.Equal(5, len);
-            foreach (int rows in new[] { 75, 90, 105, 120, 150 })
-            {
-                int prevEnd = 0;
-                for (int k = 0; k < 3; k++)
-                {
-                    int start = GateRules.StartRow(rows, k, 3, len), end = GateRules.EndRow(rows, k, 3, len);
-                    Assert.Equal(start + len - 1, end);
-                    Assert.True(start > prevEnd + 2, "gate " + k + " of " + rows + " rows is clear of the one below");
-                    Assert.True(end <= rows - 3, "gate " + k + " keeps 3 rows under the top");
-                    int centre = (start + end) / 2;
-                    Assert.InRange(centre * 100 / rows, 25 * (k + 1) - 3, 25 * (k + 1) + 3);   // 25, 50 and 75 percent
-                    for (int r = start; r <= end; r++) Assert.Equal(k, GateRules.GateOfRow(rows, 3, len, r));
-                    prevEnd = end;
-                }
-                Assert.Equal(-1, GateRules.GateOfRow(rows, 3, len, 1));
-                Assert.Equal(-1, GateRules.GateOfRow(rows, 3, len, rows));
-            }
-        }
-
-        static LevelSpec GatesSpec(int rows)
-        {
-            LevelSpec spec = T3.Spec(1, 777, 16, SignatureKind.None, GoalType.ComboGates, 3, 3);
-            spec.Rows = rows;
-            return spec;
-        }
-
-        [Fact]
-        public void ComboGatesNeedsEveryGateAndTheTopRowAndALeftBehindGateEndsTheRun()
-        {
-            LevelSpec spec = GatesSpec(105);
-            int len = GateRules.Length(3);
-            int e0 = GateRules.EndRow(105, 0, 3, len), e1 = GateRules.EndRow(105, 1, 3, len);
-            SimState s = new SimState();
-            s.Row = 1;
-            Assert.False(GoalEvaluator.IsFailed(spec, s));
-            s.Row = e0;                                    // still inside gate 0: it can be cleared on its last rung
-            Assert.False(GoalEvaluator.IsFailed(spec, s));
-            s.Row = e0 + 1;                                // the row above gate 0 without its bit: the run ends right there
-            Assert.True(GoalEvaluator.IsFailed(spec, s));
-            Assert.Equal(0, GateRules.MissedGate(spec, s.Row, 0));
-            s.GateMask = 1;                                // gate 0 done
-            Assert.False(GoalEvaluator.IsFailed(spec, s));
-            s.Row = e1 + 1;
-            Assert.True(GoalEvaluator.IsFailed(spec, s));
-            Assert.Equal(1, GateRules.MissedGate(spec, s.Row, 1));
-            s.GateMask = 1 | 2;
-            Assert.False(GoalEvaluator.IsFailed(spec, s));
-            s.Row = 105;
-            Assert.True(GoalEvaluator.IsFailed(spec, s), "gate 2 was left behind");
-            Assert.False(GoalEvaluator.IsComplete(spec, s));
-            s.GateMask = 7;
-            Assert.False(GoalEvaluator.IsFailed(spec, s));
-            Assert.True(GoalEvaluator.IsComplete(spec, s));
-            Assert.Equal(3, GoalEvaluator.GatesCleared(spec, s));
-            s.Row = 104;
-            Assert.False(GoalEvaluator.IsComplete(spec, s), "the gates alone do not clear the level");
-        }
-
-        /// <summary>
-        /// Hand-built towers: with rungs 1.2 u apart a standing jump (4.51 u) always lands 3 rungs up, so the jump from row 0 lands on row 3 (outside the gate, no bit) and the next one on row 6 (inside, bit set);
-        /// with rungs 1.8 u apart it lands 2 rungs up, which is inside the gate but gains only 2 floors (no bit).
-        /// </summary>
-        [Fact]
-        public void TheSimSetsAGateBitOnlyForAComboJumpLandedInsideTheGate()
-        {
-            SimConfig cfg = new SimConfig();
-            LevelSpec spec = RuleSpec(SpecialLevelType.None);
-            spec.Goal.Type = GoalType.ComboGates; spec.Goal.Value = 3; spec.Goal.Count = 1; spec.Rows = 12;
-
-            var plats = new List<Platform>();
-            for (int r = 1; r <= 12; r++) plats.Add(T3.P(r, 5, 1.2 * r, 9, PlatformKind.Normal));
-            LevelData d = T3.World(cfg, null, null, plats.ToArray());
-            d.Rows = 12;
-            d.GateStartRows = new[] { 4 };   // rows 4 to 8
-            d.GateLength = 5;
-            d.GateFloors = 3;
-            Sim sim = new Sim(cfg, d, spec);
-            SimState s = sim.NewState();
-            sim.Step(ref s, SimInput.Jump);
-            for (int t = 0; t < 400 && !s.Grounded && !s.Dead; t++) sim.Step(ref s, 0);
-            Assert.True(s.Grounded && s.Row == 3 && s.LastJumpFloors == 3, "landed on row 3 (outside the gate), row " + s.Row);
-            Assert.Equal(0, s.GateMask);
-            sim.Step(ref s, SimInput.Jump);
-            for (int t = 0; t < 400 && !s.Grounded && !s.Dead; t++) sim.Step(ref s, 0);
-            Assert.True(s.Grounded && s.Row == 6 && s.LastJumpFloors == 3, "landed on row 6 (inside the gate), row " + s.Row);
-            Assert.Equal(1, s.GateMask);
-            Assert.Equal(1, GoalEvaluator.GatesCleared(spec, s));
-
-            var wide = new List<Platform>();
-            for (int r = 1; r <= 12; r++) wide.Add(T3.P(r, 5, 1.8 * r, 9, PlatformKind.Normal));
-            LevelData d2 = T3.World(cfg, null, null, wide.ToArray());
-            d2.Rows = 12;
-            d2.GateStartRows = new[] { 1 };
-            d2.GateLength = 5;
-            d2.GateFloors = 3;
-            Sim sim2 = new Sim(cfg, d2, spec);
-            SimState u = sim2.NewState();
-            sim2.Step(ref u, SimInput.Jump);
-            for (int t = 0; t < 400 && !u.Grounded && !u.Dead; t++) sim2.Step(ref u, 0);
-            Assert.True(u.Grounded && u.Row == 2 && u.LastJumpFloors == 2, "landed on row 2 inside the gate with 2 floors, row " + u.Row + " gained " + u.LastJumpFloors);
-            Assert.Equal(0, u.GateMask);
-        }
-
-        /// <summary>The gates of every shipped Combo Gates level hold a ladder a STANDING jump can climb: three rungs up are 3.6 u, under the standing peak, in one column.</summary>
-        [Fact]
-        public void TheGatesOfEveryShippedComboGatesLevelAreWithinAStandingJump()
-        {
-            SimConfig cfg = new SimConfig();
-            Fx v0 = cfg.JumpSpeed(Fx.Zero);
-            Fx standingPeak = v0 * v0 / (cfg.Gravity * 2);   // 4.51 u
-            int n = 0;
-            foreach (LoadedLevel ll in Shipped().Where(l => SpecialLevels.TypeOf(l.Spec) == SpecialLevelType.ComboGates))
-            {
-                foreach (int seed in new[] { 0, 11, 222, 3333 })
-                {
-                    LevelSpec spec = ll.Spec.WithAttemptSeed(seed);
-                    LevelData d = LevelBuilder.Build(cfg, spec);
-                    int rows = spec.RowsFor();
-                    Assert.Equal(3, d.GateStartRows.Length);
-                    Assert.Equal(5, d.GateLength);
-                    Assert.Equal(3, d.GateFloors);
-                    for (int k = 0; k < 3; k++)
-                    {
-                        Assert.Equal(GateRules.StartRow(rows, k, 3, 5), d.GateStartRows[k]);
-                        Platform[] rungs = d.Platforms.Where(p => p.Row >= d.GateStartRows[k] && p.Row < d.GateStartRows[k] + d.GateLength).ToArray();
-                        Assert.Equal(5, rungs.Length);
-                        for (int i = 0; i + 3 < rungs.Length; i++)
-                        {
-                            Assert.Equal(PlatformKind.Normal, rungs[i].Kind);
-                            Assert.True(rungs[i + 3].Y - rungs[i].Y < standingPeak * 85 / 100, ll.Id + " gate " + k + " rung " + i);
-                            Assert.Equal(rungs[i].X.Raw, rungs[i + 3].X.Raw);
-                        }
-                        Assert.DoesNotContain(d.Hazards, h => h.Y > rungs[0].Y && h.Y < rungs[4].Y);   // no gong in a gate
-                    }
-                }
-                n++;
-            }
-            Assert.Equal(5, n);
-        }
-
         // ------------------------------------------------------------------ Sky Hoops (Final Change 6)
 
         [Fact]
@@ -880,7 +700,7 @@ namespace FluffyClimbers.Simulation.Tests
             int n = 0;
             foreach (LoadedLevel ll in Shipped().Where(l => SpecialLevels.TypeOf(l.Spec) == SpecialLevelType.SkyHoops))
             {
-                foreach (int seed in new[] { 0, 5, 77 })
+                foreach (int seed in new[] { 0, 5, 77, 7001, 7002, 7003, 7004, 7005, 7006, 7007, 7008, 7009, 7010 })
                 {
                     LevelSpec spec = ll.Spec.WithAttemptSeed(seed);
                     LevelData d = LevelBuilder.Build(cfg, spec);
@@ -899,7 +719,7 @@ namespace FluffyClimbers.Simulation.Tests
                 }
                 n++;
             }
-            Assert.Equal(5, n);
+            Assert.Equal(10, n);   // two Sky Hoops levels in each of the five regions
         }
 
         [Fact]
@@ -929,19 +749,34 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.Equal(1, s.Rings);
         }
 
-        // ------------------------------------------------------------------ the retired Combo Climb stays decodable
+        // ------------------------------------------------------------------ the removed Combo Climb, Combo Gates and Chase stay decodable
 
         [Fact]
-        public void TheRetiredComboClimbAndChaseStillBuildAndPlayFromOldData()
+        public void TheRemovedComboClimbComboGatesAndChaseStillDecodeAndBuildPlainLevelsWithoutAnyLadder()
         {
             SimConfig cfg = new SimConfig();
             LevelSpec combo = T3.Spec(1, 500, 14, SignatureKind.None, GoalType.ComboChain, 3, 3);
             combo.Rows = 105;
-            LevelData d = LevelBuilder.Build(cfg, combo);
-            Assert.True(d.LadderStartRow > 0 && d.LadderEndRow == 102);
-            Assert.Null(d.GateStartRows);
+            LevelSpec gates = T3.Spec(1, 501, 16, SignatureKind.None, GoalType.ComboGates, 3, 3);
+            gates.Rows = 105;
             Assert.Equal(SpecialLevelType.ComboClimb, SpecialLevels.TypeOf(combo));
-            LevelSpec chase = T3.Spec(1, 501, 14, SignatureKind.None, GoalType.BossChase, 105);
+            Assert.Equal(SpecialLevelType.ComboGates, SpecialLevels.TypeOf(gates));
+            Assert.Equal(GoalType.ComboChain, GoalTypes.FromId("comboChain"));
+            Assert.Equal(GoalType.ComboGates, GoalTypes.FromId("comboGates"));
+            foreach (LevelSpec spec in new[] { combo, gates })
+            {
+                LevelData d = LevelBuilder.Build(cfg, spec);
+                Assert.Equal(105, d.Rows);
+                Assert.Equal(d.Rows, d.Platforms.Select(p => p.Row).Max());
+                SimState s = new SimState();
+                s.Row = 104;
+                Assert.False(GoalEvaluator.IsComplete(spec, s));
+                s.Row = 105;
+                Assert.True(GoalEvaluator.IsComplete(spec, s), "a removed goal plays as a plain reach-the-top level");
+                Assert.False(GoalEvaluator.IsFailed(spec, s));
+                Assert.Equal("", SpecialLevels.RuleText(SpecialLevels.TypeOf(spec)));
+            }
+            LevelSpec chase = T3.Spec(1, 502, 14, SignatureKind.None, GoalType.BossChase, 105);
             chase.Ramp = true;
             Assert.Equal(SpecialLevelType.Chase, SpecialLevels.TypeOf(chase));
             Assert.True(new Sim(cfg, LevelBuilder.Build(cfg, chase), chase).CampaignRamp);

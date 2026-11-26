@@ -38,7 +38,7 @@ namespace FluffyClimbers.Simulation
         private const int ChunkEndReserve = 12;
 
         /// <summary>
-        /// Balanced mode: the rows that carry the level's signature platform. Exactly round(share * free rows) of the generated rows (not ladder, chunk or
+        /// Balanced mode: the rows that carry the level's signature platform. Exactly round(share * free rows) of the generated rows (not chunk or
         /// hidden gem rows), picked by a seeded shuffle. Bounce kinds are never chained, so they take no row next to another bounce row or a chunk.
         /// </summary>
         private static bool[] PlanSignatureRows(LevelSpec spec, PlatformKind sigKind, int sigShare, int rows, bool[] locked, int gemRow)
@@ -134,43 +134,10 @@ namespace FluffyClimbers.Simulation
                 if (sigShare > cfg.SignatureMaxPercent) sigShare = cfg.SignatureMaxPercent;
             }
 
-            // ---- plan fixed-position elements: combo ladder, chunks, hidden gem, wave ----
+            // ---- plan fixed-position elements: chunks, hidden gem, wave (the combo ladder and the Combo Gates ladders were removed 2026-11-26) ----
             bool[] locked = new bool[rows + 3];
             LevelData data = new LevelData();
             data.Rows = rows;
-
-            int ladderStart = -1, ladderLen = 0, ladderV = 0;
-            if (spec.Goal.Type == GoalType.ComboChain)
-            {
-                ladderV = spec.Goal.Value < 2 ? 2 : spec.Goal.Value;
-                int cnt = spec.Goal.Count < 1 ? 1 : spec.Goal.Count;
-                ladderLen = ladderV * cnt + 2;
-                // Doc 25: the ladder sits at the TOP of a combo level (the run ends on it, so the whole level has to be climbed first).
-                ladderStart = rows - 2 - ladderLen;
-                if (ladderStart < 5) ladderStart = 5;
-                for (int r = ladderStart; r < ladderStart + ladderLen; r++) locked[r] = true;
-                data.LadderStartRow = ladderStart;
-                data.LadderEndRow = ladderStart + ladderLen - 1;
-            }
-
-            // Combo Gates (Final Change 6): the same ladder, built three times (GateRules: about 25, 50 and 75 percent of the height), each a short column of rungs the combo jump is landed on.
-            int[] gateStarts = null;
-            int gateCount = GateRules.Count(spec);
-            if (gateCount > 0)
-            {
-                int gateFloors = GateRules.Floors(spec);
-                ladderV = gateFloors;
-                ladderLen = GateRules.Length(gateFloors);
-                gateStarts = new int[gateCount];
-                for (int k = 0; k < gateCount; k++)
-                {
-                    gateStarts[k] = GateRules.StartRow(rows, k, gateCount, ladderLen);
-                    for (int r = gateStarts[k]; r < gateStarts[k] + ladderLen; r++) locked[r] = true;
-                }
-                data.GateStartRows = gateStarts;
-                data.GateLength = ladderLen;
-                data.GateFloors = gateFloors;
-            }
 
             // Boss Rise (owner Final Change 6, 2026-11-25): the top BossArenaRows rows are the boss arena (wide painted platforms, no special platforms, no hazards, no row mates).
             // Sprint and Rest: every ShelterRows floors the spine platform is an 8 u shelter (a Normal platform of the shelter width; no special kind, no row mate).
@@ -245,7 +212,6 @@ namespace FluffyClimbers.Simulation
             PlatformKind[] specialPlan = specials ? SpecialPlatforms.Plan(cfg, spec, SignatureKinds.PlatformFor(spec.Signature), rows, locked, gemRow) : null;
             bool[] sigRow = !specials && balanced && sigShare > 0 ? PlanSignatureRows(spec, sigKind, sigShare, rows, locked, gemRow) : null;
             int prevDir = 0;
-            int prevPhase = 0;                // Final Change 6: the member index of the previous Glowworm Relay pad
             Fx prevAmp = Fx.Zero;             // Final Change 6: the swing / dart length of the previous platform (Dragonfly Dart, Dewdrop Mirror Leaf)
 
             // Doc 25: 1.3 platforms per row = the spine platform of every row plus row mates on round(0.3 x rows) rows. The rows are drawn up front
@@ -298,47 +264,6 @@ namespace FluffyClimbers.Simulation
             int jellyRun = -1;   // Final Change 6: position of the current row inside a Moon Jelly Chain (0 first pad, 1, 2), -1 when the row is no jelly pad
             while (rowNo <= rows)
             {
-                // ---------- combo ladder ----------
-                if (rowNo == ladderStart || (gateStarts != null && System.Array.IndexOf(gateStarts, rowNo) >= 0))
-                {
-                    Fx gap0 = rng.Range(Fx.Lerp(gapEasyLo, gapHardLo, d), Fx.Lerp(gapEasyHi, gapHardHi, d));
-                    gap0 = Fx.Min(gap0, cfg.NormalGapMax);
-                    // The row below the ladder sits more than one window under its first rung, so no window holds more than MaxPerWindow.
-                    gap0 = Fx.Max(gap0, WindowHeight + Fx.FromRatio(5, 100));
-                    gap0 = Fx.Min(gap0, cfg.NormalGapMax);
-                    if (prevKind == PlatformKind.Sticky) gap0 = Fx.Min(gap0, cfg.StickyNextGapMax);
-                    bool lAfterBounce = PlatformKinds.IsBouncePad(prevKind);
-                    if (lAfterBounce) gap0 = Fx.Min(gap0, cfg.BounceNextGapMax);
-                    Fx jm0 = prevKind == PlatformKind.Sticky ? cfg.StickyJumpMultiplier : Fx.One;
-                    // Rungs closer than LadderMinStackGap would stack 5+ platforms in a window: such ladders (comboChain value 4+) use
-                    // rungs of LadderMinRung and alternate between two columns that are at least 2 u apart edge to edge.
-                    Fx rung = cfg.ComboLadderSpan / ladderV;
-                    bool zig = rung < cfg.LadderMinStackGap;
-                    if (zig && rung < cfg.LadderMinRung) rung = cfg.LadderMinRung;
-                    Fx lw = zig ? cfg.LadderZigWidth : cfg.ComboLadderWidth;
-                    Fx lim0 = cfg.LayoutMaxReachDx(gap0, jm0) * 6 / 10 + (prevW + lw) / 2 + half;
-                    if (lAfterBounce) lim0 = Fx.Min(lim0, cfg.BounceNextDxMax + (prevW + lw) / 2);
-                    Fx xl = prevX + Fx.Clamp(screen / 2 - prevX, -lim0, lim0);
-                    xl = Fx.Clamp(xl, lw / 2, screen - lw / 2);
-                    Fx xOther = xl;
-                    if (zig)
-                    {
-                        Fx colSep = lw + cfg.LadderColumnGap;
-                        Fx edge = lw / 2;
-                        if (xl < screen / 2) { xl = Fx.Clamp(xl, edge, screen - edge - colSep); xOther = xl + colSep; }
-                        else { xl = Fx.Clamp(xl, edge + colSep, screen - edge); xOther = xl - colSep; }
-                    }
-                    for (int i = 0; i < ladderLen; i++)
-                    {
-                        y = y + (i == 0 ? gap0 : rung);
-                        ctx.Add(rowNo + i, PlatformKind.Normal, (i & 1) == 0 ? xl : xOther, y, lw, Fx.Zero, 0, 0);
-                    }
-                    xl = (ladderLen & 1) == 1 ? xl : xOther;
-                    prevX = xl; prevW = lw; prevKind = PlatformKind.Normal;
-                    rowNo += ladderLen;
-                    continue;
-                }
-
                 // ---------- authored chunk ----------
                 if (chunkAt[rowNo] >= 0)
                 {
@@ -480,9 +405,8 @@ namespace FluffyClimbers.Simulation
                 }
                 if (jellyRun >= 1) dx = Fx.Min(dx, cfg.JellyNextDxMax);   // (again after the zigzag sweep)
                 if (jellyRun == 0) dx = Fx.Min(dx, cfg.JellyEntryDxMax);
-                // Final Change 6, region 1: the pads of one relay sit close together (the climb is timed), and the row after a mirror leaf is reachable from the whole slide
-                if (kind == PlatformKind.GlowwormRelay && prevKind == PlatformKind.GlowwormRelay) dx = Fx.Min(dx, cfg.RelayDxMax);
-                if (prevKind == PlatformKind.DewdropMirrorLeaf) dx = Fx.Min(dx, Fx.Max(Fx.Zero, dxLimit - prevAmp));
+                // Final Change 6, region 1: the row after a mirror leaf is reachable from the whole slide
+                if (prevKind == PlatformKind.DewdropMirrorLeaf || prevKind == PlatformKind.CloverSwap) dx = Fx.Min(dx, Fx.Max(Fx.Zero, dxLimit - prevAmp));   // a Clover Swap pair: prevX is its centre, prevAmp the half distance between the homes (2026-11-26)
                 Fx x = prevX + dx * dir;
                 if (x < lo || x > hi) x = prevX - dx * dir;
                 x = Fx.Clamp(x, lo, hi);
@@ -497,12 +421,27 @@ namespace FluffyClimbers.Simulation
                 // After a dragonfly dart the next platform sits on the other side of the dart, reachable from the resting and from the darted position.
                 if (prevKind == PlatformKind.DragonflyDart && prevDir != 0) x = SpecialPlatforms.DartNextX(prevX, prevDir, prevAmp, dx, dxLimit, w, screen);
 
+                // Clover Swap (2026-11-26): a PAIR of slabs on this row (homes x -/+ h), both inside the walls and within reach of the row below; the stack rule leaves room for the pair (at most one other platform in the window).
+                // No pair fits = the row stays Normal.
+                bool clover = false;
+                Fx cloverH = Fx.Zero;
+                if (kind == PlatformKind.CloverSwap)
+                {
+                    Fx cc = x, cw = w;
+                    if (CountInWindow(ctx.Plats, y) <= MaxPerWindow - 3 && SpecialPlatforms.CloverPair(cfg, prevX, dxLimit - w / 2, screen, ref cc, ref cw, out cloverH)) { clover = true; x = cc; w = cw; }
+                    else kind = PlatformKind.PollenPuff;   // no pair fits here: the row keeps a special kind (the level's special row count never depends on the seed): a helpful Pollen Puff slab
+                }
+
                 Fx amp = Fx.Zero;
                 int period = 0, phase = 0, pdir = 0;
-                if (PlatformKinds.IsRegionNew(kind))
+                if (clover)
+                {
+                    amp = cloverH * 2;   // Platform.Amplitude = the distance between the two homes
+                }
+                else if (PlatformKinds.IsRegionNew(kind))
                 {
                     SpecialPlatforms.Params(cfg, ref rng, kind, x, Fx.Min(x - lo, hi - x), screen, out amp, out period, out phase, out pdir);
-                    SpecialPlatforms.FinishParams(cfg, kind, x, w, screen, prevKind, prevPhase, ref amp, ref period, ref phase, ref pdir);   // relay member index, dart length, mirror limit (Final Change 6)
+                    SpecialPlatforms.FinishParams(cfg, kind, x, w, screen, prevKind, ref amp, ref period, ref phase, ref pdir);   // dart length, mirror limit (Final Change 6)
                     x = SpecialPlatforms.FitSwing(kind, x, w, amp, screen, prevX, dxLimit);   // Ladybug / Turtle keep their whole path (never amplitude 0 at a wall)
                 }
                 else if (kind == PlatformKind.Moving)
@@ -517,7 +456,22 @@ namespace FluffyClimbers.Simulation
                     phase = rng.Next(period);
                 }
                 else if (kind == PlatformKind.Vanishing) phase = rng.Next(cfg.VanishVisibleTicks + cfg.VanishHiddenTicks);
-                ctx.Add(row, kind, x, y, w, amp, period, phase, pdir);
+                if (clover)
+                {
+                    ctx.Add(row, kind, x - cloverH, y, w, amp, 0, 0, 0);   // member 0 (Phase 0): the left home
+                    Platform mate = new Platform();
+                    mate.Id = ctx.Plats.Count;
+                    mate.Row = row;
+                    mate.Kind = PlatformKind.CloverSwap;
+                    mate.X = x + cloverH;   // member 1 (Phase 1): the right home
+                    mate.Y = y;
+                    mate.Width = w;
+                    mate.Amplitude = amp;
+                    mate.Phase = 1;
+                    ctx.Plats.Add(mate);
+                    amp = cloverH;   // the next row is placed from the centre of the pair with the half distance as its swing (prevX, prevAmp)
+                }
+                else ctx.Add(row, kind, x, y, w, amp, period, phase, pdir);
 
                 if (row == gemRow)
                 {
@@ -554,6 +508,10 @@ namespace FluffyClimbers.Simulation
                     data.HiddenGemRow = row;
                     data.HiddenGemX = hiddenGemX;
                 }
+                else if (clover)
+                {
+                    if (extraRow[row]) extraDebt++;   // the pair already fills the row: its row mate moves to a later row
+                }
                 else if (extraRow[row] || extraDebt > 0)
                 {
                     // Row mate (doc 25: 1.3 platforms per row). A mate that finds no spot moves to a later row (extraDebt).
@@ -561,7 +519,7 @@ namespace FluffyClimbers.Simulation
                     else if (extraRow[row]) extraDebt++;
                 }
 
-                prevX = x; prevW = w; prevKind = kind; prevDir = pdir; prevPhase = phase; prevAmp = amp;
+                prevX = x; prevW = w; prevKind = kind; prevDir = pdir; prevAmp = amp;
                 rowNo++;
             }
 
@@ -575,11 +533,11 @@ namespace FluffyClimbers.Simulation
             }
 
             // ---- pickups ----
-            data.Pickups = BuildPickups(cfg, spec, ctx, data.Platforms, rows, StarLimitRow(spec, rows, ladderStart, data.HiddenGemRow), d, hiddenGemPlaced, hiddenGemX, hiddenGemY);
+            data.Pickups = BuildPickups(cfg, spec, ctx, data.Platforms, rows, StarLimitRow(spec, rows, data.HiddenGemRow), d, hiddenGemPlaced, hiddenGemX, hiddenGemY);
             if (spec.Goal.Type == GoalType.SkyHoops && !spec.Endless) data.Pickups = AddRings(cfg, spec, data.Platforms, data.Pickups, rows, d);   // Sky Hoops: rings on the arcs of real jumps (own file part, RingPlacement)
 
             // ---- hazards ----
-            data.Hazards = BuildHazards(cfg, spec, ctx, data.Platforms, data.Pickups, rows, d, wave, waveStart, waveEnd, ladderStart, ladderLen);
+            data.Hazards = BuildHazards(cfg, spec, ctx, data.Platforms, data.Pickups, rows, d, wave, waveStart, waveEnd);
             if (bossLevel && data.Hazards.Length > 0) data.Hazards = WithoutArenaHazards(cfg, data.Hazards, data.Platforms, rows);
             if (spec.Goal.Type == GoalType.RivalRace && spec.GhostRowAtTick != null && spec.GhostRowAtTick.Length > 1) data.GhostRowAtTick = spec.GhostRowAtTick;   // Rival Race: the baked ghost path rides with the level data (and its hash)
             return data;
@@ -734,7 +692,7 @@ namespace FluffyClimbers.Simulation
                 for (int i = j - 1; i >= 0 && plats[i].Row == plats[j].Row; i--)
                 {
                     if (plats[i].Width >= Fx.FromInt(9) || (drop != null && drop[i])) continue;
-                    Fx gap = Fx.Abs(plats[j].X - plats[i].X) - plats[i].Width / 2 - plats[i].Amplitude - plats[j].Width / 2 - plats[j].Amplitude;
+                    Fx gap = Fx.Abs(plats[j].X - plats[i].X) - plats[i].Width / 2 - SwingOf(plats[i]) - plats[j].Width / 2 - SwingOf(plats[j]);
                     if (gap >= TouchLimit) continue;
                     if (drop == null) drop = new bool[plats.Length];
                     drop[j] = true; dropped++;
@@ -747,6 +705,12 @@ namespace FluffyClimbers.Simulation
             for (int i = 0; i < plats.Length; i++)
                 if (!drop[i]) { kept[k] = plats[i]; kept[k].Id = k; k++; }
             return kept;
+        }
+
+        /// <summary>Half-width of the path a platform sweeps beside its home x (its Amplitude), except for the two Clover Swap members: their Amplitude is the distance between the two homes and the pair only crosses itself, so they rest as plain slabs (2026-11-26).</summary>
+        private static Fx SwingOf(Platform p)
+        {
+            return p.Kind == PlatformKind.CloverSwap ? Fx.Zero : p.Amplitude;
         }
 
         /// <summary>Visible air kept between two platforms of one row, swing included (Region2AuditTests / PlatformSeparationTests: touching platforms read as one broken strip).</summary>
@@ -765,10 +729,10 @@ namespace FluffyClimbers.Simulation
                 for (int i = j - 1; i >= 0 && plats[i].Row == plats[j].Row; i--)
                 {
                     if (plats[i].Width >= Fx.FromInt(9)) continue;
-                    Fx need = plats[i].Width / 2 + plats[i].Amplitude + plats[j].Width / 2 + plats[j].Amplitude + MinRowGap;
+                    Fx need = plats[i].Width / 2 + SwingOf(plats[i]) + plats[j].Width / 2 + SwingOf(plats[j]) + MinRowGap;
                     Fx dist = Fx.Abs(plats[j].X - plats[i].X);
                     if (dist >= need) continue;
-                    Fx edge = plats[j].Width / 2 + plats[j].Amplitude;
+                    Fx edge = plats[j].Width / 2 + SwingOf(plats[j]);
                     Fx nx = plats[j].X >= plats[i].X ? plats[i].X + need : plats[i].X - need;
                     plats[j].X = Fx.Clamp(nx, edge, screen - edge);
                 }
@@ -785,12 +749,11 @@ namespace FluffyClimbers.Simulation
         // ------------------------------------------------------------------------------------------
         /// <summary>
         /// Highest row stars and gems may sit on. The run ends the moment the goal is met, so a pickup above that point can never be taken:
-        /// a ComboChain level ends on its ladder (stars stay below it) and a FindHiddenGem level ends on the gem row. Every other goal
+        /// a FindHiddenGem level ends on the gem row. Every other goal
         /// ends at the top, where the limit is the last row.
         /// </summary>
-        public static int StarLimitRow(LevelSpec spec, int rows, int ladderStart, int hiddenGemRow)
+        public static int StarLimitRow(LevelSpec spec, int rows, int hiddenGemRow)
         {
-            if (spec.Goal.Type == GoalType.ComboChain && ladderStart > 0) return ladderStart - 1;
             if (spec.Goal.Type == GoalType.FindHiddenGem && hiddenGemRow > 0) return hiddenGemRow - 1;
             return rows;
         }
@@ -819,7 +782,6 @@ namespace FluffyClimbers.Simulation
                 int count = (int)(expected / 1000);
                 if (gemRng.Next(1000) < (int)(expected % 1000)) count++;
                 if (count > spots) count = spots;
-                if (spec.Goal.Type == GoalType.ComboChain) count = 0;   // doc 25: combo chain levels have no gem pickups
                 int[] pool = new int[spots];
                 for (int i = 0; i < spots; i++) pool[i] = lo + i;
                 for (int i = 0; i < count; i++)
@@ -1139,22 +1101,19 @@ namespace FluffyClimbers.Simulation
         // sideways by GongAmplitude and rise a little at the swing extremes (pendulum).
         // ------------------------------------------------------------------------------------------
         private static Hazard[] BuildHazards(SimConfig cfg, LevelSpec spec, Ctx ctx, Platform[] platforms, Pickup[] pickups, int rows, Fx d,
-            bool wave, int waveStart, int waveEnd, int ladderStart, int ladderLen)
+            bool wave, int waveStart, int waveEnd)
         {
             bool gongRegion = spec.LevelIndex >= 3 && spec.Signature == SignatureKind.SwingingGongs;
             if (!gongRegion && !wave) return new Hazard[0];
-            int gateRowsCount = GateRules.Count(spec), gateRowsLen = gateRowsCount > 0 ? GateRules.Length(GateRules.Floors(spec)) : 0;   // Combo Gates rows stay free of gongs
             Rng r = new Rng(spec.Seed ^ 0x5A3C9E17);
             Fx screen = cfg.ScreenWidth;
             List<Hazard> list = new List<Hazard>();
             // Balanced mode (random attempt layouts): the number of hazard rows per density zone is exactly round(chance * rows) (at least one),
             // placed by a shuffle, so every attempt of a level has the same hazard count. Base layouts keep the independent draws.
             bool[] hitRow = null, twinRow = null;
-            if (spec.AttemptSeed != 0) PlanHazardRows(cfg, spec, d, rows, wave, waveStart, waveEnd, gongRegion, ladderStart, ladderLen, out hitRow, out twinRow);
+            if (spec.AttemptSeed != 0) PlanHazardRows(cfg, spec, d, rows, wave, waveStart, waveEnd, gongRegion, out hitRow, out twinRow);
             for (int row = 2; row <= rows; row++)
             {
-                if (ladderStart >= 0 && row >= ladderStart && row < ladderStart + ladderLen) continue;
-                if (gateRowsLen > 0 && GateRules.GateOfRow(rows, gateRowsCount, gateRowsLen, row) >= 0) continue;   // Combo Gates: no gong in a gate
                 bool inWave = wave && row >= waveStart && row <= waveEnd;
                 int chance = HazardChance(cfg, spec, d, inWave, gongRegion);
                 if (chance <= 0) continue;
@@ -1232,11 +1191,10 @@ namespace FluffyClimbers.Simulation
         /// above 0, chosen by a seeded shuffle; inside the wave zone round(chance / 2 * hit rows) of them hold two hazards.
         /// </summary>
         private static void PlanHazardRows(SimConfig cfg, LevelSpec spec, Fx d, int rows, bool wave, int waveStart, int waveEnd, bool gongRegion,
-            int ladderStart, int ladderLen, out bool[] hit, out bool[] twin)
+            out bool[] hit, out bool[] twin)
         {
             hit = new bool[rows + 3];
             twin = new bool[rows + 3];
-            int gateRowsCount = GateRules.Count(spec), gateRowsLen = gateRowsCount > 0 ? GateRules.Length(GateRules.Floors(spec)) : 0;
             Rng pr = new Rng(spec.Seed ^ 0x2C1B3C6D);
             for (int zone = 0; zone < 2; zone++)
             {
@@ -1247,8 +1205,6 @@ namespace FluffyClimbers.Simulation
                 List<int> zoneRows = new List<int>();
                 for (int row = 2; row <= rows; row++)
                 {
-                    if (ladderStart >= 0 && row >= ladderStart && row < ladderStart + ladderLen) continue;
-                    if (gateRowsLen > 0 && GateRules.GateOfRow(rows, gateRowsCount, gateRowsLen, row) >= 0) continue;
                     if ((wave && row >= waveStart && row <= waveEnd) != inWave) continue;
                     zoneRows.Add(row);
                 }

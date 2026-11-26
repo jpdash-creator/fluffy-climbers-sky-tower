@@ -49,10 +49,6 @@ namespace FluffyClimbers.Gameplay
 
         /// <summary>Keep Moving level: the run ended because the hero stood on one platform for more than the limit (not a fall).</summary>
         public bool KeepMovingTimedOut { get { return Sim.KeepMoving && State.Dead && State.StandTicks > Cfg.KeepMovingLimitTicks; } }
-        /// <summary>Combo Climb level: the top row was reached without the combo jumps asked for (the goal is lost, see GoalEvaluator.IsFailed).</summary>
-        public bool ComboMissed { get { return GoalLost && Spec.Goal.Type == GoalType.ComboChain; } }
-        /// <summary>Combo Gates level: a gate was left behind without its combo jump (the goal is lost, the run ends right there; the failed popup says "Gate missed").</summary>
-        public bool GateMissed { get { return GoalLost && Spec.Goal.Type == GoalType.ComboGates; } }
         /// <summary>Sky Hoops level: too many rings are gone or the top came without enough (the goal is lost; the failed popup says "Rings missed").</summary>
         public bool RingsMissed { get { return GoalLost && Spec.Goal.Type == GoalType.SkyHoops; } }
         /// <summary>Rival Race level: the ghost reached the top first (the goal is lost, no revive; the failed popup says "Rival won").</summary>
@@ -66,9 +62,8 @@ namespace FluffyClimbers.Gameplay
             get
             {
                 if (RivalWon) return RivalRace.LostText + "!";
-                if (GateMissed) return "Gate missed!";
                 if (RingsMissed) return "Rings missed!";
-                if (GoalLost) return ComboMissed ? "Combo missed!" : "Wall touched!";
+                if (GoalLost) return "Wall touched!";
                 return KeepMovingTimedOut ? "Too slow!" : "You fell!";
             }
         }
@@ -79,9 +74,8 @@ namespace FluffyClimbers.Gameplay
             get
             {
                 if (RivalWon) return "Your rival reached the top first.";
-                if (GateMissed) return "Land a 3-floor combo jump inside every gate.";
                 if (RingsMissed) return "You need " + RingRules.Needed(Spec) + " of the " + RingRules.Total(Spec) + " rings.";
-                if (GoalLost) return ComboMissed ? "The combo jumps were still missing at the top." : "This level fails on any wall touch.";
+                if (GoalLost) return "This level fails on any wall touch.";
                 if (KeepMovingTimedOut) return "Over 3 seconds on one platform.";
                 if (!IsEndless && Spec.OneLife) return "One Life: no revive and no Safety Net.";
                 return null;
@@ -564,13 +558,12 @@ namespace FluffyClimbers.Gameplay
 
         /// <summary>
         /// The rule line shown under the goal before the level starts: the one-sentence rule of the level's special type (SpecialLevels.RuleText, "Touching a wall ends the run."),
-        /// or null for a Regular Run and in Endless. Menus and the intro only (a Combo Climb builds its text from the goal numbers).
+        /// or null for a Regular Run and in Endless. Menus and the intro only.
         /// </summary>
         public static string GoalRule(LevelSpec spec)
         {
             SpecialLevelType type = SpecialLevels.TypeOf(spec);
             if (type == SpecialLevelType.None) return null;
-            if (type == SpecialLevelType.ComboClimb) return "A combo jump climbs " + spec.Goal.Value + " floors or more at once.";
             return SpecialLevels.RuleText(type);
         }
 
@@ -590,13 +583,11 @@ namespace FluffyClimbers.Gameplay
             {
                 case GoalType.ReachFloor: return "Reach floor " + g.Value;   // economy review 2026-11-13: no gem pickups on the rows, so no "grab the gems" line
                 case GoalType.CollectCoins: return "Collect " + g.Count + " coins";
-                case GoalType.ComboChain: return "Floor " + spec.TargetRow() + " with " + GoalEvaluator.ComboJumpsNeeded(spec) + " combo jump" + (GoalEvaluator.ComboJumpsNeeded(spec) == 1 ? "" : "s");
                 case GoalType.NoWallBounce: return "Reach floor " + g.Value;
                 case GoalType.FindHiddenGem: return "Find the hidden gem";
                 case GoalType.Speedrun: return "Reach floor " + g.Value + " in " + g.TimeSec + " s";
                 case GoalType.SurviveWave: return "Survive the wave and reach the top";
                 case GoalType.BossChase: return "Outclimb the chase: floor " + g.Value;
-                case GoalType.ComboGates: return "Floor " + spec.TargetRow() + ", combo in each gate";
                 case GoalType.SkyHoops: return "Floor " + spec.TargetRow() + " with " + RingRules.Needed(spec) + " of " + RingRules.Total(spec) + " rings";
                 default: return "Reach the top";
             }

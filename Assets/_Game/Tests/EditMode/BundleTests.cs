@@ -402,23 +402,23 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
-        public void RefreshCosts100CoinsOr5GemsAndDrawsSixNewDistinctOnes()
+        public void RefreshCosts500CoinsOr25GemsAndDrawsSixNewDistinctOnes()
         {
             ProgressService svc = NewService();
-            svc.AddCoins(250);
-            svc.AddGems(12);
+            svc.AddCoins(650);
+            svc.AddGems(60);
             List<string> first = svc.CurrentBundleOffers().Select(b => b.Id).ToList();
 
             Assert.AreEqual(BundleResult.Ok, svc.RefreshBundleOffers(true));
             Assert.AreEqual(150, svc.Coins);
-            Assert.AreEqual(12, svc.Gems);
+            Assert.AreEqual(60, svc.Gems);
             List<string> second = svc.CurrentBundleOffers().Select(b => b.Id).ToList();
             Assert.AreEqual(6, second.Distinct().Count());
             Assert.IsEmpty(second.Intersect(first), "all six are new");
 
             Assert.AreEqual(BundleResult.Ok, svc.RefreshBundleOffers(false));
             Assert.AreEqual(150, svc.Coins);
-            Assert.AreEqual(7, svc.Gems);
+            Assert.AreEqual(35, svc.Gems);
             List<string> third = svc.CurrentBundleOffers().Select(b => b.Id).ToList();
             Assert.AreEqual(6, third.Distinct().Count());
             Assert.IsEmpty(third.Intersect(second));
@@ -428,8 +428,8 @@ namespace FluffyClimbers.Tests
         public void RefreshWithAShortWalletChangesNothing()
         {
             ProgressService svc = NewService();
-            svc.AddCoins(99);
-            svc.AddGems(4);
+            svc.AddCoins(499);
+            svc.AddGems(24);
             svc.CurrentBundleOffers();
             string before = Snapshot(svc);
             Assert.AreEqual(BundleResult.NotEnoughCoins, svc.RefreshBundleOffers(true));
@@ -456,7 +456,7 @@ namespace FluffyClimbers.Tests
             var defs = new List<BundleDef>();
             for (int i = 0; i < 8; i++) defs.Add(Def("s" + i, 200, 1000 + i, Pw("pw_safety_net", 1)));
             ProgressService svc = NewService(BundleCatalog.FromDefs(defs));
-            svc.AddCoins(300);
+            svc.AddCoins(600);
             Assert.AreEqual(6, svc.CurrentBundleOffers().Select(b => b.Id).Distinct().Count());
             Assert.AreEqual(BundleResult.Ok, svc.RefreshBundleOffers(true));
             Assert.AreEqual(6, svc.CurrentBundleOffers().Select(b => b.Id).Distinct().Count());

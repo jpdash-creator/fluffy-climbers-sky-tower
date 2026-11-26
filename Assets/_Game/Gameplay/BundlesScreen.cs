@@ -11,7 +11,7 @@ namespace FluffyClimbers.Gameplay
 {
     /// <summary>
     /// The Bundles page of the shop (docs/26 section 3, docs/37; owner issue list 28 and Bug List 1 B4.a): a fixed "Refresh Bundles" header (ribbon, caption, two refresh buttons:
-    /// 5 gems or 100 coins, direct) above six slim bundle rows for gems: an "i" info button (top left) over the bag icon, the name and compact content chips (coin, power-ups,
+    /// 25 gems or 500 coins, direct) above six slim bundle rows for gems: an "i" info button (top left) over the bag icon, the name and compact content chips (coin, power-ups,
     /// the hidden hero card as an icon with a "?") on the left, the italic "Worth x2.1" text (top right, no star, no pill) over the green gem-price button on the right. No dollars anywhere. The list scrolls under the header when it does not fit. Built once into the content rect that ShopChrome.BuildBody returns; a refresh
     /// rebuilds the same rect. Menu screen only: no per-frame code, every position is an anchor, an edge offset or a fixed-size chip, so it fits
     /// 9:16, 9:19.5, 9:21 and 3:4, the safe area and 130 percent text. Touch targets are at least 48 dp (price and Refresh buttons are 130 px tall).
@@ -833,7 +833,20 @@ namespace FluffyClimbers.Gameplay
                 return;
             }
             RectTransform overlay = host.NewOverlay();
-            const float panelW = 860f, W = 780f, gap = 12f, chipsY = 250f, colW = 250f, colGap = 15f;   // 250 (was 215): a long bundle name that wraps to two lines at 130 percent text reached the first chip row on 3:4 (layout audit 2026-11-14)
+            const float panelW = 860f, W = 780f, chipsY = 250f, colW = 250f, colGap = 15f;   // 250 (was 215): a long bundle name that wraps to two lines at 130 percent text reached the first chip row on 3:4 (layout audit 2026-11-14)
+            // spacing: 12 normally, 4 when the card would be taller than this screen (3:4 with a notch at 130 percent text and a two-line bundle name); touch targets and text keep their size
+            System.Func<float, float> panelHFor = g =>
+            {
+                float ch = ChipBlockHeight(ChipRows(def));
+                float hY = chipsY + ch + g * 2f, hH = def.HiddenCard ? Mathf.Max(80f, TextHeight(heroText, 40f, W - 100f)) : 0f;
+                float cY = hY + hH + (def.HiddenCard ? g : 0f), cH = def.HiddenCard ? TextHeight("Uncommon\n40%", 40f, colW) : 0f;
+                float wY = cY + cH + (def.HiddenCard ? g : 0f), wH = WorthPillH();
+                bool hj = !string.IsNullOrEmpty(def.Joke);
+                float jY = wY + wH + g, jH = hj ? TextHeight(def.Joke, 40f, W) : 0f;
+                return Mathf.Max(1100f, (hj ? jY + jH : wY + wH) + 50f + Mathf.Max(170f, UiKit.MinTouchRef) + g);
+            };
+            float availH = overlay != null && overlay.rect.height > 100f ? overlay.rect.height : 100000f;
+            float gap = panelHFor(12f) > availH - 8f ? 4f : 12f;
             float chipsH = ChipBlockHeight(ChipRows(def));
             float heroY = chipsY + chipsH + gap * 2f, heroH = def.HiddenCard ? Mathf.Max(80f, TextHeight(heroText, 40f, W - 100f)) : 0f;
             float chanceY = heroY + heroH + (def.HiddenCard ? gap : 0f);
@@ -846,7 +859,6 @@ namespace FluffyClimbers.Gameplay
             float panelH = Mathf.Max(1100f, (hasJoke ? jokeY + jokeH : worthY + worthH) + buttonReserve);
             RectTransform panel = UiKit.BuildPopupFrame(overlay, def.Name, art, new Vector2(panelW, panelH), onDone);
             panel.name = "BundleInfoPopup";
-
             AddChipsCentered(panel, def, art, panelW, chipsY, true);
 
             if (def.HiddenCard)

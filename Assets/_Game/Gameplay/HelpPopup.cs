@@ -22,6 +22,9 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Ribbon width as a fraction of the frame width, centre height as a fraction of the frame height (its lower edge meets the inner rect), text box as fractions of the ribbon.</summary>
         public const float RibbonW = 0.66f, RibbonCenterY = 0.075f, RibbonTextW = 0.76f, RibbonTextH = 0.60f;
 
+        /// <summary>Vertical centre of the ribbon's BODY as a fraction of the ribbon picture's height from its top (measured on help_ribbon.png: the opaque body spans 3 to 192 of 306 px at the middle column, 8 to 197 at 35 percent, so about 0.33; the lower part of the picture is the folds and shadow). The title is centred on this line, whatever the screen size.</summary>
+        public const float RibbonBodyCenterY = 0.335f;
+
         /// <summary>Test hooks: set to fake the art in a test (reset to null afterwards).</summary>
         public static Sprite TestFrame, TestRibbon;
 
@@ -46,9 +49,9 @@ namespace FluffyClimbers.Gameplay
         public const string RootName = "HelpPopup", ViewportName = "HelpViewport", BackName = "HelpBack", NextName = "HelpNext", GotItName = "HelpGotIt", DotName = "HelpDot", PageName = "HelpPage", RowName = "HelpRow", MoreName = "HelpMore";
         public const int MaxPages = 6;
 
-        const float PanelMaxW = 920f, SideMargin = 24f, EdgeMargin = 40f, Pad = 40f, TitleTop = 196f, RowGap = 10f, RowPad = 10f, IconSize = 80f, ChromeGap = 16f, BottomPad = 36f, MoreH = 56f;
+        const float PanelMaxW = 1010f, SideMargin = 8f, EdgeMargin = 24f, Pad = 40f, TitleTop = 196f, RowGap = 10f, RowPad = 10f, IconSize = 88f, ChromeGap = 16f, BottomPad = 36f, MoreH = 56f;
         // inside the frame art's cream rect (smaller: the rect is only about 72 percent of the card width, 76 percent of its height)
-        const float ArtPad = 10f, ArtTitleTop = 16f, ArtBottomPad = 8f, ArtChromeGap = 8f, ArtMaxW = 1000f, DotSlotMax = 30f;
+        const float ArtPad = 10f, ArtTitleTop = 16f, ArtBottomPad = 8f, ArtChromeGap = 8f, ArtMaxW = 1100f, DotSlotMax = 30f;
 
         RectTransform root, panel, inner, strip, viewport;
         Text title;
@@ -60,7 +63,7 @@ namespace FluffyClimbers.Gameplay
         Action onClosed;
         Canvas canvas;
         float vw, stripX, targetX, scrollY, dragX, lastDx, dotBig = 26f, dotSmall = 16f;
-        bool dragHorizontal, dragging, closed, animating;
+        bool dragHorizontal, dragUndecided, dragging, closed, animating;
         GameObject moreHint;
 
         /// <summary>The page showing (0 based).</summary>
@@ -131,7 +134,9 @@ namespace FluffyClimbers.Gameplay
                 titleText.resizeTextForBestFit = true;
                 titleText.resizeTextMinSize = Mathf.RoundToInt(UiKit.MinBodyTextPx);   // CUX-5: never below 16 sp
                 titleText.resizeTextMaxSize = titleText.fontSize;
-                UiKit.Place((RectTransform)titleText.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(rw * HelpFrameArt.RibbonTextW, rh * HelpFrameArt.RibbonTextH));
+                // centred on the ribbon BODY (not on the picture, whose lower part is folds and shadow): the anchor is the body centre line as a fraction of the ribbon height, so it holds on every screen size
+                UiKit.Place((RectTransform)titleText.transform, new Vector2(0.5f, 1f - HelpFrameArt.RibbonBodyCenterY), Vector2.zero, new Vector2(rw * HelpFrameArt.RibbonTextW, rh * HelpFrameArt.RibbonTextH));
+                ((RectTransform)titleText.transform).pivot = new Vector2(0.5f, 0.5f);   // Place() pivots on the anchor: the text box itself must be centred on the body line
             }
             else
             {
@@ -268,14 +273,13 @@ namespace FluffyClimbers.Gameplay
             nxrt.pivot = new Vector2(1f, 0f);
             nxrt.sizeDelta = new Vector2(bs, bs);
             nxrt.anchoredPosition = new Vector2(-pad, bottomPad + (btnH - bs) * 0.5f);
-            float gw = n > 1 ? Mathf.Min(360f, panelW * 0.5f - pad - dotsW * 0.5f - gap) : Mathf.Min(360f, panelW - 2f * pad);
-            gw = Mathf.Max(gw, bs);
-            h.gotIt = UiKit.AddButton(layout, GotItName, "Got it", ToyKit.Button(1), Color.white, new Vector2(gw, Mathf.Max(132f, touch)), h.Dismiss, 52);
+            // the last page closes with a green tick button in the place of Next (owner 2026-11-26: no "Got it" word button); same size and style as Next, the spoken label stays "Got it"
+            h.gotIt = ToyKit.GlyphButton(layout, GotItName, "Got it", 1, Glyphs.Check, new Vector2(bs, bs), h.Dismiss, false, 0.62f);
             var gtrt = (RectTransform)h.gotIt.transform;
             gtrt.anchorMin = gtrt.anchorMax = new Vector2(1f, 0f);
             gtrt.pivot = new Vector2(1f, 0f);
-            gtrt.sizeDelta = new Vector2(gw, Mathf.Max(132f, touch));
-            gtrt.anchoredPosition = new Vector2(-pad, bottomPad + (btnH - gtrt.sizeDelta.y) * 0.5f);
+            gtrt.sizeDelta = new Vector2(bs, bs);
+            gtrt.anchoredPosition = new Vector2(-pad, bottomPad + (btnH - bs) * 0.5f);
 
             h.SetIndex(0, true);
             return h;
@@ -293,14 +297,9 @@ namespace FluffyClimbers.Gameplay
                 RectTransform rt = UiKit.Rect(content, RowName + r);
                 rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
                 rt.pivot = new Vector2(0f, 1f);
-                var bg = rt.gameObject.AddComponent<Image>();
-                bg.sprite = Theme.RoundSprite;
-                bg.type = Image.Type.Sliced;
-                bg.pixelsPerUnitMultiplier = 1.5f;
-                bg.color = Theme.SurfaceDim;   // a readable light backing under every icon and text (CUX-5)
-                bg.raycastTarget = false;
+                // no plate behind the rows (owner 2026-11-26): the dark ink text sits straight on the cream card, which is its readable backing (CUX-5)
 
-                Text t = UiKit.AddText(rt, "Text", row.Text, 40, Theme.Ink, TextAnchor.MiddleLeft);
+                Text t = UiKit.AddText(rt, "Text", row.Text, 44, Theme.Ink, TextAnchor.MiddleLeft);
                 UiKit.OnPanel(t);
                 var trt = (RectTransform)t.transform;
                 trt.anchorMin = trt.anchorMax = new Vector2(0f, 0.5f);
@@ -426,13 +425,21 @@ namespace FluffyClimbers.Gameplay
             dragging = true;
             dragX = 0f;
             lastDx = 0f;
-            dragHorizontal = pageMax[Index] <= 0f || Mathf.Abs(e.position.x - e.pressPosition.x) >= Mathf.Abs(e.position.y - e.pressPosition.y);
+            dragUndecided = true;   // horizontal (page swipe) or vertical (scroll) is decided on the first real movement, not at the instant the drag starts (no movement exists yet then)
+            dragHorizontal = pageMax[Index] <= 0f;
             animating = false;
         }
 
         public void OnDrag(PointerEventData e)
         {
             if (!dragging) return;
+            if (dragUndecided)
+            {
+                Vector2 moved = e.position - e.pressPosition;
+                if (moved.sqrMagnitude < 4f) return;   // not moved yet
+                dragUndecided = false;
+                dragHorizontal = pageMax[Index] <= 0f || Mathf.Abs(moved.x) >= Mathf.Abs(moved.y);
+            }
             float s = Scale();
             if (dragHorizontal)
             {
@@ -441,7 +448,7 @@ namespace FluffyClimbers.Gameplay
                 bool pastEnd = (Index == 0 && dragX > 0f) || (Index == PageCount - 1 && dragX < 0f);
                 ApplyStrip(pastEnd ? dragX * 0.3f : dragX);   // a little resistance at the first and last page
             }
-            else SetScroll(scrollY - e.delta.y / s);   // dragging up scrolls the content up
+            else SetScroll(scrollY + e.delta.y / s);   // the finger moves up (delta.y > 0): the content follows it up, i.e. the scroll offset (content moved up from the top edge) grows
         }
 
         public void OnEndDrag(PointerEventData e)

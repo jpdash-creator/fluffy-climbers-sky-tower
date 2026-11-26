@@ -5,7 +5,7 @@ namespace FluffyClimbers.Gameplay
 {
     /// <summary>
     /// Painted icons of the five Final Change 6 special level types and the five region boss badges (owner picks 2026-11-25, OpenArt batch 8; Resources/Art/Ui, 256 px round badges).
-    /// Every lookup returns null when the file is missing, so the caller keeps its letter glyph or number (CUX-10). The six older types stay as they are (letter badge).
+    /// Every lookup returns null when the file is missing, so the caller keeps its letter glyph or number (CUX-10). Since 2026-11-26 No Wall Touch, No Power-ups, One Life and Keep Moving have painted badges too (owner picks, icons2 sheet); the retired Combo Climb and Chase keep the letter.
     /// </summary>
     public static class SpecialIcons
     {
@@ -14,6 +14,10 @@ namespace FluffyClimbers.Gameplay
         {
             switch (type)
             {
+                case SpecialLevelType.NoWallTouch: return "icon_special_nowall";
+                case SpecialLevelType.NoPowerUps: return "icon_special_nopowerups";
+                case SpecialLevelType.OneLife: return "icon_special_onelife";
+                case SpecialLevelType.KeepMoving: return "icon_special_keepmoving";
                 case SpecialLevelType.ComboGates: return "icon_special_combogates";
                 case SpecialLevelType.SkyHoops: return "icon_special_skyhoops";
                 case SpecialLevelType.BossRise: return "icon_special_bossrise";

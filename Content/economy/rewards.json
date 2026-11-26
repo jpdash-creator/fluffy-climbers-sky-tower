@@ -564,10 +564,10 @@
       "coins": 400
     },
     {
-      "id": "w2_special_combogates",
-      "title": "Clear the Combo Gates level",
+      "id": "w2_special_skyhoops",
+      "title": "Clear the Sky Hoops level",
       "group": "special",
-      "stat": "specialType.7",
+      "stat": "specialType.8",
       "target": 1,
       "coins": 400
     },

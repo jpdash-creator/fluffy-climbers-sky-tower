@@ -11,8 +11,8 @@ namespace FluffyClimbers.Economy
     public sealed partial class ProgressService
     {
         public const int BundleOfferCount = 6;
-        public const int BundleRefreshCoins = 100;
-        public const int BundleRefreshGems = 5;
+        public const int BundleRefreshCoins = 500;   // owner 2026-11-26: 25 gems or 500 coins (1 gem = 20 coins)
+        public const int BundleRefreshGems = 25;
         /// <summary>Gems cost above which the page asks the player to confirm (docs/26: confirm above 50 gems).</summary>
         public const int BundleConfirmAboveGems = 50;
         public const int BundleTimerPercentOff = 30;
@@ -134,7 +134,7 @@ namespace FluffyClimbers.Economy
         }
 
         /// <summary>
-        /// Draws 6 new distinct bundles (none of the current ones while the catalog is big enough) and saves them. Costs 100 coins or 5 gems;
+        /// Draws 6 new distinct bundles (none of the current ones while the catalog is big enough) and saves them. Costs 500 coins or 25 gems;
         /// nothing changes when the wallet is short.
         /// </summary>
         public BundleResult RefreshBundleOffers(bool payWithCoins)

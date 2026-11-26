@@ -729,7 +729,7 @@ namespace FluffyClimbers.Simulation.Tests
             output.WriteLine("endless special share: floors 5-40 " + ep.ToString("F1") + " percent, floors 200-320 " + lp.ToString("F1") + " percent");
             Assert.InRange(ep, 8, 16);   // endless cycle: floors 5-40 are the start of level 1 (10 to 30 percent ramp over its 100 floors)
             Assert.InRange(lp, 18, 30);   // floors 200-320 are levels 2 to 4 (Bug List 6 curve: 10 to 35 percent ramps)
-            Assert.Equal(14, seen.Count);   // all seven new platforms + the four Final Change 6 kinds (Region1NewPlatformTests), the flower and the two generics (Crumble, Moving) appear
+            Assert.Equal(14, seen.Count);   // all seven new platforms + the four 2026-11-26 kinds Dragonfly Dart, Dewdrop Mirror Leaf, Clover Swap and Pollen Puff (Region1NewPlatformTests; Glowworm Relay and Silk Snare Web were deleted 2026-11-26), the flower and the two generics (Crumble, Moving) appear
         }
 
         [Fact]

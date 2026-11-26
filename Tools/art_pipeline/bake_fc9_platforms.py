@@ -4,7 +4,7 @@
     python Tools/art_pipeline/bake_fc9_platforms.py [kind ...]      (no argument = every kind below)
 
 Picks (owner 2026-11-25):
-  R1 dragonflydart   = r1_slabs_A rows 1-3 (lily pad slabs)            R1 silksnareweb  = r1_slabs_B rows 4-6 (dewy turf)
+  R1 dragonflydart   = r1_slabs_A rows 1-3 (lily pad slabs)
   R2 fogpuffdrift    = r2_slabs_B rows 1-2 (fur shelf, long widths = the plain middle repeated)
   R2 sporefunnel     = r2_slabs_A rows 5-6 (glowing vent = fixed centred shape; the slab is cut / repeated on BOTH sides of it by the same amount, the vent never stretches)
   R3 moonjellychain  = r3_jelly_B whole (rows 1-3 unarmed, rows 4-6 armed; each armed row has its own glow, keyed from its own band)
@@ -190,12 +190,6 @@ def bake_dragonfly():
     return _bake_plain(1, "dragonflydart", spread(rows, WIDTHS), WIDTHS)
 
 
-def bake_silk():
-    items = rows_of(P("r1_slabs_B"), [3, 4, 5], 8, peel={})
-    rows = make_rows(items, cols=((0.25, 0.75),))
-    return _bake_plain(1, "silksnareweb", spread(rows, WIDTHS), WIDTHS)
-
-
 def bake_fog():
     items = rows_of(P("r2_slabs_B"), [0, 1], 8, peel={"light_min": 140, "sat_max": 0.34})
     rows = make_rows(items, cols=((0.25, 0.75),))
@@ -320,7 +314,7 @@ def bake_glass():
     return pieces, outdir
 
 
-KINDS = {"dragonflydart": bake_dragonfly, "silksnareweb": bake_silk, "fogpuffdrift": bake_fog, "sporefunnel": bake_funnel, "moonjellychain": bake_jelly,
+KINDS = {"dragonflydart": bake_dragonfly, "fogpuffdrift": bake_fog, "sporefunnel": bake_funnel, "moonjellychain": bake_jelly,
          "undertowpad": bake_undertow, "splittingpier": bake_pier, "sugarglassledge": bake_glass}
 
 

@@ -49,7 +49,17 @@ namespace FluffyClimbers.Gameplay
             fc6.Clear();
             Sprite[] all = Resources.LoadAll<Sprite>("Art/Fc6/r" + ra.Index);
             if (all != null) for (int k = 0; k < all.Length; k++) fc6[all[k].name] = all[k];
+            pollenIdle = Part("pollen_idle_a");   // Pollen Puff (2026-11-26): cached once per region, so the per-frame update never looks a name up
+            pollenBurst1 = Part("pollen_burst_1");
+            pollenBurst2 = Part("pollen_burst_2");
+            pollenBurst3 = Part("pollen_burst_3");
+            pollenSpent = Part("pollen_spent");
         }
+
+        /// <summary>Pollen Puff parts (Resources/Art/Fc6/r1, baked at 130 pixels per world unit while the sprites import at 100: every pollen part is scaled to rect pixels / 130).</summary>
+        Sprite pollenIdle, pollenBurst1, pollenBurst2, pollenBurst3, pollenSpent;
+        const float PollenPixelsPerUnit = 130f;
+        const int PollenBurstTicks = 18;   // the one-shot burst after a cloud was used: frames 1, 2, 3 of 6 ticks each, then the spent remnant
 
         Sprite Part(string name)
         {
@@ -64,8 +74,8 @@ namespace FluffyClimbers.Gameplay
             switch (p.Kind)
             {
                 case PlatformKind.DewdropMirrorLeaf: return Part("dewdrop");
+                case PlatformKind.PollenPuff: second = Part("pollen_idle_b"); return Part("pollen_idle_a");   // 2026-11-26: the golden cloud over a normal slab (idle frames alternate)
                 case PlatformKind.DragonflyDart: second = Part("dragonfly_buzz"); return Part("dragonfly_perched");
-                case PlatformKind.SilkSnareWeb: return p.Width.F() <= 2.5f ? Part("web_small") : Part("web_wide");
                 case PlatformKind.FogPuffDrift: return Part("spore_cloud_" + (1 + p.Id % 3));
                 case PlatformKind.SporeFunnel:
                     if (p.Width.F() < 3.5f) { second = Part("spore_cone_narrow_b"); return Part("spore_cone_narrow_a"); }
@@ -123,11 +133,11 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.ThornBush: return new Color(0.55f, 0.78f, 0.5f, 1f);
                 case PlatformKind.Ladybug: return new Color(1f, 0.6f, 0.55f, 1f);
                 case PlatformKind.Seesaw: return new Color(0.72f, 1f, 0.72f, 1f);
-                // Final Change 6, region 1 additions (ids 43 to 46): placeholders only (moss-stone green, dragonfly blue, dewdrop silver-green, silk white), no drawn cues (CUX-7), until the painted pieces exist
-                case PlatformKind.GlowwormRelay: return new Color(0.7f, 0.95f, 0.6f, 1f);
+                // Final Change 6, region 1 additions (ids 44 and 45): placeholders only (dragonfly blue, dewdrop silver-green), no drawn cues (CUX-7), until the painted pieces exist
                 case PlatformKind.DragonflyDart: return new Color(0.6f, 0.82f, 1f, 1f);
                 case PlatformKind.DewdropMirrorLeaf: return new Color(0.78f, 1f, 0.9f, 1f);
-                case PlatformKind.SilkSnareWeb: return new Color(0.94f, 0.95f, 1f, 1f);
+                // 2026-11-26 (ids 62 and 63): clover lime placeholder; the Pollen Puff slab is a NORMAL slab, so it keeps the plain colour (its cloud is the painted overlay)
+                case PlatformKind.CloverSwap: return new Color(0.72f, 0.95f, 0.5f, 1f);
                 // Region 2 placeholders (Mushroom Grove: purple, teal, glow cyan, warm pink) until the painted pieces of the T73 packet exist
                 case PlatformKind.SquishCap: return new Color(0.85f, 0.7f, 1f, 1f);
                 case PlatformKind.SproutLift: return new Color(0.6f, 0.95f, 0.75f, 1f);
@@ -214,7 +224,7 @@ namespace FluffyClimbers.Gameplay
             if (p.Kind == PlatformKind.RollingLog) part = hasArt && logArt != null ? logArt : blank;   // the log is a moving object: a tinted block until its sprite exists
             if (alt.Length < parts.Length) System.Array.Resize(ref alt, parts.Length);
             alt[i] = null;
-            if (part == null && hasArt)
+            if (part == null && (hasArt || p.Kind == PlatformKind.PollenPuff))   // the Pollen Puff slab has no kind art of its own (normal art), only the cloud overlay
             {
                 Sprite second;
                 part = OverlayFor(p, out second);
@@ -232,10 +242,10 @@ namespace FluffyClimbers.Gameplay
             parts[i] = sr;
         }
 
-        /// <summary>Air fields (web, spore clouds and cones, funnels, magnet, jet, mist) are drawn behind the platforms so they never cover the next platform (CUX-3).</summary>
+        /// <summary>Air fields (spore clouds and cones, funnels, magnet, jet, mist) are drawn behind the platforms so they never cover the next platform (CUX-3).</summary>
         static bool BehindPlatforms(PlatformKind k)
         {
-            return k == PlatformKind.SilkSnareWeb || k == PlatformKind.FogPuffDrift || k == PlatformKind.SporeFunnel || k == PlatformKind.UndertowPad
+            return k == PlatformKind.FogPuffDrift || k == PlatformKind.SporeFunnel || k == PlatformKind.UndertowPad || k == PlatformKind.PollenPuff
                 || k == PlatformKind.CaramelMagnet || k == PlatformKind.SourSprinklerCannon || k == PlatformKind.IncenseMistBank;
         }
 
@@ -289,6 +299,28 @@ namespace FluffyClimbers.Gameplay
             switch (p.Kind)
             {
                 case PlatformKind.DewdropMirrorLeaf: Place(ov, a1, 0.9f, x, y + 0.02f, false); break;
+                case PlatformKind.PollenPuff:
+                    {
+                        // idle: two frames alternate every 30 ticks (reduced motion: the first only); used: a 18-tick burst (frames 1 to 3), then the spent remnant for the rest of the run. All bodies share one bottom edge
+                        // (burst 3 has no body: it sits on the cloud centre). Uniform scale only (rect pixels / 130), the cloud centre PollenHeight above the slab.
+                        int used = s.CrumbleTick != null ? s.CrumbleTick[p.Id] : -1;
+                        float centreY = y + sim.Cfg.PollenHeight.F();
+                        float bodyBottom = centreY - (pollenIdle != null ? pollenIdle.rect.height / PollenPixelsPerUnit : 1.8f) * 0.5f;
+                        Sprite pic = a1;
+                        bool atCentre = false;
+                        if (used < 0) { if (!reduced && a2 != null && (tick / 30) % 2 == 1) pic = a2; }
+                        else
+                        {
+                            int e = tick - used;
+                            if (reduced || e >= PollenBurstTicks) pic = pollenSpent;
+                            else { pic = e < 6 ? pollenBurst1 : (e < 12 ? pollenBurst2 : pollenBurst3); atCentre = e >= 12; }
+                        }
+                        if (pic == null) { ov.enabled = false; break; }
+                        ov.enabled = true;
+                        float ph = pic.rect.height / PollenPixelsPerUnit;
+                        Place(ov, pic, pic.rect.width / PollenPixelsPerUnit, x, atCentre ? centreY - ph * 0.5f : bodyBottom, true);
+                        break;
+                    }
                 case PlatformKind.DragonflyDart:
                     {
                         int ph = sim.DartPhase(p.Id, tick, s.CrumbleTick);
@@ -296,15 +328,6 @@ namespace FluffyClimbers.Gameplay
                         Sprite pic = (ph == 1 || ph == 2) && a2 != null ? a2 : (perched != null ? perched : a1);
                         ov.flipX = p.Dir > 0;
                         Place(ov, pic, 1.3f, x, y + 0.02f, false);
-                        break;
-                    }
-                case PlatformKind.SilkSnareWeb:
-                    {
-                        float target = sim.WebWidthOf(in p).F();
-                        Vector2 sz = a1.bounds.size;
-                        float sc = target / Mathf.Max(0.01f, sz.x);
-                        t.localScale = new Vector3(sc, sc, 1f);
-                        t.position = new Vector3(x, y + sim.Cfg.WebHeight.F(), 0f);   // the web band hangs WebHeight above the slab, as in the Sim
                         break;
                     }
                 case PlatformKind.FogPuffDrift: Place(ov, a1, 2.4f, sim.FogX(p.Id, tick).F(), y + 1.6f, true); break;
@@ -426,10 +449,6 @@ namespace FluffyClimbers.Gameplay
                         }
                         break;
                     }
-                case PlatformKind.GlowwormRelay:
-                    // the ghost state of the pad (outside its window it does not hold): the plain placeholder fades like a shut Snap Daisy; the painted frame swaps glow on / off instead
-                    if (baseSr != null && !painted[i]) { Color c = baseSr.color; c.a = sim.RelaySolid(p.Id, tick, s.CrumbleTick) ? 1f : 0.25f; baseSr.color = c; }   // painted art swaps its glow frame instead (RunView.PoseOf)
-                    break;
                 case PlatformKind.Ladybug:
                     {
                         if (painted[i] && baseSr != null)

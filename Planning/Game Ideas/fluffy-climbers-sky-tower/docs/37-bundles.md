@@ -24,7 +24,7 @@ Per tier of the shipped file:
 | 3 | 635 | 750 to 1,000 | 870 | 32,073 | 1,209 | 4.42x |
 | All | 2,000 | 200 to 1,000 | 610 | 19,384 | 719 | **4.54x** |
 
-A Common card is the base hero of an open region (Momo in region 1 always exists), drawn like a Common chest card (`BundleCards.Pool`, also used by `ChestRolls.Pool`). A tier with no hero in an open region falls back to the next lower tier. The info popup shows three columns "Common 50%", "Uncommon 40%", "Rare 10%". The timer offer (30 percent off), Refresh (5 gems or 100 coins) and the 6 offers at a time are unchanged. Tests: `Tests/content/test_bundles.py`, `Tests/Simulation/BundleCardTests.cs`, `Assets/_Game/Tests/EditMode/BundleTests.cs` pin the new price range, the 3.0 to 6.0 band, the odds and pool version 5.
+A Common card is the base hero of an open region (Momo in region 1 always exists), drawn like a Common chest card (`BundleCards.Pool`, also used by `ChestRolls.Pool`). A tier with no hero in an open region falls back to the next lower tier. The info popup shows three columns "Common 50%", "Uncommon 40%", "Rare 10%". The timer offer (30 percent off), Refresh (25 gems or 500 coins, since 2026-11-26) and the 6 offers at a time are unchanged. Tests: `Tests/content/test_bundles.py`, `Tests/Simulation/BundleCardTests.cs`, `Assets/_Game/Tests/EditMode/BundleTests.cs` pin the new price range, the 3.0 to 6.0 band, the odds and pool version 5.
 
 ## History: the pool of Bug List 1 (2026-11-03) and its rules
 
@@ -85,7 +85,7 @@ Save compatibility: `BundleSaveData.PoolVersion` (`BundleCatalog.PoolVersion = 5
 - **"i" popup** (`BundlesScreen.ShowInfo`, object `BundleInfoPopup`): title = bundle name; the contents as icon chips with amounts (coins, power-ups, "?" card); a line "HeroCardIcon + Heroes from your open regions (N)"; three columns "Common 50%", "Uncommon 40%", "Rare 10%" in their rarity colour (since 2026-11-22); the pill "Worth x2.1 for 340 gems" and, below it, the **joke** in small italic text (object `Joke`, 16 sp and up, wrapped, panel height measured). Text 16 sp and up, built for 130 percent; the same "i" sits at the top left of the timer-offer popup (it opens the info popup and OK/X returns to the offer).
 - **Hero card icon:** object name `HeroCardIcon`; sprite `Resources/Art/Ui/hero_card_icon.png` when it exists, else `icon_heroes` (existing). To use an OpenArt icon, drop it there under that name; no code change. The white "?" is a text child (`Mark`).
 - **Confirm popup** ("Buy X for N gems?", gems you have, "Worth x2.1", "Includes 1 hidden hero card (?)"), **reveal popup** (hero portrait, "You got: name (rarity)" in the rarity colour, the worth pill "Worth x2.1", the rest of the bundle as icon chips) and the **timer offer** (bag, "i", italic worth text, chips with the "?" card, was/ends in, Buy, Hide) all use the same helpers.
-- Refresh (5 gems or 100 coins), 6 offers at a time, the 45 minute timer offer and the per-account seed draw are unchanged; every price (200+ gems) shows the confirm popup (threshold 50 gems).
+- Refresh (25 gems or 500 coins, since 2026-11-26), 6 offers at a time, the 45 minute timer offer and the per-account seed draw are unchanged; every price (200+ gems) shows the confirm popup (threshold 50 gems).
 - CUX: layout audit screens `bundles-page-*`, `bundles-info`, `bundles-confirm-popup`, `bundles-card-reveal`, `bundles-card-reveal-long-name`, `bundles-card-reveal-no-hero-fallback`, `timer-offer-popup`, `timer-offer-info` at 100 and 130 percent text.
 
 ## Tests
