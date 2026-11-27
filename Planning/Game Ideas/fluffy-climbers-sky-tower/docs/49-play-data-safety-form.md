@@ -2,18 +2,19 @@
 
 Owner request 2026-11-10. Play Console > App content > Data safety. The answers below are derived from what the build actually ships
 (`Packages/manifest.json`: Google Mobile Ads Unity plugin 11.6.0 with the UMP consent form, Play Games Services plugin 2.3.0 with Saved Games,
-Unity In-App Purchasing 5.4.4; Unity Analytics / Crash Reporting / Performance Reporting off; no server of ours; no notifications) and from the
+Unity In-App Purchasing 5.4.4; Firebase App and Auth 14.1.0 with Analytics deactivated; Unity Analytics / Crash Reporting / Performance Reporting off; our own Cloud Run service for the leaderboard and the save backup copy; no notifications) and from the
 three vendor disclosure pages (links at the end). `POLICY.md` section 18 must say the same thing as the form; see "Policy follow-up" below.
 
 Facts the answers rest on:
-- Ads: `Services` calls `AdMobAdService.Begin()` at boot. After the UMP consent step the SDK is initialised and the revive rewarded ad is
-  **pre-loaded immediately**, so the ad SDK sends its data at app start, not only when the player taps an ad button. Ad content rating T,
+- Ads: `BootLoader` creates `Services.Ads` (`AdMobAdService.Begin()`) at boot. After the UMP consent step the SDK is initialised and the rewarded and interstitial ads are
+  **pre-loaded immediately** (also when Remove Ads is owned), so the ad SDK sends its data at app start, not only when the player taps an ad button. Ad content rating T,
   child-directed tag unspecified, consent form shown where the law requires it (EEA, UK, Switzerland; US state privacy messages).
-- Purchases: Unity IAP is initialised lazily (`ShopScreen`, `SubscriptionScreen`, `StoreLink`, Restore in Settings), so Unity's IAP telemetry
-  (transaction data, installation id, device info, crash logs, diagnostics, country from IP) flows only when the player opens the shop or buys.
+- Purchases: Unity IAP is initialised **at every app start** (`BootLoader` step `StoreLink.Start`; corrected 2026-11-27, it is not lazy), so Unity's IAP telemetry
+  (transaction data, installation id, device info, crash logs, diagnostics, country from IP) flows whenever the app runs.
   Unity's own Play disclosure for IAP 5.4+ marks these as collected, not shared, required, purposes App functionality + Analytics.
 - Sign-in: optional. The game receives the Play Games player id and display name; the player id goes into the save, and the save (progress,
-  wallet, items, purchase records) is uploaded to Google's Saved Games when signed in. The display name never leaves the device through the game.
+  wallet, items, purchase records) is uploaded to Google's Saved Games when signed in, and as a backup copy to our Firestore (`saveBackups/{uid}`).
+  Signing in also joins the weekly leaderboards, which sends the display name and picture link (last section). Play Games performs its automatic sign-in check at launch for everyone.
 
 ## Step 1 - Overview
 Read, click **Next**.
@@ -22,9 +23,9 @@ Read, click **Next**.
 | Question | Answer | Why |
 |---|---|---|
 | Does your app collect or share any of the required user data types? | **Yes** | AdMob, Unity IAP and Play Games Services all transmit data off the device |
-| Is all of the user data collected by your app encrypted in transit? | **Yes** | AdMob: TLS; Play Games Services: HTTPS; Unity IAP: yes on its disclosure; the game itself makes no network calls |
-| Do you provide a way for users to request that their data is deleted? | **Yes** | `POLICY.md` sections 13, 14 and 16: Reset progress (uploads an empty save), delete Play Games data for the game, reset/delete the advertising ID, e-mail jpdash.creator@gmail.com (requests to Unity are relayed through Unity's IAP support form) |
-| Does your app allow users to create an account? (account deletion section) | **No** | The game creates no account of its own and has no server; sign-in links the existing Google Play Games profile, whose per-game data the user deletes in their Play Games profile. If a reviewer objects, switch to Yes and give `https://jpdash-creator.github.io/fluffy-climbers-sky-tower/policy.html` (section 13) as the deletion-request URL |
+| Is all of the user data collected by your app encrypted in transit? | **Yes** | AdMob: TLS; Play Games Services: HTTPS; Unity IAP: yes on its disclosure; the game's own calls (our service, Firebase) are HTTPS |
+| Do you provide a way for users to request that their data is deleted? | **Yes** | `POLICY.md` sections 13, 14 and 16: Reset progress (uploads the reset save), e-mail deletion of the leaderboard data and the backup copy, delete Play Games data for the game, reset/delete the advertising ID, e-mail jpdash.creator@gmail.com (requests to Unity are relayed through Unity's IAP support form) |
+| Does your app allow users to create an account? (account deletion section) | **No** (check against Play's account deletion policy before release) | The game has no account system of its own; sign-in links the existing Google Play Games profile. Note that a Firebase user is created silently and deleted on e-mail request only. If a reviewer objects, switch to Yes and give `https://jpdash-creator.github.io/fluffy-climbers-sky-tower/policy.html` (section 13) as the deletion-request URL |
 | Independent security review (MASA) | **No** / leave unticked | Not done; not required for games |
 
 ## Step 3 - Data types (tick exactly these)
@@ -36,7 +37,7 @@ Read, click **Next**.
 - App info and performance > **Crash logs**, **Diagnostics**, **Other app performance data**
 - Device or other IDs > **Device or other IDs**
 
-Everything else stays unticked (no name, e-mail, phone, address, precise location, contacts, photos, audio, files, health, messages,
+Everything else stays unticked (no e-mail, phone, address, precise location, contacts, photos, audio, files, health, messages,
 search or browsing history, installed apps, calendar, financial account details, other user-generated content).
 
 ## Step 4 - Data usage and handling (one card per ticked type)
@@ -45,13 +46,13 @@ Columns: C = collected, S = shared. "Required" = "Data collection is required (u
 | Data type | C / S | Ephemeral? | Required or optional | Why collected | Why shared | Source |
 |---|---|---|---|---|---|---|
 | Approximate location | C + S | No | Required | App functionality, Analytics, Advertising or marketing, Fraud prevention, security, and compliance | Advertising or marketing, Analytics, Fraud prevention, security, and compliance | AdMob (IP address at every ad request, from app start); Unity IAP (country from IP) |
-| User IDs | C + S | No | Optional | App functionality, Account management, Analytics, Fraud prevention, security, and compliance | App functionality (Google / Firebase as service provider) | Play Games player id (in the cloud save); Firebase uid (leaderboard sign-in); Unity IAP player / installation id |
-| Purchase history | C | No | Optional | App functionality, Analytics, Fraud prevention, security, and compliance | - | Unity IAP transaction data to Unity's IAP service; product and transaction ids in the cloud save |
+| User IDs | C + S | No | Required (Unity IAP identifiers from app start; Play Games and Firebase ids only after sign-in) | App functionality, Account management, Analytics, Fraud prevention, security, and compliance | App functionality (Google / Firebase as service provider) | Play Games player id (in the cloud save); Firebase uid (leaderboard sign-in); Unity IAP player / installation id |
+| Purchase history | C | No | Required (Unity IAP starts with the app) | App functionality, Analytics, Fraud prevention, security, and compliance | - | Unity IAP transaction data to Unity's IAP service; product and transaction ids in the cloud save |
 | App interactions | C + S | No | Required | Advertising or marketing, Analytics, Fraud prevention, security, and compliance | Advertising or marketing, Analytics, Fraud prevention, security, and compliance | AdMob (app launch, taps, video views) |
-| Other actions | C | No | Optional | App functionality, Account management | - | Game progress, wallet, items and records in the Saved Games file (only when signed in) |
-| Crash logs | C | No | Optional | Analytics | - | Unity IAP service telemetry |
+| Other actions | C | No | Optional | App functionality, Account management | - | Game progress, wallet, items and records in the Saved Games file and in the Firebase backup copy (only when signed in) |
+| Crash logs | C | No | Required | Analytics | - | Unity IAP service telemetry |
 | Diagnostics | C + S | No | Required | App functionality, Analytics, Advertising or marketing, Fraud prevention, security, and compliance | Advertising or marketing, Analytics, Fraud prevention, security, and compliance | AdMob (SDK performance), Unity IAP, Play Games Services |
-| Other app performance data | C | No | Optional | App functionality, Analytics | - | Unity IAP |
+| Other app performance data | C | No | Required | App functionality, Analytics | - | Unity IAP |
 | Device or other IDs | C + S | No | Required | App functionality, Analytics, Advertising or marketing, Fraud prevention, security, and compliance | Advertising or marketing, Analytics, Fraud prevention, security, and compliance | AdMob (advertising ID, app set ID); Unity IAP installation id; Play Games Services |
 
 "Shared" is ticked only for the AdMob-sourced types: Google's disclosure says the plugin "collects and shares" them and Google uses them for
@@ -66,14 +67,16 @@ Check the summary against the table above, **Save**, then **Submit** (the form i
 - **Advertising ID**: Yes, the app uses advertising ID; purposes Advertising or marketing, Analytics. The Google Mobile Ads SDK merges the
   `com.google.android.gms.permission.AD_ID` permission into the manifest.
 - **Privacy policy URL**: `https://jpdash-creator.github.io/fluffy-climbers-sky-tower/policy.html` (the same address as `legal_config.json`).
-- **Ads**: Yes, the app contains ads (rewarded video only).
+- **Ads**: Yes, the app contains ads (rewarded video and interstitial).
 
 ## Policy alignment (done 2026-11-10)
 `POLICY.md` was aligned with this form on 2026-11-10 (summary bullets, sections 5, 6, 7, 8, 11, 13, 14, 16 and 18; `docs/policy.html`
 regenerated with `python Tools/legal_html.py`): (1) ad-SDK data is collected from app start because the ad is pre-loaded, not "only if you
 tap an ad button"; (2) Unity IAP 5.4 sends its own diagnostics, crash logs, device / installation identifiers and country to Unity's IAP
-service whenever the shop is used, independent of the (disabled) Unity engine services. Section 18 now lists the same nine data types with
+service whenever the shop is used, independent of the (disabled) Unity engine services. Section 18 now lists the same data types with
 the same collected / shared / required answers as Step 4 above. Keep the two in step: a change to one is a change to the other.
+
+**Corrected 2026-11-27 (checked against the code):** Unity IAP starts with the app, so User IDs, Purchase history, Crash logs and Other app performance data are now Required; the save backup copy was added under Other actions; ads include interstitials. Re-enter the form in the Play Console if the older answers were submitted.
 
 ## Sources
 - Google Mobile Ads Unity plugin, Google Play data disclosure: https://developers.google.com/admob/unity/privacy/play-data-disclosure
@@ -91,8 +94,8 @@ Enter or change these items. Everything else in Steps 2 to 4 above stays as it i
 
 | Play Console item | Data type | Collected | Shared | Ephemeral | Required / optional | Purposes (collected) | Purposes (shared) | Source in the build |
 |---|---|---|---|---|---|---|---|---|
-| Personal info > User IDs | Google Play Games player id and Firebase uid | Yes | Yes: with a service provider (Google / Firebase; the uid is also shown only as a short public id, never the uid) | No | Optional (only when signed in and the player joins the boards) | App functionality, Account management, Fraud prevention, security, and compliance | App functionality | Play Games Services; Firebase Authentication; Cloud Run token check |
-| Personal info > Name | Play Games display name | Yes | Yes: shown publicly to other players on the boards and held by Google as service provider | No | Optional (only if the player accepts the one-time consent popup and plays the boards) | App functionality | App functionality | Cloud Firestore `players/{uid}.displayName`, boards top 100 |
+| Personal info > User IDs | Google Play Games player id and Firebase uid | Yes | Yes: with a service provider (Google / Firebase; the uid is also shown only as a short public id, never the uid) | No | Optional (only when signed in) | App functionality, Account management, Fraud prevention, security, and compliance | App functionality | Play Games Services; Firebase Authentication; Cloud Run token check |
+| Personal info > Name | Play Games display name | Yes | Yes: shown publicly to other players on the boards and held by Google as service provider | No | Optional (only when signed in: signing in joins the boards automatically, there is no consent popup) | App functionality | App functionality | Cloud Firestore `players/{uid}.displayName`, boards top 100 |
 | Photos and videos > Photos | Link to the Play Games profile picture (no file is read or uploaded) | Yes | Yes: shown publicly to other players | No | Optional (same as Name) | App functionality | App functionality | Cloud Firestore `players/{uid}.avatarUrl` |
 | App activity > App interactions | Weekly scores (crowns), the recorded run inputs by game tick, hero and power-ups used, prize claims | Yes | Yes: with a service provider (Google / Firebase); scores are public on the boards | No | Optional | App functionality, Fraud prevention, security, and compliance | App functionality | Cloud Run `/submit-run`, Cloud Firestore `weeks/...` |
 | Device or other IDs | Firebase installation id (Firebase Authentication) in addition to the ad IDs | Yes | Yes: with a service provider (Google / Firebase) | No | Required once the SDK runs | App functionality, Fraud prevention, security, and compliance | App functionality | Firebase Installations (inside Firebase Auth); already ticked for AdMob |

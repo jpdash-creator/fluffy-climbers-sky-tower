@@ -477,14 +477,18 @@ namespace FluffyClimbers.Gameplay
                 {
                     if (busy) return;
                     busy = true;
-                    UiKit.SetText(view.Status, "Signing in...");
-                    AccountSync.SignInAndLink((ok, message) =>
+                    SignInNotice.Ask(canvas, GameSession.Art, () =>
                     {
-                        busy = false;
                         if (view == null || view.Root == null) return;
-                        if (ok) finish();
-                        else UiKit.SetText(view.Status, message ?? "");
-                    });
+                        UiKit.SetText(view.Status, "Signing in...");
+                        AccountSync.SignInAndLink((ok, message) =>
+                        {
+                            busy = false;
+                            if (view == null || view.Root == null) return;
+                            if (ok) finish();
+                            else UiKit.SetText(view.Status, message ?? "");
+                        });
+                    }, () => busy = false);
                 },
                 () =>
                 {

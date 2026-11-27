@@ -329,6 +329,15 @@ namespace FluffyClimbers.Tests
             yield return CheckScreen("menu", () => meta.ShowMenu(), problems);
             // Account (docs/35 section 8): Home has no account button any more (B1.c); the pop-up code stays for Settings, so it is audited in the three states, plus the Settings account block signed in and in a build without sign-in.
             yield return CheckScreen("google-prompt", () => { AccountScenario("guest"); meta.ShowMenu(); meta.ShowGooglePrompt(); }, problems);
+            RectTransform notice = null;
+            yield return CheckScreen("sign-in-notice", () =>
+            {
+                AccountScenario("guest");
+                if (notice != null) Object.DestroyImmediate(notice.gameObject);
+                meta.ShowSettings();
+                notice = SignInNotice.Ask(Object.FindFirstObjectByType<Canvas>().transform, GameSession.Art, null, null);
+            }, problems);
+            if (notice != null) Object.DestroyImmediate(notice.gameObject);
             yield return CheckScreen("menu-signed-in", () => { AccountScenario("signed-in"); meta.ShowMenu(); }, problems);
             yield return CheckScreen("account-popup-guest", () => { AccountScenario("guest"); meta.ShowMenu(); meta.ShowAccount(); }, problems);
             yield return CheckScreen("account-popup-signed-in", () => { AccountScenario("signed-in"); meta.ShowMenu(); meta.ShowAccount(); }, problems);
@@ -616,7 +625,15 @@ namespace FluffyClimbers.Tests
             FindRt("SaveProgress").GetComponent<Button>().onClick.Invoke();
             Assert.AreEqual(AccountPopup.SavedText, meta.SaveButtonTextForTests, "guest: Saved");
             Assert.IsFalse(AccountSync.IsGoogleMode);
-            FindRt("Google").GetComponent<Button>().onClick.Invoke();   // the stub signs in at once and Settings rebuilds
+            FindRt("Google").GetComponent<Button>().onClick.Invoke();   // the notice comes first
+            yield return null;
+            Assert.IsFalse(AccountSync.IsGoogleMode, "nothing is signed in before the notice is accepted");
+            FindRt(SignInNotice.NotNowName).GetComponent<Button>().onClick.Invoke();
+            yield return null;
+            Assert.IsFalse(AccountSync.IsGoogleMode, "Not now keeps the player a guest");
+            FindRt("Google").GetComponent<Button>().onClick.Invoke();
+            yield return null;
+            FindRt(SignInNotice.AgreeName).GetComponent<Button>().onClick.Invoke();   // the stub signs in at once and Settings rebuilds
             yield return null;
             yield return null;
             Assert.IsTrue(AccountSync.IsSignedIn, "signed in after the tap");
@@ -875,7 +892,9 @@ namespace FluffyClimbers.Tests
             Assert.IsNotNull(FindRt("Google"), "guest: Sign in with Google Play");
             Assert.IsNull(FindRt("SyncNow"), "guest: no Sync now");
             Assert.IsNotNull(FindRt("CloseX"), "a Close X");
-            FindRt("Google").GetComponent<Button>().onClick.Invoke();   // the stub signs in at once
+            FindRt("Google").GetComponent<Button>().onClick.Invoke();   // the notice comes first
+            yield return null;
+            FindRt(SignInNotice.AgreeName).GetComponent<Button>().onClick.Invoke();   // the stub signs in at once
             yield return null;
             yield return null;
             Assert.IsTrue(AccountSync.IsSignedIn, "signed in after the tap");

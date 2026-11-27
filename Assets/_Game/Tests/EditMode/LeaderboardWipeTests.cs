@@ -38,6 +38,18 @@ namespace FluffyClimbers.Tests
         static HttpReply Ok() { return new HttpReply { Status = 200, Body = "{\"deleted\":true}" }; }
 
         [Test]
+        public void NothingIsSentOnceThePlayerUnlinks()
+        {
+            auth.SignIn(null);
+            bool google = true;
+            LeaderboardHub.AccountModeIsGoogle = () => google;
+            Assert.IsTrue(LeaderboardHub.CanUpload, "linked: runs are sent");
+            google = false;   // Unlink: the Firebase user stays until the app restarts
+            Assert.IsFalse(LeaderboardHub.CanUpload);
+            Assert.IsFalse(LeaderboardHub.WantsTicket, "no run ticket is asked for");
+        }
+
+        [Test]
         public void TheClientPostsDeleteMyEntriesWithTheBearerTokenAndReportsTheOutcome()
         {
             auth.SignIn(null);

@@ -69,3 +69,6 @@ Revision `fluffy-leaderboard-00011-kx6`, 100 percent traffic (previous: `00010-q
 
 ## Deployed 2026-11-27 (owner approved, Final Bugs 2 fixes): commit 7a6413a
 Revision `fluffy-leaderboard-00012-d4m`, 100 percent traffic (previous: `00011-kx6`). Content hash 650ca4fb... (lvl_001_15 new seed), `simVersions` [4, 5] kept, `/healthz/` ok. v0.71.138 runs on lvl_001_15 or the changed Region 3 physics may be refused as a mismatch.
+
+## Checked 2026-11-27 (release v0.72.142)
+Service revision `fluffy-leaderboard-00012-d4m` at 100 percent, content hash 650ca4fb...; Firestore rules equal firestore.rules; 6 composite indexes READY; the 7 TTL policies (including breakdowns and saveBackups) are ACTIVE, so the earlier open item "firebase deploy --only firestore:indexes" is done.

@@ -216,14 +216,18 @@ namespace FluffyClimbers.Gameplay
                 {
                     if (busy) return;
                     busy = true;
-                    UiKit.SetText(view.Status, "Signing in...");
-                    RunPrimary(State.Guest, (ok, text) =>
+                    SignInNotice.Ask(view.Root.parent, art, () =>
                     {
-                        busy = false;
-                        if (ok && onChanged != null) onChanged();
                         if (view.Root == null) return;
-                        Fill(view, art, onClose, onChanged, ok ? "Signed in." : text);
-                    });
+                        UiKit.SetText(view.Status, "Signing in...");
+                        RunPrimary(State.Guest, (ok, text) =>
+                        {
+                            busy = false;
+                            if (ok && onChanged != null) onChanged();
+                            if (view.Root == null) return;
+                            Fill(view, art, onClose, onChanged, ok ? "Signed in." : text);
+                        });
+                    }, () => busy = false);
                 });
                 UiKit.Place((RectTransform)view.SignIn.transform, new Vector2(0.5f, 1f), new Vector2(0f, -y), new Vector2(W, googleH));
             }

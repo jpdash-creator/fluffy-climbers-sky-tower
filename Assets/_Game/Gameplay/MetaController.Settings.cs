@@ -116,11 +116,13 @@ namespace FluffyClimbers.Gameplay
                 float googleH = Mathf.Max(150f, UiKit.MinTouchRef);
                 Button g = LoginScreen.BuildGoogleButton(c, AccountPopup.SettingsButtonLabel(st), () =>
                 {
-                    AccountPopup.RunPrimary(st, (ok, text) =>
+                    Action run = () => AccountPopup.RunPrimary(st, (ok, text) =>
                     {
                         if (ok) ShowSettings();            // rebuild: the button follows the new state
                         else ShowMessage("Account", text);
                     });
+                    if (st == AccountPopup.State.Guest) SignInNotice.Ask(canvas.transform, art, run, null);   // signing in publishes the name and picture: say so first
+                    else run();
                 });
                 UiKit.Place((RectTransform)g.transform, new Vector2(0f, 1f), new Vector2(0f, -y), new Vector2(contentW, googleH));
                 y += googleH + gap;

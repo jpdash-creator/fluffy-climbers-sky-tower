@@ -135,7 +135,10 @@ namespace FluffyClimbers.Gameplay
             ShowMenu();
         }
 
-        /// <summary>Uploads the current save to the Google account (signed-in players only). Never blocks or throws; the result is ignored.</summary>
+        /// <summary>
+        /// Uploads the reset save to the Google account and replaces the Firebase backup copy at once (signed-in players only; the two are independent). Never blocks or throws. When the Google upload fails,
+        /// CloudResetPending stays set and the next upload (AccountSync) sends both again.
+        /// </summary>
         void PushCloudSave()
         {
             if (!CloudSignedIn) return;
@@ -143,7 +146,9 @@ namespace FluffyClimbers.Gameplay
             {
                 IAccountService acc = Services.Account;
                 if (acc == null || !acc.IsSignedIn) return;
-                acc.SaveCloud(SaveSync.Serialize(progress.Data), ok => { if (ok) progress.MarkCloudSynced(); });
+                byte[] bytes = SaveSync.Serialize(progress.Data);
+                SaveBackup.UploadIfDue(bytes, progress.Data.Version, Time.unscaledTime, true);   // forced: the backup must not keep the progress that was just wiped
+                acc.SaveCloud(bytes, ok => { if (ok) progress.MarkCloudSynced(); });
             }
             catch (Exception e) { Debug.LogWarning("[Settings] cloud save after reset failed: " + e.Message); }
         }

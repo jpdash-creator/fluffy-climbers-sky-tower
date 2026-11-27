@@ -104,7 +104,7 @@ namespace FluffyClimbers.Gameplay
         }
 
         /// <summary>Back key (Android back = Escape in the Input System) dismisses the pop-up like Later.</summary>
-        sealed class BackKey : MonoBehaviour
+        internal sealed class BackKey : MonoBehaviour
         {
             public Action OnBack;
 

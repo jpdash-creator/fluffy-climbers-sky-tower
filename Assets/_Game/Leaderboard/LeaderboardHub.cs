@@ -156,8 +156,8 @@ namespace FluffyClimbers.Leaderboard
         /// <summary>The Google Play Games account is signed in (the first step of the sign-in) and the player plays with it, not as a guest.</summary>
         public static bool IsGoogleSignedIn { get { return Services.Account != null && Services.Account.IsSignedIn && (AccountModeIsGoogle == null || AccountModeIsGoogle()); } }
         public static bool HasConsent { get { return progress != null && progress.HasLeaderboardConsent; } }
-        /// <summary>The player's runs are sent: switched on, signed in, consent given.</summary>
-        public static bool CanUpload { get { return IsSignedIn && HasConsent && client != null; } }
+        /// <summary>The player's runs are sent: switched on, signed in, consent given, and playing with the Google account (Unlink stops uploads at once, although the Firebase user stays until the app restarts).</summary>
+        public static bool CanUpload { get { return IsSignedIn && HasConsent && client != null && (AccountModeIsGoogle == null || AccountModeIsGoogle()); } }
         public static LbProfile Profile { get { return auth != null ? auth.Profile : new LbProfile(); } }
         public static string Uid { get { return auth != null ? auth.Uid : ""; } }
         public static MyWeekData MyWeek { get { return fakeOn ? fakeWeek : myWeek; } }

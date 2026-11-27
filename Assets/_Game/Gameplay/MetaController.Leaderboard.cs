@@ -53,11 +53,11 @@ namespace FluffyClimbers.Gameplay
         void LeaderboardSignIn(Action<bool> done)
         {
             if (LeaderboardHub.IsGoogleSignedIn) { LeaderboardHub.SignIn(done); return; }
-            AccountSync.SignInAndLink((ok, message) =>
+            SignInNotice.Ask(canvas.transform, art, () => AccountSync.SignInAndLink((ok, message) =>
             {
                 if (!ok) { if (done != null) done(false); return; }
                 LeaderboardHub.SignIn(done);
-            });
+            }), () => { if (done != null) done(false); });
         }
 
         /// <summary>The one-time consent popup. "Join leaderboards" stores the consent and (on the Leaderboard screen) rebuilds it; "Not now" stores nothing and asks again tomorrow at the earliest.</summary>
