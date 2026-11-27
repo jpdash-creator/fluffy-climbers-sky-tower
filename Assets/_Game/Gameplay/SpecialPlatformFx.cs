@@ -66,7 +66,6 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.DewdropMirrorLeaf: return Part("dewdrop");
                 case PlatformKind.DragonflyDart: second = Part("dragonfly_buzz"); return Part("dragonfly_perched");
                 case PlatformKind.FogPuffDrift: return Part("spore_cloud_" + (1 + p.Id % 3));
-                case PlatformKind.UndertowPad: second = Part("funnel_b"); return Part("funnel_a");
                 case PlatformKind.SeaFoamPad: second = Part("foam_heap_2"); return Part("foam_heap_1");
                 case PlatformKind.CaramelMagnet: second = Part("magnet_pulse"); return Part("magnet_idle");
                 case PlatformKind.SourSprinklerCannon: second = Part("sour_burst_b"); return Part("sour_burst_a");
@@ -142,7 +141,7 @@ namespace FluffyClimbers.Gameplay
                 case PlatformKind.TurtleShuttle: return new Color(0.55f, 0.85f, 0.5f, 1f);
                 case PlatformKind.KelpTangle: return new Color(0.35f, 0.6f, 0.35f, 1f);
                 case PlatformKind.PufferfishPad: return new Color(1f, 0.88f, 0.45f, 1f);
-                // Final Change 6, region 3 placeholders (moon jelly pale blue, pier weathered wood, undertow deep teal, sea foam white-blue) until the painted pieces are imported
+                // Final Change 6, region 3 placeholders (moon jelly pale blue, pier weathered wood, undertow pad deep teal, sea foam white-blue) until the painted pieces are imported
                 case PlatformKind.MoonJellyChain: return new Color(0.7f, 0.85f, 1f, 1f);
                 case PlatformKind.SplittingPier: return new Color(0.78f, 0.62f, 0.45f, 1f);
                 case PlatformKind.UndertowPad: return new Color(0.4f, 0.65f, 0.8f, 1f);
@@ -226,10 +225,10 @@ namespace FluffyClimbers.Gameplay
             parts[i] = sr;
         }
 
-        /// <summary>Air fields (spore clouds, funnels, magnet, jet, mist) are drawn behind the platforms so they never cover the next platform (CUX-3).</summary>
+        /// <summary>Air fields (spore clouds, magnet, jet, mist) are drawn behind the platforms so they never cover the next platform (CUX-3).</summary>
         static bool BehindPlatforms(PlatformKind k)
         {
-            return k == PlatformKind.FogPuffDrift || k == PlatformKind.UndertowPad
+            return k == PlatformKind.FogPuffDrift
                 || k == PlatformKind.CaramelMagnet || k == PlatformKind.SourSprinklerCannon || k == PlatformKind.IncenseMistBank;
         }
 
@@ -293,12 +292,6 @@ namespace FluffyClimbers.Gameplay
                         break;
                     }
                 case PlatformKind.FogPuffDrift: Place(ov, a1, 2.4f, sim.FogX(p.Id, tick).F(), y + 1.6f, true); break;
-                case PlatformKind.UndertowPad:
-                    {
-                        Sprite f = (!reduced && a2 != null && (tick / 12) % 2 == 1) ? a2 : Part("funnel_a");
-                        Place(ov, f != null ? f : a1, 3.2f, x, y + 0.1f, true);
-                        break;
-                    }
                 case PlatformKind.SeaFoamPad:
                     {
                         float fade = 0f;

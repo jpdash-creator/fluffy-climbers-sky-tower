@@ -229,9 +229,18 @@ namespace FluffyClimbers.Gameplay
         /// <summary>0 = Stats, 1 = Details.</summary>
         public int Tab { get { return tab; } }
 
-        public HeroSheetScreen(RectTransform parent, CharacterDef who, ArtCatalog art, HeroSheetData data, bool inUse, Action onBack, Action onClose, Action onUse, Action<CharacterDef> onNavigate = null)
+        /// <summary>Text of the greyed use button of a hero the player does not own.</summary>
+        public const string LockedLabel = "Locked";
+        /// <summary>Name of the "how to get it" line of a locked hero (under the use button).</summary>
+        public const string HowName = "HowToGet";
+        /// <summary>Not null: the player does not own the hero. The button reads "Locked", it can never be chosen, and this line says how to get it (Final Bugs 2 #19).</summary>
+        readonly string lockedHow;
+        public bool Locked { get { return lockedHow != null; } }
+
+        public HeroSheetScreen(RectTransform parent, CharacterDef who, ArtCatalog art, HeroSheetData data, bool inUse, Action onBack, Action onClose, Action onUse, Action<CharacterDef> onNavigate = null, string lockedHow = null)
         {
-            this.who = who; this.art = art; this.data = data; this.inUse = inUse;
+            this.who = who; this.art = art; this.data = data; this.inUse = inUse && lockedHow == null;
+            this.lockedHow = lockedHow;
             this.onBack = onBack; this.onClose = onClose; this.onUse = onUse; this.onNavigate = onNavigate;
             // neighbours among the heroes the player OWNS, in hero-list order (Momo, Capi, Otto, Bonbon, Bao)
             CharacterDef[] owned = CharacterCatalog.Available(GameSession.Progress);
@@ -338,11 +347,14 @@ namespace FluffyClimbers.Gameplay
 
         static float PortraitH(float w, float frac) { float pw = Mathf.Round(w * frac); return Mathf.Round(HeroSheetArt.NaturalHeight("portrait", pw, pw * 1.08f)); }
 
+        /// <summary>Room for three lines of the "how to get it" text at the 16 sp floor.</summary>
+        static float HowH { get { return 3f * Mathf.Ceil(UiKit.MinBodyTextPx * UiKit.TextScale * 1.3f) + 28f; } }
+
         /// <summary>Height of the content for the current plan values (without the top padding).</summary>
         float Measure(float w)
         {
             float y = PortraitH(w, pf) + gap + TabH + gap;
-            if (tab == 0) y += 3f * cellH + 2f * 14f + gap + RunBonusH + gap + UseH;
+            if (tab == 0) y += 3f * cellH + 2f * 14f + gap + RunBonusH + gap + UseH + (Locked ? gap + HowH : 0f);
             else y += 3f * rowH + 2f * 10f + 2f * PanelPad + gap + PowerH;
             return y + 24f;
         }
@@ -541,14 +553,25 @@ namespace FluffyClimbers.Gameplay
             float rx0 = (w - rowW) * 0.5f;
             AddArrow("PrevHero", "Previous hero", false, prevHero, rx0, y);
             AddArrow("NextHero", "Next hero", true, nextHero, rx0 + rowW - UseH, y);
-            string label2 = inUse ? "In use" : "Use this hero";
-            Button use = UiKit.AddButton(content, "UseHero", label2, ToyKit.Button(1), Color.white, bs, inUse ? null : onUse, 46);
+            string label2 = Locked ? LockedLabel : inUse ? "In use" : "Use this hero";
+            Button use = UiKit.AddButton(content, "UseHero", label2, ToyKit.Button(Locked ? 0 : 1), Color.white, bs, inUse || Locked ? null : onUse, 46);
             Put((RectTransform)use.transform, rx0 + UseH + ArrowGap, y, bs.x, bs.y);
-            if (inUse) use.interactable = false;
-            use.GetComponent<A11yLabel>().Text = inUse ? data.Name + " is the chosen hero" : "Use " + data.Name;
+            if (inUse || Locked) use.interactable = false;
+            use.GetComponent<A11yLabel>().Text = Locked ? data.Name + " is locked. " + lockedHow : inUse ? data.Name + " is the chosen hero" : "Use " + data.Name;
             Text ut = use.GetComponentInChildren<Text>();
             if (ut != null) Fit(ut, label2, 46, FloorPx, bs.x - 60f, bs.y - 30f, false);
-            return y + bs.y;
+            y += bs.y;
+            if (!Locked) return y;
+
+            y += gap;
+            Image hp = UiKit.AddImage(content, "HowPlate", null, Color.white);
+            HeroSheetArt.Skin(hp, "stat_value", HeroSheetArt.Cream, HowH);
+            Put(hp.rectTransform, 0f, y, w, HowH);
+            Text how = UiKit.OnPanel(UiKit.AddText(hp.transform, HowName, lockedHow, FloorPx, UiKit.PanelInk, TextAnchor.MiddleCenter));
+            Put(how.rectTransform, 40f, 10f, w - 80f, HowH - 20f);
+            Fit(how, lockedHow, FloorPx, FloorPx, w - 80f, HowH - 20f, true);
+            hp.gameObject.AddComponent<A11yLabel>().Text = lockedHow;
+            return y + HowH;
         }
 
         void AddBonusPair(Transform plate, string name, Sprite icon, string amount, float x, float iconS, float numW, float h)

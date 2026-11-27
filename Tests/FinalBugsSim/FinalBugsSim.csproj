@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Overnight computer test (headless): every shipped level of regions 1-5 on Relaxed and Insane with the region's Common hero, one child process per bot run. Compiles the same sources as Tests/Simulation. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../Assets/_Game/Simulation/**/*.cs" />
+    <Compile Include="../../Assets/_Game/Economy/HeroTable.cs" />
+    <Compile Include="../../Assets/_Game/Economy/HeroVariants.cs" />
+    <Compile Include="../../Assets/_Game/Economy/HeroRolls.cs" />
+    <Compile Include="../../Assets/_Game/Economy/TierRules.cs" />
+    <Compile Include="../../Assets/_Game/Economy/HeroRegionPenalty.cs" />
+    <Compile Include="../../Assets/_Game/Economy/MergeTierDefs.cs" />
+    <Compile Include="../../Assets/_Game/Economy/Characters.cs" />
+    <Compile Include="../Simulation/ContentLoader.cs" />
+  </ItemGroup>
+
+</Project>

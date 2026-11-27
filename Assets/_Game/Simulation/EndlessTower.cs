@@ -453,7 +453,7 @@ namespace FluffyClimbers.Simulation
             Fx y = prevY + gap;
 
             Fx jm = prevKind == PlatformKind.Sticky ? cfg.StickyJumpMultiplier : Fx.One;
-            if (prevKind == PlatformKind.UndertowPad) jm = cfg.UndertowReachFactor;   // Final Change 6: the gravity column above an Undertow Pad cuts the reach
+            if (prevKind == PlatformKind.UndertowPad) jm = cfg.UndertowReachFactor;   // layout rule only (Undertow Pad has no physics of its own since 2026-11-27; kept so layouts do not change)
             Fx offFrac = rng.Range(Fx.Lerp(offEasyLo, offHardLo, d), Fx.Lerp(offEasyHi, offHardHi, d));
             Fx dx = offFrac * screen;
             Fx dxLimit = cfg.LayoutMaxReachDx(gap, jm) * 6 / 10 + (prevW + w) / 2 + half;

@@ -22,6 +22,16 @@ namespace FluffyClimbers.Leaderboard
         /// <summary>Rejoin attempts per queued run (after that the normal backoff and its 12-try cap apply).</summary>
         public const int MaxRejoinsPerRun = 2;
 
+        /// <summary>Shown when the service refused a run because this app is too old (Final Bugs 2 #8).</summary>
+        public const string OldAppText = "Update the game to count runs";
+        /// <summary>Shown for every other final refusal of a run.</summary>
+        public const string NotVerifiedText = "Could not verify this run";
+
+        /// <summary>The refusal means "this app version is too old" (HTTP 426 / unsupported_version).</summary>
+        public static bool IsOldApp(int status, string code) { return status == 426 || code == "unsupported_version"; }
+
+        public static string RefusalText(bool oldApp) { return oldApp ? OldAppText : NotVerifiedText; }
+
         public static SubmitVerdict Classify(HttpReply r, int tries)
         {
             if (r == null) return SubmitVerdict.Retry;

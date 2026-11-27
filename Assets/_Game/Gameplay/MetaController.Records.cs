@@ -27,7 +27,7 @@ namespace FluffyClimbers.Gameplay
         public static float EndlessActionRowHeight() { return ActionRowTop + EndlessActionSize() + ActionCaptionGap + ActionCaptionH() + ActionRowBottom; }
 
         /// <summary>
-        /// The "3:00, best N floors" record line, placed <paramref name="lineTop"/> below the top of the panel. The two play buttons stand on one row below it
+        /// The "Time Attack: best N floors" record line, placed <paramref name="lineTop"/> below the top of the panel. The two play buttons stand on one row below it
         /// (<see cref="AddEndlessActionRow"/>).
         /// </summary>
         void AddTimeAttackEntry(RectTransform panel, RegionDef region, int mode, float lineTop)
@@ -70,13 +70,13 @@ namespace FluffyClimbers.Gameplay
         public static int TimeAttackLineLines(TimeAttackRecord rec) { return rec != null && rec.BestFloors > 0 ? 2 : 1; }
 
         /// <summary>
-        /// "3:00, best N floors" and, on a second line, the best pace (floors per second of that run, "0.83 plat/s") plus "fell at m:ss" when the best run ended before the full 3:00.
+        /// "Time Attack: best N floors" and, on a second line, the best pace (floors per second of that run, "0.83 plat/s") plus "fell at m:ss" when the best run ended before the full 3:00.
         /// Built only when the popup opens (never per frame).
         /// </summary>
         public static string TimeAttackLineText(TimeAttackRecord rec)
         {
             if (rec == null || rec.BestFloors <= 0) return "3:00, floors in three minutes";
-            string head = "3:00, best " + rec.BestFloors + " floors";
+            string head = "Time Attack: best " + rec.BestFloors + " floors";   // its own best (Final Bugs 2 #23, #25)
             int ticks = rec.Ticks > 0 ? rec.Ticks : TimeRecords.TimeAttackTicks;   // saves from before the time was stored count as a full run
             string tail = TimedUi.PaceText(new PaceValue(rec.BestFloors, ticks));
             if (ticks < TimeRecords.TimeAttackTicks) tail += ", fell at " + TimeRecords.FormatTime(ticks);

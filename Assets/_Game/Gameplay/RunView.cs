@@ -13,10 +13,10 @@ namespace FluffyClimbers.Gameplay
     {
         sealed class Layer
         {
-            public SpriteRenderer[] Tiles;
+            public Transform[] Tiles;                 // one root per repeat, positioned by its BOTTOM edge
+            public SpriteRenderer[][] Renderers;      // what each repeat draws (for the debug hooks)
             public float Factor;
-            public float Height;
-            public float Scale;
+            public float Pitch;                       // distance between two repeats, world units (the picture height less the blended join)
         }
 
         sealed class Pop
@@ -27,6 +27,7 @@ namespace FluffyClimbers.Gameplay
             public float Life = 0.35f;
             public float Size = 1f;
             public float Rise = 1f;
+            public float Grow = 2.5f;
         }
 
         RunSession session;
@@ -191,15 +192,15 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Debug/test hook: hides the parallax layers so the gameplay objects can be inspected on their own.</summary>
         public void SetBackgroundVisible(bool visible)
         {
-            for (int i = 0; i < layers.Count; i++)
-                for (int k = 0; k < layers[i].Tiles.Length; k++) layers[i].Tiles[k].enabled = visible;
+            SetBackgroundLayerCount(visible ? layers.Count : 0);
         }
 
         /// <summary>Debug/test hook: shows only the first n parallax layers (0 = none).</summary>
         public void SetBackgroundLayerCount(int n)
         {
             for (int i = 0; i < layers.Count; i++)
-                for (int k = 0; k < layers[i].Tiles.Length; k++) layers[i].Tiles[k].enabled = i < n;
+                foreach (SpriteRenderer[] tile in layers[i].Renderers)
+                    foreach (SpriteRenderer sr in tile) sr.enabled = i < n;
         }
 
         public string DebugPlayer()
@@ -301,23 +302,81 @@ namespace FluffyClimbers.Gameplay
             return sr;
         }
 
+        // ---------------- background ----------------
+        // Final Bugs 2 #3: the painted picture repeats UPRIGHT (it used to be mirrored every other time: upside-down pagodas, seas and flowers) and each repeat blends softly
+        // into the one below over BackgroundBlendShare of its height. The blend is the same picture cut into thin strips with rising opacity, drawn over the top of the repeat
+        // below: no new art, no texture work, one uniform scale (CUX-9).
+
+        /// <summary>Share of the picture height that two neighbouring repeats overlap in, and the number of opacity steps of the blend.</summary>
+        public const float BackgroundBlendShare = 0.14f;
+        public const int BackgroundBlendSteps = 24;
+
+        /// <summary>Tint of the far background. Region 4 (Candy Canyon) is dimmed so its pale hero and platforms stand out (Final Bugs 2 #35).</summary>
+        public static Color BackgroundTintFor(int regionIndex)
+        {
+            return regionIndex == 4 ? new Color(0.68f, 0.70f, 0.76f, 1f) : new Color(0.84f, 0.9f, 0.98f, 1f);
+        }
+
+        /// <summary>The calm veil over the background. Region 4 gets a heavier, neutral veil: laid over the pink it also takes colour out of it (a code desaturation, Final Bugs 2 #35).</summary>
+        public static Color VeilColorFor(int regionIndex)
+        {
+            return regionIndex == 4 ? new Color(0.13f, 0.15f, 0.22f, 0.55f) : new Color(0.08f, 0.2f, 0.42f, 0.42f);
+        }
+
+        static readonly Dictionary<Sprite, Sprite[]> blendSlices = new Dictionary<Sprite, Sprite[]>();
+
+        /// <summary>[0] = the body above the blend band, [1..steps] = the band's strips from the bottom up. Pivot bottom centre of the WHOLE picture. Cached per picture.</summary>
+        static Sprite[] SlicesOf(Sprite picture)
+        {
+            Sprite[] cached;
+            if (blendSlices.TryGetValue(picture, out cached) && cached != null && cached[0] != null) return cached;
+            Rect r = picture.textureRect;
+            int band = Mathf.Max(BackgroundBlendSteps, Mathf.RoundToInt(r.height * BackgroundBlendShare));
+            var slices = new Sprite[BackgroundBlendSteps + 1];
+            for (int i = 0; i <= BackgroundBlendSteps; i++)
+            {
+                int from = i == 0 ? band : (int)((long)band * (i - 1) / BackgroundBlendSteps);
+                int to = i == 0 ? (int)r.height : (int)((long)band * i / BackgroundBlendSteps);
+                var part = new Rect(r.x, r.y + from, r.width, to - from);
+                var pivot = new Vector2(0.5f, -(float)from / (to - from));   // every slice shares the picture's bottom centre as its origin
+                slices[i] = Sprite.Create(picture.texture, part, pivot, picture.pixelsPerUnit, 0, SpriteMeshType.FullRect);
+                slices[i].name = picture.name + (i == 0 ? "_body" : "_blend" + i);
+            }
+            blendSlices[picture] = slices;
+            return slices;
+        }
+
         void BuildBackground(float screenW)
         {
             Sprite[] sprites = region != null ? new[] { region.BgFar, region.BgMid, region.BgNear } : new Sprite[3];
             float[] factor = { 0.12f, 0.25f, 0.45f };
             float[] alpha = { 1f, 0f, 0f };   // the mid and near layers are full pictures: faint, so they never ghost into a double image behind the platforms (owner, T15, 2026-10-20)
+            int regionIndex = session.Region.Index;
             for (int i = 0; i < 3; i++)
             {
                 if (sprites[i] == null || alpha[i] <= 0f) continue;   // owner issue 14: calm background, no ghost layers behind the platforms
                 Vector2 size = sprites[i].bounds.size;
                 float scale = Mathf.Max(screenW * 1.1f / size.x, designHalfH * 2f * 1.05f / size.y);
-                var layer = new Layer { Factor = factor[i], Height = size.y * scale, Scale = scale, Tiles = new SpriteRenderer[3] };
+                Sprite[] slices = SlicesOf(sprites[i]);
+                float blend = slices[0].rect.height > 0f ? sprites[i].textureRect.height - slices[0].rect.height : 0f;
+                var layer = new Layer { Factor = factor[i], Pitch = (sprites[i].textureRect.height - blend) / sprites[i].pixelsPerUnit * scale, Tiles = new Transform[3], Renderers = new SpriteRenderer[3][] };
+                Color tint = i == 0 ? BackgroundTintFor(regionIndex) : new Color(1f, 1f, 1f, alpha[i]);
                 for (int k = 0; k < 3; k++)
                 {
-                    var sr = NewSprite("bg" + i + "_" + k, sprites[i], -100 + i * 10);
-                    sr.transform.localScale = new Vector3(scale, scale, 1f);
-                    sr.color = i == 0 ? new Color(0.84f, 0.9f, 0.98f, 1f) : new Color(1f, 1f, 1f, alpha[i]);
-                    layer.Tiles[k] = sr;
+                    var root = new GameObject("bg" + i + "_" + k).transform;
+                    root.SetParent(worldRoot, false);
+                    root.localScale = new Vector3(scale, scale, 1f);
+                    var parts = new SpriteRenderer[slices.Length];
+                    for (int n = 0; n < slices.Length; n++)
+                    {
+                        var sr = NewSprite(n == 0 ? "body" : "blend" + n, slices[n], -100 + i * 10 + (n == 0 ? 0 : 1), root);   // the strips lie over the body of the repeat below
+                        Color c = tint;
+                        if (n > 0) c.a *= (n - 0.5f) / BackgroundBlendSteps;
+                        sr.color = c;
+                        parts[n] = sr;
+                    }
+                    layer.Tiles[k] = root;
+                    layer.Renderers[k] = parts;
                 }
                 layers.Add(layer);
             }
@@ -326,13 +385,17 @@ namespace FluffyClimbers.Gameplay
             if (white != null && sprites[0] != null)
             {
                 float vs = designHalfH * 2f * 1.7f / Mathf.Max(0.01f, white.bounds.size.y);
-                var veil = new Layer { Factor = 0f, Height = white.bounds.size.y * vs, Scale = vs, Tiles = new SpriteRenderer[3] };
+                var veil = new Layer { Factor = 0f, Pitch = white.bounds.size.y * vs, Tiles = new Transform[3], Renderers = new SpriteRenderer[3][] };
                 for (int k = 0; k < 3; k++)
                 {
-                    var sr = NewSprite("veil" + k, white, -75);
-                    sr.transform.localScale = new Vector3(vs, vs, 1f);
-                    sr.color = new Color(0.08f, 0.2f, 0.42f, 0.42f);
-                    veil.Tiles[k] = sr;
+                    var root = new GameObject("veil" + k).transform;
+                    root.SetParent(worldRoot, false);
+                    root.localScale = new Vector3(vs, vs, 1f);
+                    var sr = NewSprite("fill", white, -75, root);
+                    sr.transform.localPosition = new Vector3(0f, white.bounds.size.y * 0.5f, 0f);   // the white square is centred: lift it so the root is its bottom edge
+                    sr.color = VeilColorFor(regionIndex);
+                    veil.Tiles[k] = root;
+                    veil.Renderers[k] = new[] { sr };
                 }
                 layers.Add(veil);
             }
@@ -1146,14 +1209,30 @@ namespace FluffyClimbers.Gameplay
             rivalGhost.localScale = new Vector3(s, s, 1f);   // uniform scale, never stretched
         }
 
-        /// <summary>Per frame: puts the ghost on its baked path (RivalRace.GhostPosition, interpolated between the platforms of two samples). The path is the mechanic, so reduced motion changes nothing.</summary>
-        void UpdateRivalGhost()
+        Vector2 ghostPrev, ghostCur;   // the ghost at the previous and the current tick (interpolated like the hero, Final Bugs 2 #42)
+        bool ghostKnown;
+
+        /// <summary>After every Sim tick: remembers where the ghost was and is.</summary>
+        void SampleRivalGhost()
         {
             if (rivalGhost == null) return;
             SimState st = session.State;
-            if (!RivalRace.GhostPosition(session.Sim, in st, out Fx gx, out Fx gy)) { rivalGhost.gameObject.SetActive(false); return; }
+            if (!RivalRace.GhostPosition(session.Sim, in st, out Fx gx, out Fx gy)) { ghostKnown = false; return; }
+            Vector2 now = new Vector2(gx.F(), gy.F());
+            ghostPrev = ghostKnown ? ghostCur : now;
+            ghostCur = now;
+            ghostKnown = true;
+        }
+
+        /// <summary>Per frame: puts the ghost on its baked path (RivalRace.GhostPosition), between the last two ticks. The path is the mechanic, so reduced motion changes nothing.</summary>
+        void UpdateRivalGhost(float alpha)
+        {
+            if (rivalGhost == null) return;
+            if (!ghostKnown) { SampleRivalGhost(); ghostPrev = ghostCur; }   // before the first tick: the start position
+            if (!ghostKnown) { rivalGhost.gameObject.SetActive(false); return; }
             if (!rivalGhost.gameObject.activeSelf) rivalGhost.gameObject.SetActive(true);
-            rivalGhost.position = new Vector3(gx.F(), gy.F() + playerHeight * 0.5f, 0f);
+            Vector2 p = Vector2.Lerp(ghostPrev, ghostCur, alpha);
+            rivalGhost.position = new Vector3(p.x, p.y + playerHeight * 0.5f, 0f);
         }
 
         void SetPlayerColor(Color c)
@@ -1378,6 +1457,19 @@ namespace FluffyClimbers.Gameplay
             }
         }
 
+        /// <summary>Width of the hero as a share of its height, for <see cref="HeroScreenRect"/>.</summary>
+        const float HeroWidthShare = 0.7f;
+
+        /// <summary>The hero on screen in pixels (the HUD fades a pad the hero is behind, Final Bugs 2 #6); an empty rectangle when there is none. No allocation.</summary>
+        public Rect HeroScreenRect()
+        {
+            if (player == null || cam == null) return default(Rect);
+            Vector3 c = player.position;
+            float hw = playerHeight * HeroWidthShare * 0.5f, hh = playerHeight * 0.5f;
+            Vector3 a = cam.WorldToScreenPoint(new Vector3(c.x - hw, c.y - hh, 0f)), b = cam.WorldToScreenPoint(new Vector3(c.x + hw, c.y + hh, 0f));
+            return Rect.MinMaxRect(a.x, a.y, b.x, b.y);
+        }
+
         // ---------------- per tick / per frame ----------------
 
         /// <summary>Call once after every Sim tick: remembers the previous and current player position for interpolation and spawns effects.</summary>
@@ -1391,6 +1483,7 @@ namespace FluffyClimbers.Gameplay
             curX = session.State.X.F();
             curY = session.State.Y.F();
             bool grounded = session.State.Grounded;
+            SampleRivalGhost();
             DeriveAudio(grounded);
             DerivePowerFx();
             if (grounded && !wasGrounded) { squash = 1f; Spawn(curX, curY + 0.1f, 0.9f, new Color(1f, 1f, 1f, 0.6f), 0.25f, 0.2f, ArtCatalog.Pick(art != null ? art.DustPuff : null, 0)); }
@@ -1437,17 +1530,30 @@ namespace FluffyClimbers.Gameplay
                 {
                     Sprite gem = art != null ? ArtCatalog.Pick(art.GemSizes, pk.Kind == PickupKind.HiddenGem ? 2 : Mathf.Min(pk.Tag, 2)) : null;
                     Color tint = pk.Kind == PickupKind.HiddenGem ? new Color(1f, 0.6f, 1f, 1f) : RarityTint[Mathf.Clamp(pk.Tag, 0, 3)];
-                    Spawn(x, y, 0.9f, tint, 0.45f, 1.1f, gem);
+                    SpawnBehindHero(x, y, 0.9f, tint, 0.45f, 1.1f, gem);
                 }
                 else if (pk.Kind == PickupKind.Ring)
                 {
                     if (ringIdle == null) Spawn(x, y, 2.4f, new Color(0.35f, 0.9f, 1f, 1f), 0.45f, 0.6f, art != null ? art.StarFilled : null);   // the painted ring plays its own burst frames instead
                 }
                 else if (pk.Kind == PickupKind.Star)
-                    Spawn(x, y, 1.3f, Color.white, 0.5f, 0.9f, art != null ? art.StarFilled : null);
+                    SpawnBehindHero(x, y, 1.1f, Color.white, 0.5f, 0.9f, art != null ? art.StarFilled : null);
                 else
-                    Spawn(x, y, 0.7f, new Color(1f, 0.9f, 0.3f, 1f), 0.3f, 0.8f, ArtCatalog.Pick(art != null ? art.Sparkles : null, 0));
+                    SpawnBehindHero(x, y, 0.7f, new Color(1f, 0.9f, 0.3f, 1f), 0.3f, 0.8f, ArtCatalog.Pick(art != null ? art.Sparkles : null, 0));
             }
+        }
+
+        /// <summary>Effects are drawn over the hero (<see cref="EffectOrder"/>) except pickup effects, which stay behind it and grow only a little, so a collected star never hides the hero (Final Bugs 2 #10).</summary>
+        public const int EffectOrder = 20, PickupEffectOrder = 8;
+        const float EffectGrow = 2.5f, PickupEffectGrow = 0.8f;
+
+        void SpawnBehindHero(float x, float y, float size, Color color, float life, float rise, Sprite sprite)
+        {
+            if (reduced) return;
+            Pop p = pops[nextPop];
+            Spawn(x, y, size, color, life, rise, sprite);
+            p.Sr.sortingOrder = PickupEffectOrder;
+            p.Grow = PickupEffectGrow;
         }
 
         void Spawn(float x, float y, float size, Color color, float life, float rise, Sprite sprite)
@@ -1455,6 +1561,8 @@ namespace FluffyClimbers.Gameplay
             if (reduced) return;
             Pop p = pops[nextPop];
             nextPop = (nextPop + 1) % pops.Length;
+            p.Sr.sortingOrder = EffectOrder;
+            p.Grow = EffectGrow;
             p.Age = 0f;
             p.Life = life;
             p.Size = size;
@@ -1509,7 +1617,7 @@ namespace FluffyClimbers.Gameplay
             SetPlayerColor(s.Invuln > 0 && (reduced || (tick / 10) % 2 == 0) ? new Color(1f, 1f, 1f, 0.55f) : Color.white);
             UpdatePowerFx(px, py + h * 0.5f);
             UpdateKeepMovingFx(px, py + playerHeight * 0.5f);   // centred on the unstretched hero so the squash of a landing does not move the ring
-            UpdateRivalGhost();
+            UpdateRivalGhost(alpha);
             UpdateGearFx(px, py + h * 0.5f, h);
 
             // Platforms (moving ones follow the sim, vanishing ones blink, crumbling ones fade).
@@ -1591,7 +1699,7 @@ namespace FluffyClimbers.Gameplay
                 Fx hx, hy;
                 session.Sim.HazardPosition(session.Data.Hazards[i].Id, tick, out hx, out hy);
                 hazardTf[i].position = new Vector3(hx.F(), hy.F(), 0f);
-                hazardTf[i].rotation = Quaternion.Euler(0f, 0f, Mathf.Sin(tick * 0.05f + i) * 12f);
+                hazardTf[i].rotation = reduced ? Quaternion.identity : Quaternion.Euler(0f, 0f, Mathf.Sin(tick * 0.05f + i) * 12f);   // reduced motion: no wobble (Final Bugs 2 #43)
             }
 
             // Effects.
@@ -1605,7 +1713,7 @@ namespace FluffyClimbers.Gameplay
                 c.a = 1f - t;
                 p.Sr.color = c;
                 p.Tf.position += new Vector3(0f, p.Rise * deltaTime, 0f);
-                p.Tf.localScale *= 1f + deltaTime * 2.5f;
+                p.Tf.localScale *= 1f + deltaTime * p.Grow;
             }
 
             UpdatePortal(deltaTime);
@@ -1650,17 +1758,10 @@ namespace FluffyClimbers.Gameplay
             {
                 Layer l = layers[i];
                 double scrolled = reduced ? 0.0 : absCam * l.Factor;
-                double cell = System.Math.Floor(scrolled / l.Height);
-                float offset = (float)(scrolled - cell * l.Height);
-                long baseIdx = (long)cell;
+                float offset = (float)(scrolled - System.Math.Floor(scrolled / l.Pitch) * l.Pitch);
+                // three repeats, all upright, each placed by its bottom edge: one below, one around and one above the camera
                 for (int k = 0; k < l.Tiles.Length; k++)
-                {
-                    // Every other tile is mirrored vertically so neighbouring tiles meet on identical pixels: no visible seam.
-                    bool mirror = (((baseIdx + k - 1) % 2) + 2) % 2 == 1;
-                    l.Tiles[k].transform.localScale = new Vector3(l.Scale, mirror ? -l.Scale : l.Scale, 1f);
-                    float cy = camY - offset + (k - 1) * l.Height;
-                    l.Tiles[k].transform.position = new Vector3(camHalfW, cy + l.Height * 0.5f - camHalfH * 0.0f, 0f);
-                }
+                    l.Tiles[k].position = new Vector3(camHalfW, camY - offset + (k - 1) * l.Pitch, 0f);
             }
         }
 

@@ -338,7 +338,6 @@ namespace FluffyClimbers.Simulation
                 PlatformKind bk = Platforms[i].Kind;
                 if (bk == PlatformKind.FizzVent) { zones = true; if (cfg.VentHeight > reach) reach = cfg.VentHeight; }
                 else if (bk == PlatformKind.PinwheelGust) { zones = true; if (cfg.PinwheelHeight > reach) reach = cfg.PinwheelHeight; }
-                else if (bk == PlatformKind.UndertowPad) { zones = true; if (cfg.UndertowHeight > reach) reach = cfg.UndertowHeight; }   // Final Change 6, region 3
                 else if (bk == PlatformKind.FogPuffDrift) { zones = true; if (cfg.FogHeight > reach) reach = cfg.FogHeight; }
                 if (bk == PlatformKind.HiveLift && cfg.HiveBobAmplitude > bob) bob = cfg.HiveBobAmplitude;
                 else if (bk == PlatformKind.SproutLift && cfg.SproutRise > bob) bob = cfg.SproutRise;
@@ -2645,11 +2644,6 @@ namespace FluffyClimbers.Simulation
                 else if (p.Kind == PlatformKind.PinwheelGust)
                 {
                     if (Fx.Abs(s.X - p.X) < Cfg.PinwheelHalfWidth && s.Y - p.Y < Cfg.PinwheelHeight) push = push + Cfg.PinwheelPush * (p.Dir == 0 ? 1 : p.Dir);
-                }
-                else if (p.Kind == PlatformKind.UndertowPad)
-                {
-                    // Undertow Pad: gravity is UndertowGravityPercent while the player moves UP inside the column (falling is normal)
-                    if (s.Vy > Fx.Zero && Fx.Abs(s.X - p.X) < Cfg.UndertowHalfWidth && s.Y - p.Y < Cfg.UndertowHeight) gravity = Cfg.Gravity * Cfg.UndertowGravityPercent / 100;
                 }
                 else if (p.Kind == PlatformKind.FogPuffDrift)
                 {

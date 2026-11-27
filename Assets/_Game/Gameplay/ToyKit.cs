@@ -293,6 +293,74 @@ namespace FluffyClimbers.Gameplay
             return b;
         }
 
+        /// <summary>Clear space kept above and below a popup that had to be capped.</summary>
+        const float PopupEdge = 20f;
+
+        /// <summary>The tallest a centred popup may be in an overlay <paramref name="overlayH"/> tall with this safe area: the larger inset (notch or home bar) is kept free on both sides.</summary>
+        public static float PopupMaxHeight(float overlayH, Rect safe)
+        {
+            float inset = Mathf.Max(0f, Mathf.Max(1f - safe.yMax, safe.yMin)) * overlayH;
+            return Mathf.Max(600f, overlayH - 2f * inset - 2f * PopupEdge);
+        }
+
+        /// <summary>
+        /// Keeps a centred popup <paramref name="desired"/> tall, but never taller than the safe area, now and whenever the overlay changes size. The popup's middle must scroll
+        /// (a stretched viewport between the title and the bottom buttons, see <see cref="ScrollPopupMiddle"/>): the title, the X and the buttons are anchored to the edges and stay put.
+        /// </summary>
+        public static void FitPopupHeight(RectTransform overlay, RectTransform panel, float desired)
+        {
+            Action apply = () =>
+            {
+                if (panel == null || overlay == null) return;
+                float h = overlay.rect.height > 1f ? overlay.rect.height : UiKit.CanvasSizeRef().y;
+                float fit = Mathf.Min(desired, PopupMaxHeight(h, UiKit.SafeAreaNormalized()));
+                if (Mathf.Abs(panel.sizeDelta.y - fit) > 0.5f) panel.sizeDelta = new Vector2(panel.sizeDelta.x, fit);
+            };
+            var watch = overlay.gameObject.AddComponent<LeaderboardFitter>();
+            watch.OnSize = (w, h) => apply();
+            apply();
+        }
+
+        /// <summary>
+        /// Moves the middle of a finished popup (every child of <paramref name="panel"/> from <paramref name="firstChild"/> on, all anchored to the panel's top) into a scroll
+        /// viewport from <paramref name="top"/> below the panel top to <paramref name="reserve"/> above its bottom, then caps the popup to the safe area. Call it BEFORE the bottom
+        /// buttons are added. Nothing is cut: what does not fit is scrolled to.
+        /// </summary>
+        public static void ScrollPopupMiddle(RectTransform overlay, RectTransform panel, int firstChild, float top, float reserve)
+        {
+            float desired = panel.sizeDelta.y;
+            var middle = new System.Collections.Generic.List<RectTransform>();
+            for (int i = firstChild; i < panel.childCount; i++) middle.Add((RectTransform)panel.GetChild(i));
+
+            RectTransform vp = UiKit.Rect(panel, "Viewport");
+            vp.anchorMin = Vector2.zero;
+            vp.anchorMax = Vector2.one;
+            vp.offsetMin = new Vector2(0f, reserve);
+            vp.offsetMax = new Vector2(0f, -top);
+            vp.gameObject.AddComponent<RectMask2D>();
+            Image catcher = vp.gameObject.AddComponent<Image>();   // a transparent surface so a drag anywhere in the middle scrolls
+            catcher.color = new Color(0f, 0f, 0f, 0f);
+            RectTransform content = UiKit.Rect(vp, "Content");
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = new Vector2(0f, Mathf.Max(0f, desired - top - reserve));
+            foreach (RectTransform c in middle)
+            {
+                c.SetParent(content, false);
+                c.anchoredPosition += new Vector2(0f, top);
+            }
+            var sr = vp.gameObject.AddComponent<ScrollRect>();
+            sr.viewport = vp;
+            sr.content = content;
+            sr.horizontal = false;
+            sr.vertical = true;
+            sr.movementType = ScrollRect.MovementType.Clamped;   // content that fits does not move at all
+            sr.scrollSensitivity = 40f;
+            FitPopupHeight(overlay, panel, desired);
+        }
+
         /// <summary>A small red notification badge in the top-right corner of a button.</summary>
         public static Image AddBadge(Transform button)
         {

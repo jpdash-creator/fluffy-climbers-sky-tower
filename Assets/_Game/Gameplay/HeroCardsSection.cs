@@ -118,13 +118,9 @@ namespace FluffyClimbers.Gameplay
             float availY = y;
             y += availH + gap;
             float buttonReserve = 50f + Mathf.Max(170f, UiKit.MinTouchRef) + gap;
-            // The panel is as tall as its content, at most what fits the safe area with its title and X (a mirrored margin so a notch or home bar never pushes it out);
+            // The panel is as tall as its content, at most what fits the safe area with its title and X (ToyKit.FitPopupHeight, again whenever the screen changes);
             // a taller content scrolls inside the panel (the title, the X and OK stay put).
-            Vector2 canvas = UiKit.CanvasSizeRef();
-            float topInset = UiKit.TopInsetRef();
-            float botInset = Mathf.Max(0f, canvas.y - UiKit.SafeSizeRef().y - topInset);
-            float maxPanel = Mathf.Max(700f, canvas.y - 2f * Mathf.Max(topInset, botInset) - 60f);
-            float panelH = Mathf.Min(maxPanel, Mathf.Max(1000f, bodyTop + y + buttonReserve));
+            float panelH = Mathf.Max(1000f, bodyTop + y + buttonReserve);
             RectTransform panel = UiKit.BuildPopupFrame(overlay, rname + " heroes", art, new Vector2(panelW, panelH), host.CloseOverlay);
             panel.name = "HeroTierInfo";
             RectTransform vp = UiKit.Rect(panel, "Viewport");
@@ -139,18 +135,16 @@ namespace FluffyClimbers.Gameplay
             content.pivot = new Vector2(0.5f, 1f);
             content.anchoredPosition = Vector2.zero;
             content.sizeDelta = new Vector2(0f, y);
-            if (y > panelH - bodyTop - buttonReserve + 0.5f)
-            {
-                Image catcher = vp.gameObject.AddComponent<Image>();   // a transparent surface so a drag anywhere in the viewport scrolls
-                catcher.color = new Color(0f, 0f, 0f, 0f);
-                var sr = vp.gameObject.AddComponent<ScrollRect>();
-                sr.viewport = vp;
-                sr.content = content;
-                sr.horizontal = false;
-                sr.vertical = true;
-                sr.movementType = ScrollRect.MovementType.Clamped;
-                sr.scrollSensitivity = 40f;
-            }
+            Image catcher = vp.gameObject.AddComponent<Image>();   // a transparent surface so a drag anywhere in the viewport scrolls
+            catcher.color = new Color(0f, 0f, 0f, 0f);
+            var sr = vp.gameObject.AddComponent<ScrollRect>();
+            sr.viewport = vp;
+            sr.content = content;
+            sr.horizontal = false;
+            sr.vertical = true;
+            sr.movementType = ScrollRect.MovementType.Clamped;   // content that fits does not move
+            sr.scrollSensitivity = 40f;
+            ToyKit.FitPopupHeight(overlay, panel, panelH);
             BundlesScreen.AddHeroCardIcon(content, new Vector2(0.5f, 1f), new Vector2(0f, 0f), 140f);
             float cy = linesY;
             for (int i = 0; i < lines.Count; i++)

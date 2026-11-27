@@ -20,7 +20,7 @@ MAXSIDE = 512
 PARTS = {
     1: {"dewdrop": ("P1_parts.png", 0, 0), "dragonfly_perched": ("P2_parts.png", 0, 1), "dragonfly_buzz": ("P2_parts.png", 0, 2)},
     2: {"spore_cloud_1": ("P2_parts.png", 0, 1), "spore_cloud_2": ("P2_parts.png", 0, 2), "spore_cloud_3": ("P2_parts.png", 1, 0)},
-    3: {"funnel_a": ("P1_parts.png", 0, 0), "funnel_b": ("P1_parts.png", 0, 1), "foam_heap_1": ("P1_parts.png", 0, 2), "foam_heap_2": ("P1_parts.png", 1, 0)},
+    3: {"foam_heap_1": ("P1_parts.png", 0, 2), "foam_heap_2": ("P1_parts.png", 1, 0)},
     4: {"magnet_idle": ("P2_parts.png", 0, 0), "magnet_pulse": ("P2_parts.png", 0, 1), "sour_burst_a": ("P2_parts.png", 0, 2), "sour_burst_b": ("P2_parts.png", 1, 0),
         "core_stub": ("P1_parts.png", 1, 1)},
     5: {"scroll_roll": ("P1_parts.png", 0, 0), "torii": ("P2_parts.png", 0, 1), "incense_mist_a": ("P2_parts.png", 0, 2), "incense_mist_b": ("P2_parts.png", 1, 0)},

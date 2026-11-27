@@ -73,7 +73,7 @@ namespace FluffyClimbers.Gameplay
         RewardsTicker ticker;
         Text timerText;
         int timerSeconds = -1;
-        double lastRemaining;
+        DateTime periodEnd;
         int selectedRegion;
 
         public Text CoinText { get; private set; }
@@ -192,7 +192,7 @@ namespace FluffyClimbers.Gameplay
             mainHeader = null;
             claimAllGo = null;
             stripSnap = null;
-            lastRemaining = Tab == RewardTab.Main ? 0.0 : Remaining().TotalSeconds;
+            periodEnd = Tab == RewardTab.Main ? DateTime.MinValue : PeriodEnd(Remaining());
 
             if (Tab == RewardTab.Main) BuildMainHeader(body);
             BuildList();
@@ -206,6 +206,13 @@ namespace FluffyClimbers.Gameplay
 
         TimeSpan Remaining() { return Tab == RewardTab.Weekly ? progress.WeeklyResetIn() : progress.DailyResetIn(); }
 
+        /// <summary>
+        /// The calendar day the running period ends on (local midnight, or the Monday midnight of the week), from the time left. A different answer later means another day or week has started,
+        /// however much time is left: an app that sleeps and wakes the next day at a later hour has LESS time left than before, so "the time left grew" missed it (Final Bugs 2 #28).
+        /// The extra hour keeps the two clock reads on the same side of midnight. No allocation.
+        /// </summary>
+        DateTime PeriodEnd(TimeSpan left) { return ((progress.Clock != null ? progress.Clock() : DateTime.Now) + left).AddHours(1).Date; }
+
         /// <summary>Once-a-second countdown and the rollover check (a day or week that ends while the screen is open rebuilds the tab); on Main it drives the strip's snap glide.</summary>
         void Tick()
         {
@@ -216,8 +223,7 @@ namespace FluffyClimbers.Gameplay
             }
             if (timerText == null) return;
             TimeSpan left = Remaining();
-            if (left.TotalSeconds > lastRemaining + 1.0) { Render(); return; }   // the period rolled over: new counters, new claims
-            lastRemaining = left.TotalSeconds;
+            if (PeriodEnd(left) != periodEnd) { Render(); return; }   // another day or week: new counters, new claims
             int secs = (int)left.TotalSeconds;
             if (secs == timerSeconds) return;
             timerSeconds = secs;

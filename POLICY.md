@@ -1,6 +1,6 @@
 # Fluffy Climbers: Tower Jump Privacy Policy
 
-Last updated: 2026-11-26
+Last updated: 2026-11-27
 
 > **In short**
 >
@@ -168,7 +168,7 @@ The weekly leaderboards (section 4a) were added on 2026-11-12. If the Game gains
 | Internet and network state | Ads, purchases, Google sign-in and cloud save | Unity engine, Google Mobile Ads SDK, Unity In-App Purchasing |
 | `com.android.vending.BILLING` | In-app purchases through Google Play | Unity In-App Purchasing |
 | `com.google.android.gms.permission.AD_ID` | Lets the ad software read the advertising ID (Android 13 and later) | Google Mobile Ads SDK |
-| Vibrate | Haptic feedback when you turn Haptics on in Settings | Unity engine |
+| Vibrate | Short haptic feedback when you turn Haptics on in Settings | The Game |
 
 The Game requests no runtime permissions: it never asks for camera, microphone, location, contacts, storage, photos or notification access. Google Play Games sign-in uses the Google account picker provided by Google Play services and needs no separate permission from the Game.
 

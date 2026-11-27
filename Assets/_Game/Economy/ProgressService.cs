@@ -706,9 +706,10 @@ namespace FluffyClimbers.Economy
 
             var result = new EndlessReward();
             result.Floors = floors;
-            result.BestBefore = EndlessBestFloor(regionId);
-            result.NewBest = !timeAttack && floors > result.BestBefore;
-            if (result.NewBest) Data.EndlessBest[regionId] = floors;
+            // Final Bugs 2 #23: a Time Attack compares with its OWN best of this Gameplay setting (read before the run is recorded), never with the Endless best.
+            result.BestBefore = timeAttack ? TimeAttackBestFloors(regionId, mode) : EndlessBestFloor(regionId);
+            result.NewBest = floors > result.BestBefore;
+            if (result.NewBest && !timeAttack) Data.EndlessBest[regionId] = floors;   // the Endless best is only ever set by Endless runs
 
             // Final Change 1 (owner 2026-11-22): the Gameplay setting bonus applies to the full-rate coins (floors and combo x region factor), BEFORE the daily-cap halving.
             int plain = EndlessRewards.FullRateCoins(floors, comboCoins, region.CoinFactor);   // without the setting bonus

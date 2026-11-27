@@ -5,15 +5,38 @@ using UnityEngine.UI;
 namespace FluffyClimbers.Gameplay
 {
     /// <summary>Held / pressed state of one on-screen control (Left, Right or Jump).</summary>
-    public sealed class HoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
+    public sealed class HoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler, IPointerEnterHandler
     {
         public bool Held;
         public bool PressedEdge;   // set on pointer down, consumed by the input reader
+        /// <summary>True for the Left and Right pads: a thumb that slides from one arrow onto the other takes it over (Final Bugs 2 #27).</summary>
+        public bool Arrow;
 
-        public void OnPointerDown(PointerEventData e) { Held = true; PressedEdge = true; Haptics.Pulse(); }
-        public void OnPointerUp(PointerEventData e) { Held = false; }
-        public void OnPointerExit(PointerEventData e) { Held = false; }
-        void OnDisable() { Held = false; PressedEdge = false; }
+        PointerEventData slid;   // the pointer that slid onto this arrow; its release goes to the arrow it was pressed on, so it is watched here
+
+        public void OnPointerDown(PointerEventData e) { Held = true; PressedEdge = true; slid = null; Haptics.Pulse(); }
+        public void OnPointerUp(PointerEventData e) { Held = false; slid = null; }
+        public void OnPointerExit(PointerEventData e) { Held = false; slid = null; }
+
+        public void OnPointerEnter(PointerEventData e)
+        {
+            if (!Arrow || Held || e == null || e.pointerPress == null) return;   // only a pointer that is down, and was put down on an arrow
+            HoldButton from = e.pointerPress.GetComponent<HoldButton>();
+            if (from == null || !from.Arrow) return;
+            Held = true;
+            slid = e;
+            Haptics.Pulse();
+        }
+
+        void Update() { ReleaseSlid(); }
+
+        /// <summary>Lets go when the pointer that slid on is no longer down. Public so tests can drive it.</summary>
+        public void ReleaseSlid()
+        {
+            if (slid != null && slid.pointerPress == null) { Held = false; slid = null; }
+        }
+
+        void OnDisable() { Held = false; PressedEdge = false; slid = null; }
     }
 
     /// <summary>
@@ -42,8 +65,11 @@ namespace FluffyClimbers.Gameplay
             float jumpAnchor = leftHanded ? 0f : 1f;
             float dir = leftHanded ? -1f : 1f;
 
-            pad.Left = Make(parent, "PadLeft", "Move left", plate, Glyphs.Left, false, new Vector2(moveAnchor, 0f), new Vector2(dir * moveMargin, bottom + 20f), size, arrowW);
-            pad.Right = Make(parent, "PadRight", "Move right", plate, Glyphs.Left, true, new Vector2(moveAnchor, 0f), new Vector2(dir * (moveMargin + arrowW + gap), bottom + 20f), size, arrowW);
+            // Left is ALWAYS left of Right (Final Bugs 2 #20): the offsets are counted from the screen edge, so on the right edge (left-handed) the order of the two offsets swaps.
+            float near = dir * moveMargin, far = dir * (moveMargin + arrowW + gap);
+            pad.Left = Make(parent, "PadLeft", "Move left", plate, Glyphs.Left, false, new Vector2(moveAnchor, 0f), new Vector2(leftHanded ? far : near, bottom + 20f), size, arrowW);
+            pad.Right = Make(parent, "PadRight", "Move right", plate, Glyphs.Left, true, new Vector2(moveAnchor, 0f), new Vector2(leftHanded ? near : far, bottom + 20f), size, arrowW);
+            pad.Left.Arrow = pad.Right.Arrow = true;
             pad.Jump = Make(parent, "PadJump", "Jump", ToyKit.Button(1), Glyphs.Up, false, new Vector2(jumpAnchor, 0f), new Vector2(-dir * margin, bottom + 20f), jumpSize);
             return pad;
         }

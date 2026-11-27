@@ -63,7 +63,7 @@ namespace FluffyClimbers.Tests
 
             var full = new TimeAttackRecord { BestFloors = 108, Ticks = TimeRecords.TimeAttackTicks };
             string t = MetaController.TimeAttackLineText(full);
-            StringAssert.StartsWith("3:00, best 108 floors\n", t);
+            StringAssert.StartsWith("Time Attack: best 108 floors\n", t);
             StringAssert.Contains(TimeRecords.FormatPace(108, TimeRecords.TimeAttackTicks), t, "108 floors in 180 s is 0.60 plat/s");
             StringAssert.DoesNotContain("fell", t, "a full run did not fall");
             Assert.AreEqual(2, MetaController.TimeAttackLineLines(full));

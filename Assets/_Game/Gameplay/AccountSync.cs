@@ -32,6 +32,8 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Called after the cloud save replaced the device save, so the open screen can redraw.</summary>
         public static Action RefreshUi;
         static GameObject conflictRoot;
+        /// <summary>"Sync now" requests that arrived while an upload or the start-up compare was still running: each one is answered by a fresh sync afterwards, never with an early "synced" (Final Bugs 2 #16).</summary>
+        static Action<bool, string> waiting;
 
         public static IAccountService Account { get { return Services.Account; } }
 
@@ -60,6 +62,7 @@ namespace FluffyClimbers.Gameplay
             progress.QuietChanged += OnQuiet;
             quiet.Clear();
             dirty = uploading = syncReady = blockUpload = startInFlight = pendingCheck = false;
+            waiting = null;
             startAttempts = 0;
             if (runner == null)
             {
@@ -93,10 +96,19 @@ namespace FluffyClimbers.Gameplay
         static void Tick()
         {
             float now = Time.unscaledTime;
+            if (waiting != null && !uploading && !startInFlight && conflictRoot == null) { AnswerWaiting(); return; }
             if (!dirty && !uploading && quiet.Due(now)) { dirty = true; uploadAt = now; }   // a quiet change waited long enough
             if (!dirty || uploading) return;
             if (now < uploadAt) return;
             Flush();
+        }
+
+        /// <summary>The running work ended: one fresh sync, whose real result goes to everyone who was waiting.</summary>
+        static void AnswerWaiting()
+        {
+            Action<bool, string> done = waiting;
+            waiting = null;
+            SyncNow(done);
         }
 
         /// <summary>Uploads now if something is waiting (app pause or quit).</summary>
@@ -229,17 +241,21 @@ namespace FluffyClimbers.Gameplay
             syncReady = false;
             dirty = false;
             blockUpload = false;
+            Action<bool, string> left = waiting;
+            waiting = null;
+            if (left != null) left(false, "Signed out.");
         }
 
         /// <summary>
         /// "Sync now" (Account popup): uploads the save at once when the account is in step, otherwise signs in quietly and compares the saves again
-        /// (the choose-your-save popup appears if they differ). done(ok, message) always runs once, with a short player-facing message.
+        /// (the choose-your-save popup appears if they differ). done(ok, message) always runs once, with a short player-facing message, and only when the result is known:
+        /// a request made while an upload is still running waits for it and then uploads the save as it is by then.
         /// </summary>
         public static void SyncNow(Action<bool, string> done)
         {
             if (progress == null || !IsGoogleMode) { if (done != null) done(false, "Sign in first."); return; }
             if (blockUpload) { if (done != null) done(false, "Your account has a newer save. Update the app to sync."); return; }
-            if (uploading || startInFlight) { if (done != null) done(true, "Already syncing."); return; }
+            if (uploading || startInFlight) { waiting += done; return; }
             if (Active)
             {
                 dirty = false;
@@ -265,6 +281,8 @@ namespace FluffyClimbers.Gameplay
             startInFlight = true;
             Action<string> finish = fail =>
             {
+                // the compare decided that the device save goes up: that upload has not happened yet, so do it now and report its result
+                if (fail == null && dirty && Active) { SyncNow(done); return; }
                 if (done != null) done(syncReady && fail == null, fail ?? (syncReady ? "Synced." : "Could not sync yet."));
             };
             if (Account.IsSignedIn) { LoadAndResolve(() => finish(null)); return; }
@@ -386,6 +404,7 @@ namespace FluffyClimbers.Gameplay
             progress = null;
             quiet = new QuietUploadGate();
             dirty = uploading = syncReady = blockUpload = startInFlight = pendingCheck = false;
+            waiting = null;
             startAttempts = 0;
             Parent = null;
             RefreshUi = null;

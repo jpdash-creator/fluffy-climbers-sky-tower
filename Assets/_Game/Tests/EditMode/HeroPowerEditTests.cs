@@ -249,8 +249,8 @@ namespace FluffyClimbers.Tests
             }
             Assert.AreEqual(0f, PowerUpBar.AnchorX(true));
             Assert.AreEqual(1f, PowerUpBar.AnchorX(false));
-            // one narrow column per group: well clear of the centred banners (BannerW 380) on the narrowest canvas (about 942 px wide at 9:21)
-            Assert.Less(PowerUpBar.ReachFromEdge + UiKit.MinSpacingPx, (942f - RunHud.BannerW) * 0.5f);
+            // one narrow column per group: well clear of the combo and speed pill pair under the top bar (Final Bugs 2) on the narrowest canvas (about 942 px wide at 9:21)
+            Assert.Less(PowerUpBar.ReachFromEdge + UiKit.MinSpacingPx, (942f - (2f * RunHud.BannerW + RunHud.BannerGap)) * 0.5f);
         }
     }
 }

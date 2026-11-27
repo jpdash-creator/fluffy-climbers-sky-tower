@@ -17,6 +17,8 @@ namespace FluffyClimbers.Gameplay
         // and every button must be at least 48 dp (UiKit.MinTouchPx, about 126 px), so the card is that button plus 5 px above and below.
         const float IconW = 104f, CardPadX = 20f, CardCorner = 48f, RewardCorner = 30f;
         const float CardPadY = 8f, ItemIcon = 48f, ItemGap = 12f, PlatePad = 14f, CheckW = 44f;
+        /// <summary>Text insets of a wide card with a button (ad power-up, weekly prize): clear of the card's painted border at the left and the top (Final Bugs 2 #30).</summary>
+        public const float ButtonCardPadL = 44f, ButtonCardPadT = 24f;
         /// <summary>Space between cards.</summary>
         public const float CardGap = 10f;
         /// <summary>Base height of a card; it grows (never shrinks) with the text size and a wrapped title.</summary>
@@ -367,7 +369,7 @@ namespace FluffyClimbers.Gameplay
         float ButtonCardTextWidth(float buttonW)
         {
             float listW = screen != null && screen.rect.width > 200f ? screen.rect.width : 1080f;
-            return Mathf.Max(1f, listW - 2f * Side - CardPadX - (buttonW + CardPadX * 2f) - 4f);
+            return Mathf.Max(1f, listW - 2f * Side - ButtonCardPadL - (buttonW + CardPadX * 2f) - 4f);
         }
 
         /// <summary>
@@ -431,17 +433,17 @@ namespace FluffyClimbers.Gameplay
         /// </summary>
         internal static void FitButtonCard(RewardCardFit f, float cardW)
         {
-            float textW = Mathf.Max(1f, cardW - CardPadX - (f.BtnW + CardPadX * 2f) - 4f);
+            float textW = Mathf.Max(1f, cardW - ButtonCardPadL - (f.BtnW + CardPadX * 2f) - 4f);
             float line = LineH(BodyPx);
             float titleH = Mathf.Max(line * 2f, MeasureWrapped(f.Title, f.Title.text, textW));
             float bodyH = Mathf.Max(line * f.BodyMinLines, MeasureWrapped(f.Body, f.Body.text, textW));
             if (f.Alts != null) for (int i = 0; i < f.Alts.Length; i++) bodyH = Mathf.Max(bodyH, MeasureWrapped(f.Body, f.Alts[i], textW));
             RectTransform trt = f.Title.rectTransform;
-            trt.offsetMin = new Vector2(CardPadX, -(CardPadY + titleH)); trt.offsetMax = new Vector2(-(f.BtnW + CardPadX * 2f), -CardPadY);
-            float bodyTop = CardPadY + titleH + 6f;
+            trt.offsetMin = new Vector2(ButtonCardPadL, -(ButtonCardPadT + titleH)); trt.offsetMax = new Vector2(-(f.BtnW + CardPadX * 2f), -ButtonCardPadT);
+            float bodyTop = ButtonCardPadT + titleH + 6f;
             RectTransform brt = f.Body.rectTransform;
-            brt.offsetMin = new Vector2(CardPadX, -(bodyTop + bodyH)); brt.offsetMax = new Vector2(-(f.BtnW + CardPadX * 2f), -bodyTop);
-            f.Row.minHeight = f.Row.preferredHeight = Mathf.Max(CardPadY * 2f + titleH + 6f + bodyH + f.TailExtra, f.MinH);
+            brt.offsetMin = new Vector2(ButtonCardPadL, -(bodyTop + bodyH)); brt.offsetMax = new Vector2(-(f.BtnW + CardPadX * 2f), -bodyTop);
+            f.Row.minHeight = f.Row.preferredHeight = Mathf.Max(ButtonCardPadT + CardPadY + titleH + 6f + bodyH + f.TailExtra, f.MinH);
         }
 
         /// <summary>Completed (small) card: the title may wrap to any number of lines; the card grows to title + 24 (at least the header height).</summary>

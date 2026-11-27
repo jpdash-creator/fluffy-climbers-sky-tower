@@ -56,3 +56,13 @@ Applies on top of the Final Change 1 steps above (do them once, from the release
 
 ## Rules version 4 (Final Changes 5 and 6, 2026-11-25), NOT deployed
 `LeaderboardConfig.SimVersion`, `Limits.SimVersions` and `config.default.json` say 4 (19 new platforms, nine special level types, Moving platform fix, new level layouts and Rival Race ghost paths). Owner steps: redeploy `fluffy-leaderboard` from the release commit, set `simVersions` to `[4]` in Firestore `config/leaderboard`, re-measure the prize entry limits. Version 3 apps then get HTTP 426.
+
+## Deployed 2026-11-27 (owner approved in chat): rules version 4, build v0.71.138
+Revision `fluffy-leaderboard-00010-qbg`, 100 percent traffic (previous: `fluffy-leaderboard-00009-j8d`). Source commit e34e8bd, same staging and command as step 6. `dotnet test Tests/LeaderboardService`: 113 passed. Smoke: `/healthz/` content hash equals the shipped manifest (f8530c45...), unauthenticated calls answer 401, no error log lines. Covers the pending items above: rules version 4, `/delete-my-entries`, `/sync-breakdown`, profile upsert on submit, `/v1/save`.
+No Firestore `config/leaderboard` document exists, so `simVersions` comes from the deployed defaults. Still open: `firebase deploy --only firestore:indexes` (TTL for breakdowns and saveBackups), publish the POLICY.md/TERMS.md wording, re-measure prize entry limits.
+
+## Rules version 5 (Region 3 funnel removed), NOT deployed
+Owner Final Bugs 2 (2026-11-27): the Undertow Pad is a plain platform (no water funnel, no slowing column). Platform layouts are unchanged; the replay physics differs and the Rival Race ghost of `lvl_003_13` was re-baked (level file and its golden hash changed; rebuild the content manifest, which the build does before every player build, before deploying so the service and the app hold the same content). Sky Hoops ring positions follow the physics: the shipped base layouts are identical, a few attempt-seed layouts of `lvl_003_08` / `_17` place rings differently. `LeaderboardConfig.SimVersion`, `Limits.SimVersions` and `config.default.json` say 5. Redeploy `fluffy-leaderboard` from the release commit (same command as step 6); there is no Firestore `config/leaderboard` document, so the deployed defaults apply. Version 4 apps (v0.71.138) then get HTTP 426.
+
+## Deployed 2026-11-27 (owner approved in chat): rules 4 and 5
+Revision `fluffy-leaderboard-00011-kx6`, 100 percent traffic (previous: `00010-qbg`). Working tree of Final Bugs 2 (not yet committed), content hash e8cda644..., 113 service tests passed. `simVersions` [4, 5]: phones on v0.71.138 keep counting (no APK was built; drop 4 with the next release). A v0.71.138 Region 3 run that used the old funnel, or level 3-13, may be refused as a mismatch.

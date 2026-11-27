@@ -388,7 +388,13 @@ namespace FluffyClimbers.Leaderboard
                 if (run.InputsB64 != null && run.InputsB64.Length > ProgressService.LeaderboardMaxRunChars && !sending)
                 {
                     sending = true;
-                    client.SubmitRun(run, r => { sending = false; if (r.Ok) MarkStale(); Pump(); }, new LbProfile { DisplayName = ShownName, AvatarUrl = auth.Profile.AvatarUrl });
+                    client.SubmitRun(run, r =>
+                    {
+                        sending = false;
+                        if (r.Ok) { Accepted(); MarkStale(); }
+                        else if (LeaderboardRetryPolicy.Classify(r, 0) == SubmitVerdict.Drop) Refused(r);   // too big to wait in the queue: it is not sent again
+                        Pump();
+                    }, new LbProfile { DisplayName = ShownName, AvatarUrl = auth.Profile.AvatarUrl });
                 }
                 return;
             }
@@ -409,7 +415,7 @@ namespace FluffyClimbers.Leaderboard
                 sending = false;
                 switch (LeaderboardRetryPolicy.Classify(r, run.Tries))
                 {
-                    case SubmitVerdict.Done: progress.RemoveLeaderboardRun(id); MarkStale(); Pump(); break;
+                    case SubmitVerdict.Done: progress.RemoveLeaderboardRun(id); Accepted(); MarkStale(); Pump(); break;
                     case SubmitVerdict.Retry: progress.LeaderboardRunFailed(id, Now); break;   // backoff: 30 s, 1 min, 2 min ... at most 30 min, dropped after 12 tries
                     case SubmitVerdict.RejoinThenRetry:
                         // the service no longer knows the player (profile or weekly row removed): write the profile and register again, keep the run and send it again soon
@@ -417,9 +423,30 @@ namespace FluffyClimbers.Leaderboard
                         SyncProfile();
                         progress.LeaderboardRunFailed(id, Now);
                         break;
-                    default: progress.RemoveLeaderboardRun(id); break;   // the service refused THIS run for good (mismatch, ticket used or expired, update the app): never retried
+                    default: progress.RemoveLeaderboardRun(id); Refused(r); break;   // the service refused THIS run for good (mismatch, ticket used or expired, update the app): never retried, the reason is kept for the popup
                 }
             }, new LbProfile { DisplayName = ShownName, AvatarUrl = auth.Profile.AvatarUrl });
+        }
+
+        /// <summary>Keeps why a run was refused (saved, shown until the week ends) and tells the open screens.</summary>
+        static void Refused(HttpReply r)
+        {
+            if (progress == null) return;
+            progress.SetLeaderboardRefusal(CurrentWeekKey, LeaderboardRetryPolicy.IsOldApp(r != null ? r.Status : 0, r != null ? r.ErrorCode : ""));
+            Raise();
+        }
+
+        /// <summary>An accepted run proves the app is new enough again: the "update the game" note goes.</summary>
+        static void Accepted() { if (progress != null) progress.ClearLeaderboardOldAppRefusal(); }
+
+        /// <summary>The short reason a run of this week was refused by the service, "" when none was.</summary>
+        public static string RefusalText
+        {
+            get
+            {
+                if (progress == null || progress.LeaderboardRefusalWeek != CurrentWeekKey) return "";
+                return LeaderboardRetryPolicy.RefusalText(progress.LeaderboardRefusedOldApp);
+            }
         }
 
         /// <summary>The slow tick: retry the queue, retry the silent sign-in, notice a new week.</summary>

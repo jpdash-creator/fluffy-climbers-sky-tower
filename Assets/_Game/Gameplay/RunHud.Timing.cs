@@ -31,8 +31,12 @@ namespace FluffyClimbers.Gameplay
         public Text DeltaText { get { return deltaText; } }
         public bool GhostActive { get { return ghostOn; } }
 
+        /// <summary>Share of the pill height the stopwatch of the timer takes, and the unit behind a best pace ("0.83/s" = platforms per second).</summary>
+        public const float TimerIconShare = 0.78f;
+        public const string PaceUnit = "/s";
+
         /// <summary>A glass pill with a small icon at the left and a right-aligned value; <paramref name="flex"/> is its share of a layout row (ignored when it is placed by hand).</summary>
-        Text TimedPill(Transform parent, string name, Sprite icon, float flex, Color color, float h, out Image iconImage)
+        Text TimedPill(Transform parent, string name, Sprite icon, float flex, Color color, float h, out Image iconImage, float iconShare = 0.55f)
         {
             Image pill = Theme.GlassPanel(parent, name, h * 0.25f);
             var le = pill.gameObject.AddComponent<LayoutElement>();
@@ -43,16 +47,17 @@ namespace FluffyClimbers.Gameplay
             Image ic = UiKit.AddImage(pill.transform, "Icon", icon, Color.white);
             ic.rectTransform.anchorMin = ic.rectTransform.anchorMax = new Vector2(mirror ? 1f : 0f, 0.5f);
             ic.rectTransform.pivot = new Vector2(mirror ? 1f : 0f, 0.5f);
-            ic.rectTransform.anchoredPosition = new Vector2((mirror ? -1f : 1f) * h * 0.15f, 0f);
-            ic.rectTransform.sizeDelta = new Vector2(h * 0.55f, h * 0.55f);
+            ic.rectTransform.anchoredPosition = new Vector2((mirror ? -1f : 1f) * h * 0.12f, 0f);
+            ic.rectTransform.sizeDelta = new Vector2(h * iconShare, h * iconShare);
+            float textInset = h * Mathf.Max(0.8f, iconShare + 0.18f);
             iconImage = ic;
             Text t = UiKit.AddText(pill.transform, "Value", "", 46, color, mirror ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight, true);
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             var trt = (RectTransform)t.transform;
             trt.anchorMin = Vector2.zero;
             trt.anchorMax = Vector2.one;
-            trt.offsetMin = new Vector2(mirror ? 16f : h * 0.8f, 0f);
-            trt.offsetMax = new Vector2(mirror ? -h * 0.8f : -16f, 0f);
+            trt.offsetMin = new Vector2(mirror ? 16f : textInset, 0f);
+            trt.offsetMax = new Vector2(mirror ? -textInset : -16f, 0f);
             return t;
         }
 
@@ -87,8 +92,9 @@ namespace FluffyClimbers.Gameplay
                     hasBest = bp.IsValid;
                     if (hasBest)
                     {
-                        var sb = new System.Text.StringBuilder(8);
+                        var sb = new System.Text.StringBuilder(12);
                         TimeRecords.AppendHundredths(sb, bp.Hundredths);
+                        sb.Append(PaceUnit);
                         bestLabel = sb.ToString();
                     }
                 }
@@ -111,10 +117,12 @@ namespace FluffyClimbers.Gameplay
             hl.reverseArrangement = mirror;
             float h = RunLayout.Row3H;
             Image ic;
-            timerText = TimedPill(row, "TimerPill", ToyKit.Get("icon_dial"), 1.3f, Color.white, h, out ic);
+            // Final Bugs 2 #15: a plain stopwatch, drawn large, instead of the small speed dial.
+            timerText = TimedPill(row, "TimerPill", TimedIcons.Stopwatch, 1.3f, Color.white, h, out ic, TimerIconShare);
             UiKit.SetText(timerText, TimedText.TimeOfTenths(timeAttack ? TimeRecords.TimeAttackTicks / 6 : 0));
             if (levelChipWanted) AddLevelChip(row, h);   // owner 2026-11-26: every level line (Gates, Rings, Rival, Boss, Shelter, Keep Moving) sits right next to the timer, dark glass like it
-            bestText = TimedPill(row, "BestPill", ToyKit.Get("icon_crown"), 0.9f, new Color(1f, 0.9f, 0.4f), h, out ic);
+            // Final Bugs 2 #23/#40: never a crown here (the crown is a score). A Time Attack shows its best floors with the tower; the others their best pace with the speed icon and a unit.
+            bestText = TimedPill(row, "BestPill", ToyKit.Get(timeAttack ? "icon_tower" : "icon_speed"), 0.9f, new Color(1f, 0.9f, 0.4f), h, out ic);
             UiKit.SetText(bestText, bestLabel);
             bestGraphics = bestText.transform.parent.GetComponentsInChildren<Graphic>(true);
             SetGraphics(bestGraphics, hasBest);

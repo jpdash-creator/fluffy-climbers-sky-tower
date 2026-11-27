@@ -63,6 +63,10 @@ namespace FluffyClimbers.Economy
         [JsonProperty("slotsCache", NullValueHandling = NullValueHandling.Ignore)] public LeaderboardSlotsCache SlotsCache;
         /// <summary>Fingerprint (week + slots with their times) of the breakdown the service last confirmed, so an unchanged breakdown is not uploaded again (owner 2026-11-17). Empty = nothing confirmed. Additive.</summary>
         [JsonProperty("bdSent", DefaultValueHandling = DefaultValueHandling.Ignore)] public string BreakdownSent = "";
+        /// <summary>Week key of the last run the service refused for good ("" or null = none), so the calculation popup can say why (Final Bugs 2 #8). Additive.</summary>
+        [JsonProperty("refusedWeek", NullValueHandling = NullValueHandling.Ignore)] public string RefusedWeek;
+        /// <summary>That refusal was "the app is too old". Additive.</summary>
+        [JsonProperty("refusedOld", DefaultValueHandling = DefaultValueHandling.Ignore)] public bool RefusedOldApp;
     }
 
     /// <summary>

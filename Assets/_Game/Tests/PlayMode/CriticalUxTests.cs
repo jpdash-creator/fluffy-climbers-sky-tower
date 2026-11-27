@@ -603,7 +603,7 @@ namespace FluffyClimbers.Tests
             }
         }
 
-        /// <summary>Google button: Sign in with Google (guest) or Unlink Google Account (signed in) with the existing sign-in logic; Save Progress: guest saves on the phone, signed in saves to Google.</summary>
+        /// <summary>Google button: Sign in with Google (guest) or Unlink Google Account (signed in) with the existing sign-in logic; Save Progress: guest saves on the phone, signed in saves to the cloud too; the button says only Saved or Save failed.</summary>
         [UnityTest]
         public IEnumerator SettingsGoogleButtonAndSaveProgress()
         {
@@ -614,7 +614,7 @@ namespace FluffyClimbers.Tests
             yield return null;
             Assert.AreEqual(AccountPopup.SignInLabel, FindRt("Google").GetComponent<A11yLabel>().Text, "guest: Sign in with Google");
             FindRt("SaveProgress").GetComponent<Button>().onClick.Invoke();
-            Assert.AreEqual(AccountPopup.SavedLocalText, meta.SaveButtonTextForTests, "guest: saved on this phone");
+            Assert.AreEqual(AccountPopup.SavedText, meta.SaveButtonTextForTests, "guest: Saved");
             Assert.IsFalse(AccountSync.IsGoogleMode);
             FindRt("Google").GetComponent<Button>().onClick.Invoke();   // the stub signs in at once and Settings rebuilds
             yield return null;
@@ -622,7 +622,7 @@ namespace FluffyClimbers.Tests
             Assert.IsTrue(AccountSync.IsSignedIn, "signed in after the tap");
             Assert.AreEqual(AccountPopup.UnlinkLabel, FindRt("Google").GetComponent<A11yLabel>().Text, "signed in: Unlink Google Account");
             FindRt("SaveProgress").GetComponent<Button>().onClick.Invoke();
-            Assert.AreEqual(AccountPopup.SavedGoogleText, meta.SaveButtonTextForTests, "signed in: saved to Google");
+            Assert.AreEqual(AccountPopup.SavedText, meta.SaveButtonTextForTests, "signed in: Saved");
             FindRt("Google").GetComponent<Button>().onClick.Invoke();   // unlink
             yield return null;
             yield return null;
@@ -1536,9 +1536,10 @@ namespace FluffyClimbers.Tests
             Report(problems);
         }
 
-        /// <summary>CUX-3 (owner 2026-11-02): the combo and speed-up banners are in the CENTRE of the screen (horizontally centred, around the vertical middle), below the top HUD strip and above the pads, never at the bottom.</summary>
+        /// <summary>CUX-3 (owner 2026-11-27, Final Bugs 2 #2/#24; replaces the screen-centre rule): the combo and speed-up pills sit directly under the top bar, side by side, inside
+        /// the screen, never over the HUD rows and never in the middle of the screen where the hero and the next platforms are.</summary>
         [UnityTest]
-        public IEnumerator CentreBannersStayInTheScreenCentre()
+        public IEnumerator ComboAndSpeedPillsSitUnderTheTopBar()
         {
             GameSession.CurrentLevelId = "lvl_001_01";
             yield return Load("Run");
@@ -1551,20 +1552,27 @@ namespace FluffyClimbers.Tests
                 UiKit.SafeAreaNormalized = () => FullSafe;
                 yield return ApplyAspect(a, holder);
                 yield return null;
-                RectTransform top = FindRt("TopStrip");
+                RectTransform timer = FindRt("TimerPill");
+                var boxes = new List<Rect>();
+                int found = 0;
                 foreach (RectTransform rt in Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                 {
                     if (rt.name != "ComboBanner" && rt.name != "SpeedBanner") continue;
+                    found++;
                     bool was = rt.gameObject.activeSelf;
                     rt.gameObject.SetActive(true);
+                    rt.localScale = Vector3.one;
                     Canvas.ForceUpdateCanvases();
                     Rect r = CanvasBox(rt);
                     Rect screen = CanvasBox(rt.GetComponentInParent<Canvas>().rootCanvas.GetComponent<RectTransform>());
-                    if (Mathf.Abs(r.center.x - screen.center.x) > 2f) problems.Add(a.Name + ": " + rt.name + " not horizontally centred");
-                    if (r.center.y < screen.yMin + screen.height * 0.3f || r.center.y > screen.yMin + screen.height * 0.7f) problems.Add(a.Name + ": " + rt.name + " is not in the vertical centre (y " + r.center.y.ToString("F0") + ")");
-                    if (top != null && r.yMax > CanvasBox(top).yMin + 1.5f) problems.Add(a.Name + ": " + rt.name + " overlaps the top HUD strip");
+                    if (r.xMin < screen.xMin - 1f || r.xMax > screen.xMax + 1f) problems.Add(a.Name + ": " + rt.name + " leaves the screen");
+                    if (r.yMin < screen.yMin + screen.height * 0.6f) problems.Add(a.Name + ": " + rt.name + " reaches into the play area (y " + r.yMin.ToString("F0") + ")");
+                    if (timer != null && r.yMax > CanvasBox(timer).yMin + 1.5f) problems.Add(a.Name + ": " + rt.name + " overlaps the HUD rows");
+                    foreach (Rect other in boxes) if (other.Overlaps(r)) problems.Add(a.Name + ": the combo and speed pills overlap");
+                    boxes.Add(r);
                     rt.gameObject.SetActive(was);
                 }
+                if (found != 2) problems.Add(a.Name + ": expected the two pills, found " + found);
             }
             Restore(holder);
             Report(problems);
@@ -2052,7 +2060,7 @@ namespace FluffyClimbers.Tests
         }
 
         /// <summary>The merged run buttons: at least 48 dp, labelled, same alpha, at least 8 dp from each other and from the pads, inside the safe area, on the side of their type
-        /// group (mirrored by the left-handed option) and clear of the centred banners (CUX-3/4).</summary>
+        /// group (mirrored by the left-handed option) and clear of the combo and speed pills under the top bar (CUX-3/4).</summary>
         static void AssertPowerGroupsLayout(RunController rc, bool leftHanded)
         {
             PowerUpBar bar = rc.Hud.Powers;
@@ -2077,9 +2085,9 @@ namespace FluffyClimbers.Tests
                 Assert.LessOrEqual(r.yMax, parent.y, "button " + i + " inside the safe area (top)");
                 bool onLeftEdge = r.center.x < parent.x * 0.5f;
                 Assert.AreEqual(bar.ButtonIsLeft(i) != leftHanded, onLeftEdge, "the left group sits on the left edge (right edge when left-handed): " + bar.ButtonType(i));
-                float mid = parent.x * 0.5f, halfBanner = RunHud.BannerW * 0.5f + UiKit.MinSpacingPx;
-                if (onLeftEdge) Assert.LessOrEqual(r.xMax, mid - halfBanner, "button " + i + " clear of the centred banners");
-                else Assert.GreaterOrEqual(r.xMin, mid + halfBanner, "button " + i + " clear of the centred banners");
+                float mid = parent.x * 0.5f, halfPills = RunHud.BannerW + RunHud.BannerGap * 0.5f + UiKit.MinSpacingPx;
+                if (onLeftEdge) Assert.LessOrEqual(r.xMax, mid - halfPills, "button " + i + " clear of the pills under the top bar");
+                else Assert.GreaterOrEqual(r.xMin, mid + halfPills, "button " + i + " clear of the pills under the top bar");
                 rects.Add(r);
             }
             var pads = new List<Rect>();

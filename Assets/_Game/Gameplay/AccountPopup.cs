@@ -1,5 +1,6 @@
 using System;
 using FluffyClimbers.Economy;
+using FluffyClimbers.Leaderboard;
 using FluffyClimbers.Monetization;
 using UnityEngine;
 using UnityEngine.UI;
@@ -23,11 +24,9 @@ namespace FluffyClimbers.Gameplay
         public const string SignInLabel = "Sign in with Google";
         public const string UnlinkLabel = "Unlink Google Account";
         public const string SaveLabel = "Save Progress";
-        /// <summary>Short results of Save Progress (they replace the button label for a moment, so each fits one line at 130 percent text).</summary>
-        public const string SavedLocalText = "Saved on this phone";
-        public const string SavedGoogleText = "Saved to Google";
-        public const string SavedLocalOnlyText = "Saved on phone only";
-        public const string NothingToSaveText = "Nothing to save";
+        /// <summary>The two results of Save Progress (they replace the button label for a moment).</summary>
+        public const string SavedText = SaveBackupRules.SavedText;
+        public const string SaveFailedText = SaveBackupRules.SaveFailedText;
 
         // ---------------- pure logic ----------------
 
@@ -113,27 +112,39 @@ namespace FluffyClimbers.Gameplay
         }
 
         /// <summary>
-        /// Settings > Save Progress. The save is always written to this device first. A guest is done ("Saved on this phone"); a player linked to Google
-        /// also pushes it to Google Saved Games (AccountSync.SyncNow, the SaveSync upload): "Saved to Google", or "Saved on phone only" when the upload failed.
-        /// done(ok, text) runs once with a short text.
+        /// Settings > Save Progress. The save is always written to this device first. A player linked to Google also pushes it to Google Saved Games
+        /// (AccountSync.SyncNow, the SaveSync upload) and then to the Firebase backup copy. done(ok, text) runs once: text is only "Saved" (the phone save worked and,
+        /// for a Google player, at least one cloud copy is ok) or "Save failed" (<see cref="SaveBackupRules.ResultText"/>); the per-target detail goes to the log only.
         /// </summary>
         public static void SaveProgress(ProgressService progress, Action<bool, string> done)
         {
-            if (progress == null) { if (done != null) done(false, NothingToSaveText); return; }
+            if (progress == null)
+            {
+                Debug.Log("[Settings] Save Progress: no progress to save");
+                if (done != null) done(false, SaveFailedText);
+                return;
+            }
             try { progress.SaveLocalNow(); }
             catch (Exception e)
             {
-                Debug.LogWarning("[Settings] local save failed: " + e.Message);
-                if (done != null) done(false, NothingToSaveText);
+                Debug.Log("[Settings] Save Progress: phone=Failed (" + e.Message + ")");
+                if (done != null) done(false, SaveFailedText);
                 return;
             }
-            if (!AccountSync.IsGoogleMode) { if (done != null) done(true, SavedLocalText); return; }
+            if (!AccountSync.IsGoogleMode)
+            {
+                Debug.Log("[Settings] Save Progress: phone=Ok, guest (no cloud copies)");
+                if (done != null) done(true, SavedText);
+                return;
+            }
             // Final Bugs 1 item 12: two targets, reported separately. Google Saved Games first (also compares with the account save); then the Firebase backup copy, only when the device is in step with the account.
             AccountSync.SyncNow((ok, text) =>
             {
                 SaveTargetResult google = ok ? SaveTargetResult.Ok : SaveTargetResult.Failed;
                 AccountSync.BackupNow(firebase =>
                 {
+                    Debug.Log("[Settings] Save Progress: phone=Ok, google=" + google + " (" + text + "), firebase=" + firebase
+                        + (firebase == SaveTargetResult.Failed ? " (" + SaveBackup.LastFailure + ")" : ""));
                     if (done == null) return;
                     done(SaveBackupRules.AnyOk(google, firebase), SaveBackupRules.ResultText(google, firebase));
                 });

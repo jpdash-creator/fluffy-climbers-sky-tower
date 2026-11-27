@@ -710,9 +710,23 @@ namespace FluffyClimbers.Gameplay
             NewScreen(HeroSheetScreen.ScreenName);
             SkyBackground();
             CharacterDef pick = who;
+            string lockedHow = progress != null && dataOverride == null && !CharacterCatalog.Owns(progress, who) ? LockedHeroHow(who.Id) : null;   // Final Bugs 2 #19: a hero that is not owned can be looked at, never chosen
             heroSheet = new HeroSheetScreen(screen, who, art, dataOverride ?? HeroSheetData.For(who), CharacterCatalog.Selected == who, goBack, goBack,
-                () => { CharacterCatalog.Selected = pick; ShowHeroSheet(pick, goBack, dataOverride); },
-                other => ShowHeroSheet(other, goBack));   // the green arrows step to the previous / next owned hero
+                () =>
+                {
+                    if (progress != null && dataOverride == null && !CharacterCatalog.Owns(progress, pick)) return;
+                    CharacterCatalog.Selected = pick; ShowHeroSheet(pick, goBack, dataOverride);
+                },
+                other => ShowHeroSheet(other, goBack),   // the green arrows step to the previous / next owned hero
+                lockedHow);
+        }
+
+        /// <summary>"How to get: ..." for a hero the player does not own (the same words as the All Heroes screen).</summary>
+        string LockedHeroHow(string heroId)
+        {
+            var groups = AllHeroes.Build(i => { RegionDef r = repo != null ? repo.TryGetRegionByIndex(i) : null; return r != null ? r.Name : null; }, null);
+            foreach (AllHeroEntry e in AllHeroes.Flatten(groups)) if (e.Id == heroId) return "How to get: " + e.HowToGet;
+            return "How to get: Bundles / Chests / Rewards";
         }
 
         // ---------------- world map ----------------
@@ -1048,24 +1062,8 @@ namespace FluffyClimbers.Gameplay
                 replanner.OnSize = ReplanTags;   // plans the tags against the real content size, again when it changes
             }
 
-            // Clouds along the bottom edge of the lowest page: the art begins at a cloud (the path rises out of it). Drawn over the page, under the pins.
-            if (painted != null)
-            {
-                float[] bx = { 0.04f, 0.22f, 0.41f, 0.60f, 0.79f, 0.97f };
-                for (int c = 0; c < bx.Length; c++)
-                {
-                    Image puff = UiKit.AddImage(mapContent, "BottomCloud", Theme.RoundSprite, new Color(1f, 1f, 1f, 1f));
-                    puff.type = Image.Type.Sliced;
-                    puff.preserveAspect = false;
-                    puff.pixelsPerUnitMultiplier = 0.3f;
-                    puff.raycastTarget = false;
-                    puff.rectTransform.anchorMin = puff.rectTransform.anchorMax = new Vector2(bx[c], 0f);
-                    puff.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                    puff.rectTransform.sizeDelta = new Vector2(420f + (c % 2) * 100f, 190f + (c % 3) * 30f);
-                    puff.rectTransform.anchoredPosition = new Vector2(0f, (c % 2 == 0 ? 6f : -10f));
-                    puff.transform.SetSiblingIndex(painted.pages.Length);   // above the page pictures, below the pins
-                }
-            }
+            // No cloud shapes along the bottom edge: the painted art runs to the bottom of the screen on its own. The six opaque white puffs that were drawn there merged
+            // into a flat white band behind the bottom bar (Final Bugs 2 #38).
 
             // Soft cloud bands over the joins between the painted pages (owner, 2026-10-24: clouds separate the six sets).
             if (painted != null)

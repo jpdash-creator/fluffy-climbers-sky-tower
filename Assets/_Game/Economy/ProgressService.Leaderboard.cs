@@ -193,6 +193,33 @@ namespace FluffyClimbers.Economy
             return Math.Min(s, 1800L);
         }
 
+        // ---------------- refused runs ----------------
+
+        /// <summary>Week key of the last refused run, "" when none.</summary>
+        public string LeaderboardRefusalWeek { get { return LbState.RefusedWeek ?? ""; } }
+        /// <summary>The last refusal was "update the game".</summary>
+        public bool LeaderboardRefusedOldApp { get { return LbState.RefusedOldApp; } }
+
+        /// <summary>Remembers that the service refused a run in week <paramref name="weekKey"/> and whether the app was too old. Saves on a change.</summary>
+        public void SetLeaderboardRefusal(string weekKey, bool oldApp)
+        {
+            LeaderboardSaveData lb = LbState;
+            if (lb.RefusedWeek == weekKey && lb.RefusedOldApp == oldApp) return;
+            lb.RefusedWeek = weekKey;
+            lb.RefusedOldApp = oldApp;
+            Commit();
+        }
+
+        /// <summary>A run was accepted: an "update the game" note no longer applies.</summary>
+        public void ClearLeaderboardOldAppRefusal()
+        {
+            LeaderboardSaveData lb = LbState;
+            if (!lb.RefusedOldApp) return;
+            lb.RefusedOldApp = false;
+            lb.RefusedWeek = null;
+            Commit();
+        }
+
         // ---------------- weekly prize ----------------
 
         /// <summary>True when this device already granted the prize of the claim (weekKey_board_uid).</summary>

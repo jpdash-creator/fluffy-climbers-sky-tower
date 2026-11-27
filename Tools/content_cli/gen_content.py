@@ -129,6 +129,11 @@ def gem_rewards(index):
     return {"chance": 0.0, "min": 0, "max": 0}
 
 
+# Hand-picked seeds that differ from the formula below. migrate_levels_25.py keeps the seed already in the level file; this table keeps it through a fresh gen_content.py run.
+# lvl_001_15 (2026-11-27, Final Bugs 2 #46): the anchor level of the hero Forgiveness Index gate (docs/44 section 13); the formula seed 1591199 left 60 of 171 hero entries under the level 15 limit.
+SEED_OVERRIDES = {"lvl_001_15": 1591215}
+
+
 def make_level(r, region_id, i):
     cls, d, goal = LEVELS[i]
     level_id = "lvl_%03d_%02d" % (r, i)
@@ -136,7 +141,7 @@ def make_level(r, region_id, i):
         "id": level_id,
         "region": region_id,
         "index": i,
-        "seed": (r * 7919 + i * 104729 + 12345) % 2147483647,
+        "seed": SEED_OVERRIDES.get(level_id, (r * 7919 + i * 104729 + 12345) % 2147483647),
         "class": cls,
         "difficulty": d,
         "goal": goal,

@@ -115,7 +115,7 @@ namespace FluffyClimbers.Simulation.Tests
             LevelSpec b = T3.Spec(777, 700, 10, SignatureKind.SwingingGongs, GoalType.SurviveWave);
             b.FixedChunks = new string[] { "chunk_complex_a" };
             b.Class = 3;
-            Assert.Equal(8661963450143395285L, LevelBuilder.Build(cfg, a).ComputeHash());   // re-rolled 2026-11-26 (Clover Swap and Pollen Puff added to the region 1 plans; was 1056615307241436098); re-rolled 2026-11-26 (Glowworm Relay and Silk Snare Web deleted from the region 1 plans; was -4264933285507034215); re-rolled 2026-11-26 (Final Change 6 integration; was 4542318949224134653); re-rolled 2026-11-25 (Ladybug and Seesaw fixes; was -1274289823304530343); re-rolled 2026-11-13 (economy review: no gem pickups; was -3181476168520851783); re-rolled 2026-11-10: region 1 got the generics Crumble and Moving (was -7839884808577442138, re-rolled 2026-10-31 for doc 24)
+            Assert.Equal(2858691524904337284L, LevelBuilder.Build(cfg, a).ComputeHash());   // re-rolled 2026-11-26 (Final Bugs 1: Pollen Puff removed from the region 1 plans; was 8661963450143395285); re-rolled 2026-11-26 (Clover Swap and Pollen Puff added to the region 1 plans; was 1056615307241436098); re-rolled 2026-11-26 (Glowworm Relay and Silk Snare Web deleted from the region 1 plans; was -4264933285507034215); re-rolled 2026-11-26 (Final Change 6 integration; was 4542318949224134653); re-rolled 2026-11-25 (Ladybug and Seesaw fixes; was -1274289823304530343); re-rolled 2026-11-13 (economy review: no gem pickups; was -3181476168520851783); re-rolled 2026-11-10: region 1 got the generics Crumble and Moving (was -7839884808577442138, re-rolled 2026-10-31 for doc 24)
             Assert.Equal(-5875272777180945040L, LevelBuilder.Build(cfg, b).ComputeHash());   // re-rolled 2026-11-17 (gem levels restored: 2 or 3 collectible gems; was -3729750187827399642); re-rolled 2026-11-16 (collectible gems on level 10: was 5136200250945043513); re-rolled 2026-11-13 (economy review: no gem pickups; was -9118401508389237609); re-rolled 2026-11-04: SwingingGongs (region 5) now draws from its 7 new kinds (Bug List 3 D5); was -5175047465905895765
         }
 
@@ -501,14 +501,14 @@ namespace FluffyClimbers.Simulation.Tests
         }
 
         [Fact]
-        public void BounceCapLaunchesHigherThanBounceThanNormal()
+        public void BounceAndBounceCapLaunchAlikeAndHigherThanNormal()   // owner Final Bugs 1 (2026-11-26): every spring launches at the Bounce Cap height
         {
             SimConfig cfg = new SimConfig();
             Fx normal = PeakAfterLanding(cfg, PlatformKind.Normal);
             Fx bounce = PeakAfterLanding(cfg, PlatformKind.Bounce);
             Fx cap = PeakAfterLanding(cfg, PlatformKind.BounceCap);
             Assert.True(bounce > normal + Fx.One);
-            Assert.True(cap > bounce + Fx.One);
+            Assert.Equal(cap, bounce);
         }
 
         // ---------------- gongs ----------------

@@ -67,10 +67,11 @@ namespace FluffyClimbers.Gameplay
             string modeName = GameSettings.DifficultyNames[Mathf.Clamp(mode, 0, GameSettings.DifficultyNames.Length - 1)];
             if (!pace.IsValid && timeTicks <= 0)
             {
-                Line(panel, "RecordNone", modeName + ": no record yet", y, 780f, 1, false, Theme.InkSoft);
+                // Final Bugs 2 #25: the Endless pop-up says whose record is missing (a Time Attack best is listed right below it)
+                Line(panel, "RecordNone", endless ? "Endless " + modeName + ": no record" : modeName + ": no record yet", y, 780f, 1, false, Theme.InkSoft);
                 return RecordBlockHeight(false);
             }
-            Line(panel, "RecordLabel", endless ? "Best in " + modeName + " (pace, time alive)" : "Best in " + modeName, y, 780f, 2, false, Theme.Ink);
+            Line(panel, "RecordLabel", endless ? "Endless best in " + modeName + " (pace, time alive)" : "Best in " + modeName, y, 780f, 2, false, Theme.Ink);
             float labelH = 2f * LineHeight();
             RectTransform row = ToyKit.PillRow(panel, "Record", y + labelH + 4f, 96f);
             Text p = StatPill(row, null, PaceText(pace), Gold, 430f, 96f);

@@ -347,7 +347,7 @@ namespace FluffyClimbers.Gameplay
 
         // ---------------- Save Progress ----------------
 
-        /// <summary>Save Progress: a guest saves on this phone, a Google player also pushes to Google Saved Games. The result is shown on the button for a moment.</summary>
+        /// <summary>Save Progress: a guest saves on this phone, a Google player also writes the cloud copies. The button shows only "Saved" or "Save failed" for a moment.</summary>
         void OnSaveProgress()
         {
             if (saving) return;

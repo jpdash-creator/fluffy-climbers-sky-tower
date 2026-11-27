@@ -20,6 +20,8 @@ namespace FluffyClimbers.Gameplay
         public const float Row2H = 76f;
         /// <summary>Row 3 (timer, best pace, live delta; doc 46 section 5) height.</summary>
         public const float Row3H = 80f;
+        /// <summary>Distance from the top of the safe area to the end of the three HUD rows (the combo and speed pills start here, Final Bugs 2 #2/#24).</summary>
+        public static float HudRowsH { get { return 16f + RowH + 12f + Row2H + 12f + Row3H + 12f; } }
         public const float ChipH = 84f;
         /// <summary>Space of the bottom strip above the safe-area bottom: 20 + jump pad (230) + 20.</summary>
         public const float BottomPadRef = ControlPad.PadBottom + ControlPad.JumpSize;
@@ -47,7 +49,7 @@ namespace FluffyClimbers.Gameplay
         {
             float cw = CanvasW(aspect), ch = cw / Mathf.Max(0.3f, aspect);
             Rect sa = UiKit.SafeAreaNormalized();
-            top = Mathf.Max(0f, 1f - sa.yMax) * ch + 16f + RowH + 12f + Row2H + 12f + Row3H + 12f;
+            top = Mathf.Max(0f, 1f - sa.yMax) * ch + HudRowsH;
             bottom = 0f;   // owner decision 2026-11-02: no bottom strip and no red line; the play field runs to the real screen bottom, the pads float over it
             float unitsPerRef = worldWidth / cw;
             float room = ch * unitsPerRef - MinPlayUnits;
@@ -180,6 +182,17 @@ namespace FluffyClimbers.Gameplay
             topStrip.rectTransform.sizeDelta = new Vector2(0f, topRef);
             topStripRt = topStrip.rectTransform;
             topStrip.transform.SetAsFirstSibling();
+            // Final Bugs 2 #4: a soft dark strip behind the pills, gauge and timer (platforms, stars and hoops scroll under it and stay quiet), fading out below the rows.
+            Image shade = UiKit.AddImage(canvas.transform, TopShadeName, TopShadeSprite(), Color.white);
+            shade.preserveAspect = false;   // a flat vertical gradient: every row is one colour, so the width may stretch freely
+            shade.raycastTarget = false;
+            topShadeRt = shade.rectTransform;
+            topShadeRt.anchorMin = new Vector2(0f, 1f);
+            topShadeRt.anchorMax = new Vector2(1f, 1f);
+            topShadeRt.pivot = new Vector2(0.5f, 1f);
+            topShadeRt.anchoredPosition = Vector2.zero;
+            topShadeRt.sizeDelta = new Vector2(0f, TopShadeHeight(aspect));
+            shade.transform.SetAsFirstSibling();
             worldWidth = session.Cfg.ScreenWidth.F();
             // no bottom strip and no danger line is drawn (owner 2026-11-02): the physical screen bottom is the danger edge
 
@@ -237,17 +250,23 @@ namespace FluffyClimbers.Gameplay
             gaugeMarker = marker.rectTransform;
             gauge.gameObject.SetActive(!endless);
             starIcons = new Image[3];
+            starOutlines = new Outline[3];
             for (int i = 0; i < 3 && !endless; i++)
             {
-                starIcons[i] = UiKit.AddImage(root, "Star" + i, art != null ? art.StarFilled : null, new Color(0.35f, 0.35f, 0.4f, 0.9f));
+                starIcons[i] = UiKit.AddImage(root, "Star" + i, art != null ? art.StarFilled : null, StarOffColor);
                 P(starIcons[i].rectTransform, new Vector2(1f, 1f), new Vector2(-18f - (2 - i) * (starS + starGap), row2Y - (RunLayout.Row2H - starS) * 0.5f), new Vector2(starS, starS));
+                // Final Bugs 2 #4: an unearned star keeps its dark fill but gets a bright rim, so it never vanishes into the background.
+                starOutlines[i] = starIcons[i].gameObject.AddComponent<Outline>();
+                starOutlines[i].effectColor = StarRimColor;
+                starOutlines[i].effectDistance = new Vector2(3f, -3f);
+                starOutlines[i].useGraphicAlpha = false;
             }
 
-            // Combo and speed-up are transient banners in the CENTRE of the screen (owner 2026-11-02): horizontally centred, combo just above and speed-up just below the vertical middle.
-            // The centre is clear of the top HUD rows, the pads and the power-up buttons (those sit at the sides / bottom); anchors are symmetric, so left-handed mirroring needs no change.
+            // Combo and speed-up are transient pills directly UNDER the top bar (owner 2026-11-27, Final Bugs 2 #2/#24; replaces the screen-centre rule): side by side, combo left of the
+            // middle and speed-up right of it, so they never cover the hero or the platforms in the middle of the screen. Symmetric, so left-handed mirroring needs no change.
             // Level text (Gates, Rings, Rival, Shelter, Keep Moving, speedrun clock) lives in ONE chip at the top, next to the run timer (owner 2026-11-26); the bottom keeps only the pads.
-            comboRoot = BannerRoot(root, "ComboBanner", "icon_flame", new Color(1f, 0.85f, 0.2f), BannerComboY, out comboText);
-            speedRoot = BannerRoot(root, "SpeedBanner", "icon_speed", new Color(1f, 0.7f, 0.4f), BannerSpeedY, out speedText);
+            comboRoot = BannerRoot(root, "ComboBanner", "icon_flame", new Color(1f, 0.85f, 0.2f), true, out comboText);
+            speedRoot = BannerRoot(root, "SpeedBanner", "icon_speed", new Color(1f, 0.7f, 0.4f), false, out speedText);
             comboRoot.gameObject.SetActive(false);
             speedRoot.gameObject.SetActive(false);
             BuildSpeedCueTexts(session.Cfg);
@@ -269,11 +288,11 @@ namespace FluffyClimbers.Gameplay
             introTimer = 3.2f;
         }
 
-        /// <summary>Banner size and centre offsets (reference px from the middle of the safe area). Public so tests can assert the centre placement.</summary>
         /// <summary>Offset of the intro popup centre from the middle of the safe area (0 = centred vertically).</summary>
         public const float IntroCenterY = 0f;
 
-        public const float BannerW = 380f, BannerH = 112f, BannerComboY = 70f, BannerSpeedY = -70f;
+        /// <summary>Size of the combo and speed-up pills and the gap between the pair (reference px). The pair is narrow enough to sit BETWEEN the two power button columns even on 9:21, so it can never collide with them. Public so tests can assert the placement.</summary>
+        public const float BannerW = 250f, BannerH = 92f, BannerGap = 12f;
 
         // ---- special level types (owner Final Change 1, 2026-11-22) ----
 
@@ -388,7 +407,7 @@ namespace FluffyClimbers.Gameplay
         bool restLevelHud;
 
         /// <summary>
-        /// Sprint and Rest: "Shelter at floor F  Line +P%" (the "REST n" cue replaces it).
+        /// Sprint and Rest: "Shelter at floor F" over "Line +P%" (two deliberate lines, Final Bugs 2 #5; the "REST n" cue replaces them).
         /// Cached strings only (CUX-1); the chip has an own text for every state the level can reach.
         /// </summary>
         void BuildLevelRuleCues(RectTransform root, RunSession session)
@@ -403,7 +422,7 @@ namespace FluffyClimbers.Gameplay
                 for (int n = 0; n <= shelters; n++)
                 {
                     string line = "Line +" + (n * cfg.ShelterSpeedPercent) + "%";
-                    levelChipTexts[n] = n < shelters ? "Shelter at floor " + ((n + 1) * cfg.ShelterRows) + "  " + line : "No more shelters  " + line;
+                    levelChipTexts[n] = n < shelters ? "Shelter at floor " + ((n + 1) * cfg.ShelterRows) + "\n" + line : "No more shelters\n" + line;
                 }
             }
         }
@@ -545,31 +564,32 @@ namespace FluffyClimbers.Gameplay
             return "+" + percent + "%";
         }
 
-        /// <summary>An icon + text pill (combo, speed up) in the centre of the screen: anchored to the middle, offset vertically by <paramref name="y"/>. Returns its root; the text is the out parameter.</summary>
-        RectTransform BannerRoot(RectTransform root, string name, string icon, Color number, float y, out Text text)
+        /// <summary>An icon + text pill (combo, speed up) directly under the top HUD rows, left or right of the middle. Returns its root; the text is the out parameter.</summary>
+        RectTransform BannerRoot(RectTransform root, string name, string icon, Color number, bool leftOfMiddle, out Text text)
         {
             float h = BannerH;
             Image pill = Theme.GlassPanel(root, name, 24f);
             RectTransform prt = pill.rectTransform;
-            prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 0.5f);
-            prt.pivot = new Vector2(0.5f, 0.5f);
-            prt.anchoredPosition = new Vector2(0f, y);
+            prt.anchorMin = prt.anchorMax = new Vector2(0.5f, 1f);
+            prt.pivot = new Vector2(leftOfMiddle ? 1f : 0f, 1f);
+            prt.anchoredPosition = new Vector2((leftOfMiddle ? -0.5f : 0.5f) * BannerGap, -RunLayout.HudRowsH);
             prt.sizeDelta = new Vector2(BannerW, h);
             Image ic = UiKit.AddImage(pill.transform, "Icon", ToyKit.Get(icon), Color.white);
             ic.rectTransform.anchorMin = ic.rectTransform.anchorMax = new Vector2(0f, 0.5f);
             ic.rectTransform.pivot = new Vector2(0f, 0.5f);
-            ic.rectTransform.anchoredPosition = new Vector2(22f, 0f);
-            ic.rectTransform.sizeDelta = new Vector2(84f, 84f);
-            text = UiKit.AddText(pill.transform, "Value", "", 64, number, TextAnchor.MiddleCenter, true);
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.resizeTextForBestFit = true;   // "+100%" must stay inside the pill at 130% text
-            text.resizeTextMinSize = 40;
-            text.resizeTextMaxSize = 64;
+            ic.rectTransform.anchoredPosition = new Vector2(14f, 0f);
+            ic.rectTransform.sizeDelta = new Vector2(56f, 56f);
+            text = UiKit.AddText(pill.transform, "Value", "", 56, number, TextAnchor.MiddleCenter, true);
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;   // wrap + truncate lets best fit shrink "+400%" into the pill at 130% text
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 36;
+            text.resizeTextMaxSize = 56;
             var trt = (RectTransform)text.transform;
             trt.anchorMin = Vector2.zero;
             trt.anchorMax = Vector2.one;
-            trt.offsetMin = new Vector2(120f, 0f);
-            trt.offsetMax = new Vector2(-24f, 0f);
+            trt.offsetMin = new Vector2(74f, 0f);
+            trt.offsetMax = new Vector2(-10f, 0f);
             return pill.rectTransform;
         }
 
@@ -601,14 +621,21 @@ namespace FluffyClimbers.Gameplay
             UiKit.Place((RectTransform)region.transform, new Vector2(0.5f, 1f), new Vector2(0f, -28f), new Vector2(720f, 70f));
             introText = UiKit.AddText(introRoot, "Level", introTitle, session.IsTimeAttack ? 72 : 88, Color.white, TextAnchor.MiddleCenter, true);
             UiKit.Place((RectTransform)introText.transform, new Vector2(0.5f, 1f), new Vector2(0f, -100f), new Vector2(720f, 120f));
-            // Goal: flag icon and the target floor.
-            Image flag = UiKit.AddImage(introRoot, "GoalIcon", ToyKit.Get("icon_flag"), Color.white);
-            UiKit.Place(flag.rectTransform, new Vector2(0.5f, 1f), new Vector2(-110f, -250f), new Vector2(96f, 96f));
+            // Goal: flag icon and the target floor. Endless and Time Attack have no target: the tower icon and the best floors to beat, or one line of goal when there is no record yet
+            // (Final Bugs 2 #40: the card is never half empty; best floors use the tower icon).
+            bool endlessBest = endless && bestBefore > 0;
+            Image flag = UiKit.AddImage(introRoot, "GoalIcon", ToyKit.Get(endless ? "icon_tower" : "icon_flag"), Color.white);
+            UiKit.Place(flag.rectTransform, new Vector2(0.5f, 1f), new Vector2(endlessBest ? -160f : -110f, -250f), new Vector2(96f, 96f));
             flag.rectTransform.pivot = new Vector2(0.5f, 1f);
-            Text goal = UiKit.AddText(introRoot, "Goal", endless ? "" : session.Spec.TargetRow().ToString(), 72, new Color(1f, 0.95f, 0.6f), TextAnchor.MiddleLeft, true);
-            UiKit.Place((RectTransform)goal.transform, new Vector2(0.5f, 1f), new Vector2(100f, -246f), new Vector2(260f, 100f));
+            string goalLine = !endless ? session.Spec.TargetRow().ToString() : (endlessBest ? "Best " + bestBefore : IntroNoRecordText);
+            Text goal = UiKit.AddText(introRoot, "Goal", goalLine, endless && !endlessBest ? 52 : 72, new Color(1f, 0.95f, 0.6f), endless && !endlessBest ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft, true);
+            Vector2 goalPos = !endless ? new Vector2(100f, -246f) : (endlessBest ? new Vector2(90f, -246f) : new Vector2(0f, -246f));
+            Vector2 goalSize = !endless ? new Vector2(260f, 100f) : (endlessBest ? new Vector2(380f, 100f) : new Vector2(720f, 100f));
+            UiKit.Place((RectTransform)goal.transform, new Vector2(0.5f, 1f), goalPos, goalSize);
             goal.rectTransform.pivot = new Vector2(0.5f, 1f);
-            flag.gameObject.SetActive(!endless);
+            goal.horizontalOverflow = HorizontalWrapMode.Overflow;
+            flag.gameObject.SetActive(!endless || endlessBest);
+            if (endless) back.rectTransform.sizeDelta = new Vector2(780f, 380f);
             string rule = endless ? null : RunSession.GoalRule(session.Spec);
             if (rule != null)
             {
@@ -617,12 +644,16 @@ namespace FluffyClimbers.Gameplay
                 float nameH = Mathf.Ceil(48f * UiKit.TextScale * 1.25f), ruleH = Mathf.Ceil(2f * Mathf.Max(40f, UiKit.MinBodyTextPx) * UiKit.TextScale * 1.25f);
                 Text special = UiKit.AddText(introRoot, "Special", RunSession.SpecialName(session.Spec), 48, Color.white, TextAnchor.MiddleCenter, true);
                 special.horizontalOverflow = HorizontalWrapMode.Overflow;
+                nameH = Mathf.Max(nameH, Mathf.Ceil(special.preferredHeight));   // the real line (a high minimum text size can be bigger than the estimate)
                 UiKit.Place((RectTransform)special.transform, new Vector2(0.5f, 1f), new Vector2(0f, -360f), new Vector2(720f, nameH));
                 special.rectTransform.pivot = new Vector2(0.5f, 1f);
                 Text ruleText = UiKit.AddText(introRoot, "Rule", rule, 40, new Color(1f, 0.95f, 0.6f), TextAnchor.MiddleCenter, true);
                 ruleText.fontStyle = FontStyle.Italic;
                 UiKit.Place((RectTransform)ruleText.transform, new Vector2(0.5f, 1f), new Vector2(0f, -360f - nameH - 6f), new Vector2(720f, ruleH));
+                ruleH = Mathf.Max(ruleH, Mathf.Ceil(ruleText.preferredHeight));   // a rule that needs a third line gets the room instead of spilling over the name
+                ruleText.rectTransform.sizeDelta = new Vector2(720f, ruleH);
                 ruleText.rectTransform.pivot = new Vector2(0.5f, 1f);
+                ruleText.gameObject.AddComponent<BalancedLines>().Init(ruleText, 720f);
                 back.rectTransform.sizeDelta = new Vector2(780f, 360f + nameH + 6f + ruleH + 28f);   // room for the name and the rule under the goal
             }
             if (!endless && session.Spec.Goal.Type == GoalType.RivalRace)
@@ -643,6 +674,65 @@ namespace FluffyClimbers.Gameplay
             }
             // The small control-hint chips (left, right, jump) were removed on purpose (owner 2026-11-02): the intro shows the level number, the target and the rule only.
             AddPenaltyCue(back.rectTransform, session);
+        }
+
+        /// <summary>The intro line of an Endless or Time Attack run that has no record yet.</summary>
+        public const string IntroNoRecordText = "Climb as high as you can";
+
+        /// <summary>
+        /// Width for a wrapping text box so a two-line text breaks into two lines of nearly equal length (no orphan words, Final Bugs 2 #11): the smallest width whose longer
+        /// part still holds one of the word breaks. <paramref name="maxWidth"/> when the text fits on one line, or needs more than two. Pure; the string is never changed.
+        /// </summary>
+        public static float BalancedWidth(string s, float maxWidth, Func<string, float> measure)
+        {
+            if (string.IsNullOrEmpty(s) || measure(s) <= maxWidth) return maxWidth;
+            float best = float.MaxValue;
+            for (int i = 1; i < s.Length - 1; i++)
+            {
+                if (s[i] != ' ') continue;
+                float w = Mathf.Max(measure(s.Substring(0, i)), measure(s.Substring(i + 1)));
+                if (w < best) best = w;
+            }
+            // 6 percent of slack: glyph widths round a little differently from one canvas scale to the next
+            return best <= maxWidth ? Mathf.Min(maxWidth, Mathf.Ceil(best * 1.06f) + 4f) : maxWidth;
+        }
+
+        /// <summary>Narrows a centred, wrapping text box to <see cref="BalancedWidth"/>; keeps the full width when narrowing would make the text taller (one line more).</summary>
+        static void BalanceLines(Text t, float maxWidth)
+        {
+            RectTransform rt = t.rectTransform;
+            float boxH = rt.sizeDelta.y;
+            rt.sizeDelta = new Vector2(maxWidth, boxH);
+            float fullHeight = t.preferredHeight;
+            string s = t.text;
+            float w = BalancedWidth(s, maxWidth, part => { t.text = part; return t.preferredWidth; });
+            t.text = s;
+            rt.sizeDelta = new Vector2(w, boxH);
+            if (t.preferredHeight > fullHeight + 1f) rt.sizeDelta = new Vector2(maxWidth, boxH);
+        }
+
+        /// <summary>Balances a text box at build time and again whenever the canvas scale changes (rotation, split screen, tests). Idle otherwise: one float compare, no allocation.</summary>
+        sealed class BalancedLines : MonoBehaviour
+        {
+            Text text;
+            Canvas canvas;
+            float maxWidth, lastScale;
+
+            public void Init(Text t, float width)
+            {
+                text = t;
+                maxWidth = width;
+                canvas = t.GetComponentInParent<Canvas>();
+                lastScale = canvas != null ? canvas.scaleFactor : 1f;
+                BalanceLines(text, maxWidth);
+            }
+
+            void LateUpdate()
+            {
+                if (text == null || canvas == null || canvas.scaleFactor == lastScale) return;
+                lastScale = canvas.scaleFactor;
+                BalanceLines(text, maxWidth);
+            }
         }
 
         /// <summary>Name of the penalty cue text on the intro (tests look it up).</summary>
@@ -672,17 +762,106 @@ namespace FluffyClimbers.Gameplay
             UiKit.Place((RectTransform)cue.transform, new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Vector2(720f, h));
         }
 
+        // ---- top shade and star rims (Final Bugs 2 #4) ----
+        public const string TopShadeName = "TopBacking";   // the layout audit treats a backing of this name as scenery
+        /// <summary>Alpha of the dark strip at the very top of the screen; it fades to 0 a little below the HUD rows.</summary>
+        public const float TopShadeAlpha = 0.58f;
+        /// <summary>Bright rim of an unearned star.</summary>
+        public static readonly Color StarRimColor = new Color(1f, 0.95f, 0.72f, 0.95f);
+        static readonly Color StarOffColor = new Color(0.35f, 0.35f, 0.4f, 0.9f);
+        RectTransform topShadeRt;
+        Outline[] starOutlines;
+        static Sprite topShadeSprite;
+
+        static Sprite TopShadeSprite()
+        {
+            if (topShadeSprite != null) return topShadeSprite;
+            const int w = 4, h = 64;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var px = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                float t = y / (float)(h - 1);                           // 0 = bottom (clear), 1 = top
+                float a = TopShadeAlpha * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.45f));
+                for (int x = 0; x < w; x++) px[y * w + x] = new Color(0.04f, 0.05f, 0.12f, a);
+            }
+            tex.SetPixels32(px);
+            tex.Apply();
+            topShadeSprite = Sprite.Create(tex, new UnityEngine.Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+            return topShadeSprite;
+        }
+
+        static float TopShadeHeight(float aspect)
+        {
+            float ch = RunLayout.CanvasW(aspect) / Mathf.Max(0.3f, aspect);
+            return Mathf.Max(0f, 1f - UiKit.SafeAreaNormalized().yMax) * ch + RunLayout.HudRowsH + 40f;
+        }
+
+        // ---- pads turn more see-through while the hero is behind them (Final Bugs 2 #6) ----
+        /// <summary>Opacity of a pad while the hero is behind it (normal: <see cref="ControlPad.ButtonAlpha"/>).</summary>
+        public const float HeroBehindPadAlpha = 0.32f;
+        const float PadFadePerSecond = 4f;
+        readonly Vector3[] padCorners = new Vector3[4];
+        CanvasGroup[] padGroups;
+        RectTransform[] padRects;
+
+        /// <summary>Once per frame: fades each pad that the hero (screen pixel rectangle) is behind, and brings it back afterwards. No allocation after the first call.</summary>
+        public void FadePadsBehindHero(UnityEngine.Rect heroScreen, float deltaTime)
+        {
+            if (Pad == null) return;
+            if (padGroups == null)
+            {
+                HoldButton[] pads = { Pad.Left, Pad.Right, Pad.Jump };
+                padGroups = new CanvasGroup[pads.Length];
+                padRects = new RectTransform[pads.Length];
+                for (int i = 0; i < pads.Length; i++)
+                {
+                    padGroups[i] = pads[i].GetComponent<CanvasGroup>();
+                    padRects[i] = (RectTransform)pads[i].transform;
+                }
+            }
+            Camera uiCam = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            for (int i = 0; i < padGroups.Length; i++)
+            {
+                if (padGroups[i] == null || padRects[i] == null) continue;
+                padRects[i].GetWorldCorners(padCorners);
+                Vector2 min = RectTransformUtility.WorldToScreenPoint(uiCam, padCorners[0]), max = RectTransformUtility.WorldToScreenPoint(uiCam, padCorners[2]);
+                bool behind = heroScreen.width > 0f && UnityEngine.Rect.MinMaxRect(min.x, min.y, max.x, max.y).Overlaps(heroScreen);
+                float target = behind ? HeroBehindPadAlpha : ControlPad.ButtonAlpha;
+                float a = padGroups[i].alpha;
+                if (a != target) padGroups[i].alpha = GameSettings.ReducedMotion ? target : Mathf.MoveTowards(a, target, deltaTime * PadFadePerSecond);
+            }
+        }
+
+        // ---- Android back (Final Bugs 2 #26) ----
+
+        /// <summary>
+        /// The back key on a run pop-up acts as its close: pause and "Get ready" resume, end pop-ups go to the level select, the shop over a paused run goes back one step.
+        /// False when no pop-up is open (the run controller then pauses).
+        /// </summary>
+        public bool HandleBack()
+        {
+            if (shopRoot != null) { if (shopPopup != null) ClosePopupInShop(); else CloseShop(); return true; }
+            if (overlay != null) { if (OnClose != null) OnClose(); return true; }
+            return false;
+        }
+
+        /// <summary>Set by RunController once a cleared run has been paid: the wallet then already holds the picked gems, so the gem pill shows the wallet alone (Final Bugs 2 #1).</summary>
+        public bool RunPaid;
+        float lastGaugeW;
+
         Image[] starIcons;
         int lastRow = -1, lastStarMask = -1, lastGems = -1, lastTimeKey = -1, lastCombo2 = -1, lastBest = -1;
 
         /// <summary>
         /// The number in the top gem pill (Final Bugs 1 item 5). During a run: the wallet plus the gems picked up so far (Endless shows only the picked ones). Once the run has ended in a
         /// fall (failed popup, Endless or Time Attack game over) the pill shows the REAL wallet again, because picked gems only pay on a clear; a revive makes the run live again
-        /// (<paramref name="over"/> false) and the pill returns to the in-run value. A cleared run is not touched by this rule. Pure.
+        /// (<paramref name="over"/> false) and the pill returns to the in-run value. Once a cleared run has been paid (<paramref name="paid"/>) the wallet already holds the picked
+        /// gems, so the pill shows the wallet alone and never counts them twice (Final Bugs 2 #1). Pure.
         /// </summary>
-        public static int GemPillValue(bool over, bool goalReached, bool endless, bool hasWallet, int walletGems, int pickedGems, int hiddenGems)
+        public static int GemPillValue(bool over, bool goalReached, bool endless, bool hasWallet, int walletGems, int pickedGems, int hiddenGems, bool paid = false)
         {
-            if (over && !goalReached && hasWallet) return walletGems;
+            if (hasWallet && (paid || (over && !goalReached))) return walletGems;
             return pickedGems + hiddenGems + (endless || !hasWallet ? 0 : walletGems);
         }
 
@@ -697,6 +876,13 @@ namespace FluffyClimbers.Gameplay
                 float tr, br;
                 RunLayout.StripsRef(asp, worldWidth, out tr, out br);
                 topStripRt.sizeDelta = new Vector2(0f, tr);
+                topShadeRt.sizeDelta = new Vector2(0f, TopShadeHeight(asp));
+            }
+            // The gauge got another width (rotation, split screen, first layout): place the hero, rival and ghost markers again, or a marker stays outside the bar (Final Bugs 2 #39).
+            if (gaugeTrack != null)
+            {
+                float width = gaugeTrack.rect.width;
+                if (Mathf.Abs(width - lastGaugeW) > 0.5f) { lastGaugeW = width; lastRow = -1; lastRivalRow = -1; lastGhostKey = -1; }
             }
             if (Powers != null) Powers.SyncOwned();   // a power-up bought during the run gets its button now (RunSession.SyncStock)
             if (Powers != null && Powers.ButtonCount > 0)
@@ -725,9 +911,15 @@ namespace FluffyClimbers.Gameplay
             if (st.StarMask != lastStarMask)
             {
                 lastStarMask = st.StarMask;
-                for (int i = 0; i < 3; i++) if (starIcons[i] != null) starIcons[i].color = (st.StarMask & (1 << i)) != 0 ? Color.white : new Color(0.35f, 0.35f, 0.4f, 0.9f);
+                for (int i = 0; i < 3; i++)
+                {
+                    if (starIcons[i] == null) continue;
+                    bool earned = (st.StarMask & (1 << i)) != 0;
+                    starIcons[i].color = earned ? Color.white : StarOffColor;
+                    starOutlines[i].enabled = !earned;
+                }
             }
-            int gems = GemPillValue(s.Over, s.GoalReached, endless, GameSession.Progress != null, GameSession.Progress != null ? GameSession.Progress.Gems : 0, st.Gems, st.HiddenGems);
+            int gems = GemPillValue(s.Over, s.GoalReached, endless, GameSession.Progress != null, GameSession.Progress != null ? GameSession.Progress.Gems : 0, st.Gems, st.HiddenGems, RunPaid);
             if (gems != lastGems) { lastGems = gems; UiKit.SetText(gemText, gems.ToString()); }
             if (s.Spec.Goal.Type == GoalType.Speedrun)
             {
@@ -956,7 +1148,7 @@ namespace FluffyClimbers.Gameplay
         }
 
         /// <summary>A thin progress bar (dark track, green fill) at <paramref name="y"/> below the top of the panel; <paramref name="fraction"/> 0..1.</summary>
-        void ProgressBar(Transform panel, float y, float fraction)
+        void ProgressBar(Transform panel, float y, float fraction, string label = null)
         {
             // Bug List 6: flat rounded track and fill (the old bevelled pill sprites ended in a point on the right and the bar had no number); the percent sits centred on the bar.
             const float barH = 50f, trackR = 25f, fillR = 19f;   // 50 high like before: the bar must end where the reserved "Ad not ready" line starts
@@ -984,8 +1176,16 @@ namespace FluffyClimbers.Gameplay
             fill.rectTransform.anchorMax = new Vector2(Mathf.Max(0.07f, Mathf.Clamp01(fraction)), 1f);
             fill.rectTransform.offsetMin = Vector2.zero;
             fill.rectTransform.offsetMax = Vector2.zero;
-            // (no number on the bar: the two pills above it already show the floor and the goal, and a label here collided with the reserved "Ad not ready" line)
+            // Normally no number on the bar (the two pills above show the floor and the goal). "Rival won!" labels it, INSIDE the bar, so it is clear whose climb it shows (Final Bugs 2 #41).
+            if (label == null) return;
+            Text t = UiKit.AddText(track.transform, ProgressLabelName, label, 36, Color.white, TextAnchor.MiddleCenter, true);
+            t.horizontalOverflow = HorizontalWrapMode.Overflow;
+            t.verticalOverflow = VerticalWrapMode.Overflow;
+            UiKit.Stretch(t.rectTransform);
         }
+
+        /// <summary>Names and texts of the "Rival won!" labels (tests).</summary>
+        public const string ProgressLabelName = "ProgressLabel", RivalLostCaptionName = "RivalResultCaption", RivalLostCaption = "Race lost";
 
         /// <summary>
         /// Run failed. ONE line with [Watch Ad] (always while the run has an ad revive left; dimmed when no ad is loaded) next to [gem icon + 5 or 10]; schedule in <see cref="RevivePolicy"/>.
@@ -1019,7 +1219,7 @@ namespace FluffyClimbers.Gameplay
             RectTransform row = ToyKit.PillRow(panel, "Result", 215f, 104f);
             ToyKit.InfoPill(row, ToyKit.Get("icon_tower"), s.State.Row.ToString(), Color.white, 270f, 104f);
             ToyKit.InfoPill(row, ToyKit.Get("icon_flag"), target.ToString(), new Color(1f, 0.95f, 0.6f), 270f, 104f);
-            ProgressBar(panel, 345f, s.State.Row / (float)target);
+            ProgressBar(panel, 345f, s.State.Row / (float)target, s.RivalWon ? "Your climb: " + s.State.Row + " of " + target : null);
             if (reason != null)
             {
                 // The reason, crisp and centred under the progress bar.
@@ -1027,7 +1227,18 @@ namespace FluffyClimbers.Gameplay
                 why.fontStyle = FontStyle.Italic;
                 UiKit.Place((RectTransform)why.transform, new Vector2(0.5f, 1f), new Vector2(0f, -415f), new Vector2(780f, 90f));
             }
-            if (rivalLostIcon) AddRivalResultIcon(panel, "icon_rival_lost", iconY);
+            if (rivalLostIcon)
+            {
+                // the grey flag badge with its words beside it (Final Bugs 2 #41): badge left of the middle, caption right of it, same height as before
+                AddRivalResultIcon(panel, "icon_rival_lost", iconY);
+                RectTransform badge = (RectTransform)panel.Find(RivalResultIconName);
+                badge.anchoredPosition = new Vector2(-120f, -iconY);
+                Text cap = UiKit.AddText(panel, RivalLostCaptionName, RivalLostCaption, 44, Theme.Ink, TextAnchor.MiddleLeft, true);
+                UiKit.OnPanel(cap);
+                cap.horizontalOverflow = HorizontalWrapMode.Overflow;
+                UiKit.Place((RectTransform)cap.transform, new Vector2(0.5f, 1f), new Vector2(100f, -iconY), new Vector2(300f, RivalResultIconSize));
+                cap.rectTransform.pivot = new Vector2(0.5f, 1f);
+            }
             if (offerGems)
             {
                 // ONE line, two equal buttons side by side (ad left, gems right; a lone gem button is centred and wider). Schedule: RevivePolicy.
@@ -1119,6 +1330,9 @@ namespace FluffyClimbers.Gameplay
             return b;
         }
 
+        /// <summary>Names of the best-floors and crown (score) values of the Endless / Time Attack game over (tests).</summary>
+        public const string GameOverBestName = "BestFloorsValue", GameOverCrownName = "CrownScoreValue";
+
         /// <summary>
         /// Endless game over (and the end of a 3:00 Time Attack): floor, best (or NEW BEST), score and coins paid; then (doc 46) the run Time (the time survived, or the full 3:00), the Pace
         /// and the difference to the previous best, and the NEW BEST badge. No revive in endless. Try again starts a new tower.
@@ -1137,9 +1351,17 @@ namespace FluffyClimbers.Gameplay
             if (endTitle != null) { var etr = (RectTransform)endTitle; etr.anchoredPosition = new Vector2(0f, etr.anchoredPosition.y); etr.sizeDelta = new Vector2(540f, etr.sizeDelta.y); }   // centred on the panel (the frame shifts it 30 left to leave room for the X)
             RectTransform row1 = ToyKit.PillRow(panel, "Result", 215f, 104f);
             ToyKit.InfoPill(row1, ToyKit.Get("icon_tower"), r.Floors.ToString(), Color.white, 270f, 104f);
-            ToyKit.InfoPill(row1, ToyKit.Get("icon_crown"), (r.NewBest ? r.Floors : r.BestBefore).ToString(), new Color(1f, 0.9f, 0.4f), 270f, 104f);
+            // Final Bugs 2 #23/#25: best floors use the tower icon and say "Best" (Endless: the region's best; Time Attack: its OWN best), and the crown is always the score.
+            Text bestPill = ToyKit.InfoPill(row1, ToyKit.Get("icon_tower"), "Best " + (r.NewBest ? r.Floors : r.BestBefore), new Color(1f, 0.9f, 0.4f), 380f, 104f);
+            bestPill.name = GameOverBestName;
+            bestPill.resizeTextForBestFit = true;   // a five digit floor still fits the pill
+            bestPill.horizontalOverflow = HorizontalWrapMode.Wrap;
+            bestPill.verticalOverflow = VerticalWrapMode.Truncate;
+            bestPill.resizeTextMinSize = 28;
+            bestPill.resizeTextMaxSize = 50;
             RectTransform row2 = ToyKit.PillRow(panel, "Result2", 335f, 104f);
-            ToyKit.InfoPill(row2, art != null ? art.StarFilled : null, s.State.Score.ToString(), Color.white, 270f, 104f);
+            Text crownPill = ToyKit.InfoPill(row2, ToyKit.Get("icon_crown"), CrownScore.FromScore(s.State.Score, s.Mode).ToString(), Color.white, 270f, 104f);
+            crownPill.name = GameOverCrownName;
             ToyKit.InfoPill(row2, art != null ? art.CoinIcon : null, "+" + r.Coins, new Color(1f, 0.92f, 0.5f), 270f, 104f);
             timing.Build(panel, 450f, 560f, 670f);
             OverlayRow(
@@ -1164,17 +1386,27 @@ namespace FluffyClimbers.Gameplay
             float starY = TitleTop + titleH + SectionGap;
             float yMedals = starY + StarSize + SectionGap;
             float medalsH = medals ? MedalStrip.CompactHeight + SectionGap : 0f;
-            float yEarned = yMedals + medalsH;
-            float yTime = yEarned + 2f * PillPitch, yTail = yTime + 2f * PillPitch - SectionGap;   // 6 px gaps between the pill rows; the ribbons start right under the pace row
+            // The combo pill only shows a real combo (Final Bugs 2 #14: "x0" said nothing); without any pill for the second earned row that row is left out.
+            bool showCombo = s.State.BestCombo > 1;
+            bool earned2 = showCombo || reward.FirstClear || !string.IsNullOrEmpty(reward.UnlockedRegionId);
+            float rowsH = (earned2 ? 2f : 1f) * PillPitch + 2f * PillPitch - SectionGap;   // 6 px gaps between the pill rows; the ribbons start right under the pace row
             float actionTopL = ButtonY + ButtonSizeFor(150f);
+            float fixedH = yMedals + rowsH + 12f + actionTopL;
             // "Double the coins" (rewarded ad, owner 2026-11-17): its own row between the earned rows and the action row, sized by the real touch minimum and shown only when an ad is ready.
             float dblRow = doubleOffer ? DoubleCoinsRowH : 0f;
-            float panelH = yTail + timing.TailHeight + 12f + dblRow + actionTopL;
-            if (doubleOffer && panelH > UiKit.CanvasSizeRef().y * UiKit.SafeAreaNormalized().height)
-            {
-                doubleOffer = false;   // never overflow the safe area (CUX-3): on a short screen or at 130 percent text the x2 row is left out rather than squeezed below 48 dp
-                panelH -= dblRow;
-            }
+            // Final Bugs 2: the x2 offer is never dropped on a short screen. The popup gives up room in this order until it fits the safe area: one ribbon instead of two,
+            // no medal strip, no ribbon, and last the x2 button moves into the action row (no extra height).
+            float canvasH = ((RectTransform)canvas.transform).rect.height;   // the canvas the pop-up is really drawn on (not the window, which can differ: render textures)
+            if (canvasH <= 1f) canvasH = UiKit.CanvasSizeRef().y;
+            float availH = canvasH * UiKit.SafeAreaNormalized().height;
+            if (fixedH + medalsH + timing.TailHeight + dblRow > availH) timing.Merged = true;
+            if (fixedH + medalsH + timing.TailHeight + dblRow > availH) { medals = false; medalsH = 0f; }
+            if (fixedH + medalsH + timing.TailHeight + dblRow > availH) timing.Hidden = true;
+            bool doubleInRow = doubleOffer && fixedH + medalsH + timing.TailHeight + dblRow > availH;
+            if (doubleInRow) dblRow = 0f;
+            float yEarned = yMedals + medalsH;
+            float yTime = yEarned + (earned2 ? 2f : 1f) * PillPitch, yTail = yTime + 2f * PillPitch - SectionGap;
+            float panelH = fixedH + medalsH + timing.TailHeight + dblRow;
             OpenOverlay("Level clear!", panelH);
             AudioManager.Play(Sfx.Win);
             OnClose = () => { if (OnMenu != null) OnMenu(); };
@@ -1216,13 +1448,17 @@ namespace FluffyClimbers.Gameplay
             RectTransform row1 = ToyKit.PillRow(panel, "Earned", yEarned, PillH);
             ToyKit.InfoPill(row1, art != null ? art.CoinIcon : null, "+" + reward.TotalCoins, new Color(1f, 0.92f, 0.5f), 270f, PillH);
             ToyKit.InfoPill(row1, art != null ? art.GemIcon : null, "+" + reward.TotalGems, new Color(0.75f, 0.92f, 1f), 270f, PillH);
-            RectTransform row2 = ToyKit.PillRow(panel, "Earned2", yEarned + PillPitch, PillH);
-            ToyKit.InfoPill(row2, ToyKit.Get("icon_flame"), "x" + s.State.BestCombo, new Color(1f, 0.78f, 0.35f), 270f, PillH);
-            if (reward.FirstClear) ToyKit.InfoPill(row2, ToyKit.Get("icon_crown"), "First", new Color(1f, 0.9f, 0.4f), 270f, PillH);
-            if (!string.IsNullOrEmpty(reward.UnlockedRegionId)) ToyKit.InfoPill(row2, ToyKit.Get("icon_flag"), "New", new Color(0.7f, 1f, 0.75f), 270f, PillH);
+            if (earned2)
+            {
+                RectTransform row2 = ToyKit.PillRow(panel, "Earned2", yEarned + PillPitch, PillH);
+                if (showCombo) ToyKit.InfoPill(row2, ToyKit.Get("icon_flame"), "x" + s.State.BestCombo, new Color(1f, 0.78f, 0.35f), 270f, PillH);
+                if (reward.FirstClear) ToyKit.InfoPill(row2, Glyphs.Check, "First", new Color(1f, 0.9f, 0.4f), 270f, PillH);   // not the crown: the crown always means score (Final Bugs 2 #23)
+                if (!string.IsNullOrEmpty(reward.UnlockedRegionId)) ToyKit.InfoPill(row2, ToyKit.Get("icon_flag"), "New", new Color(0.7f, 1f, 0.75f), 270f, PillH);
+            }
             timing.Build(panel, yTime, yTime + PillPitch, yTail);
             doubleCoinsButton = null;
-            if (doubleOffer)
+            doubleCoinsCaption = null;
+            if (doubleOffer && !doubleInRow)
             {
                 int extra = ProgressService.DoubleCoinsAmount(reward);
                 doubleCoinsButton = ReviveButton(panel, "x2", "Watch an ad to double your coins, " + extra + " more", ToyKit.AdsIcon, 1, 0f, actionTopL + 12f, ReviveBtnWSolo, () => { if (OnDoubleCoins != null) OnDoubleCoins(); });
@@ -1244,17 +1480,26 @@ namespace FluffyClimbers.Gameplay
                     if (dt != null) { var dtr = (RectTransform)dt.transform; dtr.offsetMin = new Vector2(bh * 0.78f + bh * 0.68f, dtr.offsetMin.y); }
                 }
             }
-            // Three equal round buttons (owner issue 16.7).
-            OverlayRow(
-                MakeAct("Next", "Next level", 1, ToyKit.Get("icon_play"), 150f, () => { if (OnNext != null) OnNext(); }, hasNext),
-                MakeAct("Retry", "Play again", 0, Glyphs.Restart, 150f, () => { if (OnRetry != null) OnRetry(); }),
-                MakeAct("Home", "Level select", 2, ToyKit.Get("icon_home"), 150f, () => { if (OnMenu != null) OnMenu(); }));
+            // Three equal round buttons (owner issue 16.7); four when the x2 offer had no room for its own row.
+            Act next = MakeAct("Next", "Next level", 1, ToyKit.Get("icon_play"), 150f, () => { if (OnNext != null) OnNext(); }, hasNext);
+            Act again = MakeAct("Retry", "Play again", 0, Glyphs.Restart, 150f, () => { if (OnRetry != null) OnRetry(); });
+            Act home = MakeAct("Home", "Level select", 2, ToyKit.Get("icon_home"), 150f, () => { if (OnMenu != null) OnMenu(); });
+            if (doubleInRow)
+            {
+                string a11y = "Watch an ad to double your coins, " + ProgressService.DoubleCoinsAmount(reward) + " more";
+                OverlayRow(next, MakeAct("x2 coins", a11y, 1, ToyKit.AdsIcon, 150f, () => { if (OnDoubleCoins != null) OnDoubleCoins(); }), again, home);
+                Transform btn = panel.Find(a11y), cap = panel.Find(a11y + "Caption");
+                if (btn != null) { doubleCoinsButton = btn.GetComponent<Button>(); btn.name = DoubleCoinsButtonName; }
+                if (cap != null) doubleCoinsCaption = cap.GetComponent<Text>();
+            }
+            else OverlayRow(next, again, home);
             FitPanelToSafeArea();
             AddUnrankedNote();
         }
 
         public const string DoubleCoinsButtonName = "DoubleCoins";
         Button doubleCoinsButton;
+        Text doubleCoinsCaption;   // set only when the x2 button sits in the action row
         /// <summary>Height the "Double the coins" row adds to the result popup: the button at the touch minimum plus the gap above the action row and below the earned rows.</summary>
         static float DoubleCoinsRowH { get { return ReviveButtonH + 12f + 10f; } }
 
@@ -1263,7 +1508,7 @@ namespace FluffyClimbers.Gameplay
         {
             if (doubleCoinsButton == null) return;
             doubleCoinsButton.interactable = false;
-            Text t = doubleCoinsButton.GetComponentInChildren<Text>();
+            Text t = doubleCoinsCaption != null ? doubleCoinsCaption : doubleCoinsButton.GetComponentInChildren<Text>();
             if (t != null) t.text = "+" + extra;
             A11yLabel a = doubleCoinsButton.GetComponent<A11yLabel>();
             if (a != null) a.Text = "Coins doubled, " + extra + " added";

@@ -322,13 +322,34 @@ namespace FluffyClimbers.Gameplay
             rt.sizeDelta = new Vector2(w, h);
         }
 
-        /// <summary>Height a wrapping text needs: lines estimated with a generous glyph width (0.6 of the font size), each newline starts a line; grows with the text scale.</summary>
+        /// <summary>One line of the game fonts is this tall for each unit of font size (Nunito: ascender plus descender 1.364). A smaller factor cut the last line of wrapped texts (Final Bugs 2 #21, #22).</summary>
+        public const float LineFactor = 1.4f;
+        static TextGenerator heightMeasurer;
+
+        /// <summary>
+        /// Height a wrapping text needs; grows with the text scale. The larger of two answers: lines estimated with a generous glyph width (0.6 of the font size, each newline starts a line)
+        /// and the real wrapped height in the body font, so a text box built from it never cuts a line.
+        /// </summary>
         public static float TextHeight(string text, float fontPx, float width)
         {
             float fs = Mathf.Max(fontPx, UiKit.MinBodyTextPx) * UiKit.TextScale;
             int lines = 0;
             foreach (string part in text.Split('\n')) lines += Mathf.Max(1, Mathf.CeilToInt(part.Length * fs * 0.6f / Mathf.Max(100f, width)));
-            return Mathf.Ceil(lines * fs * 1.2f) + 8f;
+            return Mathf.Max(Mathf.Ceil(lines * fs * LineFactor), Mathf.Ceil(MeasuredHeight(text, Mathf.RoundToInt(fs), width))) + 8f;
+        }
+
+        static float MeasuredHeight(string text, int px, float width)
+        {
+            Font f = UiKit.DefaultFont;
+            if (f == null || string.IsNullOrEmpty(text)) return 0f;
+            if (heightMeasurer == null) heightMeasurer = new TextGenerator();
+            var st = new TextGenerationSettings
+            {
+                font = f, fontSize = px, fontStyle = FontStyle.Normal, color = Color.white, scaleFactor = 1f, lineSpacing = 1f, richText = true,
+                resizeTextForBestFit = false, updateBounds = false, horizontalOverflow = HorizontalWrapMode.Wrap, verticalOverflow = VerticalWrapMode.Overflow,
+                textAnchor = TextAnchor.UpperLeft, pivot = new Vector2(0f, 1f), generateOutOfBounds = true, generationExtents = new Vector2(Mathf.Max(100f, width), 0f)
+            };
+            return heightMeasurer.GetPreferredHeight(text, st);
         }
 
         /// <summary>Rarity colours on the cream popup panel (dark shades): Uncommon green, Rare blue, Elite purple, Legendary gold-brown.</summary>
@@ -856,6 +877,7 @@ namespace FluffyClimbers.Gameplay
             float panelH = Mathf.Max(1100f, (hasJoke ? jokeY + jokeH : worthY + worthH) + buttonReserve);
             RectTransform panel = UiKit.BuildPopupFrame(overlay, def.Name, art, new Vector2(panelW, panelH), onDone);
             panel.name = "BundleInfoPopup";
+            int middleStart = panel.childCount;   // everything added from here to the OK button scrolls when the screen is too short (a long joke on 3:4 at 130 percent text)
             AddChipsCentered(panel, def, art, panelW, chipsY, true);
 
             if (def.HiddenCard)
@@ -908,6 +930,7 @@ namespace FluffyClimbers.Gameplay
                 jt.resizeTextMaxSize = jt.fontSize;
                 PlaceTop((RectTransform)jt.transform, jokeY, W, jokeH);
             }
+            ToyKit.ScrollPopupMiddle(overlay, panel, middleStart, chipsY - 6f, buttonReserve);
             ToyKit.PopupAction(panel, "OK", ToyKit.Button(1), Color.white, 50f, onDone);
         }
 

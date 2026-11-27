@@ -4,6 +4,7 @@ using FluffyClimbers.Leaderboard;
 using FluffyClimbers.Monetization;
 using FluffyClimbers.Simulation;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 namespace FluffyClimbers.Gameplay
@@ -186,6 +187,7 @@ namespace FluffyClimbers.Gameplay
             Hud.OnNext = PlayNext;
             Hud.OnRevive = Revive;
             Hud.OnReviveAd = ReviveByAd;
+            Haptics.Warmup();      // the vibrator and its two effects are fetched before the run, never on the first press
             AdGate.PreloadAll();   // starts consent/SDK/ad loading early and loads revive, x2 coins, daily power-up and the restart interstitial (no-op on the stub)
             Hud.OnPower = type => Input.LatchPower((PowerUp)type);
         }
@@ -228,6 +230,8 @@ namespace FluffyClimbers.Gameplay
         {
             if (Session == null) return;
             float dt = Mathf.Min(Time.deltaTime, 0.1f);   // the game never changes timeScale; deltaTime also honours Time.captureFramerate in tests
+            Keyboard kb = Keyboard.current;
+            if (kb != null && kb.escapeKey.wasPressedThisFrame) Back();   // Android back = Escape in the Input System
             Input.Update();
             if (GameSession.Progress != null && hookedProgress != GameSession.Progress)
             {
@@ -259,12 +263,14 @@ namespace FluffyClimbers.Gameplay
                 if (steps == MaxStepsPerFrame) acc = 0f;   // never spiral after a long frame
             }
             View.Render(Mathf.Clamp01(acc / StepSeconds), dt);
-            Hud.Refresh(Session, dt);
+            Hud.Refresh(Session, Paused ? 0f : dt);   // the intro countdown and the cue timers stand still while paused (Final Bugs 2 #29)
+            Hud.FadePadsBehindHero(View.HeroScreenRect(), dt);
 
             if (Session.Over && !endHandled)
             {
                 if (Session.GoalReached && !GameSettings.ReducedMotion)
                 {
+                    if (!View.WarpActive) Haptics.Strong();   // the clear is felt when the top is reached
                     View.PlayWarp();                       // Momo flies into the galaxy portal first
                     if (View.WarpDone) HandleEnd();
                 }
@@ -279,7 +285,7 @@ namespace FluffyClimbers.Gameplay
             if (Session.IsEndless)
             {
                 // The run is over for good (no revive in endless): best floor and coins are saved right now (CUX-8).
-                Haptics.Pulse();
+                Haptics.Strong();
                 RunRecord endlessRecord = Session.BuildRunRecord(Application.version);   // Kind (Endless or TimeAttack) comes from the session; Coins = the combo coins of the run
                 RecordResult endlessRecorded;
                 // One call pays the coins (endless or Time Attack table, shared daily cap) and records the run (best Pace, survived Time, floors, splits, captures).
@@ -293,7 +299,9 @@ namespace FluffyClimbers.Gameplay
             }
             if (Session.GoalReached)
             {
+                if (GameSettings.ReducedMotion) Haptics.Strong();   // no warp with reduced motion: the buzz comes with the results
                 RewardResult reward = GameSession.Progress.ApplyRun(Session.Level.Id, Session.BuildOutcome());
+                Hud.RunPaid = true;   // the wallet now holds the picked gems (Final Bugs 2 #1)
                 Session.MarkStatsReported();   // the outcome carried the combo and power-up statistics
                 GameSession.Progress.FlushPlayTime();
                 LastReward = reward;
@@ -310,7 +318,7 @@ namespace FluffyClimbers.Gameplay
             }
             else
             {
-                Haptics.Pulse();
+                Haptics.Strong();
                 ReportRunStats();
                 ShowFailedOffer();
             }
@@ -323,6 +331,19 @@ namespace FluffyClimbers.Gameplay
             GameSession.Progress.RecordRunStats(Session.BuildOutcome());
             Session.MarkStatsReported();
             GameSession.Progress.FlushPlayTime();
+        }
+
+        /// <summary>
+        /// Android back (Final Bugs 2 #26): on a run pop-up it acts as that pop-up's close (pause and "Get ready" resume, end pop-ups leave for the level select, the shop goes
+        /// back one step); in play it pauses. Ignored while an ad is up. True when it did something.
+        /// </summary>
+        public bool Back()
+        {
+            if (adBusy || Session == null || Hud == null) return false;
+            if (Hud.HandleBack()) return true;
+            if (Session.Over || Paused) return false;
+            Pause();
+            return true;
         }
 
         public void Pause()

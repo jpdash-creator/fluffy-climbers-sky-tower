@@ -22,6 +22,9 @@ namespace FluffyClimbers.Gameplay
 
         static readonly Color BandColor = new Color(0.80f, 0.79f, 0.93f, 1f);
 
+        /// <summary>Name of the line that says why a run of this week was refused.</summary>
+        public const string RefusalName = "RefusalNote";
+
         public bool BreakdownOpen { get { return breakdownOpen; } }
         public BreakdownState BreakdownPhase
         {
@@ -196,11 +199,34 @@ namespace FluffyClimbers.Gameplay
             return y;
         }
 
-        /// <summary>Space for the widest crown number of the lines at the current text size.</summary>
-        static float CrownColW(float inner, long maxCrown, int px)
+        /// <summary>
+        /// Space for the widest of the crown numbers the popup writes, each measured as drawn (its own size and font, the minus sign of "-2,250" included): a number never breaks
+        /// into two lines (Final Bugs 2 #7; the old estimate came from the positive total only and used one size for all).
+        /// </summary>
+        static float CrownColW(BreakdownResult br, float inner)
         {
-            float fontPx = Mathf.Round(Mathf.Max(px, UiKit.MinBodyTextPx) * UiKit.TextScale);
-            return Mathf.Min(inner * 0.46f, N0(maxCrown).Length * fontPx * 0.58f + 10f);
+            float w = NumberW(br.Total, 46, true);
+            w = Mathf.Max(w, Mathf.Max(NumberW(br.LevelsSubtotal, 50, true), NumberW(br.EndlessSubtotal, 50, true)));
+            foreach (BreakdownGroup g in br.Groups)
+            {
+                w = Mathf.Max(w, NumberW(g.Subtotal, 46, true));
+                foreach (BreakdownLine l in g.Lines) w = Mathf.Max(w, NumberW(l.Crown, 44, false));
+            }
+            return Mathf.Min(inner * 0.5f, Mathf.Ceil(w) + 16f);
+        }
+
+        static float NumberW(long v, int px, bool display)
+        {
+            int fontPx = Mathf.RoundToInt(Mathf.Max(px, UiKit.MinBodyTextPx) * UiKit.TextScale);
+            return MeasureWidth(N0(v), fontPx, display || px >= UiKit.DisplayFromSize ? UiKit.DisplayFont : UiKit.DefaultFont);
+        }
+
+        /// <summary>A crown number in its column: one line, never wrapped.</summary>
+        static float PopupNumber(RectTransform parent, string name, long v, int px, float x, float y, float w, bool display)
+        {
+            float h = PopupText(parent, name, N0(v), px, TextAnchor.UpperRight, x, y, w, display);
+            parent.GetChild(parent.childCount - 1).GetComponent<Text>().horizontalOverflow = HorizontalWrapMode.Overflow;
+            return h;
         }
 
         float BuildBreakdownContent(RectTransform pc, BreakdownResult br, string board, float inner)
@@ -226,15 +252,17 @@ namespace FluffyClimbers.Gameplay
                 : "Your 3 best Endless runs and your 3 best Time Attack runs of the week in each region and setting, added up.";
             y += PopupText(pc, "TotalHow", how, 40, TextAnchor.UpperCenter, 0f, y, inner, false) + 20f;
 
+            // Final Bugs 2 #8: a run the service refused this week is not dropped silently: the popup says why in one short line
+            string refusal = LeaderboardHub.RefusalText;
+            if (refusal.Length > 0) y += PopupText(pc, RefusalName, refusal, body, TextAnchor.UpperCenter, 0f, y, inner, true) + 20f;
+
             if (!br.HasLines)
             {
                 y += PopupText(pc, "NoRuns", "No runs counted this week yet. Finish a level or an Endless run to earn crowns.", body, TextAnchor.UpperCenter, 0f, y, inner, false) + 12f;
                 return y;
             }
 
-            long maxCrown = br.Total;
-            foreach (BreakdownGroup g in br.Groups) { if (g.Subtotal > maxCrown) maxCrown = g.Subtotal; foreach (BreakdownLine l in g.Lines) if (l.Crown > maxCrown) maxCrown = l.Crown; }
-            float crownW = CrownColW(inner, maxCrown, body);
+            float crownW = CrownColW(br, inner);
             float settingW = Mathf.Round(Mathf.Max(body, UiKit.MinBodyTextPx) * UiKit.TextScale) * 0.58f * 7f + 10f;   // "Relaxed"
             const float gap = 12f;
             float labelW = Mathf.Max(120f, inner - settingW - crownW - 2f * gap);
@@ -248,7 +276,7 @@ namespace FluffyClimbers.Gameplay
                     lastSection = g.Section;
                     long sub = g.Section == BreakdownGroup.SectionLevels ? br.LevelsSubtotal : br.EndlessSubtotal;
                     float hh = PopupText(pc, "Section" + g.Section, g.Section, 50, TextAnchor.UpperLeft, 0f, y + 6f, inner - crownW - gap, true);
-                    float sh = PopupText(pc, "Section" + g.Section + "Sum", N0(sub), 50, TextAnchor.UpperRight, inner - crownW, y + 6f, crownW, true);
+                    float sh = PopupNumber(pc, "Section" + g.Section + "Sum", sub, 50, inner - crownW, y + 6f, crownW, true);
                     y += Mathf.Max(hh, sh) + 18f;
                 }
                 // group header band: the region (or Endless / Time Attack) and its subtotal
@@ -257,7 +285,7 @@ namespace FluffyClimbers.Gameplay
                 var band = ToyKit.Sliced(pc, "Backdrop", UiKit.PillSprite, 28f);   // named Backdrop: the layout audit treats it as the text's own backing
                 band.color = BandColor; band.raycastTarget = false;
                 float hl = PopupText(pc, "GroupName_" + g.Header, headerText, 46, TextAnchor.UpperLeft, 18f, y + 10f, headerTextW, true);
-                float hr = PopupText(pc, "GroupSum_" + g.Header, N0(g.Subtotal), 46, TextAnchor.UpperRight, inner - crownW - 18f, y + 10f, crownW, true);
+                float hr = PopupNumber(pc, "GroupSum_" + g.Header, g.Subtotal, 46, inner - crownW - 18f, y + 10f, crownW, true);
                 float bandH = Mathf.Max(hl, hr) + 20f;
                 UiKit.Place(band.rectTransform, new Vector2(0f, 1f), new Vector2(0f, -y), new Vector2(inner, bandH));
                 band.rectTransform.SetAsFirstSibling();
@@ -275,7 +303,7 @@ namespace FluffyClimbers.Gameplay
                 {
                     float a =PopupText(pc, "LineLabel", l.Label, body, TextAnchor.UpperLeft, 18f, y, labelW - 18f, false);
                     float b = PopupText(pc, "LineSetting", l.Setting, body, TextAnchor.UpperLeft, labelW + gap, y, settingW, false);
-                    float c = PopupText(pc, "LineCrown", N0(l.Crown), body, TextAnchor.UpperRight, inner - crownW, y, crownW, false);
+                    float c = PopupNumber(pc, "LineCrown", l.Crown, body, inner - crownW, y, crownW, false);
                     y += Mathf.Max(a, Mathf.Max(b, c)) + 8f;
                     string runs = RunsText(l);   // Endless / Time Attack: the runs that make the sum above, on their own full-width row under the line (wraps, never overlaps the columns)
                     if (runs.Length > 0) y += PopupText(pc, "LineRuns", runs, 40, TextAnchor.UpperLeft, 44f, y - 4f, inner - 44f, false) + 4f;

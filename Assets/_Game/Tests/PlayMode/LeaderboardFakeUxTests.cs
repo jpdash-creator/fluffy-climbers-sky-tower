@@ -86,14 +86,15 @@ namespace FluffyClimbers.Tests
                 // the avatar circle never touches the medal / rank number or the name box
                 Rect av = LbWorld((RectTransform)row.Find("Avatar")), nm = LbWorld((RectTransform)row.Find("NameText")), cr = LbWorld((RectTransform)row.Find("CrownsText")), ic = LbWorld((RectTransform)row.Find("CrownIcon"));
                 Assert.LessOrEqual(av.xMax, nm.xMin + 0.5f, who + ": avatar and name do not overlap");
-                Assert.LessOrEqual(nm.xMax, ic.xMin + 0.5f, who + ": name and crown icon do not overlap");
+                // side by side, or (a long name) the name over the whole width with the crowns on the line under it: either way the boxes never overlap
+                Assert.IsTrue(nm.xMax <= ic.xMin + 0.5f || ic.yMax <= nm.yMin + 0.5f, who + ": name and crown icon do not overlap");
+                Assert.IsTrue(nm.xMax <= cr.xMin + 0.5f || cr.yMax <= nm.yMin + 0.5f, who + ": name and amount do not overlap");
                 Assert.LessOrEqual(ic.xMax, cr.xMin + 0.5f, who + ": icon and amount do not overlap");
                 Text crowns = row.Find("CrownsText").GetComponent<Text>();
                 Assert.AreNotSame(UiKit.DisplayFont, crowns.font, who + ": the amount uses the regular body face, not the heavy display face");
                 Assert.LessOrEqual(crowns.fontSize, Mathf.RoundToInt(UiKit.MinBodyTextPx * UiKit.TextScale) + 1, who + ": the amount is as small as the 16 sp floor allows");
                 Text name = row.Find("NameText").GetComponent<Text>();
-                Assert.LessOrEqual(name.text.Split('\n').Length, 2, who + ": at most two name lines");
-                if (name.text.Contains("\n")) Assert.GreaterOrEqual(((RectTransform)name.transform).rect.height, 2f * RewardsScreen.LineH(42) - 1f, who + ": two lines only when the box holds them");
+                Assert.IsFalse(name.text.Contains("\n"), who + ": a name is never broken into two lines (Final Bugs 2 #7)");
                 // rows that are fully visible do not poke out of the list (the glow rings of the own row are inside the list padding)
                 if (rw.yMin >= list.yMin && rw.yMax <= list.yMax) Assert.IsTrue(LbInside(rw, list), who);
             }

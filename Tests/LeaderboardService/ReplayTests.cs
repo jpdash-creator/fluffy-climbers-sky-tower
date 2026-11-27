@@ -413,12 +413,13 @@ namespace FluffyClimbers.LeaderboardService.Tests
             // owner Final Change 1 (2026-11-22): the speed steps and the crown bonus changed, so a client of the old rules must be told to update (HTTP 426)
             string client = System.IO.File.ReadAllText(System.IO.Path.Combine(Harness.Root, "Assets", "_Game", "Leaderboard", "LeaderboardConfig.cs"));
             Assert.Contains("public const int SimVersion = " + Harness.ClientSimVersion + ";", client);
-            Assert.Equal(4, Harness.ClientSimVersion);
+            Assert.Equal(5, Harness.ClientSimVersion);
             Assert.True(new Limits().SimVersionAllowed(Harness.ClientSimVersion));
             Assert.False(new Limits().SimVersionAllowed(1));
             Assert.False(new Limits().SimVersionAllowed(2), "Final Change 2 (hero bands, powers, region penalty) changed the replay: version 2 runs cannot be replayed");
             string cfg = System.IO.File.ReadAllText(System.IO.Path.Combine(Harness.Root, "Tools", "leaderboard_service", "config.default.json"));
-            Assert.Contains("\"simVersions\": [4]", cfg);
+            Assert.Contains("\"simVersions\": [4, 5]", cfg);
+            Assert.True(new Limits().SimVersionAllowed(4), "version 4 stays accepted until the next release (owner 2026-11-27): only Region 3 funnel runs can differ, and the replay check catches those");
 
             RunSession s = Harness.NewLevelSession("lvl_001_01", 2, 9);
             Harness.Play(s, Harness.BotTrace(s, s.State));

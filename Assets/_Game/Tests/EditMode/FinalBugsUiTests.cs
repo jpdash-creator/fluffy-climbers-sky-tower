@@ -48,6 +48,25 @@ namespace FluffyClimbers.Tests
             Assert.AreEqual(2, RunHud.GemPillValue(false, false, true, true, 9, 2, 0), "Endless in a live run shows only the picked gems");
         }
 
+        // ---- Final Bugs 2, menu screens ----
+
+        [Test]
+        public void ARegionNameShowsOnlyWhenAllOfItFits()
+        {
+            Assert.IsTrue(RewardsScreen.NameFits(471f, 110f, 942f), "the centred region");
+            Assert.IsTrue(RewardsScreen.NameFits(108f, 108f, 942f), "just inside the left edge");
+            Assert.IsFalse(RewardsScreen.NameFits(39f, 110f, 942f), "a side region peeking in");
+            Assert.IsFalse(RewardsScreen.NameFits(903f, 110f, 942f));
+        }
+
+        [Test]
+        public void AWrappedTextBoxHoldsEveryLineOfTheFont()
+        {
+            // two lines of the 42 px body font are about 115 px tall: the old 1.2 factor gave 109 and cut the second line (#21, #22)
+            float h = BundlesScreen.TextHeight("Pay once, rewards every day for 30 days", 40f, 680f);
+            Assert.GreaterOrEqual(h, 2f * UnityEngine.Mathf.Round(UiKit.MinBodyTextPx * UiKit.TextScale) * 1.36f);
+        }
+
         // ---- item 4: locked levels ----
 
         [Test]

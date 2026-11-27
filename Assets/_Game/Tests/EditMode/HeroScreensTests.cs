@@ -472,6 +472,8 @@ namespace FluffyClimbers.Tests
                 foreach (float ts in new[] { 1f, 1.3f })
                 {
                     UiKit.TextScale = ts;
+                    // only this size's screen may be on the canvas: FindDeep returns the first match, so a screen left over from the previous size would be measured instead
+                    for (int i = canvas.childCount - 1; i >= 0; i--) Object.DestroyImmediate(canvas.GetChild(i).gameObject);
                     PowersScreen s = NewPowers();
                     Canvas.ForceUpdateCanvases();
                     Transform card = FindDeep(canvas, "Power_pw_rocket");
@@ -482,7 +484,8 @@ namespace FluffyClimbers.Tests
                     float gapIconName = ci[0].y - cn[1].y, gapNameNumber = cn[0].y - cb[1].y;
                     Assert.AreEqual(PowersScreen.RowGap, gapIconName, 1f, "icon to name gap at text " + ts);
                     Assert.AreEqual(gapIconName, gapNameNumber, 1f, "name to number gap equals icon to name gap at text " + ts);
-                    Assert.AreEqual(name.rect.height, badge.rect.height, 1f, "same box height for name and number");
+                    Assert.AreEqual(PowersScreen.NamePillH, name.rect.height, 1f, "the name box holds two lines (Final Bugs 2 #34)");
+                    Assert.AreEqual(PowersScreen.PillH, badge.rect.height, 1f, "the number box holds one line");
                     Assert.GreaterOrEqual(cb[0].y, co[0].y, "number box inside the card");
                     Assert.LessOrEqual(ci[1].y, co[1].y, "icon inside the card");
                     Text t = FindDeep(card, PowersScreen.OwnedName).GetComponent<Text>();

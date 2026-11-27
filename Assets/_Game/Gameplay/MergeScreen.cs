@@ -503,10 +503,18 @@ namespace FluffyClimbers.Gameplay
             MergeButton.GetComponent<A11yLabel>().Text = "Merge. " + hint;
             y += bh + 6f;
             float lh = Line(BodyFont);
-            Text t = UiKit.AddText(TopRow(body, "HintRow", y, lh, Margin), "Hint", hint, BodyFont, Color.white, TextAnchor.MiddleCenter);
+            RectTransform hintRow = TopRow(body, "HintRow", y, lh, Margin);
+            // a dark pill behind the line: small white text straight on the bright merge circle was hard to read (Final Bugs 2 #33; CUX-5)
+            Image hintBack = UiKit.AddPanel(hintRow, "Backdrop", HintBackColor);
+            float hintW = Mathf.Min(UiKit.CanvasSizeRef().x - 2f * Margin, Mathf.Ceil(hint.Length * Mathf.Max(BodyFont, UiKit.MinBodyTextPx) * UiKit.TextScale * 0.6f) + 64f);
+            UiKit.Place(hintBack.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(hintW, lh));
+            Text t = UiKit.AddText(hintRow, "Hint", hint, BodyFont, Color.white, TextAnchor.MiddleCenter);
             UiKit.Stretch(t.rectTransform);
             return y + lh + 12f;
         }
+
+        /// <summary>Backing of the line under the Merge button (white on it: above 12:1).</summary>
+        public static readonly Color HintBackColor = new Color(0.07f, 0.06f, 0.20f, 0.92f);
 
         static float lastMergeSoundTime = -100f;
 

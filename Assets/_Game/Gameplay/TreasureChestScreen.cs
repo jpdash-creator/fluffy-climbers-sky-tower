@@ -235,10 +235,10 @@ namespace FluffyClimbers.Gameplay
             nrt.anchorMax = new Vector2(1f, 1f);
             nrt.pivot = new Vector2(0.5f, 1f);
             nrt.offsetMin = new Vector2(UiKit.MinTouchPx + 14f, -(TextTop + rowH));
-            nrt.offsetMax = new Vector2(-(WorthW + 22f), -TextTop);
+            nrt.offsetMax = new Vector2(-(WorthW + SubscriptionScreen.WorthRightGap + 8f), -TextTop);
 
             float worthH = BundlesScreen.WorthTextH(44f);
-            Text worth = BundlesScreen.AddWorthText(card, WorthText(kind), new Vector2(1f, 1f), new Vector2(-14f, -(TextTop + Mathf.Max(0f, (rowH - worthH) * 0.5f))), WorthW, 44f);
+            Text worth = BundlesScreen.AddWorthText(card, WorthText(kind), new Vector2(1f, 1f), new Vector2(-SubscriptionScreen.WorthRightGap, -(TextTop + Mathf.Max(0f, (rowH - worthH) * 0.5f))), WorthW, 44f);
             worth.color = titleCol;
             var wo = worth.GetComponent<Outline>();
             if (wo != null) wo.enabled = !gold;
@@ -328,6 +328,7 @@ namespace FluffyClimbers.Gameplay
             float panelH = Mathf.Max(1100f, footY + footH + buttonReserve);
             RectTransform panel = UiKit.BuildPopupFrame(overlay, ChestName(kind), art, new Vector2(panelW, panelH), host.CloseOverlay);
             panel.name = "ChestInfoPopup";
+            int middleStart = panel.childCount;   // everything added from here to the OK button scrolls when the screen is too short
 
             RectTransform chips = UiKit.Rect(panel, "Chips");
             BundlesScreen.PlaceTop(chips, chipsY, W, chipsH);
@@ -378,6 +379,7 @@ namespace FluffyClimbers.Gameplay
             ft.resizeTextMaxSize = ft.fontSize;
             BundlesScreen.PlaceTop((RectTransform)ft.transform, footY, W, footH);
             panel.gameObject.AddComponent<A11yLabel>().Text = ChestName(kind) + ". " + DescriptionText(kind) + ". " + heroText + ". " + worthLine;
+            ToyKit.ScrollPopupMiddle(overlay, panel, middleStart, chipsY - 6f, buttonReserve);
             ToyKit.PopupAction(panel, "OK", ToyKit.Button(1), Color.white, 50f, host.CloseOverlay);
         }
 
@@ -445,7 +447,7 @@ namespace FluffyClimbers.Gameplay
             if (idx >= 0)
             {
                 GemPackDef pack = catalog.GemPacks[idx];
-                string label = "Get " + Num(pack.Gems) + " gems (" + ShopChrome.PriceText(ShopCatalog.GemPackUsd(pack, progress.LaunchPromoActive)) + ")";
+                string label = "Get " + Num(pack.Gems) + " gems (" + ShopScreen.GemPackPriceText(pack, progress.LaunchPromoActive) + ")";
                 Button buy = UiKit.AddButton(panel, "GetGems", label, ToyKit.Button(1), Color.white, new Vector2(760f, 130f), () => { if (host.BuyGemPack != null) host.BuyGemPack(idx); }, 44);
                 UiKit.Place((RectTransform)buy.transform, new Vector2(0.5f, 0f), new Vector2(0f, 230f), new Vector2(760f, 130f));
             }

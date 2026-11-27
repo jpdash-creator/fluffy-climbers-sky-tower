@@ -148,19 +148,19 @@ namespace FluffyClimbers.Tests
             Assert.IsTrue(SaveBackupRules.AutoDue(11, 10, true, true));
         }
 
-        // ---- the toast ----
+        // ---- the button text ----
 
         [Test]
-        public void SaveProgressTextNamesEachTarget()
+        public void SaveProgressTextIsOnlySavedOrSaveFailed()
         {
             var S = SaveTargetResult.Skipped; var O = SaveTargetResult.Ok; var F = SaveTargetResult.Failed;
-            Assert.AreEqual("Saved on this phone", SaveBackupRules.ResultText(S, S));
-            Assert.AreEqual("Saved to Google", SaveBackupRules.ResultText(O, S));
-            Assert.AreEqual("Saved on phone only", SaveBackupRules.ResultText(F, S));
-            Assert.AreEqual("Google ok, Firebase ok", SaveBackupRules.ResultText(O, O));
-            Assert.AreEqual("Google ok, Firebase failed", SaveBackupRules.ResultText(O, F));
-            Assert.AreEqual("Google failed, Firebase ok", SaveBackupRules.ResultText(F, O));
-            Assert.AreEqual("Saved on phone only", SaveBackupRules.ResultText(F, F));
+            Assert.AreEqual("Saved", SaveBackupRules.ResultText(S, S), "guest: the phone save is enough");
+            Assert.AreEqual("Saved", SaveBackupRules.ResultText(O, S));
+            Assert.AreEqual("Saved", SaveBackupRules.ResultText(O, O));
+            Assert.AreEqual("Saved", SaveBackupRules.ResultText(O, F));
+            Assert.AreEqual("Saved", SaveBackupRules.ResultText(F, O));
+            Assert.AreEqual("Save failed", SaveBackupRules.ResultText(F, S), "a skipped target is not a copy");
+            Assert.AreEqual("Save failed", SaveBackupRules.ResultText(F, F));
             Assert.IsTrue(SaveBackupRules.AnyOk(F, O));
             Assert.IsFalse(SaveBackupRules.AnyOk(F, F));
             Assert.IsFalse(SaveBackupRules.AnyOk(F, S));

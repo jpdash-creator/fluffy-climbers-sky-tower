@@ -30,6 +30,16 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
+        public void ARefusedRunGetsAShortReason()
+        {
+            Assert.IsTrue(LeaderboardRetryPolicy.IsOldApp(426, "unsupported_version"));
+            Assert.IsTrue(LeaderboardRetryPolicy.IsOldApp(426, ""));
+            Assert.IsFalse(LeaderboardRetryPolicy.IsOldApp(422, "mismatch"));
+            Assert.AreEqual("Update the game to count runs", LeaderboardRetryPolicy.RefusalText(true));
+            Assert.AreEqual("Could not verify this run", LeaderboardRetryPolicy.RefusalText(false));
+        }
+
+        [Test]
         public void RefusalsOfTheRunItselfAreFinal()
         {
             Assert.AreEqual(SubmitVerdict.Drop, LeaderboardRetryPolicy.Classify(R(422, "mismatch"), 0));

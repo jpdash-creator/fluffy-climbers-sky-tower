@@ -29,6 +29,8 @@ namespace FluffyClimbers.Gameplay
 
         const float SectionGap = 12f, CardGap = 10f;
         const float TextTop = 14f, BuyBottom = 14f, ChipH = 72f, ChipGap = 8f, WorthW = 260f;
+        /// <summary>Clear space between the "Worth x.." tag and the right edge of the card: more than the painted border (Final Bugs 2 #36).</summary>
+        public const float WorthRightGap = 34f;
         static float TextK { get { return Mathf.Max(1f, UiKit.TextScale) - 1f; } }
         /// <summary>The 16 sp floor in pixels; every card text uses it (the card height is fixed from it, so 130% text cannot overlap).</summary>
         static readonly int Fs = Mathf.CeilToInt(UiKit.MinBodyTextPx);
@@ -327,10 +329,10 @@ namespace FluffyClimbers.Gameplay
             const float nameMaxW = 440f;
             for (int sz = name.fontSize; sz > Mathf.RoundToInt(UiKit.MinBodyTextPx) && name.preferredWidth > nameMaxW; sz -= 2) name.fontSize = sz - 2;
             RectTransform nrt = name.rectTransform;
-            Anchored(nrt, 0f, 1f, 1f, 1f, new Vector2(UiKit.MinTouchPx + 14f, -(TextTop + rowH)), new Vector2(-(WorthW + 22f), -TextTop));
+            Anchored(nrt, 0f, 1f, 1f, 1f, new Vector2(UiKit.MinTouchPx + 14f, -(TextTop + rowH)), new Vector2(-(WorthW + WorthRightGap + 8f), -TextTop));
             // (no pivot change here: setting the pivot after Anchored shifted the rect down by half a row and made the name overlap the intro and the ticket; found by the layout audit 2026-11-14)
             float worthH = BundlesScreen.WorthTextH(44f);
-            Text worth = BundlesScreen.AddWorthText(card, SubscriptionCatalog.WorthBadge(def), new Vector2(1f, 1f), new Vector2(-14f, -(TextTop + Mathf.Max(0f, (rowH - worthH) * 0.5f))), WorthW, 44f);
+            Text worth = BundlesScreen.AddWorthText(card, SubscriptionCatalog.WorthBadge(def), new Vector2(1f, 1f), new Vector2(-WorthRightGap, -(TextTop + Mathf.Max(0f, (rowH - worthH) * 0.5f))), WorthW, 44f);
             worth.color = titleCol;
             var wo = worth.GetComponent<Outline>();
             if (wo != null) wo.enabled = !gold;
@@ -493,7 +495,6 @@ namespace FluffyClimbers.Gameplay
             RectTransform overlay = host.NewOverlay();
             const float panelW = 860f, W = 780f, gap = 14f, chipsY = 215f, pad = 40f, pillH = 96f;
             float buttonReserve = 50f + Mathf.Max(170f, UiKit.MinTouchRef) + gap;
-            float availH = Mathf.Max(600f, UiKit.SafeSizeRef().y - 60f);
             RectTransform panel = UiKit.BuildPopupFrame(overlay, def.Name, art, new Vector2(panelW, 1100f), host.CloseOverlay);
             panel.name = "PlanInfoPopup";
             RectTransform vp = UiKit.Rect(panel, "Viewport");
@@ -553,7 +554,7 @@ namespace FluffyClimbers.Gameplay
             y += hintH + 4f;
 
             content.sizeDelta = new Vector2(0f, y);
-            panel.sizeDelta = new Vector2(panelW, Mathf.Min(Mathf.Max(1100f, chipsY + y + buttonReserve), availH));
+            ToyKit.FitPopupHeight(overlay, panel, Mathf.Max(1100f, chipsY + y + buttonReserve));   // never taller than the safe area; the middle scrolls
             var sr = vp.gameObject.AddComponent<ScrollRect>();
             sr.viewport = vp; sr.content = content;
             sr.horizontal = false; sr.vertical = true;
@@ -614,6 +615,12 @@ namespace FluffyClimbers.Gameplay
 
         bool storeBusy;
 
+        /// <summary>
+        /// A store answer can arrive after the player left the shop: the grant is saved either way, but the page is only redrawn and the pop-up only opened while it is still there
+        /// (the screen's rects are destroyed with it).
+        /// </summary>
+        bool PageAlive { get { return host != null && screen != null; } }
+
         /// <summary>A real subscription purchase (docs/33): grant and save inside the store callback, once per transaction; a plan the game cannot start is rejected (not confirmed, so refunded).</summary>
         void BuyWithStore(SubscriptionDef def)
         {
@@ -637,7 +644,7 @@ namespace FluffyClimbers.Gameplay
                 else if (r.Status == PurchaseStatus.Cancelled) return;
                 else if (r.Status == PurchaseStatus.Pending) { title = "Purchase pending"; text = "Your payment is waiting for approval."; }
                 else { title = "Purchase failed"; text = r.Status == PurchaseStatus.Unavailable ? "The store is not available right now. Check your connection and try again." : "The purchase did not go through. You were not charged."; }
-                if (host == null) return;
+                if (!PageAlive) return;
                 if (r.Success && !r.Reject) AudioManager.Play(Sfx.PowerUp);
                 Refresh();
                 Info(title, text);

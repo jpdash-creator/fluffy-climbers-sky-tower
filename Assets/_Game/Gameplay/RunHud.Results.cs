@@ -24,6 +24,8 @@ namespace FluffyClimbers.Gameplay
             public int Ticks, Floors;
             public RecordResult Rec;
             public bool Endless, NewBest, Revived;
+            /// <summary>Room on a short screen (Final Bugs 2): Time and Pace share ONE ribbon / no ribbon at all.</summary>
+            public bool Merged, Hidden;
 
             /// <summary>
             /// Pitch of one NEW BEST ribbon (also the gap-free stacking step): the ribbon graphic is <see cref="BadgeW"/> x (BadgeH) ref px. The ribbon sprite (827 x 292) has its flat label band in the
@@ -57,7 +59,7 @@ namespace FluffyClimbers.Gameplay
             /// <summary>Height under the pace row: the badge, or the revive note, or nothing.</summary>
             public float TailHeight
             {
-                get { return BadgeCount > 0 ? BadgeCount * BadgeH : 0f; }
+                get { return Hidden || BadgeCount <= 0 ? 0f : (Merged ? 1 : BadgeCount) * BadgeH; }
             }
 
             /// <summary>One gold ribbon with its label; the text shrinks to fit (never clipped, never wrapped) at any text scale.</summary>
@@ -97,7 +99,8 @@ namespace FluffyClimbers.Gameplay
                     bool good = Rec.DeltaPaceHundredths >= 0;
                     TimedUi.StatPill(rowP, good ? Glyphs.Check : Glyphs.Cross, TimedText.PaceShort(Rec.DeltaPaceHundredths), good ? TimedUi.Good : TimedUi.Bad, 290f, 96f).transform.parent.name = "PaceDelta";
                 }
-                if (BadgeCount > 0)
+                if (BadgeCount > 0 && !Hidden && Merged && BestTime && BestPace) Badge(panel, BadgeTimeName, "NEW BEST TIME + PACE", yTail);
+                else if (BadgeCount > 0 && !Hidden)
                 {
                     float y = yTail;
                     if (BestTime) { Badge(panel, BadgeTimeName, "NEW BEST TIME", y); y += BadgeH; }

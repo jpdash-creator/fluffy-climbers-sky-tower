@@ -65,7 +65,7 @@ namespace FluffyClimbers.Simulation
             if ((k == PlatformKind.SplittingPier && prev == PlatformKind.Vanishing) || (k == PlatformKind.Vanishing && prev == PlatformKind.SplittingPier)) return false;
             // integration 2026-11-26: a Vanishing platform never follows a Kelp Tangle (the 0.6 s jump lock plus the blink window left no landing in one Keep Moving layout, lvl_003_23)
             if (k == PlatformKind.Vanishing && prev == PlatformKind.KelpTangle) return false;
-            // integration 2026-11-25: a jelly chain never starts right after an Undertow Pad (its gravity column cuts the reach, the chain's first pad is a launcher: random layouts had no solution)
+            // integration 2026-11-25: a jelly chain never starts right after an Undertow Pad (layout rule from the removed slowing column, kept so layouts do not change)
             // (widened after the 60-seed sweeps: also never right after any hazard, demanding, moving, slippery, sticky or vanishing platform - the entry jump to pad 0 must be a plain one)
             if (k == PlatformKind.MoonJellyChain && (prev == PlatformKind.UndertowPad || PlatformKinds.IsHazardType(prev) || PlatformKinds.IsDemanding(prev) || prev == PlatformKind.Moving || prev == PlatformKind.Slippery || prev == PlatformKind.Sticky || prev == PlatformKind.Vanishing)) return false;
             return true;
@@ -387,7 +387,7 @@ namespace FluffyClimbers.Simulation
             if (kind == PlatformKind.SwingPlank || prevKind == PlatformKind.SwingPlank) gap = Fx.Clamp(gap, cfg.PlankGapMin, cfg.NormalGapMax - cfg.PlankRise);
             // Teeter Cap (Final Change 6): a jump from it can be as weak as x0.94 within the fair centre band, so the row above is at most TeeterGapMax (3.4 u) higher.
             if (prevKind == PlatformKind.TeeterCap) gap = Fx.Min(gap, cfg.TeeterGapMax);
-            // Undertow Pad (Final Change 6): the gravity column above it cuts the reach, so the row above is at most UndertowGapMax (3.0 u) higher.
+            // Undertow Pad (Final Change 6): the row above is at most UndertowGapMax (3.0 u) higher (layout rule, kept after the slowing column was removed so layouts do not change).
             if (prevKind == PlatformKind.UndertowPad) gap = Fx.Min(gap, cfg.UndertowGapMax);
             // Bamboo Flick: the flick peaks 2.76 u, so the next row is FlickGapMin to FlickGapMax higher (the flight lands on the way down).
             if (prevKind == PlatformKind.BambooFlick) gap = Fx.Clamp(gap, cfg.FlickGapMin, cfg.FlickGapMax);

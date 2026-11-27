@@ -263,6 +263,9 @@ namespace FluffyClimbers.Gameplay
         {
             public RectTransform Slot, Btn, MarkRt;
             public Image Mark;
+            public Text NameText;
+            /// <summary>Half the width of the widest line of the name (measured once).</summary>
+            public float NameHalfW;
             public string Name;
             public int Levels, Cleared;
             public bool Soon, Open, Done, Dot;
@@ -352,8 +355,31 @@ namespace FluffyClimbers.Gameplay
 
             for (int i = 0; i < total; i++) ApplySlot(i);
             ApplyStripSelection();
+            sr.onValueChanged.AddListener(_ => ApplyNameVisibility());
+            snap.Moved = ApplyNameVisibility;
             snap.CenterOn(selectedRegion - 1, false);
         }
+
+        /// <summary>
+        /// A name is shown only while all of it is inside the screen: a side region of a narrow screen (9:21) peeks in with its circle (the strip scrolls) and never with a cut name
+        /// (Final Bugs 2 #37). Arithmetic only: no allocation while the strip moves.
+        /// </summary>
+        void ApplyNameVisibility()
+        {
+            if (stripSlots == null || stripSnap == null || stripSnap.Content == null) return;
+            float viewW = stripSnap.ViewWidth;
+            float pad = stripSnap.Row.anchoredPosition.x, scrollX = stripSnap.Content.anchoredPosition.x;
+            for (int i = 0; i < stripSlots.Length; i++)
+            {
+                Text t = stripSlots[i].NameText;
+                if (t == null) continue;
+                bool show = NameFits(scrollX + pad + (i + 0.5f) * StripSlotW, stripSlots[i].NameHalfW, viewW);
+                if (t.enabled != show) t.enabled = show;
+            }
+        }
+
+        /// <summary>A name centred at <paramref name="centreX"/> (viewport units from its left edge) lies completely inside a viewport <paramref name="viewW"/> wide.</summary>
+        public static bool NameFits(float centreX, float halfW, float viewW) { return centreX - halfW >= -0.5f && centreX + halfW <= viewW + 0.5f; }
 
         StripSlot BuildStripSlot(RectTransform row, int index)
         {
@@ -412,6 +438,8 @@ namespace FluffyClimbers.Gameplay
             nrt.pivot = new Vector2(0.5f, 1f);
             nrt.offsetMin = new Vector2(0f, -(CircleBottom + NameGap + NameZone));   // fixed name zone below the biggest circle
             nrt.offsetMax = new Vector2(0f, -(CircleBottom + NameGap));
+            s.NameText = name;
+            s.NameHalfW = name.preferredWidth * 0.5f;
             return s;
         }
 
@@ -492,6 +520,7 @@ namespace FluffyClimbers.Gameplay
             RectTransform row = UiKit.Rect(content, "LockedNote");
             Image bg = Plate(row, "Panel", "plate_chip", Color.white, RewardCorner);
             UiKit.Stretch(bg.rectTransform);
+            bg.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;   // the backing, not a column: without this the row laid it out as a blank dark square beside the text (Final Bugs 2 #32)
             var hl = row.gameObject.AddComponent<HorizontalLayoutGroup>();
             hl.padding = new RectOffset(24, 24, 12, 12);
             hl.spacing = 16f;
@@ -572,6 +601,9 @@ namespace FluffyClimbers.Gameplay
         public float SlotW = 216f;
         public int Count = 30;
         public float FallbackWidth = 1080f;
+        /// <summary>Called when the strip was moved or resized by this component (the scroll rect reports finger drags itself).</summary>
+        public System.Action Moved;
+        public float ViewWidth { get { return ViewW; } }
 
         bool dirty = true, dragging;
         float target = float.NaN;
@@ -607,6 +639,7 @@ namespace FluffyClimbers.Gameplay
                 target = float.NaN;
             }
             else target = x;
+            if (Moved != null) Moved();
         }
 
         public void OnBeginDrag(UnityEngine.EventSystems.PointerEventData e) { dragging = true; target = float.NaN; }
@@ -630,6 +663,7 @@ namespace FluffyClimbers.Gameplay
                 dirty = false;
                 Fit();
                 if (!dragging && float.IsNaN(target)) Content.anchoredPosition = new Vector2(XFor(centered), 0f);   // a new screen size: keep the centred slot centred
+                if (Moved != null) Moved();
             }
             if (dragging || float.IsNaN(target)) return;
             if (Scroll != null) Scroll.StopMovement();   // the glide replaces the scroll rect's own inertia
@@ -637,6 +671,7 @@ namespace FluffyClimbers.Gameplay
             x = Mathf.Lerp(x, target, 1f - Mathf.Exp(-14f * dt));   // time based: the same glide at any frame rate (CUX-1)
             if (Mathf.Abs(x - target) < 0.5f) { x = target; target = float.NaN; }
             Content.anchoredPosition = new Vector2(x, 0f);
+            if (Moved != null) Moved();
         }
     }
 }

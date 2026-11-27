@@ -47,7 +47,9 @@ namespace FluffyClimbers.Gameplay
         // Bug List 5 item 1 (2026-11-17): a taller row (140) with a smaller medal and avatar so nothing touches the painted border of any plate (the gold / silver / bronze caps are round: the medal corner sat on the border at 108 tall).
         public const float MedalH = 92f, AvatarSize = 80f, RowVPad = 24f, RowBase = MedalH + 2f * RowVPad;
         /// <summary>The height of every row (top 100 and the pinned own card): the content plus its padding, never below the 48 dp touch minimum, and tall enough for the own row's name line and tag line at the current text size.</summary>
-        public static float RowH { get { return Mathf.Max(Mathf.Max(RowBase, UiKit.MinTouchRef), RewardsScreen.LineH(NameFont) + 16f); } }
+        public static float RowH { get { return Mathf.Max(Mathf.Max(RowBase, UiKit.MinTouchRef), Mathf.Max(RewardsScreen.LineH(NameFont) + 16f, 2f * (StackTextH + 2f))); } }
+        /// <summary>The full height of one line of the name font (Nunito: 1.364 of the size): a stacked row holds two of them.</summary>
+        static float StackTextH { get { return Mathf.Ceil(NameFontPx * 1.4f); } }
         const float RowGap = 12f, PadTop = 8f, PadSide = 12f, TabGap = 8f;
         /// <summary>How far the own row's glow rings grow past the plate (inside the list's side padding and row gap, so no ring is clipped or touches the next row).</summary>
         const float GlowWideGrow = 8f, GlowThinGrow = 4f;
@@ -63,8 +65,9 @@ namespace FluffyClimbers.Gameplay
         static float CrownIconH { get { return Mathf.Round(CrownFontPx * 0.9f); } }
         static float CrownIconW { get { return Mathf.Round(CrownIconH * 1.2f); } }
         const float TagBottom = 6f;
-        /// <summary>Two name lines fit the row at this text size (the own row never uses two: its YOU tag sits under the name).</summary>
-        static bool TwoLineNames { get { return RowH - 8f >= 2f * RewardsScreen.LineH(NameFont); } }
+        /// <summary>Height of one half of a stacked row (the name on top, the crowns under it) and the space kept to the plate edge.</summary>
+        static float StackPad { get { return Mathf.Clamp(RowH * 0.5f - StackTextH, 2f, 16f); } }
+        static float StackLineH { get { return RowH * 0.5f - StackPad; } }
         static readonly Color[] AvatarColors =
         {
             new Color(0.62f, 0.70f, 0.90f, 1f), new Color(0.98f, 0.76f, 0.62f, 1f), new Color(0.70f, 0.88f, 0.66f, 1f), new Color(0.92f, 0.70f, 0.86f, 1f),
@@ -86,7 +89,8 @@ namespace FluffyClimbers.Gameplay
             public Image Back, Medal, Photo, Glow, GlowWide, AvatarBg;
             public Text Rank, Name, Crowns, Letter;
             public GameObject HitGo;
-            public bool Pinned, IsMe;
+            public bool Pinned, IsMe, Stacked;
+            public RectTransform CrownIconRt, CrownsRt;
             public int PlateIdx = -1;
             public string Url = "";
         }
@@ -109,6 +113,8 @@ namespace FluffyClimbers.Gameplay
         float vpFullH, pinH;
         BoardData data;
         string[] rankText = new string[0], crownText = new string[0], initialText = new string[0], nameText = new string[0];
+        /// <summary>Rows whose name does not fit beside the crowns: name over the whole width, crowns on the line under it.</summary>
+        bool[] nameStacked = new bool[0];
         string pinnedRankText = "";
         /// <summary>Width of the crown number column, measured from the widest number of the board and the pinned card; the icon and the name box follow it.</summary>
         float crownW = 200f;
@@ -512,7 +518,7 @@ namespace FluffyClimbers.Gameplay
         void PrepareStrings()
         {
             int n = data != null ? data.Entries.Count : 0;
-            rankText = new string[n]; crownText = new string[n]; initialText = new string[n]; nameText = new string[n];
+            rankText = new string[n]; crownText = new string[n]; initialText = new string[n]; nameText = new string[n]; nameStacked = new bool[n];
             int widest = 1;
             for (int i = 0; i < n; i++)
             {
@@ -528,7 +534,7 @@ namespace FluffyClimbers.Gameplay
                 BoardRow r = data.Entries[i];
                 rankText[i] = RankString(r.Rank);
                 initialText[i] = InitialOf(r.Name);
-                nameText[i] = FitName(r.Name, false, TwoLineNames);
+                nameText[i] = FitName(r.Name, false, out nameStacked[i]);
             }
         }
 
@@ -560,9 +566,10 @@ namespace FluffyClimbers.Gameplay
         static TextGenerator measurer;
 
         /// <summary>Real width of a one-line string in the name font at <paramref name="px"/> (canvas units); falls back to an estimate when no font is available.</summary>
-        static float MeasureWidth(string s, int px)
+        static float MeasureWidth(string s, int px) { return MeasureWidth(s, px, UiKit.DefaultFont); }
+
+        static float MeasureWidth(string s, int px, Font f)
         {
-            Font f = UiKit.DefaultFont;
             if (f == null) return s.Length * px * 0.6f;
             try
             {
@@ -579,35 +586,46 @@ namespace FluffyClimbers.Gameplay
         }
 
         /// <summary>
-        /// A name that fits the name slot at the current text size, measured with the real font, so it never runs into the crown icon. A long name (every row, the own row too since the YOU tag is gone) may use two lines (broken at a space when it can);
-        /// only what still does not fit is cut with three dots (Bug List 5: names are not truncated while there is room for them).
+        /// A name on ONE line, measured with the real font: a name is never broken inside a word (Final Bugs 2 #7). A name that does not fit beside the crowns makes the row
+        /// <paramref name="stacked"/> (the name takes the whole width, the crowns go under it); only what is still wider than that is cut with three dots.
         /// </summary>
-        string FitName(string name, bool pinned, bool allowTwoLines)
+        string FitName(string name, bool pinned, out bool stacked)
         {
             string n = string.IsNullOrEmpty(name) ? "Player" : name.Trim();
             if (n.Length == 0) n = "Player";
             float boxW = Mathf.Max(60f, RowW - NameX(pinned) - NameRightReserve) - 6f;
             int px = NameFontPx;
-            if (MeasureWidth(n, px) <= boxW) return n;
-            if (!allowTwoLines) return Ellipsize(n, px, boxW);
-            int split = -1;
-            for (int i = n.Length - 1; i > 0; i--)
-                if (n[i] == ' ' && MeasureWidth(n.Substring(0, i), px) <= boxW) { split = i; break; }
-            if (split < 0)
+            stacked = MeasureWidth(n, px) > boxW;
+            if (!stacked) return n;
+            return Ellipsize(n, px, Mathf.Max(60f, RowW - NameX(pinned) - RightPad) - 6f);
+        }
+
+        /// <summary>Places the name, the crown icon and the number of a row: side by side, or stacked for a long name. Only called when the layout of a pooled row changes (no allocation).</summary>
+        void ApplyNameLayout(Row r, bool stacked)
+        {
+            r.Stacked = stacked;
+            // a half-height box holds exactly one line: never let the rounding of a font drop it
+            r.Name.verticalOverflow = stacked ? VerticalWrapMode.Overflow : VerticalWrapMode.Truncate;
+            r.Crowns.verticalOverflow = r.Name.verticalOverflow;
+            r.Crowns.horizontalOverflow = stacked ? HorizontalWrapMode.Overflow : HorizontalWrapMode.Wrap;
+            r.Crowns.resizeTextForBestFit = !stacked;
+            if (stacked)
             {
-                int lo = 1, hi = n.Length - 1;   // no space to break at: the longest prefix that fits
-                while (lo < hi)
-                {
-                    int mid = (lo + hi + 1) / 2;
-                    if (MeasureWidth(n.Substring(0, mid), px) <= boxW) lo = mid; else hi = mid - 1;
-                }
-                split = lo;
-                if (split > 0 && char.IsHighSurrogate(n[split - 1])) split--;
+                float pad = StackPad, lineH = StackLineH;
+                r.NameRt.offsetMin = new Vector2(NameX(r.Pinned), RowH * 0.5f);
+                r.NameRt.offsetMax = new Vector2(-RightPad, -pad);
+                r.CrownIconRt.anchoredPosition = new Vector2(-(RightPad + crownW + CrownGap), -lineH * 0.5f);
+                r.CrownsRt.anchoredPosition = new Vector2(-RightPad, -lineH * 0.5f);
+                r.CrownsRt.sizeDelta = new Vector2(crownW, lineH);
             }
-            string first = n.Substring(0, Mathf.Max(1, split)).TrimEnd();
-            string rest = n.Substring(Mathf.Max(1, split)).TrimStart();
-            if (rest.Length == 0) return first;
-            return first + "\n" + Ellipsize(rest, px, boxW);
+            else
+            {
+                r.NameRt.offsetMin = new Vector2(NameX(r.Pinned), r.Pinned || r.IsMe ? OwnNameBottom : 4f);
+                r.NameRt.offsetMax = new Vector2(-NameRightReserve, -4f);
+                r.CrownIconRt.anchoredPosition = new Vector2(-(RightPad + crownW + CrownGap), 0f);
+                r.CrownsRt.anchoredPosition = new Vector2(-RightPad, 0f);
+                r.CrownsRt.sizeDelta = new Vector2(crownW, RowH - 24f);
+            }
         }
 
         /// <summary>The longest prefix whose text plus three dots fits <paramref name="boxW"/>; the whole text when it fits.</summary>
@@ -660,7 +678,7 @@ namespace FluffyClimbers.Gameplay
                 r.Rt.offsetMin = new Vector2(PadSide, y - RowH);
                 r.Rt.offsetMax = new Vector2(-PadSide, y);
                 bool isMe = idx == ownIdx;
-                Bind(r, LeaderboardPin.MedalPlace(e.Rank, e.Crowns, BoardLimit), rankText[idx], nameText[idx], crownText[idx], e.Avatar, initialText[idx], isMe);
+                Bind(r, LeaderboardPin.MedalPlace(e.Rank, e.Crowns, BoardLimit), rankText[idx], nameText[idx], crownText[idx], e.Avatar, initialText[idx], isMe, nameStacked[idx]);
                 if (isMe) r.Rt.SetAsLastSibling();   // the glow outline is drawn over the neighbouring rows
             }
         }
@@ -680,7 +698,9 @@ namespace FluffyClimbers.Gameplay
             LbProfile p = LeaderboardHub.Profile;
             string name = string.IsNullOrEmpty(p.DisplayName) ? "You" : p.DisplayName;
             long crowns = ownIdx >= 0 ? data.Entries[ownIdx].Crowns : (rank != null ? rank.Crowns : 0L);
-            Bind(ownRow, 0, pinnedRankText, FitName(name, true, TwoLineNames), CrownString(crowns), p.AvatarUrl, InitialOf(name), true);
+            bool stacked;
+            string shownName = FitName(name, true, out stacked);
+            Bind(ownRow, 0, pinnedRankText, shownName, CrownString(crowns), p.AvatarUrl, InitialOf(name), true, stacked);
             ownRow.Go.SetActive(false);
         }
 
@@ -771,12 +791,14 @@ namespace FluffyClimbers.Gameplay
 
             Image ci = Painted(r.Rt, "CrownIcon", "lb_icon_crown");
             Anchor(ci.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-(RightPad + crownW + CrownGap), 0f), new Vector2(CrownIconW, CrownIconH));
+            r.CrownIconRt = ci.rectTransform;
 
             r.Crowns = Label(r.Rt, "CrownsText", "", CrownFont, Ink, TextAnchor.MiddleRight, false, true);
             OneLine(r.Crowns);
             r.Crowns.resizeTextForBestFit = true; r.Crowns.resizeTextMinSize = Mathf.RoundToInt(UiKit.MinBodyTextPx); r.Crowns.resizeTextMaxSize = r.Crowns.fontSize;
             r.Crowns.horizontalOverflow = HorizontalWrapMode.Wrap; r.Crowns.verticalOverflow = VerticalWrapMode.Truncate;
             Anchor(r.Crowns.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-RightPad, 0f), new Vector2(crownW, RowH - 24f));
+            r.CrownsRt = r.Crowns.rectTransform;
             return r;
         }
 
@@ -819,7 +841,7 @@ namespace FluffyClimbers.Gameplay
             rt.sizeDelta = size;
         }
 
-        void Bind(Row r, int medalPlace, string rankStr, string name, string crowns, string avatarUrl, string initial, bool me)
+        void Bind(Row r, int medalPlace, string rankStr, string name, string crowns, string avatarUrl, string initial, bool me, bool stacked)
         {
             int plate = LeaderboardPin.PlateIndex(medalPlace, me, r.Pinned);
             if (r.PlateIdx != plate)
@@ -851,8 +873,9 @@ namespace FluffyClimbers.Gameplay
                 r.Glow.gameObject.SetActive(me);
                 r.GlowWide.gameObject.SetActive(me);
                 r.HitGo.SetActive(me);
-                r.NameRt.offsetMin = new Vector2(NameX(false), me ? OwnNameBottom : 4f);
+                if (!r.Stacked) r.NameRt.offsetMin = new Vector2(NameX(false), me ? OwnNameBottom : 4f);
             }
+            if (r.Stacked != stacked) ApplyNameLayout(r, stacked);
             UiKit.SetText(r.Rank, rankStr);
             UiKit.SetText(r.Name, name);
             UiKit.SetText(r.Crowns, crowns);

@@ -232,6 +232,313 @@ def finish_row(a, clip_above=False, hull=False, star=True):
     return a[max(0, ys.min() - 6):ys.max() + 7, max(0, xs.min() - 6):xs.max() + 7].copy()
 
 
+# ---------------------------------------------------------------- Final Bugs 2 #12 / #13: sparkle repair by redrawing the outline, min-error joins
+
+# (sheet, row) -> repair spec, all in pixels of crop_row's result: outline = points on the OUTER edge of the dark outline around the sparkle (read from the sheet),
+# x = columns that are rebuilt, sample = a clean column right of them (rim cross section), thick = outline px, spikes = boxes holding sparkle rays inside the body
+OUTLINE_REPAIR = {
+    ("B2", 3): dict(outline=[(93, 115), (100, 101), (110, 89), (120, 81), (145, 64.5), (165, 54), (185, 46.5), (200, 41), (215, 37.5), (235, 34.5)], x=(102, 212), sample=224, thick=8, left=70,
+                    spikes=[(130, 55, 160, 108)], mode="white"),
+    ("B2", 4): dict(outline=[(100, 115), (110, 100), (120, 90), (130, 82), (150, 69.5), (180, 55.5), (215, 47), (235, 42.5), (255, 39.5), (275, 37)], x=(108, 258), sample=266, thick=8, left=80,
+                    spikes=[(148, 58, 185, 120), (218, 46, 262, 84)], mode="white"),
+    ("B2", 5): dict(outline=[(107, 118), (115, 106), (125, 95), (135, 87), (150, 76), (175, 62.5), (200, 53), (220, 47), (240, 41.5), (265, 37)], x=(113, 228), sample=244, thick=8, left=80,
+                    spikes=[(130, 62, 172, 145)], mode="white"),
+    ("C2", 3): dict(outline=[(45, 100), (50, 85.5), (60, 72), (72, 62), (85, 55.5), (95, 53), (110, 51.5), (130, 51), (160, 50), (185, 49.5)], x=(60, 180), sample=190, thick=6, left=35,
+                    spikes=[(88, 58, 160, 108)], mode="box"),
+    ("C2", 4): dict(outline=[(45, 98), (52, 83), (63, 71), (78, 63), (90, 59), (105, 57), (125, 55), (150, 53.5), (175, 52.5), (190, 52)], x=(62, 178), sample=186, thick=6, left=35,
+                    spikes=[(76, 60, 140, 120)], mode="box"),
+}
+
+
+def repair_outline(a, spec):
+    """Removes the sparkle that sits ON the outline: everything above a smooth curve is cleared, the dark outline and the light rim are redrawn along the curve
+    (rim colours taken from a clean column of the same row) and the rays inside the body are repainted from their surroundings."""
+    from scipy.interpolate import PchipInterpolator
+    from scipy.spatial import cKDTree
+    pts = np.array(spec["outline"], float)
+    curve = PchipInterpolator(pts[:, 0], pts[:, 1])
+    a = a.copy()
+    h, w = a.shape[:2]
+    x0, x1 = spec["x"]
+    T = spec["thick"]
+    dense_x = np.arange(pts[0, 0], pts[-1, 0], 0.2)
+    tree = cKDTree(np.stack([dense_x, curve(dense_x)], 1))
+    yy, xx = np.mgrid[0:h, 0:w]
+    inx = (xx >= x0) & (xx < x1)
+    cy = np.zeros(w)
+    cy[x0:x1] = curve(np.arange(x0, x1))
+    below = inx & (yy >= cy[None, :])
+    air = (xx >= spec["left"]) & (xx < x0) & (yy < float(curve(x0)) - 4)       # rays left of the rebuilt columns stand in the air above the good outline
+    a[air, 3] = 0
+    depth = np.zeros((h, w))
+    depth[below] = tree.query(np.stack([xx[below], yy[below]], 1))[0]
+    # repaint the rays and their glow inside the body first (the rim is redrawn afterwards)
+    blue = a[:, :, 2].astype(np.float32)
+    med = ndi.median_filter(blue, size=21)
+    mask = np.zeros((h, w), bool)
+    for bx0, by0, bx1, by1 in spec["spikes"]:
+        box = np.zeros((h, w), bool)
+        box[by0:by1, bx0:bx1] = True
+        if spec["mode"] == "box":
+            mask |= box
+        else:
+            mask |= ndi.binary_dilation(box & (blue > np.maximum(med + 14, 118)), iterations=3) & box
+    mask &= depth > T + 2
+    if mask.any():
+        base = bleed_colour(a)
+        painted = cv2.inpaint(np.ascontiguousarray(base[:, :, :3]), mask.astype(np.uint8) * 255, 7, cv2.INPAINT_TELEA)
+        a[mask, :3] = painted[mask]
+    # rim cross section at the clean column, indexed by the distance below the curve
+    sx = spec["sample"]
+    slope = float(curve(sx, 1))
+    ny, nx = 1.0 / np.hypot(1, slope), -slope / np.hypot(1, slope)      # unit normal pointing down into the body
+    d = np.arange(0, T + 18, dtype=float)
+    prof = np.stack([ndi.map_coordinates(a[:, :, c].astype(np.float32), [float(curve(sx)) + d * ny, sx + d * nx], order=1) for c in range(3)], 1)
+    ink = np.median(prof[1:T - 1], axis=0)
+    rim = below & (depth > T) & (depth <= T + 14)
+    feather = np.clip((T + 14 - depth[rim]) / 5.0, 0, 1)[:, None]
+    rimcol = np.stack([np.interp(depth[rim], d, prof[:, c]) for c in range(3)], 1)
+    a[rim, :3] = np.round(rimcol * feather + a[rim, :3] * (1 - feather)).astype(np.uint8)
+    line = below & (depth <= T)
+    inner = np.array([np.interp(T + 1.5, d, prof[:, c]) for c in range(3)])
+    soft = np.clip(depth[line] - (T - 1), 0, 1)[:, None]
+    a[line, :3] = np.round(ink * (1 - soft) + inner * soft).astype(np.uint8)
+    a[rim | line, 3] = 255
+    a[inx & (yy < cy[None, :]), 3] = 0
+    return a
+
+
+def finish_frame(old, raw):
+    """Returns a function that crops a repaired raw row to the rectangle the first bake used (found by matching a patch of untouched body pixels)."""
+    h, w = old.shape[:2]
+    ph, pw = 40, 60
+    cy, cx = h // 2, int(0.6 * w)
+    res = cv2.matchTemplate(np.ascontiguousarray(raw[:, :, :3]), np.ascontiguousarray(old[cy:cy + ph, cx:cx + pw, :3]), cv2.TM_SQDIFF)
+    _, _, loc, _ = cv2.minMaxLoc(res)
+    ox, oy = loc[0] - cx, loc[1] - cy
+
+    def crop(a):
+        pad = 64
+        b = np.pad(a, ((pad, pad), (pad, pad), (0, 0)))
+        return b[oy + pad:oy + pad + h, ox + pad:ox + pad + w].copy()
+    return crop
+
+
+def seam_cost(a, p, q, ov):
+    """Dynamic programming seam through the overlap of columns p.. and q..: returns (cost, seam column per row)."""
+    f = a.astype(np.float32)
+    pm = np.concatenate([f[:, :, :3] * (f[:, :, 3:] / 255.0), f[:, :, 3:]], axis=2)
+    d = np.abs(pm[:, p:p + ov] - pm[:, q:q + ov]).mean(axis=2)
+    h = d.shape[0]
+    acc = d.copy()
+    back = np.zeros((h, ov), int)
+    for y in range(1, h):
+        prev = acc[y - 1]
+        cand = np.stack([np.r_[np.inf, prev[:-1]], prev, np.r_[prev[1:], np.inf]])
+        k = np.argmin(cand, axis=0)
+        acc[y] += cand[k, np.arange(ov)]
+        back[y] = np.arange(ov) + k - 1
+    s = np.zeros(h, int)
+    s[-1] = int(np.argmin(acc[-1]))
+    for y in range(h - 1, 0, -1):
+        s[y - 1] = back[y, s[y]]
+    col = d[np.arange(h), s]
+    seen = col[col > 0]
+    # the whole overlap counts too: a seam must not slip between two features that do not line up
+    return float(seen.mean() if len(seen) else 0.0) + 0.35 * float(d.mean()) + 0.02 * float(col.max()), s
+
+
+def seam_join(a, p, q, s, ov):
+    """a[:, :p] + overlap (left of the seam from p, right of it from q) + a[:, q + ov:]. The width grows by p - q."""
+    left, right = a[:, p:p + ov].astype(np.float32), a[:, q:q + ov].astype(np.float32)
+    t = np.clip((np.arange(ov)[None, :] - s[:, None] + 1.5) / 3.0, 0, 1)[:, :, None]     # 3 px feather, no wide cross fade (that smeared the painted lines)
+    mid = np.round(left * (1 - t) + right * t).astype(np.uint8)
+    return np.concatenate([a[:, :p], mid, a[:, q + ov:]], axis=1)
+
+
+def jumps(a, delta, lo, hi, ov, keep=24):
+    """The best joins that change the width by delta inside [lo, hi): [(cost, p, q, seam)]."""
+    ps = [p for p in range(lo, hi - ov) if lo <= p - delta <= hi - ov]
+    if not ps:
+        return []
+    f = a.astype(np.float32)
+    f = np.concatenate([f[:, :, :3] * (f[:, :, 3:] / 255.0), f[:, :, 3:]], axis=2)
+    rough = [float(np.abs(f[:, p:p + ov] - f[:, p - delta:p - delta + ov]).mean()) for p in ps]
+    out = []
+    for i in np.argsort(rough)[:keep]:
+        p = ps[i]
+        c, s = seam_cost(a, p, p - delta, ov)
+        out.append((c, p, p - delta, s))
+    return sorted(out, key=lambda r: r[0])
+
+
+def seam_fit(a, delta, lo, hi, ov=20):
+    """Changes the width by exactly delta px inside [lo, hi) with one or two min-error joins (more only when the window is too short)."""
+    if delta == 0:
+        return a
+    sign = 1 if delta > 0 else -1
+    room = hi - lo - ov - 2
+    best = None
+    if abs(delta) <= room:
+        one = jumps(a, delta, lo, hi, ov)
+        if one:
+            c, p, q, s = one[0]
+            best = (c, [(p, q, s)])
+    for d1 in range(30, min(room, abs(delta) - 30) + 1, 7):
+        first = jumps(a, sign * d1, lo, hi, ov, keep=4)
+        if not first:
+            continue
+        c1, p1, q1, s1 = first[0]
+        b = seam_join(a, p1, q1, s1, ov)
+        second = jumps(b, delta - sign * d1, lo, hi + sign * d1, ov, keep=6)
+        if not second:
+            continue
+        c2, p2, q2, s2 = second[0]
+        cost2 = max(c1, c2) * 1.12      # one join is preferred over two of the same quality
+        if best is None or cost2 < best[0]:
+            best = (cost2, [(p1, q1, s1), (p2, q2, s2)])
+    if best is None:
+        d1 = sign * max(40, room // 2)
+        j = jumps(a, d1, lo, hi, ov)
+        if not j:
+            raise ValueError("window too small for %d px (lo %d hi %d)" % (delta, lo, hi))
+        c, p, q, s = j[0]
+        return seam_fit(seam_join(a, p, q, s, ov), delta - d1, lo, hi + d1, ov)
+    print("      joins %s cost %.1f" % ([p - q for p, q, _ in best[1]], best[0]))
+    for p, q, s in best[1]:
+        a = seam_join(a, p, q, s, ov)
+    return a
+
+
+# Turtle joins picked by eye from the min-error candidates: width -> [(p, q), ...] in columns of the scaled row (p = where the left part ends, q = where the
+# right part takes over; every join changes the width by p - q). They keep the hexagon pattern regular. Width 2 only needs 18 px: its seam may step sideways
+# fast (weave) so it runs through flat shell, and the one broken edge it leaves is closed with a short painted line.
+TURTLE_JOINS = {2: [(154, 136)], 3: [(256, 192), (197, 240)], 4: [(335, 250), (275, 287)], 6: [(347, 184), (503, 259)]}
+TURTLE_W2_EDGE = ((145.5, 36.0), (152.0, 33.2), (166.0, 27.8), (178.0, 27.2), (192.0, 22.2), (196.5, 23.0))      # the flat hexagon edge that closes the join
+
+
+def weave_seam(a, p, q, ov=60, step=10, pen=1.0):
+    f = a.astype(np.float32)
+    pm = np.concatenate([f[:, :, :3] * (f[:, :, 3:] / 255.0), f[:, :, 3:]], axis=2)
+    d = ndi.uniform_filter(np.abs(pm[:, p:p + ov] - pm[:, q:q + ov]).mean(axis=2), 3)
+    h = d.shape[0]
+    idx = np.arange(ov)
+    acc = d.copy()
+    back = np.zeros((h, ov), int)
+    trans = np.abs(idx[None, :] - idx[:, None]).astype(float) * pen
+    trans[np.abs(idx[None, :] - idx[:, None]) > step] = np.inf
+    for y in range(1, h):
+        t = acc[y - 1][:, None] + trans
+        back[y] = np.argmin(t, axis=0)
+        acc[y] += t[back[y], idx]
+    s = np.zeros(h, int)
+    s[-1] = int(np.argmin(acc[-1]))
+    for y in range(h - 1, 0, -1):
+        s[y - 1] = back[y, s[y]]
+    return s
+
+
+def paint_line(a, p0, p1, colour, width, soft=4):
+    """Antialiased straight stroke with round ends, drawn on top of the opaque pixels."""
+    yy, xx = np.mgrid[0:a.shape[0], 0:a.shape[1]].astype(np.float32)
+    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+    t = np.clip(((xx - p0[0]) * dx + (yy - p0[1]) * dy) / (dx * dx + dy * dy), 0, 1)
+    dist = np.hypot(xx - p0[0] - t * dx, yy - p0[1] - t * dy)
+    k = (np.clip((width / 2.0 + soft / 4.0 - dist) / (soft / 2.0), 0, 1) * (a[:, :, 3] > 0))[:, :, None]
+    a[:, :, :3] = np.round(a[:, :, :3] * (1 - k) + np.array(colour, np.float32) * k).astype(np.uint8)
+
+
+def turtle_fit(a, w):
+    if w == 2:
+        p, q = TURTLE_JOINS[2][0]
+        a = np.ascontiguousarray(seam_join(a, p, q, weave_seam(a, p, q), 60))
+        for colour, width, soft, pts in (((196, 214, 122), 8.0, 4, TURTLE_W2_EDGE[1:-1]), ((20, 56, 22), 3.6, 2, TURTLE_W2_EDGE)):
+            for e0, e1 in zip(pts[:-1], pts[1:]):
+                paint_line(a, e0, e1, colour, width, soft)
+        return a
+    for p, q in TURTLE_JOINS[w]:
+        a = seam_join(a, p, q, seam_cost(a, p, q, 32)[1], 32)
+    return a
+
+
+# ---------------------------------------------------------------- wide pufferfish pads (#13): a long fish, not a yellow bar
+
+# rows of the belly zone, columns it starts / ends at (end counted from the right edge, before the face and the hand), where the cream colour is read
+PUFFER_BELLY = {"calm": dict(y=(52, 94), xa=78, xr=215, yl=89.0, yr=70.0, cream=(200, 87), freckle=(27, 52)),
+                "swelling": dict(y=(86, 128), xa=108, xr=218, yl=119.0, yr=107.0, cream=(230, 123), freckle=(50, 80))}
+
+
+def puffer_details(img, pose):
+    """Baked details for the long calm / swelling pads: a clean scalloped belly edge (instead of the saw tooth the joins left) and freckles on the back.
+    Colours come from the piece itself; the outline and the size are untouched."""
+    cfg = PUFFER_BELLY.get(pose)
+    if cfg is None:
+        return img
+    img = np.ascontiguousarray(img).copy()
+    h, w = img.shape[:2]
+    y0, y1 = cfg["y"]
+    xa, xb = cfg["xa"], w - cfg["xr"]
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    # yellow above the belly: one colour per row, from the plain part of the body (median over columns, then smoothed), kept going downwards
+    span = img[:, xa:xb, :3].astype(np.float32)
+    top = int(min(cfg["yl"], cfg["yr"]) - 8)
+    row = np.median(span, axis=1)
+    row[top:] = row[top - 6:top].mean(axis=0)
+    row = ndi.uniform_filter1d(row, 7, axis=0)
+    cream = np.median(img[cfg["cream"][1] - 2:cfg["cream"][1] + 3, cfg["cream"][0] - 20:cfg["cream"][0] + 20, :3].reshape(-1, 3), axis=0)
+    u = np.clip((xx - xa) / float(xb - xa), 0, 1)
+    ends = np.clip(np.minimum(xx - xa, xb - xx) / 40.0, 0, 1)
+    scallops = max(2, int(round((xb - xa) / 52.0)))
+    edge = cfg["yl"] + (cfg["yr"] - cfg["yl"]) * u - 5.0 * np.abs(np.sin(np.pi * scallops * u)) * ends
+    below = np.clip(yy - edge + 0.5, 0, 1)[:, :, None]
+    paint = row[:, None, :] * (1 - below) + cream[None, None, :] * below
+    k = np.clip(np.minimum(xx - xa, xb - xx) / 28.0, 0, 1) * np.clip((yy - y0) / 10.0, 0, 1) * (yy < y1) * (img[:, :, 3] == 255)
+    img[:, :, :3] = np.round(img[:, :, :3] * (1 - k[:, :, None]) + paint * k[:, :, None]).astype(np.uint8)
+    # freckles: small clusters along the back, irregular so they do not read as a repeat
+    f0, f1 = cfg["freckle"]
+    shapes = [[(0, 0.35, 6.0), (17, 0.7, 4.0), (-12, 0.8, 3.2)], [(0, 0.6, 5.0), (15, 0.2, 3.5)], [(0, 0.2, 4.0), (11, 0.65, 5.6), (28, 0.4, 3.0)]]
+    n = max(2, int((xb - xa) / 85))
+    for i in range(n):
+        cx = xa + (i + 0.5) * (xb - xa + 20) / n + (7, -9, 3, -4, 10)[i % 5]
+        for dx, fy, r in shapes[i % 3]:
+            px, py = cx + dx, f0 + fy * (f1 - f0)
+            dot = np.clip(r + 0.5 - np.hypot(xx - px, (yy - py) * 1.15), 0, 1)[:, :, None] * (img[:, :, 3:] == 255)
+            img[:, :, :3] = np.round(img[:, :, :3] * (1 - dot * 0.8) + np.array((240.0, 170.0, 48.0)) * dot * 0.8).astype(np.uint8)
+            shine = np.clip(r * 0.35 + 0.5 - np.hypot(xx - px + r * 0.3, yy - py + r * 0.3), 0, 1)[:, :, None]
+            img[:, :, :3] = np.round(img[:, :, :3] * (1 - shine * 0.8) + np.array((255.0, 236.0, 160.0)) * shine * 0.8).astype(np.uint8)
+    return img
+
+
+# outline of the tail fin of the calm piece (columns / rows of the baked image) with its dark rim
+FIN_POLY = [(29, 85), (18, 88), (11, 94), (8, 101), (12, 107), (19, 111), (28, 109), (36, 105), (43, 101), (40, 95), (34, 89)]
+
+
+def side_fin(img, fin, pose):
+    """The fish's own tail fin, uniformly 1.15x, laid on the side of the body so the long pad reads as a fish."""
+    cfg = PUFFER_BELLY.get(pose)
+    if cfg is None or fin is None:
+        return img
+    out = Image.fromarray(np.ascontiguousarray(img))
+    f = Image.fromarray(fin)
+    f = f.resize((round(f.width * 1.15), round(f.height * 1.15)), Image.LANCZOS).transpose(Image.FLIP_LEFT_RIGHT)
+    f = f.rotate(-22, resample=Image.BICUBIC, expand=True)
+    xa, xb = cfg["xa"], img.shape[1] - cfg["xr"]
+    out.alpha_composite(f, (int(xa + 0.6 * (xb - xa)), 56 if pose == "calm" else 88))
+    return np.asarray(out)
+
+
+def cut_fin(img):
+    m = Image.new("L", (img.shape[1], img.shape[0]), 0)
+    ImageDraw.Draw(m).polygon(FIN_POLY, fill=255)
+    box = img.copy()
+    box[:, :, 3] = np.minimum(box[:, :, 3], np.asarray(m))
+    ys, xs = np.nonzero(box[:, :, 3] > 24)
+    return box[ys.min():ys.max() + 1, xs.min():xs.max() + 1].copy()
+
+
+SEAM_KINDS = ("turtleshuttle", "pufferfishpad")     # joined with min-error seams instead of the cross fade of fit_window
+
+
 _CACHE = {}
 NO_STAR = {("A2", 2), ("A2", 3), ("A2", 4), ("A2", 5), ("C2", 5)}      # rows without a sparkle (sandcastle, clam, puffed pufferfish): their white shell / foam must not be mistaken for one
 
@@ -239,7 +546,16 @@ NO_STAR = {("A2", 2), ("A2", 3), ("A2", 4), ("A2", 5), ("C2", 5)}      # rows wi
 def sheet_rows(name):
     if name not in _CACHE:
         rgba = clean_sheet(name)
-        _CACHE[name] = [finish_row(crop_row(rgba, b), name == "A2" and i < 2, name == "C2", star=(name, i) not in NO_STAR) for i, b in enumerate(row_bands(rgba))]
+        out = []
+        for i, b in enumerate(row_bands(rgba)):
+            raw = crop_row(rgba, b)
+            if (name, i) in OUTLINE_REPAIR:
+                # the frame (crop) stays that of the first bake (generic sparkle removal), so image sizes and pivots do not change
+                frame = finish_frame(finish_row(raw.copy(), False, name == "C2"), raw)
+                out.append(bleed_colour(frame(repair_outline(raw, OUTLINE_REPAIR[(name, i)]))))
+            else:
+                out.append(finish_row(raw, name == "A2" and i < 2, name == "C2", star=(name, i) not in NO_STAR))
+        _CACHE[name] = out
     return _CACHE[name]
 
 
@@ -318,6 +634,13 @@ def emit_piece(kind, outdir, img, surf, bot, w, tag, extra):
     img = center_pad(img, bl, br)
     img = np.pad(img, ((PADPX, PADPX), (PADPX, PADPX), (0, 0)))
     img = np.ascontiguousarray(img)
+    if kind == "turtleshuttle" and w == 3:      # the repaired tail measures 2 px narrower: the canvas and pivot stay those of the shipped sprite (534 px)
+        assert not img[:, :2, 3].any() and not img[:, -2:, 3].any()
+        img = np.ascontiguousarray(img[:, 2:-2])
+    if kind == "pufferfishpad":
+        if extra.get("pose") == "calm":
+            _CACHE["fin"] = cut_fin(img)      # the calm pose is baked first
+        img = np.ascontiguousarray(side_fin(puffer_details(img, extra.get("pose")), _CACHE.get("fin"), extra.get("pose")))
     name = "reg003_%s_%sw%s.png" % (kind, tag, ("%g" % w).replace(".", "_"))
     Image.fromarray(img).save(os.path.join(outdir, name))
     m = b1.measure_piece(img, surf + PADPX, bot + PADPX)
@@ -401,7 +724,11 @@ def bake_slab_kind(kind, cfg):
             delta = int(round(w * PPU)) + margin - a.shape[1]
             lo, hi = window(kind, src, src["T"], delta)
             try:
-                img, _ = b1.fit_window(a, delta, lo, hi)
+                if kind == "turtleshuttle":
+                    img = turtle_fit(a, w)
+                    assert img.shape[1] == a.shape[1] + delta, "turtle joins of width %g do not match the row" % w
+                else:
+                    img = seam_fit(a, delta, lo, hi) if kind in SEAM_KINDS else b1.fit_window(a, delta, lo, hi)[0]
             except ValueError as e:
                 print("   (width %g from the %.2f u row: %s)" % (w, src["natural"], e))
                 continue

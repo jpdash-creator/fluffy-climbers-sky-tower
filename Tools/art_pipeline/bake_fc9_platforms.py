@@ -38,13 +38,15 @@ def P(name):
 
 # ---------------------------------------------------------------- sheet helpers
 
-def peel_ring(a, sat_max=0.30, light_min=150, iters=60, keep_glow=False):
+def peel_ring(a, sat_max=0.30, light_min=150, iters=60, keep_glow=False, keep_pink=False):
     """The sticker ring: light, nearly colourless pixels connected to the outside are made transparent, stopping at the first dark outline or saturated art."""
     a = a.copy()
     r, g, b = [a[:, :, i].astype(int) for i in range(3)]
     mx, mn = np.maximum(np.maximum(r, g), b), np.minimum(np.minimum(r, g), b)
     sat = (mx - mn) / np.maximum(mx, 1)
     light = (mn >= light_min) & (sat <= sat_max)
+    if keep_pink:
+        light &= r <= g + 8      # the pale pink fur is the art itself (red above green); the sticker ring is mint / white (Final Bugs 2: the flood ate the fur)
     ext = a[:, :, 3] <= 24
     for _ in range(iters):
         grow = ndi.binary_dilation(ext, structure=np.ones((3, 3), bool)) & light & ~ext
@@ -191,8 +193,11 @@ def bake_dragonfly():
 
 
 def bake_fog():
-    items = rows_of(P("r2_slabs_B"), [0, 1], 8, peel={"light_min": 140, "sat_max": 0.34})
+    items = rows_of(P("r2_slabs_B"), [0, 1], 8, peel={"light_min": 140, "sat_max": 0.34, "keep_pink": True})
     rows = make_rows(items, cols=((0.25, 0.75),))
+    for row, left in zip(rows, (1, 2)):      # keeps the canvas and body columns of the first bake (same image sizes and pivots)
+        row.a = np.pad(row.a, ((0, 0), (left, 0), (0, 0)))
+        row.bl, row.br = row.bl + left, row.br + left
     return _bake_plain(2, "fogpuffdrift", spread(rows, WIDTHS), WIDTHS)
 
 

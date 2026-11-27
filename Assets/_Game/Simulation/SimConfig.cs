@@ -389,10 +389,7 @@ namespace FluffyClimbers.Simulation
         public Fx PierGap8 = Fx.FromRatio(20, 10);
         public Fx PierMinWidth = Fx.FromInt(4);
 
-        /// <summary>Undertow Pad: in the column UndertowHalfWidth either side of the pad and up to UndertowHeight above it gravity is UndertowGravityPercent percent while the player moves up. The row above is at most UndertowGapMax higher; the layout reaches it with UndertowReachFactor of the normal jump speed.</summary>
-        public Fx UndertowHalfWidth = Fx.FromRatio(16, 10);
-        public Fx UndertowHeight = Fx.FromRatio(35, 10);
-        public int UndertowGravityPercent = 170;
+        /// <summary>Undertow Pad: behaves like a Normal platform (its water funnel and the slowing column were removed 2026-11-27). Only these two layout rules remain, kept so every layout stays the same: the row above is at most UndertowGapMax higher and the layout reaches it with UndertowReachFactor of the normal jump speed.</summary>
         public Fx UndertowGapMax = Fx.FromInt(3);
         public Fx UndertowReachFactor = Fx.FromRatio(8, 10);
 

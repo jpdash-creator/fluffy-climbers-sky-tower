@@ -146,6 +146,30 @@ namespace FluffyClimbers.Tests
             finally { Object.DestroyImmediate(go); }
         }
 
+        [Test]
+        public void ALockedHeroCannotBeChosenAndSaysHowToGetIt()
+        {
+            var go = new GameObject("Canvas", typeof(RectTransform));
+            try
+            {
+                var parent = (RectTransform)go.transform;
+                parent.sizeDelta = new Vector2(1080f, 1920f);
+                int use = 0;
+                const string how = "How to get: Merge 3 Common Momo";
+                var screen = new HeroSheetScreen(parent, CharacterCatalog.Momo, null, HeroSheetData.For(CharacterCatalog.Momo), false, null, null, () => use++, null, how);
+                Button b = Find(screen.Root, "UseHero");
+                Assert.IsTrue(screen.Locked);
+                Assert.IsFalse(b.interactable, "never active for a hero that is not owned (Final Bugs 2 #19)");
+                Assert.AreEqual(HeroSheetScreen.LockedLabel, b.GetComponentInChildren<Text>().text);
+                b.onClick.Invoke();   // even a forced click does nothing: no listener is attached
+                Assert.AreEqual(0, use);
+                bool shown = false;
+                foreach (Text t in screen.Root.GetComponentsInChildren<Text>(true)) if (t.name == HeroSheetScreen.HowName && t.text == how) shown = true;
+                Assert.IsTrue(shown, "the sheet says how to get the hero");
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
         // ---- docs/44 roster, run bonus ----
 
         [Test]

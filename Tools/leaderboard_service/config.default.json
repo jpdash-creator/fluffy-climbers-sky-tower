@@ -1,6 +1,6 @@
 {
   "_comment": "Defaults of the leaderboard limits. The live values are the Firestore document config/leaderboard (written by the owner, never by clients); a missing field falls back to this file, then to the code default. Entry limits are for PRIZES only.",
-  "simVersions": [4],
+  "simVersions": [4, 5],
   "maxRegion": 5,
   "overallEntryLimit": 250000,
   "levelsEntryLimit": 100000,

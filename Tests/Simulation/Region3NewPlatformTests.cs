@@ -260,55 +260,34 @@ namespace FluffyClimbers.Simulation.Tests
             Assert.True(s.Grounded && s.GroundId == 1);
         }
 
-        // ------------------------------------------------------------------ Undertow Pad
-
-        private static double ApexAbove(Sim sim, int id, int xHundredths)
-        {
-            SimState s = Stand(sim, id, xHundredths);
-            Fx y0 = s.Y;
-            sim.Step(ref s, SimInput.Jump);
-            Fx top = s.Y;
-            for (int t = 0; t < 200 && !s.Dead; t++)
-            {
-                sim.Step(ref s, 0);
-                if (s.Y > top) top = s.Y;
-                if (s.Vy < Fx.Zero) break;
-            }
-            return D(top - y0);
-        }
+        // ------------------------------------------------------------------ Undertow Pad (a plain platform with its own art; layout rules unchanged)
 
         [Fact]
-        public void TheUndertowColumnMakesTheJumpRiseOnlyAboutAThirdLessAndFallingIsNormal()
+        public void TheUndertowPadBehavesLikeAPlainPlatform()
         {
-            Sim under = World(Start(), P(1, 1, PlatformKind.UndertowPad, 500, 300, 400));
+            // owner Final Bugs 2 (2026-11-27): the funnel and its slowing column are gone. Same inputs on a pad and on a Normal platform give the same flight, tick by tick,
+            // for a standing jump, a running jump and a fall back through the space above the pad.
+            Sim pad = World(Start(), P(1, 1, PlatformKind.UndertowPad, 500, 300, 400));
             Sim plain = World(Start(), P(1, 1, PlatformKind.Normal, 500, 300, 400));
-            double apexPlain = ApexAbove(plain, 1, 500), apexUnder = ApexAbove(under, 1, 500);
-            output.WriteLine("standing jump apex plain " + apexPlain.ToString("F2") + " u, from an Undertow Pad " + apexUnder.ToString("F2") + " u");
-            Assert.InRange(apexPlain, 4.2, 4.7);
-            Assert.InRange(apexUnder, 2.3, 2.95);   // 4.5 / 1.7 = 2.65 u
-            Assert.True(apexUnder < apexPlain * 0.7);
-            // a jump at full run speed leaves the 1.6 u column after about 11 ticks and still climbs 3.2 u or more: the row above is placed at most 3.0 u higher
-            SimState s = Stand(under, 1, 500);
-            s.Vx = under.Cfg.MaxSpeed;
-            Fx y0 = s.Y, top = y0;
-            under.Step(ref s, SimInput.Jump);
-            for (int t = 0; t < 200 && !s.Dead; t++)
+            foreach (Fx vx in new[] { Fx.Zero, pad.Cfg.MaxSpeed })
             {
-                under.Step(ref s, 0);
-                if (s.Y > top) top = s.Y;
-                if (s.Vy < Fx.Zero) break;
+                SimState a = Stand(pad, 1, 500), b = Stand(plain, 1, 500);
+                a.Vx = vx; b.Vx = vx;
+                Fx y0 = a.Y, top = y0;
+                for (int t = 0; t < 200 && !b.Dead; t++)
+                {
+                    int input = t == 0 ? SimInput.Jump : 0;
+                    pad.Step(ref a, input);
+                    plain.Step(ref b, input);
+                    if (a.Y > top) top = a.Y;
+                    Assert.Equal(b.X.Raw, a.X.Raw);
+                    Assert.Equal(b.Y.Raw, a.Y.Raw);
+                    Assert.Equal(b.Vx.Raw, a.Vx.Raw);
+                    Assert.Equal(b.Vy.Raw, a.Vy.Raw);
+                    Assert.Equal(b.Grounded, a.Grounded);
+                }
+                Assert.True(D(top - y0) > 4.2, "jump from the pad climbs " + D(top - y0).ToString("F2"));
             }
-            Assert.True(D(top - y0) > 3.2, "full-speed jump from the pad climbs " + D(top - y0).ToString("F2"));
-            Assert.Equal(F(160).Raw, under.Cfg.UndertowHalfWidth.Raw);
-        }
-
-        [Fact]
-        public void AJumpOutsideTheColumnIsUnaffected()
-        {
-            // pad centre 100, hero 3 u away on a wide start platform at the same height: the column does not reach him
-            Sim under = World(Start(), P(1, 1, PlatformKind.UndertowPad, 100, 300, 400), P(2, 1, PlatformKind.Normal, 700, 300, 400));
-            double apex = ApexAbove(under, 2, 700);
-            Assert.InRange(apex, 4.2, 4.7);
         }
 
         [Fact]

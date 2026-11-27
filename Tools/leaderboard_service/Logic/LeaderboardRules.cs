@@ -19,7 +19,7 @@ namespace FluffyClimbers.LeaderboardService
     /// <summary>All limits and switches, loaded from Firestore config/leaderboard (falling back to config.default.json, then to these values). Nothing here is hardcoded in the Firestore rules.</summary>
     public sealed class Limits
     {
-        public int[] SimVersions = { 4 };   // 4 = Final Changes 5 + 6 (2026-11-25): 19 new platforms, nine special level types, Moving platform fix, Rival Race; 3 = owner Final Change 2 (2026-11-23): hero bands, per-copy powers, region penalty (2 = Final Change 1: speed steps every 30 s, bonus 0/5/10/15/25); older clients are told to update
+        public int[] SimVersions = { 4, 5 };   // 4 stays accepted for now (owner 2026-11-27: phones on v0.71.138 keep counting; drop it with the next release); 5 = Region 3 funnel removed (2026-11-27, owner Final Bugs 2: the Undertow Pad is a plain platform); 4 = Final Changes 5 + 6 (2026-11-25): 19 new platforms, nine special level types, Moving platform fix, Rival Race; 3 = owner Final Change 2 (2026-11-23): hero bands, per-copy powers, region penalty (2 = Final Change 1: speed steps every 30 s, bonus 0/5/10/15/25); older clients are told to update
         public int MaxRegion = 5;
         public long OverallEntryLimit = 250000, LevelsEntryLimit = 100000, EndlessEntryLimit = 150000;
         public int TopThreeFactorPercent = 150;

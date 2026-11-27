@@ -158,9 +158,9 @@ namespace FluffyClimbers.Gameplay
             RectTransform overlay = host.NewOverlay();
             // every row is placed from its real (text-scale aware) height, top to bottom, with 12 px gaps; the panel grows when the rows need it
             // The top band holds the "i" (left, 48 dp), the bag (middle, dropped on a short canvas) and the worth pill (right): they never overlap the name below.
-            const float W = 780f, gap = 12f, bagTop = 190f;
+            const float W = 780f, gap = 12f, bagTop = 190f, panelW = 860f, side = 56f;
             float bagSize = 150f;
-            float canvasH = Mathf.Max(1f, Screen.height) / Mathf.Sqrt(Mathf.Max(1f, Screen.width) / UiKit.Reference.x * Mathf.Max(1f, Screen.height) / UiKit.Reference.y) * Mathf.Clamp01(UiKit.SafeAreaNormalized().height);
+            float canvasH = (overlay.rect.height > 1f ? overlay.rect.height : UiKit.CanvasSizeRef().y) * Mathf.Clamp01(UiKit.SafeAreaNormalized().height);   // the real overlay, the screen size before the first layout pass
             string worthText = BundleWorth.Text(def);   // worth at the LIST price, same as the normal card: the discount shows only in the cheaper gem price
             string wasText = "Was " + BundlesScreen.Num(def.PriceGems) + " gems. Ends in:";
             float bandH = Mathf.Max(bagSize, UiKit.MinTouchPx, BundlesScreen.WorthTextH(50f));
@@ -168,7 +168,8 @@ namespace FluffyClimbers.Gameplay
             float chipY = nameY + nameH + gap, chipH = BundlesScreen.ChipBlockHeight(BundlesScreen.ChipRows(def));   // the chips include the hero card icon with its "?"
             float wasY = chipY + chipH + gap, wasH = BundlesScreen.TextHeight(wasText, 44f, W);
             float leftY = wasY + wasH + 4f, leftH = BundlesScreen.TextHeight("00:00", 64f, W);
-            float panelH = Mathf.Max(1400f, leftY + leftH + 412f);
+            // as tall as its content (a fixed minimum left a large empty area above the buttons, Final Bugs 2 #31)
+            float panelH = leftY + leftH + 412f;
             if (panelH > canvasH * 0.96f)
             {
                 // a short canvas (3:4) at large text: the decorative bag goes and the band shrinks to the 48 dp "i" row, everything below moves up so the panel still fits
@@ -177,8 +178,9 @@ namespace FluffyClimbers.Gameplay
                 bagSize = 0f; nameY -= up; chipY -= up; wasY -= up; leftY -= up; panelH -= up;
             }
             // 412 = the two buttons below (Buy up from 230, Hide offer up from 60) and a gap
-            RectTransform panel = UiKit.BuildPopupFrame(overlay, ProgressService.BundleTimerPercentOff + "% OFF!", art, new Vector2(860f, panelH), host.CloseOverlay);
+            RectTransform panel = UiKit.BuildPopupFrame(overlay, ProgressService.BundleTimerPercentOff + "% OFF!", art, new Vector2(panelW, panelH), host.CloseOverlay);
 
+            int middleStart = panel.childCount;   // everything added from here to the buttons scrolls when the screen is too short
             if (bagSize > 0f)
             {
                 Image bag = UiKit.AddImage(panel, "Bag", BundlesScreen.BagIcon(art), Color.white);
@@ -187,9 +189,9 @@ namespace FluffyClimbers.Gameplay
             }
 
             // the same "i" as on the Bundles page (top left) and the worth pill (top right)
-            BundlesScreen.AddInfoButton(panel, "BundleInfo", new Vector2(0f, 1f), new Vector2(40f, -bagTop),
+            BundlesScreen.AddInfoButton(panel, "BundleInfo", new Vector2(0f, 1f), new Vector2(side, -bagTop),
                 "About " + def.Name + ": what is inside, the hero chance and the worth", () => BundlesScreen.ShowInfo(host, progress, art, def, price, OpenOffer));
-            BundlesScreen.AddWorthText(panel, worthText, new Vector2(1f, 1f), new Vector2(-40f, -bagTop), 330f, 50f);   // italic "Worth x2.1" in the font of the 50 px name
+            BundlesScreen.AddWorthText(panel, worthText, new Vector2(1f, 1f), new Vector2(-side, -bagTop), 300f, 50f);   // italic "Worth x2.1" in the font of the 50 px name
 
             Text name = UiKit.AddText(panel, "Name", def.Name, 50, UiKit.PanelInk, TextAnchor.MiddleCenter, true);
             UiKit.OnPanel(name);
@@ -199,7 +201,7 @@ namespace FluffyClimbers.Gameplay
             name.resizeTextMaxSize = name.fontSize;
             BundlesScreen.PlaceTop((RectTransform)name.transform, nameY, W, nameH);
 
-            BundlesScreen.AddChips(panel, def, art, 40f, chipY);
+            BundlesScreen.AddChipsCentered(panel, def, art, panelW, chipY, true);   // the chip rows sit in the middle, not against the left edge
 
             Text was = UiKit.AddText(panel, "Was", wasText, 44, UiKit.PanelInk, TextAnchor.MiddleCenter);
             UiKit.OnPanel(was);
@@ -210,6 +212,7 @@ namespace FluffyClimbers.Gameplay
             UiKit.OnPanel(popupTime);
             BundlesScreen.PlaceTop((RectTransform)popupTime.transform, leftY, W, leftH);
 
+            ToyKit.ScrollPopupMiddle(overlay, panel, middleStart, bagTop - 6f, 372f);   // 372: clear of the Buy button (230 up from the bottom, 130 tall)
             ToyKit.PopupAction(panel, "Buy for " + BundlesScreen.Num(price) + " gems", ToyKit.Button(1), Color.white, 230f, Buy);
             ToyKit.PopupAction(panel, "Hide offer", ToyKit.Button(0), Color.white, 60f, HideOffer);
         }

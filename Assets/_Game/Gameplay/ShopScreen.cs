@@ -60,7 +60,7 @@ namespace FluffyClimbers.Gameplay
         const float CardGap = 14f, ColGap = 16f, ButtonH = 126f;
         // Power-up card (gold like the coin and gem cards): a face with the (i), the icon, the name and the count, then a dark strip with the two price buttons.
         const float PowerStripH = 20f + ButtonH + 12f;   // one coin button (power-ups are coins only, owner Bug List Shop 2a)
-        static float PowerFaceH { get { return 262f + (Mathf.Max(1f, UiKit.TextScale) - 1f) * 200f; } }
+        static float PowerFaceH { get { return 300f + (Mathf.Max(1f, UiKit.TextScale) - 1f) * 260f; } }
         static float PowerCardH { get { return PowerFaceH + PowerStripH; } }
 
         static readonly Color PromoPriceColor = new Color(0.02f, 0.30f, 0.15f, 1f);          // deep green on the gold card (about 6:1)
@@ -261,8 +261,8 @@ namespace FluffyClimbers.Gameplay
             RectTransform crt = ShopChrome.Card(list, "Panel", ShopChrome.FrameColor.Gold);
             Transform card = crt;
             PlaceCell(crt, y, col, cols, PowerCardH, offsetCols);
-            float k = Mathf.Max(1f, UiKit.TextScale) - 1f;
-            float nameH = 60f + k * 100f;
+            float lineH = RewardsScreen.LineH(36);
+            float nameH = 2f * lineH;   // room for two lines: "Wide Platforms" wraps at its space instead of running past the card (Final Bugs 2 #34)
 
             Image strip = ToyKit.Sliced(card, "Fill", Theme.RoundSprite, 26f);
             strip.color = new Color(0.66f, 0.36f, 0.08f, 1f);
@@ -279,7 +279,7 @@ namespace FluffyClimbers.Gameplay
             AddInfoButton(card, def.Name, def.Description + "\nYou can own and use as many as you like.");
             Text name = UiKit.AddText(card, "Name", def.Name, 36, Theme.Ink, TextAnchor.MiddleCenter, true);
             DropOutline(name);
-            name.horizontalOverflow = HorizontalWrapMode.Overflow;
+            name.horizontalOverflow = HorizontalWrapMode.Wrap;
             name.rectTransform.anchorMin = new Vector2(0f, 1f);
             name.rectTransform.anchorMax = new Vector2(1f, 1f);
             name.rectTransform.pivot = new Vector2(0.5f, 1f);
@@ -293,7 +293,7 @@ namespace FluffyClimbers.Gameplay
             own.rectTransform.anchorMin = new Vector2(0f, 1f);
             own.rectTransform.anchorMax = new Vector2(1f, 1f);
             own.rectTransform.pivot = new Vector2(0.5f, 1f);
-            own.rectTransform.offsetMin = new Vector2(6f, -(130f + nameH * 2f));
+            own.rectTransform.offsetMin = new Vector2(6f, -(130f + nameH + lineH));
             own.rectTransform.offsetMax = new Vector2(-6f, -(130f + nameH));
 
             // Coins only (no gem button). Too few coins: the button is dimmed; a tap still explains it and offers the coin packs.
@@ -492,11 +492,14 @@ namespace FluffyClimbers.Gameplay
         }
 
         /// <summary>The real-money price text of a gem pack ("$0.79"; list price, or the promo price while the promo is on).</summary>
-        public string PriceText(GemPackDef pack)
+        public string PriceText(GemPackDef pack) { return GemPackPriceText(pack, progress.LaunchPromoActive); }
+
+        /// <summary>The one price text of a gem pack, wherever it is offered (shop cards, the "Need more gems" pop-ups): the store's local price once loaded, else the list price in dollars.</summary>
+        public static string GemPackPriceText(GemPackDef pack, bool promo)
         {
             ProductDef def = pack != null ? ProductCatalog.ForGemPack(pack.Gems) : null;
             string store = def != null ? StoreLink.StorePrice(def.Id) : null;   // the store localised price once it is loaded (release builds)
-            return store ?? ShopChrome.PriceText(ShopCatalog.GemPackUsd(pack, progress.LaunchPromoActive));
+            return store ?? ShopChrome.PriceText(ShopCatalog.GemPackUsd(pack, promo));
         }
 
         void BuildGemCard(RectTransform list, float y, int col, int cols, int index, GemPackDef pack, float tier)

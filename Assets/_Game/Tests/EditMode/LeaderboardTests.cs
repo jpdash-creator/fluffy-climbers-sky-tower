@@ -297,6 +297,21 @@ namespace FluffyClimbers.Tests
         }
 
         [Test]
+        public void ARefusedRunLeavesAShortReasonUntilItNoLongerApplies()
+        {
+            GoLive();
+            Assert.AreEqual("", LeaderboardHub.RefusalText);
+            net.Handler = (m, u, b) => Json("{\"error\":\"mismatch\"}", 422);
+            LeaderboardHub.Submit(Run("lvl_001_01", 500));
+            Assert.AreEqual(LeaderboardRetryPolicy.NotVerifiedText, LeaderboardHub.RefusalText);
+            net.Handler = (m, u, b) => Json("{\"error\":\"unsupported_version\"}", 426);
+            LeaderboardHub.Submit(Run("lvl_001_02", 500));
+            Assert.AreEqual(LeaderboardRetryPolicy.OldAppText, LeaderboardHub.RefusalText);
+            now = now.AddDays(7);
+            Assert.AreEqual("", LeaderboardHub.RefusalText, "the note belongs to its week");
+        }
+
+        [Test]
         public void ARunIsDroppedAfterTwelveFailuresAndWhenItsTicketExpired()
         {
             GoLive();

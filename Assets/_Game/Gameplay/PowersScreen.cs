@@ -73,8 +73,8 @@ namespace FluffyClimbers.Gameplay
             return rt;
         }
 
-        /// <summary>Height of one card at the current text size: icon, a one-line name pill, and the row of the owned number (bottom right).</summary>
-        public static float CardHeight { get { return InnerInset + Pad + IconS + RowGap + PillH + RowGap + PillH + Pad; } }
+        /// <summary>Height of one card at the current text size: icon, a name pill of up to two lines, and the row of the owned number (bottom right).</summary>
+        public static float CardHeight { get { return InnerInset + Pad + IconS + RowGap + NamePillH + RowGap + PillH + Pad; } }
 
         /// <summary>Top plus bottom inset of the card fill inside its rarity frame (RarityUi.Box: 8 px each); the content lives inside the fill, so the card grows by it.</summary>
         const float InnerInset = 16f;
@@ -82,8 +82,11 @@ namespace FluffyClimbers.Gameplay
         /// <summary>The ONE gap between icon and name and between name and number (Bug List Heroes 3c).</summary>
         public const float RowGap = 12f;
 
-        /// <summary>Height of the name pill and of the number badge (the same, one line of text plus 4 px above and below).</summary>
+        /// <summary>Height of the number badge (one line of text plus 4 px above and below).</summary>
         public static float PillH { get { return Line(BodyFont) + 8f; } }
+
+        /// <summary>Height of the name pill: two lines, so a long name ("Wide Platforms") wraps at its space instead of running past the tile (Final Bugs 2 #34).</summary>
+        public static float NamePillH { get { return 2f * Line(BodyFont) + 8f; } }
 
         
 
@@ -186,7 +189,7 @@ namespace FluffyClimbers.Gameplay
             Image icon = PowerUpUi.AddIcon(inner, "Icon", def.Type, new Vector2(0.5f, 1f), new Vector2(0f, -Pad), IconS, false);
             icon.raycastTarget = false;
 
-            // name pill: white on dark, one line
+            // name pill: white on dark, one or two lines
             Image pill = UiKit.AddPanel(inner, "NamePill", PillInk);
             pill.raycastTarget = false;
             RectTransform pr = pill.rectTransform;
@@ -194,9 +197,9 @@ namespace FluffyClimbers.Gameplay
             pr.anchorMax = new Vector2(0.97f, 1f);
             pr.pivot = new Vector2(0.5f, 1f);
             pr.anchoredPosition = new Vector2(0f, -(Pad + IconS + RowGap));
-            pr.sizeDelta = new Vector2(0f, PillH);
+            pr.sizeDelta = new Vector2(0f, NamePillH);
             Text name = UiKit.AddText(pill.transform, "PowerName", def.Name, BodyFont, Color.white, TextAnchor.MiddleCenter, true);
-            name.horizontalOverflow = HorizontalWrapMode.Overflow;
+            name.horizontalOverflow = HorizontalWrapMode.Wrap;   // breaks at spaces only: every word of a power name fits a tile on its own
             Outline no = name.GetComponent<Outline>();
             if (no != null) no.enabled = false;
             UiKit.Stretch(name.rectTransform);

@@ -150,6 +150,29 @@ def commons_candidates():
     return [(l, s, c) for (l, s, c) in cand_range(ANCHOR[:3], 0)]
 
 
+def refresh_numbers(tab):
+    """Rewrites only the recorded gate numbers (fi15, mean75, maxdev) of the active rows and variants from the measured table, after a re-measurement. No row, status or order changes."""
+    for name in ("heroes.csv", "variants.csv"):
+        path = os.path.join(GEN, name)
+        data = list(csv.DictReader(open(path, newline="")))
+        for r in data:
+            line = r["id"].split("_")[0]
+            if line not in LINES or r["id"] == "momo":
+                continue
+            tier = SUFFIX.index(r["id"][len(line):])
+            key = key_of(*(int(r[c]) for c in ("launchTenths", "speed", "control", "wall")))
+            if not tab.full(key):
+                sys.exit("not measured on every level: %s %s" % (r["id"], key))
+            mean, f15, fl = tab.stats(key)
+            lo, hi = (1.0, 1.0) if tier == 0 else (WIN_MIN[tier] - TOL, WIN_MAX[tier] + TOL)
+            dev = max([0.0] + [lo - v for v in fl if v < lo] + [v - hi for v in fl if v > hi])
+            r["fi15"], r["mean75"], r["maxdev"] = "%.3f" % f15, "%.3f" % mean, "%.3f" % dev
+        with open(path, "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(data[0].keys()), lineterminator=NL)
+            w.writeheader()
+            w.writerows(data)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--keys-stage1", action="store_true")
@@ -158,6 +181,7 @@ def main():
     ap.add_argument("--sample-only", action="store_true")
     ap.add_argument("--select", action="store_true")
     ap.add_argument("--verify", action="store_true")
+    ap.add_argument("--refresh-numbers", action="store_true", help="rewrite only fi15 / mean75 / maxdev of the active csv rows from the table")
     ap.add_argument("--apply", action="store_true", help="copy heroes_new.csv / variants_new.csv over the active lines of heroes.csv and over variants.csv (only when no row is PENDING or FAIL)")
     ap.add_argument("--csv", default=CELLS)
     a = ap.parse_args()
@@ -183,6 +207,9 @@ def main():
         print("applied: %d active rows, %d other rows kept" % (len(new_h), len(keep)))
         return
     tab = Table(a.csv, ANCHOR)
+    if a.refresh_numbers:
+        refresh_numbers(tab)
+        return
 
     def common_ok(l, s, c):
         r = gate(tab, key_of(l, s, c, 80), 0)

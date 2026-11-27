@@ -97,7 +97,7 @@ namespace FluffyClimbers.Simulation
         MoonJellyChain = 50,
         /// <summary>Splitting Pier (demanding, opening gap): on a 240-tick cycle (Platform.Phase offsets it) the pier splits in the middle: closed, opens over PierOpenTicks to a gap of PierGap(width), holds, closes. Over the gap the player falls (never lethal: the row below catches him).</summary>
         SplittingPier = 51,
-        /// <summary>Undertow Pad (hazard type, air zone): in the column UndertowHalfWidth either side of it and up to UndertowHeight above it gravity is UndertowGravityPercent percent while the player moves UP; the row above sits at most UndertowGapMax higher. Never kills.</summary>
+        /// <summary>Undertow Pad: a plain platform with its own painted pad art; it behaves like Normal (no air zone since 2026-11-27, owner Final Bugs 2). It stays in the hazard-type class for the layout rules only (shares, spacing, not in level 1), and the row above sits at most UndertowGapMax higher.</summary>
         UndertowPad = 52,
         /// <summary>Sea Foam Pad (hazard type, fading friction): standing on it the friction and the steering fade from normal to the Slippery values over FoamFadeTicks after the landing; every landing starts full again. At full slip a player slides off the edge if he does not jump. Never kills.</summary>
         SeaFoamPad = 53,

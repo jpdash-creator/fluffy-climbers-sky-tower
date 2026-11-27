@@ -171,6 +171,54 @@ namespace FluffyClimbers.Tests
             StringAssert.Contains("connection", text);
         }
 
+        /// <summary>The stub account with an upload that stays open until the test ends it.</summary>
+        sealed class SlowAccount : IAccountService
+        {
+            readonly StubAccountService inner;
+            public System.Action<bool> Pending;
+            public bool Slow;
+            public int Uploads;
+            public SlowAccount(StubAccountService s) { inner = s; }
+            public bool IsAvailable { get { return inner.IsAvailable; } }
+            public bool IsSignedIn { get { return inner.IsSignedIn; } }
+            public string DisplayName { get { return inner.DisplayName; } }
+            public string PlayerId { get { return inner.PlayerId; } }
+            public bool LastLoadFailed { get { return inner.LastLoadFailed; } }
+            public void SignIn(System.Action<SignInResult> done) { inner.SignIn(done); }
+            public void SilentSignIn(System.Action<SignInResult> done) { inner.SilentSignIn(done); }
+            public void SignOut() { inner.SignOut(); }
+            public void LoadCloudSave(System.Action<byte[]> done) { inner.LoadCloudSave(done); }
+            public void SaveCloud(byte[] data, System.Action<bool> done)
+            {
+                Uploads++;
+                if (Slow) { Pending = done; return; }
+                inner.SaveCloud(data, done);
+            }
+        }
+
+        [Test]
+        public void SyncNowDuringARunningUploadWaitsForARealResult()
+        {
+            var slow = new SlowAccount(stub);
+            Services.Account = slow;
+            ProgressService p = NewHooked();
+            AccountSync.SignInAndLink((o, m) => { });
+            AccountSync.TickForTests();
+            slow.Slow = true;
+            p.AddCoins(5);
+            AccountSync.SyncNow((o, t) => { });          // this one's upload stays open
+            int answers = 0; bool ok = false;
+            AccountSync.SyncNow((o, t) => { answers++; ok = o; });
+            Assert.AreEqual(0, answers, "no early \"synced\" while an upload is still running");
+            int before = slow.Uploads;
+            slow.Slow = false;
+            slow.Pending(true);
+            AccountSync.TickForTests();
+            Assert.AreEqual(1, answers);
+            Assert.IsTrue(ok);
+            Assert.AreEqual(before + 1, slow.Uploads, "the waiting request uploads again");
+        }
+
         // ---- Settings > Save Progress (Bug List 1 B2.a) ----
 
         /// <summary>A save store that counts how often the save was written.</summary>
@@ -192,8 +240,7 @@ namespace FluffyClimbers.Tests
             bool ok = false; string text = null;
             AccountPopup.SaveProgress(p, (o, t) => { ok = o; text = t; });
             Assert.IsTrue(ok);
-            Assert.AreEqual("Saved on this phone", text);
-            Assert.AreEqual(AccountPopup.SavedLocalText, text);
+            Assert.AreEqual("Saved", text);
             Assert.AreEqual(before + 1, counting.Saves, "the save is written now");
             SaveEnvelope cloud = null;
             stub.LoadCloudSave(b => cloud = SaveSync.TryDeserialize(b));
@@ -213,7 +260,7 @@ namespace FluffyClimbers.Tests
             bool ok = false; string text = null;
             AccountPopup.SaveProgress(p, (o, t) => { ok = o; text = t; });
             Assert.IsTrue(ok);
-            Assert.AreEqual("Saved to Google", text);
+            Assert.AreEqual("Saved", text);
             Assert.Greater(counting.Saves, before, "the phone copy is written too");
             SaveEnvelope cloud = null;
             stub.LoadCloudSave(b => cloud = SaveSync.TryDeserialize(b));
@@ -235,24 +282,24 @@ namespace FluffyClimbers.Tests
             bool ok = true; string text = null;
             AccountPopup.SaveProgress(p, (o, t) => { ok = o; text = t; });
             Assert.IsFalse(ok);
-            Assert.AreEqual(AccountPopup.SavedLocalOnlyText, text);
+            Assert.AreEqual("Save failed", text);
             Assert.Greater(counting.Saves, before);
         }
 
         [Test]
-        public void SaveProgressWithoutProgressSaysNothingToSave()
+        public void SaveProgressWithoutProgressSaysSaveFailed()
         {
             bool ok = true; string text = null;
             AccountPopup.SaveProgress(null, (o, t) => { ok = o; text = t; });
             Assert.IsFalse(ok);
-            Assert.AreEqual(AccountPopup.NothingToSaveText, text);
+            Assert.AreEqual(AccountPopup.SaveFailedText, text);
         }
 
         [Test]
-        public void SaveResultTextsAreShortSoTheyFitOneLineOnTheButton()
+        public void SaveResultTextsAreOnlySavedOrSaveFailed()
         {
-            foreach (string s in new[] { AccountPopup.SavedLocalText, AccountPopup.SavedGoogleText, AccountPopup.SavedLocalOnlyText, AccountPopup.NothingToSaveText })
-                Assert.LessOrEqual(s.Length, 24, s);
+            Assert.AreEqual("Saved", AccountPopup.SavedText);
+            Assert.AreEqual("Save failed", AccountPopup.SaveFailedText);
             Assert.AreEqual("Save Progress", AccountPopup.SaveLabel);
         }
 

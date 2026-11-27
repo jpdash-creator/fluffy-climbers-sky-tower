@@ -27,7 +27,7 @@ namespace FluffyClimbers.Economy
     /// <summary>
     /// Final Bugs 1 item 12 (owner decision): Settings > Save Progress writes the whole save to Google Play Games AND a full backup copy to the player's Firebase (Firestore, document keyed by the Firebase uid, written
     /// through our own service because the game has no Firestore SDK). Restore tries Play Games first and falls back to the Firebase copy when Play Games has no usable save or cannot be read. This file is the PURE
-    /// part (packing, checksums, classification, the fallback decision, the toast texts); the transport is <c>FluffyClimbers.Leaderboard.SaveBackup</c>. See docs/35 section 12.
+    /// part (packing, checksums, classification, the fallback decision, the button texts); the transport is <c>FluffyClimbers.Leaderboard.SaveBackup</c>. See docs/35 section 12.
     /// </summary>
     public static class SaveBackupRules
     {
@@ -40,12 +40,9 @@ namespace FluffyClimbers.Economy
         /// <summary>Seconds between two AUTOMATIC backup copies (the explicit button always writes; the service also limits to one per 5 s).</summary>
         public const double AutoIntervalSeconds = 300.0;
 
-        public const string SavedOnPhoneText = "Saved on this phone";
-        public const string SavedGoogleOnlyText = "Saved to Google";
-        public const string SavedPhoneOnlyText = "Saved on phone only";
-        public const string BothOkText = "Google ok, Firebase ok";
-        public const string GoogleOkFirebaseFailedText = "Google ok, Firebase failed";
-        public const string GoogleFailedFirebaseOkText = "Google failed, Firebase ok";
+        /// <summary>The only two texts the Save Progress button shows (owner Final Bugs 2 item 1): no service names reach the player; the per-target detail is logged.</summary>
+        public const string SavedText = "Saved";
+        public const string SaveFailedText = "Save failed";
 
         // ---- pack / unpack ----
 
@@ -182,15 +179,14 @@ namespace FluffyClimbers.Economy
 
         // ---- texts ----
 
-        /// <summary>The Save Progress toast for the two targets (each text fits one line at 130 percent text). A guest (both skipped) saves on the phone only.</summary>
+        /// <summary>
+        /// The Save Progress button text, after the phone save worked: "Saved" for a guest (both targets skipped: nothing else is needed) or when at least one cloud copy is ok, else "Save failed"
+        /// (a skipped target stored nothing, so it never counts as a copy). A Google player's Google target is never skipped.
+        /// </summary>
         public static string ResultText(SaveTargetResult google, SaveTargetResult firebase)
         {
-            if (google == SaveTargetResult.Skipped && firebase == SaveTargetResult.Skipped) return SavedOnPhoneText;
-            if (firebase == SaveTargetResult.Skipped) return google == SaveTargetResult.Ok ? SavedGoogleOnlyText : SavedPhoneOnlyText;
-            if (google == SaveTargetResult.Ok && firebase == SaveTargetResult.Ok) return BothOkText;
-            if (google == SaveTargetResult.Ok) return GoogleOkFirebaseFailedText;
-            if (firebase == SaveTargetResult.Ok) return GoogleFailedFirebaseOkText;
-            return SavedPhoneOnlyText;
+            bool guest = google == SaveTargetResult.Skipped && firebase == SaveTargetResult.Skipped;
+            return guest || AnyOk(google, firebase) ? SavedText : SaveFailedText;
         }
 
         /// <summary>The save counts as stored somewhere beyond the phone when at least one target is ok.</summary>
