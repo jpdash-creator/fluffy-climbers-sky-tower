@@ -66,3 +66,6 @@ Owner Final Bugs 2 (2026-11-27): the Undertow Pad is a plain platform (no water 
 
 ## Deployed 2026-11-27 (owner approved in chat): rules 4 and 5
 Revision `fluffy-leaderboard-00011-kx6`, 100 percent traffic (previous: `00010-qbg`). Working tree of Final Bugs 2 (not yet committed), content hash e8cda644..., 113 service tests passed. `simVersions` [4, 5]: phones on v0.71.138 keep counting (no APK was built; drop 4 with the next release). A v0.71.138 Region 3 run that used the old funnel, or level 3-13, may be refused as a mismatch.
+
+## Deployed 2026-11-27 (owner approved, Final Bugs 2 fixes): commit 7a6413a
+Revision `fluffy-leaderboard-00012-d4m`, 100 percent traffic (previous: `00011-kx6`). Content hash 650ca4fb... (lvl_001_15 new seed), `simVersions` [4, 5] kept, `/healthz/` ok. v0.71.138 runs on lvl_001_15 or the changed Region 3 physics may be refused as a mismatch.
