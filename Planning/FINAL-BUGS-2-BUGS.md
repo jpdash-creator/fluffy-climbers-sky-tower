@@ -130,3 +130,4 @@ Phone frame rate, heat, real vibration and audio, real touchscreen feel, real Ad
 - Revives: gem revives stay unlimited; correct CLAUDE.md.
 - After fixing: test on the computer, commit and push, build APK, redeploy the leaderboard service, clean install on the phone.
 - 2026-11-27 follow-up for #46 (stats retune not possible): give lvl_001_15 a new seed; no hero changes.
+- 2026-11-27 follow-up for #3: the owner preferred the old mirrored background in gameplay; the upright blended repeat was rolled back (the Candy Canyon dim #35 stays).

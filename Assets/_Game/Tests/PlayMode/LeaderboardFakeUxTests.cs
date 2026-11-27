@@ -86,9 +86,10 @@ namespace FluffyClimbers.Tests
                 // the avatar circle never touches the medal / rank number or the name box
                 Rect av = LbWorld((RectTransform)row.Find("Avatar")), nm = LbWorld((RectTransform)row.Find("NameText")), cr = LbWorld((RectTransform)row.Find("CrownsText")), ic = LbWorld((RectTransform)row.Find("CrownIcon"));
                 Assert.LessOrEqual(av.xMax, nm.xMin + 0.5f, who + ": avatar and name do not overlap");
-                // side by side, or (a long name) the name over the whole width with the crowns on the line under it: either way the boxes never overlap
-                Assert.IsTrue(nm.xMax <= ic.xMin + 0.5f || ic.yMax <= nm.yMin + 0.5f, who + ": name and crown icon do not overlap");
-                Assert.IsTrue(nm.xMax <= cr.xMin + 0.5f || cr.yMax <= nm.yMin + 0.5f, who + ": name and amount do not overlap");
+                // owner 2026-11-27: the name on top, the crown icon right below it and the amount next to the icon
+                Assert.LessOrEqual(ic.yMax, nm.yMin + 0.5f, who + ": the crown icon is under the name");
+                Assert.LessOrEqual(cr.yMax, nm.yMin + 0.5f, who + ": the amount is under the name");
+                Assert.AreEqual(nm.xMin, ic.xMin, 0.5f, who + ": the crown icon starts where the name starts");
                 Assert.LessOrEqual(ic.xMax, cr.xMin + 0.5f, who + ": icon and amount do not overlap");
                 Text crowns = row.Find("CrownsText").GetComponent<Text>();
                 Assert.AreNotSame(UiKit.DisplayFont, crowns.font, who + ": the amount uses the regular body face, not the heavy display face");

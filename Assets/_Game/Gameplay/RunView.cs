@@ -13,10 +13,10 @@ namespace FluffyClimbers.Gameplay
     {
         sealed class Layer
         {
-            public Transform[] Tiles;                 // one root per repeat, positioned by its BOTTOM edge
-            public SpriteRenderer[][] Renderers;      // what each repeat draws (for the debug hooks)
+            public SpriteRenderer[] Tiles;
             public float Factor;
-            public float Pitch;                       // distance between two repeats, world units (the picture height less the blended join)
+            public float Height;
+            public float Scale;
         }
 
         sealed class Pop
@@ -192,15 +192,15 @@ namespace FluffyClimbers.Gameplay
         /// <summary>Debug/test hook: hides the parallax layers so the gameplay objects can be inspected on their own.</summary>
         public void SetBackgroundVisible(bool visible)
         {
-            SetBackgroundLayerCount(visible ? layers.Count : 0);
+            for (int i = 0; i < layers.Count; i++)
+                for (int k = 0; k < layers[i].Tiles.Length; k++) layers[i].Tiles[k].enabled = visible;
         }
 
         /// <summary>Debug/test hook: shows only the first n parallax layers (0 = none).</summary>
         public void SetBackgroundLayerCount(int n)
         {
             for (int i = 0; i < layers.Count; i++)
-                foreach (SpriteRenderer[] tile in layers[i].Renderers)
-                    foreach (SpriteRenderer sr in tile) sr.enabled = i < n;
+                for (int k = 0; k < layers[i].Tiles.Length; k++) layers[i].Tiles[k].enabled = i < n;
         }
 
         public string DebugPlayer()
@@ -303,14 +303,6 @@ namespace FluffyClimbers.Gameplay
         }
 
         // ---------------- background ----------------
-        // Final Bugs 2 #3: the painted picture repeats UPRIGHT (it used to be mirrored every other time: upside-down pagodas, seas and flowers) and each repeat blends softly
-        // into the one below over BackgroundBlendShare of its height. The blend is the same picture cut into thin strips with rising opacity, drawn over the top of the repeat
-        // below: no new art, no texture work, one uniform scale (CUX-9).
-
-        /// <summary>Share of the picture height that two neighbouring repeats overlap in, and the number of opacity steps of the blend.</summary>
-        public const float BackgroundBlendShare = 0.14f;
-        public const int BackgroundBlendSteps = 24;
-
         /// <summary>Tint of the far background. Region 4 (Candy Canyon) is dimmed so its pale hero and platforms stand out (Final Bugs 2 #35).</summary>
         public static Color BackgroundTintFor(int regionIndex)
         {
@@ -321,29 +313,6 @@ namespace FluffyClimbers.Gameplay
         public static Color VeilColorFor(int regionIndex)
         {
             return regionIndex == 4 ? new Color(0.13f, 0.15f, 0.22f, 0.55f) : new Color(0.08f, 0.2f, 0.42f, 0.42f);
-        }
-
-        static readonly Dictionary<Sprite, Sprite[]> blendSlices = new Dictionary<Sprite, Sprite[]>();
-
-        /// <summary>[0] = the body above the blend band, [1..steps] = the band's strips from the bottom up. Pivot bottom centre of the WHOLE picture. Cached per picture.</summary>
-        static Sprite[] SlicesOf(Sprite picture)
-        {
-            Sprite[] cached;
-            if (blendSlices.TryGetValue(picture, out cached) && cached != null && cached[0] != null) return cached;
-            Rect r = picture.textureRect;
-            int band = Mathf.Max(BackgroundBlendSteps, Mathf.RoundToInt(r.height * BackgroundBlendShare));
-            var slices = new Sprite[BackgroundBlendSteps + 1];
-            for (int i = 0; i <= BackgroundBlendSteps; i++)
-            {
-                int from = i == 0 ? band : (int)((long)band * (i - 1) / BackgroundBlendSteps);
-                int to = i == 0 ? (int)r.height : (int)((long)band * i / BackgroundBlendSteps);
-                var part = new Rect(r.x, r.y + from, r.width, to - from);
-                var pivot = new Vector2(0.5f, -(float)from / (to - from));   // every slice shares the picture's bottom centre as its origin
-                slices[i] = Sprite.Create(picture.texture, part, pivot, picture.pixelsPerUnit, 0, SpriteMeshType.FullRect);
-                slices[i].name = picture.name + (i == 0 ? "_body" : "_blend" + i);
-            }
-            blendSlices[picture] = slices;
-            return slices;
         }
 
         void BuildBackground(float screenW)
@@ -357,26 +326,14 @@ namespace FluffyClimbers.Gameplay
                 if (sprites[i] == null || alpha[i] <= 0f) continue;   // owner issue 14: calm background, no ghost layers behind the platforms
                 Vector2 size = sprites[i].bounds.size;
                 float scale = Mathf.Max(screenW * 1.1f / size.x, designHalfH * 2f * 1.05f / size.y);
-                Sprite[] slices = SlicesOf(sprites[i]);
-                float blend = slices[0].rect.height > 0f ? sprites[i].textureRect.height - slices[0].rect.height : 0f;
-                var layer = new Layer { Factor = factor[i], Pitch = (sprites[i].textureRect.height - blend) / sprites[i].pixelsPerUnit * scale, Tiles = new Transform[3], Renderers = new SpriteRenderer[3][] };
+                var layer = new Layer { Factor = factor[i], Height = size.y * scale, Scale = scale, Tiles = new SpriteRenderer[3] };
                 Color tint = i == 0 ? BackgroundTintFor(regionIndex) : new Color(1f, 1f, 1f, alpha[i]);
                 for (int k = 0; k < 3; k++)
                 {
-                    var root = new GameObject("bg" + i + "_" + k).transform;
-                    root.SetParent(worldRoot, false);
-                    root.localScale = new Vector3(scale, scale, 1f);
-                    var parts = new SpriteRenderer[slices.Length];
-                    for (int n = 0; n < slices.Length; n++)
-                    {
-                        var sr = NewSprite(n == 0 ? "body" : "blend" + n, slices[n], -100 + i * 10 + (n == 0 ? 0 : 1), root);   // the strips lie over the body of the repeat below
-                        Color c = tint;
-                        if (n > 0) c.a *= (n - 0.5f) / BackgroundBlendSteps;
-                        sr.color = c;
-                        parts[n] = sr;
-                    }
-                    layer.Tiles[k] = root;
-                    layer.Renderers[k] = parts;
+                    var sr = NewSprite("bg" + i + "_" + k, sprites[i], -100 + i * 10);
+                    sr.transform.localScale = new Vector3(scale, scale, 1f);
+                    sr.color = tint;
+                    layer.Tiles[k] = sr;
                 }
                 layers.Add(layer);
             }
@@ -385,17 +342,13 @@ namespace FluffyClimbers.Gameplay
             if (white != null && sprites[0] != null)
             {
                 float vs = designHalfH * 2f * 1.7f / Mathf.Max(0.01f, white.bounds.size.y);
-                var veil = new Layer { Factor = 0f, Pitch = white.bounds.size.y * vs, Tiles = new Transform[3], Renderers = new SpriteRenderer[3][] };
+                var veil = new Layer { Factor = 0f, Height = white.bounds.size.y * vs, Scale = vs, Tiles = new SpriteRenderer[3] };
                 for (int k = 0; k < 3; k++)
                 {
-                    var root = new GameObject("veil" + k).transform;
-                    root.SetParent(worldRoot, false);
-                    root.localScale = new Vector3(vs, vs, 1f);
-                    var sr = NewSprite("fill", white, -75, root);
-                    sr.transform.localPosition = new Vector3(0f, white.bounds.size.y * 0.5f, 0f);   // the white square is centred: lift it so the root is its bottom edge
+                    var sr = NewSprite("veil" + k, white, -75);
+                    sr.transform.localScale = new Vector3(vs, vs, 1f);
                     sr.color = VeilColorFor(regionIndex);
-                    veil.Tiles[k] = root;
-                    veil.Renderers[k] = new[] { sr };
+                    veil.Tiles[k] = sr;
                 }
                 layers.Add(veil);
             }
@@ -1758,10 +1711,17 @@ namespace FluffyClimbers.Gameplay
             {
                 Layer l = layers[i];
                 double scrolled = reduced ? 0.0 : absCam * l.Factor;
-                float offset = (float)(scrolled - System.Math.Floor(scrolled / l.Pitch) * l.Pitch);
-                // three repeats, all upright, each placed by its bottom edge: one below, one around and one above the camera
+                double cell = System.Math.Floor(scrolled / l.Height);
+                float offset = (float)(scrolled - cell * l.Height);
+                long baseIdx = (long)cell;
                 for (int k = 0; k < l.Tiles.Length; k++)
-                    l.Tiles[k].position = new Vector3(camHalfW, camY - offset + (k - 1) * l.Pitch, 0f);
+                {
+                    // Every other tile is mirrored vertically so neighbouring tiles meet on identical pixels: no visible seam.
+                    bool mirror = (((baseIdx + k - 1) % 2) + 2) % 2 == 1;
+                    l.Tiles[k].transform.localScale = new Vector3(l.Scale, mirror ? -l.Scale : l.Scale, 1f);
+                    float cy = camY - offset + (k - 1) * l.Height;
+                    l.Tiles[k].transform.position = new Vector3(camHalfW, cy + l.Height * 0.5f - camHalfH * 0.0f, 0f);
+                }
             }
         }
 
